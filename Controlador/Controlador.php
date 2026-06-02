@@ -1,6 +1,7 @@
 <?php
 namespace Iteradores\Controlador;
 use Iteradores\Configuracion\Conf;
+use Iteradores\Configuracion\Entorno;
 use Iteradores\Nodos\NodoElectrico;
 use Iteradores\Nucleo\Objeto;
 use Iteradores\Nodos\Nodo;
@@ -201,19 +202,73 @@ class Controlador extends Objeto implements PerdurarSuperestructura {
             Controlador::registrar_implementacion("XML", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringXML");
             Controlador::registrar_implementacion("ESQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL");
             Controlador::establecer_metodo("ESQL");
-            NodoElectrico::establecer_fase(self::$token, "a");
+            NodoElectrico::_fase(self::$token, "a");
             Controlador::$inicializo=true;
             
         }
     }
 
+    // ──────────────────────────────────────────────────────────
+    // MÉTODO PARA PRUEBAS: ejecutarPrueba
+    // ──────────────────────────────────────────────────────────
+
     /**
-     * Auxiliar para hacer pruebas
+     * Ejecuta una función de prueba inyectando el token de seguridad.
+     *
+     * Este método está diseñado exclusivamente para entornos de desarrollo y pruebas.
+     * Permite que código externo (como suites de prueba) pueda invocar operaciones
+     * que requieren el token de seguridad sin necesidad de conocerlo.
+     *
+     * El token se pasa como único argumento a la función callback, la cual puede
+     * usarlo para llamar a métodos protegidos como NodoElectrico::_fase()
+     * o NodoElectrico::por_cada_nodo_ejecutar().
+     *
+     * ⚠️ **ADVERTENCIA**: Este método no debe estar disponible en producción.
+     * Se recomienda envolver su definición condicionalmente:
+     * ```php
+     * if (defined('ENV') && ENV === 'development') {
+     *     public static function ejecutarPrueba(callable $callback) { ... }
+     * }
+     * ```
+     *
+     * 🔗 Métodos relacionados que requieren token:
+     * - {@link Iteradores\Nodos\NodoElectrico::_fase()}
+     * - {@link Iteradores\Nodos\NodoElectrico::por_cada_nodo_ejecutar()}
+     * - {@link Iteradores\Nodos\NodoElectrico::por_cada_fase_ejecutar()}
+     *
+     * ---
+     * @example
+     * ```php
+     * // Ejemplo de uso en test.php
+     * Controlador::ejecutarPrueba(function($token) {
+     *     NodoElectrico::_fase($token, 'fase_test');
+     *     NodoElectrico::por_cada_fase_ejecutar($token, function($fase) {
+     *         echo "Fase: $fase\n";
+     *     });
+     * });
+     * ```
+     *
+     * @param callable $callback Función que recibirá el token como único parámetro.
+     *                           La función debe respetar la firma: `function(string $token): void`.
      * @return void
+     * 
+     * @note Este método solo debe ser usado en entornos de prueba/desarrollo.
+     *       En producción, se recomienda eliminarlo o deshabilitarlo.
+     * @since 0.0.1
+     * @access public
+     * @static
      */
-    public static function establecer_fase($fase){
-        NodoElectrico::establecer_fase(self::$token,$fase);
+    public static function ejecutar_prueba(callable $callback)
+    {
+        // En entorno de desarrollo, se ejecuta; en producción, se podría lanzar una excepción
+        if (!Entorno::permite_pruebas()) {
+            self::_error('ejecutar_prueba() no está disponible en entorno de producción');
+            return;
+        }
+        $callback(self::$token);
     }
+
+
 }
 
 Controlador::inicializar();

@@ -1,44 +1,47 @@
 <?php
+
 namespace Iteradores\Nodos;
+
+use Iteradores\Configuracion\Conf;
 use Iteradores\Nodos\Interfaces\Energia;
-use Iteradores\Nodos\Interfaces\Fase;
 use Iteradores\Nodos\Interfaces\FabricaDeNodosElectricos;
+use Iteradores\Nodos\Interfaces\Fase;
 use Iteradores\Nodos\Interfaces\Incidentes;
 use Iteradores\Nodos\Interfaces\IncidentesDobleVia;
 use Iteradores\Nodos\Nodo;
-use Iteradores\Configuracion\Conf;
 
-include_once("Nodo.php");
-include_once("Interfaces/IncidentesDobleVia.php");
-include_once("Interfaces/FabricaDeNodosElectricos.php");
-include_once("Interfaces/Energia.php");
-include_once("Interfaces/Fase.php");
-/** 
+include_once ('Nodo.php');
+include_once ('Interfaces/IncidentesDobleVia.php');
+include_once ('Interfaces/FabricaDeNodosElectricos.php');
+include_once ('Interfaces/Energia.php');
+include_once ('Interfaces/Fase.php');
+
+/**
  * Clase NodoElectrico
- * 
+ *
  * Todos los enlaces que generen estos nodos seran de "doble via", por eso cada Nodo maneja dos estrucuras
  * internas: adyacentes e incidentes. conteniendo los enlaces de salida y de entrada respectivamente.
- * 
+ *
  * Extiente la clase Nodo implementando FabricaDeNodosElectricos (estatica), Fase, Energia e IncidentesDobleVia.
- * 
+ *
  * ###INTERFACES
- * 
+ *
  * ##FASE
- * Vamos a manejar el concepdo de "fase" o "frecuencia" de trabajo. 
+ * Vamos a manejar el concepdo de "fase" o "frecuencia" de trabajo.
  * Por ahora la fase es simplemente un string con un nombre
- * similar a los nombres de ayacentes, pero generando un plano o 
- * matriz con estos o llave doble (fase, nombre_de_enlace). 
- * Es añadirle una dimencion mas a los adyacentes que ahora trabajaran en un plano. 
- * 
+ * similar a los nombres de ayacentes, pero generando un plano o
+ * matriz con estos o llave doble (fase, nombre_de_enlace).
+ * Es añadirle una dimencion mas a los adyacentes que ahora trabajaran en un plano.
+ *
  * La fase sera concretamente una propiedad ligada a la superestructura y manejada por
  * el controlador. Pero para eso tenemos que tener en la clase nodo (junto a la superestructura)
  * una propiedad privada (o protegida) llamada "fase" con el nombre de la fase en string,
  * de modo que cada instancia de nodo pueda consultarla para saber donde insertar los adyacentes
- * dentro de su (ahora) matris de adyacentes. 
- * 
- * La matris de edyacentes no tendra tamaños prestablecido, sera mas bien un array de arrays 
+ * dentro de su (ahora) matris de adyacentes.
+ *
+ * La matris de edyacentes no tendra tamaños prestablecido, sera mas bien un array de arrays
  * de tamaños variables.
- * 
+ *
  * La mayor complejidad viene a la hora de manejar los incidentes. No alcanza una estructura de dos
  * dimenciones para poder representarlos ya que puede haber coliciones en los nombres de los enlaces.
  * Me explico: supon que tenemos 3 nodos a, b, y c, con a y b apuntando ambos a traves de un enlace
@@ -46,40 +49,40 @@ include_once("Interfaces/Fase.php");
  * incidente, por lo que es necesario agregar una tercera dimencion que podria ser -y lo hacemos asi-
  * el id del nodo incidente. Ver las propiedades privadas (o protegias) adyacentes e incidentes para
  * ver bien la estrucura
- * 
- * 
+ *
+ *
  * ##DINAMICOS
  * Hay que agregar por_cada_fase_ejecutar y establecer_fase
  * ###MODIFIFICACIONES
- * 
+ *
  * ##INTERFAZ ADYACENTES e INCIDENTES
  * hay que reescribir cada funcion de la interfaz "adyacentes" para que cumplan con el nuevo estandar
- * 
+ *
  * ##HISTORIA
- * **V0.0.1:** 
+ * **V0.0.1:**
  * **V0.0.2.251110:** terminada la interfaz Adyacentes y Incidentes vamos a completar toda la clase
  * **V0.0.3.251117:** terminada toda la clase realizo pruebas, probado hasta ahora: todos los crear
  * 					establecer_fase, el sistema de tokens, agregados los imprimir. verificado tambien
  * 					_adyacente y adyacente_en junto con _incidente_en, por_cada_nodo_ejecutar tambien
- * 					funciona. me falta probar los eliminar. Falta _energia. Falta ver que pasa con los 
+ * 					funciona. me falta probar los eliminar. Falta _energia. Falta ver que pasa con los
  * 					guardar sql json y xml.
- * **V0.0.3.251118:** probados tiene_adyacente, tiene_incidente, por_cada_adyacente_ejecutar y 
- * 					por_cada_incidente_ejecutar. 
+ * **V0.0.3.251118:** probados tiene_adyacente, tiene_incidente, por_cada_adyacente_ejecutar y
+ * 					por_cada_incidente_ejecutar.
  * 					agregados _ejecutar_cuando_satura_por_fase y ejecutar_cuando_agota_por_fase
- * 					probados toda la interfaz Energia. echos los imprimir2 faltan los elimina. 
+ * 					probados toda la interfaz Energia. echos los imprimir2 faltan los elimina.
  * 					echo eliminar. falta eliminar autoenlazado, pero lo voy a dejara para dentro
  * 					de un ratito.
  * **V0.0.3.251121:** voy a intentar dar la vuelta final tanto por el lado de php como por el lado de js
  * 					voy a ir comprobando la completitud de cada interfaz y probando su funcionamiento
  * 					ademas de ver que se cree medianamente bien la documentacion.
- * **V0.0.3.251124:** termine y deje prolijo la doc de todos los crear falta los eliminar para terminar la interfaz 
+ * **V0.0.3.251124:** termine y deje prolijo la doc de todos los crear falta los eliminar para terminar la interfaz
  * 					FabricaDeNodosElectricos
- * 
+ *
  * 					FALTAN DOS INTERFACES FABRICADENODOSELECTRICOS Y ENERGIA
- * 	
- * 
- * 					
- * 
+ *
+ *
+ *
+ *
  * @class
  * @author Ignacio David Baigorria
  * @package Iteradores\Nodos
@@ -91,135 +94,166 @@ include_once("Interfaces/Fase.php");
  * @implements Interfaces\Energia
  * @implements Interfaces\Fase
  */
-class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosElectricos, Energia, Fase{
-
-    /**
-     * Manejador de Incidentes
-	 * @var array | array<array<array<NodoElectrico>>>>
-	 * Doble llave para acceder al array de los incidentes:[id del incidente][nombre del encase] 
-     */
-    private $incidentes; 
-
-    /**
-     * Manejador de Salidas
-     * @var 
-     */
-    //private $adyacentes=null;
-    
-    /**
-     * Configuracion Interna
-     * @var 
-     */
-    private $CI=null;
-
-
-    /**********************************************************************************************
-     *  INTERFAZ FASE (ESTATICA)
-     * 
-     *  Propiedad $fase y sus metodos estaticos relacionados
-     **********************************************************************************************/
-
-    /**
-     * Fase de trabajo
-     * @var string
-     */
-    protected static $fase="a";
-    /**
-     * Establece la fase en la que van a trabajar todos los nodos
-     * 
-     * Se necesita acceso autorizado por token
-     * @param string $token autorizacion
-     * @param string $fase nombre de la fase
-     * @return void
-     */
+class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosElectricos, Energia, Fase
+{
 	/**
-	 * Un array con key igual a los nombres de la fases y valor booleanto true si el nombre de fase fue utilizado
-	 * en algun momento
+	 * Manejador de Incidentes
+	 * @var array | array<array<array<NodoElectrico>>>>
+	 * Doble llave para acceder al array de los incidentes:[id del incidente][nombre del encase]
+	 */
+	private $incidentes;
+
+	/**
+	 * Manejador de Salidas
+	 * @var
+	 */
+	// private $adyacentes=null;
+
+	/**
+	 * Configuracion Interna
+	 * @var
+	 */
+	private $CI = null;
+
+	/**********************************************************************************************
+	 *  INTERFAZ FASE (ESTATICA)
+	 **********************************************************************************************/
+
+	/**
+	 * Fase de trabajo actual (global)
+	 * @var string
+	 */
+	protected static $fase = 'a';
+
+	/**
+	 * Historial de fases utilizadas (clave = nombre de fase, valor = true)
 	 * @var array
 	 */
-	protected static $fases=[];
+	protected static $fases = [];
 
-/**
- * Establece la fase de trabajo global para todos los nodos del sistema.
- * 
- * Esta operación es sensible y requiere un token de autorización para ser ejecutada.
- * Una vez establecida, la nueva fase se registra automáticamente en el array
- * interno `self::$fases` para mantener un histórico.
- * 
- * @param string $token Token de autorización para validar la operación.
- * @param string $fase El nombre de la nueva fase a establecer.
- * 
- * @return void
- * 
- * @throws \RuntimeException Si el token no es válido, se muestra una alerta
- *                           y la fase no se cambia.
- * 
- * @example
- * // Cambiar la fase actual a "beta" con el token correcto
- * NodoElectrico::establecer_fase('token_secreto_123', 'beta');
- * 
- * @since 0.0.1
- * @see NodoElectrico::$fase Para acceder a la fase actual.
- * @see NodoElectrico::$fases Para acceder al histórico de fases.
- */
-public static function establecer_fase(string $token, string $fase): void
-{
-    if (self::$token === $token) {
-        self::$fase = $fase;
-        self::$fases[$fase] = true;
-    } else {
-        self::_alerta("INTENTO DE ACCESO NO AUTORIZADO");
-    }
-}
-
-    /**********************************************************************************************
-     *  INTERFAZ FASE (INSTANCIA)
-     * 
-     *  Metodos relacionados con la fase 
-     **********************************************************************************************/
-/**
- * Ejecuta una función callback por cada fase registrada en el sistema.
- * 
- * Este método es fundamental para operaciones que necesitan aplicarse a todas las
- * fases existentes, como por ejemplo, exportar el estado de cada fase a un sistema
- * externo, realizar validaciones globales, o simplemente listar las fases activas.
- * 
- * @param string $token Token de autorización. Debe coincidir con el token interno
- *                      de la clase para prevenir ejecuciones no autorizadas.
- * @param callable $funcion La función que se ejecutará para cada fase. Debe aceptar
- *                          un único parámetro de tipo string (el nombre de la fase)
- *                          y no retorna ningún valor (void).
- * 
- * @return void
- * 
- * @throws \RuntimeException Si el token es inválido, se detiene la ejecución
- *                           mostrando una alerta de seguridad.
- * 
- * @example
- * // Ejemplo de uso para listar todas las fases del sistema
- * $miNodo->por_cada_fase_ejecutar($tokenSeguro, function($nombreFase) {
- *     echo "Procesando fase: " . $nombreFase . "\n";
- * });
- * 
- * @since 0.0.1
- * @see NodoElectrico::establecer_fase() Para entender cómo se registran las fases.
- */
-public function por_cada_fase_ejecutar(string $token, callable $funcion): void
-{
-    // Verificación de seguridad: el token debe coincidir
-    if (self::$token !== $token) {
-        self::_alerta("INTENTO DE ACCESO NO AUTORIZADO");
-        return;
-    }
-    
-    // Itera sobre el array de fases registradas y ejecuta el callback
-    // Nota: self::$fases es un array donde la clave es el nombre de la fase.
-    foreach (self::$fases as $fase => $usada) {
-        $funcion($fase);
-    }
-}
 	/**
-	 * Constructor de la clase Nodo 
+	 * Establece la fase global en la que trabajan todos los nodos.
+	 * Requiere token de autorización.
+	 *
+	 * @param string $token Token de autorización
+	 * @param string $fase  Nombre de la nueva fase (no vacío)
+	 * @return void
+	 *
+	 * @example
+	 * NodoElectrico::_fase($token, 'beta');
+	 */
+	public static function _fase(string $token, string $fase): void
+	{
+		
+		if (self::$token === $token) {
+			self::$fase = $fase;
+			self::$fases[$fase] = true;
+		} else {
+			self::_alerta('INTENSO DE ACCESO NO AUTORIZADO');
+		}
+	}
+
+	/**
+	 * Devuelve la fase global actual (sin necesidad de token).
+	 *
+	 * @return string
+	 */
+	public static function fase(): string
+	{
+		return self::$fase;
+	}
+
+	/**
+	 * Ejecuta una función por cada fase registrada en el sistema (global).
+	 * Este método es estático y recorre TODAS las fases que se hayan usado alguna vez.
+	 *
+	 * Requiere token de seguridad.
+	 *
+	 * @param string   $token   Token de autorización
+	 * @param callable $funcion Función que recibe (string $fase)
+	 * @return void
+	 * @since V1.2.6
+	 * @example
+	 * NodoElectrico::por_cada_fase_global_ejecutar($token, function($fase) {
+	 *     echo "Fase global: $fase\n";
+	 * });
+	 */
+	public static function por_cada_fase_global_ejecutar(string $token, callable $funcion): void
+	{
+		if (self::$token !== $token) {
+			self::_alerta('INTENTO DE ACCESO NO AUTORIZADO');
+			return;
+		}
+
+		foreach (self::$fases as $fase => $usada) {
+			$funcion($fase);
+		}
+	}
+
+	/**********************************************************************************************
+	 *  INTERFAZ FASE (INSTANCIA)
+	 **********************************************************************************************/
+
+	/**
+	 * Ejecuta una función por cada fase en la que el nodo actual tiene actividad
+	 * (es decir, tiene al menos un adyacente o un incidente en esa fase).
+	 *
+	 * Requiere token de seguridad.
+	 *
+	 * @param string   $token   Token de autorización
+	 * @param callable $funcion Función que recibe (string $fase)
+	 * @return void
+	 *
+	 * @example
+	 * $nodo->por_cada_fase_ejecutar($token, function($fase) {
+	 *     echo "El nodo tiene actividad en: $fase\n";
+	 * });
+	 */
+	public function por_cada_fase_ejecutar(string $token, callable $funcion): void
+	{
+		if (self::$token !== $token) {
+			self::_alerta('INTENTO DE ACCESO NO AUTORIZADO');
+			return;
+		}
+
+		$fases_unicas = [];
+
+		// Recorrer adyacentes: estructura $this->adyacentes[fase][enlace] = Nodo
+		if (is_array($this->adyacentes)) {
+			foreach (array_keys($this->adyacentes) as $fase) {
+				if (!empty($this->adyacentes[$fase])) {
+					$fases_unicas[$fase] = true;
+				}
+			}
+		}
+
+		// Recorrer incidentes: estructura $this->incidentes[idNodo][fase][enlace] = Nodo
+		if (is_array($this->incidentes)) {
+			foreach ($this->incidentes as $fases_por_nodo) {
+				if (is_array($fases_por_nodo)) {
+					foreach (array_keys($fases_por_nodo) as $fase) {
+						if (!empty($fases_por_nodo[$fase])) {
+							$fases_unicas[$fase] = true;
+						}
+					}
+				}
+			}
+		}
+
+		// Ejecutar callback para cada fase única
+		foreach (array_keys($fases_unicas) as $fase) {
+			$funcion($fase);
+		}
+	}
+
+	/******************************************************************************************
+	 * Interfaz FabricaDeNodosElectricos
+	 * 
+	 * 
+	 ******************************************************************************************/
+
+	/**
+	 * Constructor de la clase Nodo
 	 *
 	 * Construcción y destrucción (FabricaDeNodos)
 	 * Caso de uso: Crea internamente un nodo
@@ -230,7 +264,8 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 *
 	 * @return Nodo
 	 */
-	protected function __construct() {
+	protected function __construct()
+	{
 		self::$cant++;
 	}
 
@@ -246,35 +281,39 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 *
 	 * @return void
 	 */
-	function __destruct() {
+	function __destruct()
+	{
 		self::$cant--;
-		echo "</br>destruccion!</br>";
+		echo '</br>destruccion!</br>';
 	}
+
+
+
 	/**
 	 * Crea una nueva instancia de vacia de NodoElectrico (Interfaz FabricaDeNodosElectricos)
 	 *
 	 * 🔗 Interfaz:
-	 * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodosElectricos.html FabricaDeNodosElectricos}	 
-	 * 
-	 * El constructor de la clase es privado, con lo que se asegura que las instancias 
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodosElectricos.html FabricaDeNodosElectricos}
+	 *
+	 * El constructor de la clase es privado, con lo que se asegura que las instancias
 	 * no puedan crearse de forma directa desde el exterior, por lo que éste método es una
 	 * de las formas válidas de crear nodos.
-	 * 
+	 *
 	 * Redefino en la clase hija NodoElectrico y como el resto de los crear tendra dos parametros
 	 * extra: $capacidad y $fuga, si no se les asigna ningun valor se les asignara el valo por defecto
 	 * (ver:{@link ./classes/Iteradores-Configuracion-Conf.html#constant_CAPACIDAD_NODO_ELECTRICO Conf::CAPACIDAD_NODO_ELECTRICO}
 	 *  y {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO})
-	 * 
+	 *
 	 * 🔗 Otros métodos de creacion que se pueden usar son:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_id crear_con_id()}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato crear_con_dato()}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato_e_id crear_con_dato_e_id()}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_nodo nodo()}
-	 * 
+	 *
 	 * ---
 	 * 🔗 Otros métodos relacionados
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar eliminar()}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_nodos Nodo::cantidad_de_nodos()}  
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_nodos Nodo::cantidad_de_nodos()}
 	 *
 	 * ---
 	 * Ejemplo de uso en un script PHP
@@ -286,50 +325,51 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * // Salida esperada: 2
 	 * ```
 	 * @static
-	 * @param int $capacidad Opcional. Capacidad maxima de energia del nodo. El valor por defecto se configura desde: 
+	 * @param int $capacidad Opcional. Capacidad maxima de energia del nodo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_CAPACIDAD_NODO_ELECTRICO Conf::CAPACIDAD_NODO_ELECTRICO}.
-	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde: 
+	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO}.
 	 * @return NodoElectrico Una nueva instancia de la clase {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico}.
 	 *
 	 * @note Este método incrementa el contador estático de nodos
-	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant Nodo::$cant}), 
+	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant Nodo::$cant}),
 	 * 		 y lo agrega a la Superestructura
 	 *       lo cual permite llevar un registro global de Nodos.
-	 *
 	 */
-	public static function crear(int $capacidad=Conf::CAPACIDAD_NODO_ELECTRICO, float $fuga=Conf::FUGA_NODO_ELECTRICO): NodoElectrico{
-		$nodo= parent::crear();
-		$nodo->fuga=$fuga;
-		$nodo->capacidad=$capacidad;
+	public static function crear(int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, float $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico
+	{
+		$nodo = parent::crear();
+		$nodo->fuga = $fuga;
+		$nodo->capacidad = $capacidad;
 		return $nodo;
 	}
+
 	/**
 	 * Crear un nuevo nodo encapsulando el dato recibido (Interfaz FabricaDeNodosElectricos).
 	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodosElectricos.html FabricaDeNodosElectricos}
-	 * 
-	 * Este método crea una nueva instancia de la clase Nodo a partir de un dato cualquiera.  
+	 *
+	 * Este método crea una nueva instancia de la clase Nodo a partir de un dato cualquiera.
 	 * El dato no es procesado ni verificado: se encapsula directamente en el nodo, lo que lo hace
-	 * muy flexible tanto para valores primitivos como complejos. Incluso se pueden encapusalar 
+	 * muy flexible tanto para valores primitivos como complejos. Incluso se pueden encapusalar
 	 * otros nodos!.
 	 *
-	 * El constructor de la clase es privado, con lo que se asegura que las instancias 
+	 * El constructor de la clase es privado, con lo que se asegura que las instancias
 	 * no puedan crearse de forma directa desde el exterior, por lo que éste método es una
 	 * de las formas válidas de crear nodos.
-	 * 
+	 *
 	 * Redefino en la clase hija NodoElectrico y como el resto de los crear tendra dos parametros
 	 * extra: $capacidad y $fuga, si no se les asigna ningun valor se les asignara el valo por defecto
 	 * (ver:{@link ./classes/Iteradores-Configuracion-Conf.html#constant_CAPACIDAD_NODO_ELECTRICO Conf::CAPACIDAD_NODO_ELECTRICO}
 	 *  y {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO})
-	 * 
+	 *
 	 * 🔗 Otros métodos de creacion que se pueden usar son:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear crear()}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_id crear_con_id()}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato_e_id crear_con_dato_e_id()}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_nodo nodo()}
-	 * 
+	 *
 	 * ---
 	 * 🔗 Métodos relacionados:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar eliminar()}
@@ -342,34 +382,35 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * echo $nodo->dato(); // Devuelve: "Hola Mundo"
 	 * ```
 	 * @note Este método incrementa el contador estático de nodos
-	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant Nodo::$cant}), 
+	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant Nodo::$cant}),
 	 * 		 y lo agrega a la Superestructura
 	 *       lo cual permite llevar un registro global de Nodos.
 	 * @static
 	 * @param mixed $dato Valor a encapsular en el nuevo nodo.
 	 * @param boolean $todos lo dejo por compatibilidad pero en cualquier momento lo borro
-	 * @param int $capacidad Opcional. Capacidad maxima de energia del nodo. El valor por defecto se configura desde: 
+	 * @param int $capacidad Opcional. Capacidad maxima de energia del nodo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_CAPACIDAD_NODO_ELECTRICO Conf::CAPACIDAD_NODO_ELECTRICO}.
-	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde: 
+	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO}.
 	 * @return NodoElectrico Una nueva instancia de la clase {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico}.
-	 *
 	 */
-	public static function crear_con_dato($dato, $todos = false, $capacidad=Conf::CAPACIDAD_NODO_ELECTRICO, $fuga=Conf::FUGA_NODO_ELECTRICO):NodoElectrico{
-		$nodo=parent::crear_con_dato($dato, $todos);
-		$nodo->capacidad=$capacidad;
-		$nodo->fuga=$fuga;
+	public static function crear_con_dato($dato, $todos = false, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico
+	{
+		$nodo = parent::crear_con_dato($dato, $todos);
+		$nodo->capacidad = $capacidad;
+		$nodo->fuga = $fuga;
 		return $nodo;
 	}
+
 	/**
 	 * Crear un nuevo nodo asignándole un identificador válido (Interfaz FabricaDeNodosElectricos).
 	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodosElectricos.html FabricaDeNodosElectricos}
 	 *
-	 * Este método permite crear un nodo directamente a partir de un identificador.  
+	 * Este método permite crear un nodo directamente a partir de un identificador.
 	 * Antes de instanciar el nodo, el identificador es evaluado mediante el método
-	 * `{@link ./classes/Iteradores-Nucleo-Objeto.html#method_es_id_especial es_id_especial(id)}` 
+	 * `{@link ./classes/Iteradores-Nucleo-Objeto.html#method_es_id_especial es_id_especial(id)}`
 	 * definido en la clase Objeto, garantizando que cumple con los
 	 * criterios internos de validez. Si el identificador no supera la verificación,
 	 * el nodo no será creado y se deberá manejar el error en consecuencia.
@@ -381,7 +422,7 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * extra: $capacidad y $fuga, si no se les asigna ningun valor se les asignara el valo por defecto
 	 * (ver:{@link ./classes/Iteradores-Configuracion-Conf.html#constant_CAPACIDAD_NODO_ELECTRICO Conf::CAPACIDAD_NODO_ELECTRICO}
 	 *  y {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO})
-	 * 
+	 *
 	 * ---
 	 * 🔗 Otros métodos de creación:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear crear()}
@@ -403,43 +444,44 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * ```
 	 *
 	 * @note Este método incrementa el contador estático de nodos
-	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant Nodo::$cant}) 
+	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant Nodo::$cant})
 	 *       y lo agrega a la Superestructura.
 	 *
 	 * @static
 	 * @param mixed $id Identificador a asignar al nuevo nodo (debe ser único y *especial*).
-	 * @param int $capacidad Opcional. Capacidad maxima de energia del nodo. El valor por defecto se configura desde: 
+	 * @param int $capacidad Opcional. Capacidad maxima de energia del nodo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_CAPACIDAD_NODO_ELECTRICO Conf::CAPACIDAD_NODO_ELECTRICO}.
-	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde: 
+	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO}.
 	 * @return NodoElectrico|null Instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico} con el identificador *especial* en caso de exito, null en caso contrario.
 	 */
-	public static function crear_con_id($id, $capacidad=Conf::CAPACIDAD_NODO_ELECTRICO, $fuga=Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null{
-		$nodo=parent::crear_con_id($id);
-		$nodo->capacidad=$capacidad;
-		$nodo->fuga=$fuga;
+	public static function crear_con_id($id, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null
+	{
+		$nodo = parent::crear_con_id($id);
+		$nodo->capacidad = $capacidad;
+		$nodo->fuga = $fuga;
 		return $nodo;
 	}
 
-		/**
+	/**
 	 * Crear un nuevo nodo encapsulando un dato y asignándole un identificado *especial* (Interfaz FabricaDeNodosElectricos).
 	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodosElectricos.html FabricaDeNodosElectricos}
 	 *
-	 * Este método combina las capacidades de {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato crear_con_dato()}  
-	 * y {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_id crear_con_id()}.  
+	 * Este método combina las capacidades de {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato crear_con_dato()}
+	 * y {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_id crear_con_id()}.
 	 * Permite instanciar un nodo con un valor cualquiera (primitivo, complejo u otro nodo) y a la vez asignarle
-	 * un identificador único *especial* que debe pasar la validación de 
+	 * un identificador único *especial* que debe pasar la validación de
 	 * {@link ./classes/Iteradores-Nucleo-Objeto.html#method_es_id_especial es_id_especial()}.
 	 *
 	 * El constructor de la clase Nodo es privado, de modo que esta función constituye una de las formas válidas de creación de nodos.
-	 * 
+	 *
 	 * Redefino en la clase hija NodoElectrico y como el resto de los crear tendra dos parametros
 	 * extra: $capacidad y $fuga, si no se les asigna ningun valor se les asignara el valo por defecto
 	 * (ver:{@link ./classes/Iteradores-Configuracion-Conf.html#constant_CAPACIDAD_NODO_ELECTRICO Conf::CAPACIDAD_NODO_ELECTRICO}
 	 *  y {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO})
-	 * 
+	 *
 	 * ---
 	 * 🔗 Otros métodos de creación:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear crear()}
@@ -452,7 +494,7 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar eliminar()}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_nodos cantidad_de_nodos()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_es_especial es_especial()}
-	 * 
+	 *
 	 * ---
 	 * Ejemplo de uso:
 	 * ```php
@@ -462,24 +504,24 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * ```
 	 *
 	 * @note Este método incrementa el contador estático de nodos
-	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant Nodo::$cant}), 
+	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant Nodo::$cant}),
 	 *       y lo registra en la Superestructura para un seguimiento global.
 	 *
 	 * @static
 	 * @param mixed $dato Valor a encapsular en el nodo.
 	 * @param mixed $id Identificador del nodo (debe pasar verificación).
-	 * @param int $capacidad Opcional. Capacidad maxima de energia del nodo. El valor por defecto se configura desde: 
+	 * @param int $capacidad Opcional. Capacidad maxima de energia del nodo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_CAPACIDAD_NODO_ELECTRICO Conf::CAPACIDAD_NODO_ELECTRICO}.
-	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde: 
+	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO}.
-	 * @return NodoElectrico|null Instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico} con dato 
+	 * @return NodoElectrico|null Instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico} con dato
 	 * e identificador *especial* en caso de exito, null en caso contrario.
-	 *
 	 */
-	public static function crear_con_dato_e_id($dato, $id, $capacidad=Conf::CAPACIDAD_NODO_ELECTRICO, $fuga=Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null{
-		$nodo=parent::crear_con_dato_e_id($dato,$id);
-		$nodo->capacidad=$capacidad;
-		$nodo->fuga=$fuga;
+	public static function crear_con_dato_e_id($dato, $id, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null
+	{
+		$nodo = parent::crear_con_dato_e_id($dato, $id);
+		$nodo->capacidad = $capacidad;
+		$nodo->fuga = $fuga;
 		return $nodo;
 	}
 
@@ -490,22 +532,22 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodosElectricos.html FabricaDeNodosElectricos}
 	 *
 	 * Este método recibe un valor cualquiera (o ninguno) o un posible nodo y asegura que el resultado final
-	 * sea siempre una instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html Nodo}.  
+	 * sea siempre una instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html Nodo}.
 	 * - Si no recibe ningun parámetro crea un Nodo vacío totalmente válido
 	 * - Si el parámetro recibido **ya es un Nodo**, simplemente lo retorna y marca la variable
-	 *   de referencia `$es_nodo` como `true`.  
-	 * - Si el parámetro **no es un Nodo**, crea uno nuevo con 
-	 *   {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato crear_con_dato()}, 
-	 *   lo retorna y establece `$es_nodo` como `false`.  
+	 *   de referencia `$es_nodo` como `true`.
+	 * - Si el parámetro **no es un Nodo**, crea uno nuevo con
+	 *   {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato crear_con_dato()},
+	 *   lo retorna y establece `$es_nodo` como `false`.
 	 * - Si no se pasa ningún valor en el parámetro `$elemento`, crea un nodo vacío totalmente valido
-	 *   encapsulando `null`.  
+	 *   encapsulando `null`.
 	 *
 	 * Este método es especialmente útil cuando se procesan entradas heterogéneas, ya que garantiza
 	 * que siempre se trabaje con un Nodo válido sin tener que comprobarlo manualmente.
 	 *
- 	 * El constructor de la clase Nodo es privado, de modo que esta función constituye una de las
+	 * El constructor de la clase Nodo es privado, de modo que esta función constituye una de las
 	 * formas válidas de creación de nodos.
-	 * 
+	 *
 	 * Redefino en la clase hija NodoElectrico y como el resto de los crear tendra dos parametros
 	 * extra: $capacidad y $fuga, si no se les asigna ningun valor se les asignara el valo por defecto
 	 * (ver:{@link ./classes/Iteradores-Configuracion-Conf.html#constant_CAPACIDAD_NODO_ELECTRICO Conf::CAPACIDAD_NODO_ELECTRICO}
@@ -522,151 +564,153 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * 🔗 Otros métodos relacionados:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar eliminar()}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_nodos cantidad_de_nodos()}
-	 * 
+	 *
 	 * ---
 	 * Ejemplo de uso
 	 * ```php
-	 * // Caso 0: se llama sin ningun parametro(crea nodo vacio completamente valido): 
+	 * // Caso 0: se llama sin ningun parametro(crea nodo vacio completamente valido):
 	 * $nodo0= Nodo::nodo();
-     * echo $nodo0->dato(); // 
-     * echo $nodo0->id(); //0
-	 * 
-     * // Caso 1: se le pasa un parámetro no Nodo (crea un nodo con el dato pasado por parametro)
-     * $nodo1=Nodo::nodo("Soy el nodo 1");
-     * echo $nodo1->dato(); // "Soy el nodo 1"
-     * echo $nodo1->id();//1
-	 * 
-     * // Caso 2: se le pasa un parametro que es un nodo (no crea ningun nodo, devuelve el mismo nodo)
-     * $nodo2=Nodo::nodo($nodo1);
-     * echo $nodo2->dato(); // "soy el nodo 1"
-     * echo $nodo2->id(); //1
-	 * 
-     * // Caso 3: se le pasa un parametro no Nodo y un segundo parametro por referencia (crea una 
-	 * //nueva instancia de Nodo con el dato pasado en el primer parametro. Además asigna un valor 
+	 * echo $nodo0->dato(); //
+	 * echo $nodo0->id(); //0
+	 *
+	 * // Caso 1: se le pasa un parámetro no Nodo (crea un nodo con el dato pasado por parametro)
+	 * $nodo1=Nodo::nodo("Soy el nodo 1");
+	 * echo $nodo1->dato(); // "Soy el nodo 1"
+	 * echo $nodo1->id();//1
+	 *
+	 * // Caso 2: se le pasa un parametro que es un nodo (no crea ningun nodo, devuelve el mismo nodo)
+	 * $nodo2=Nodo::nodo($nodo1);
+	 * echo $nodo2->dato(); // "soy el nodo 1"
+	 * echo $nodo2->id(); //1
+	 *
+	 * // Caso 3: se le pasa un parametro no Nodo y un segundo parametro por referencia (crea una
+	 * //nueva instancia de Nodo con el dato pasado en el primer parametro. Además asigna un valor
 	 * //booleano al segundo parámetro para que se pueda verificar si el primer parametro era un Nodo o no.
 	 * $esNodo=null;
-     * $nodo3 = Nodo::Nodo("soy nodo 3", $esNodo);
-     * if ($esNodo){
-     *    echo "el parametro de entrada era un nodo";
-     * }else{
-     *    echo "el parametro de entrada no era un nodo"; // Imprime esto
-     * }
-     * echo $nodo3->id();//2
-	 * 
-     * // Caso 4: se le pasa un parametro Nodo y un segundo parametro por referencia (crea una 
-	 * //nueva instancia de Nodo con el dato pasado en el primer parametro. Además asigna un valor 
+	 * $nodo3 = Nodo::Nodo("soy nodo 3", $esNodo);
+	 * if ($esNodo){
+	 *    echo "el parametro de entrada era un nodo";
+	 * }else{
+	 *    echo "el parametro de entrada no era un nodo"; // Imprime esto
+	 * }
+	 * echo $nodo3->id();//2
+	 *
+	 * // Caso 4: se le pasa un parametro Nodo y un segundo parametro por referencia (crea una
+	 * //nueva instancia de Nodo con el dato pasado en el primer parametro. Además asigna un valor
 	 * //booleano al segundo parámetro para que se pueda verificar si el primer parametro era un Nodo o no.
 	 * $esNodo=null;
-     * $nodo3 = Nodo::Nodo($nodo3, $esNodo);
-     * if ($esNodo){
-     *    echo "el parametro de entrada era un nodo"; // Imprime esto
-     * }else{
-     *    echo "el parametro de entrada no era un nodo"; 
-     * }
-     * echo $nodo3->id();//2
+	 * $nodo3 = Nodo::Nodo($nodo3, $esNodo);
+	 * if ($esNodo){
+	 *    echo "el parametro de entrada era un nodo"; // Imprime esto
+	 * }else{
+	 *    echo "el parametro de entrada no era un nodo";
+	 * }
+	 * echo $nodo3->id();//2
 	 * ```
 	 *
 	 * @static
-	 * @param mixed $elemento Valor a encapsular o nodo existente.  
-	 *                        Si es `null`, se crea un nodo vacío válido.  
-	 * @param bool|null &$es_nodo Parámetro de salida por referencia.  
+	 * @param mixed $elemento Valor a encapsular o nodo existente.
+	 *                        Si es `null`, se crea un nodo vacío válido.
+	 * @param bool|null &$es_nodo Parámetro de salida por referencia.
 	 *                            Devuelve `true` si `$elemento` ya era un nodo, `false` en caso contrario.
-	 * @param int $capacidad Opcional. Capacidad maxima de energia del nodo. El valor por defecto se configura desde: 
+	 * @param int $capacidad Opcional. Capacidad maxima de energia del nodo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_CAPACIDAD_NODO_ELECTRICO Conf::CAPACIDAD_NODO_ELECTRICO}.
-	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde: 
+	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO}.
-	 * @return NodoElectrico Instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico} 
+	 * @return NodoElectrico Instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico}
 	 *
 	 * @since V2.9.3
 	 */
-	public static function nodo($elemento=null, &$es_nodo=null, $capacidad=Conf::CAPACIDAD_NODO_ELECTRICO, $fuga=Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null{
-		$nodo=parent::nodo($elemento,$es_nodo);
-		if (!$es_nodo){
-			$nodo->capacidad=$capacidad;
-			$nodo->fuga=$fuga;
+	public static function nodo($elemento = null, &$es_nodo = null, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null
+	{
+		$nodo = parent::nodo($elemento, $es_nodo);
+		if (!$es_nodo) {
+			$nodo->capacidad = $capacidad;
+			$nodo->fuga = $fuga;
 		}
 		return $nodo;
 	}
 
-	    /**
-     * Elimina un nodo tatalmente del sistema (Interfaz FabricaDeNodosElectricos)
-	 * 
-     * 🔗 Interfaz:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodoElectricos.html FabricaDeNodosElectricos}
-	 * 
+	/**
+	 * Elimina un nodo tatalmente del sistema (Interfaz FabricaDeNodosElectricos)
+	 *
+	 * 🔗 Interfaz:
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodoElectricos.html FabricaDeNodosElectricos}
+	 *
 	 * Este método intenta eliminar el nodo, incluyendo de la superestructura
-     * y de los nodos especiales (si corresponde). Devuelve `true` en
- 	 * caso de éxito.
-     *
+	 * y de los nodos especiales (si corresponde). Devuelve `true` en
+	 * caso de éxito.
+	 *
 	 * ⚠️ Condición imprescindible: el nodo no debe tener enlaces hacia el
 	 * incluso si provienen desde sí mismo. Si existen, la operación devuelve `false` y lanza
-	 * un error.  
-     *
-     * ---
-     * 🔗 Métodos de creación relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear crear()}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato crear_con_dato()}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_id crear_con_id()}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato_e_id crear_con_dato_e_id()}
+	 * un error.
+	 *
+	 * ---
+	 * 🔗 Métodos de creación relacionados:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear crear()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato crear_con_dato()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_id crear_con_id()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato_e_id crear_con_dato_e_id()}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_nodo nodo()}
-	 * 
+	 *
 	 * 🔗 Otros métodos relacionados:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar eliminar()}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_nodos cantidad_de_nodos()}
-     *
-	 * --- 
+	 *
+	 * ---
 	 * ⚠️ Nota importante sobre PHP:
 	 * - Si se invoca `eliminar($nodo);` y luego se usa `$nodo->dato()`,
 	 *   la llamada seguirá funcionando, salvo que se haga también
 	 *   `unset($nodo);` fuera de la función.
 	 * - Un `unset` dentro de `eliminar()` solo borraria la referencia local,
-	 *   no afecta la referencia externa.  
+	 *   no afecta la referencia externa.
 	 * - El destructor `__destruct()` se ejecuta únicamente cuando la **última
 	 *   referencia** al objeto desaparece.
-	 * 
-     * ---
-     * Ejemplo de uso:
-     * ```php
-     * // Crear un nodo
-     * $nodo = Nodo::crear_con_dato("Eliminarme");
-     *
-     * // Eliminar el nodo
-     * $resultado = Nodo::eliminar($nodo);
-     * var_dump($resultado); // true
-     *
-     * // Intentar eliminar un nodo con referencias
-     * $nodoA = Nodo::crear_con_dato("A");
-     * $nodoB = Nodo::crear_con_dato("B");
-     * $nodoA->_adyacente($nodoB);
-     * var_dump(Nodo::eliminar($nodoB)); // false
-     * ```
-     *
-     * @static
-     * @param NodoElectrico $nodo Nodo a eliminar.
-     * @return bool `true` si fue eliminado, `false` si no pudo eliminarse,
-     *                   `null` si el parámetro no es válido.
-     */
-	public static function eliminar($nodo): bool|null {
-	// Validación del parámetro: debe ser instancia de Nodo
+	 *
+	 * ---
+	 * Ejemplo de uso:
+	 * ```php
+	 * // Crear un nodo
+	 * $nodo = Nodo::crear_con_dato("Eliminarme");
+	 *
+	 * // Eliminar el nodo
+	 * $resultado = Nodo::eliminar($nodo);
+	 * var_dump($resultado); // true
+	 *
+	 * // Intentar eliminar un nodo con referencias
+	 * $nodoA = Nodo::crear_con_dato("A");
+	 * $nodoB = Nodo::crear_con_dato("B");
+	 * $nodoA->_adyacente($nodoB);
+	 * var_dump(Nodo::eliminar($nodoB)); // false
+	 * ```
+	 *
+	 * @static
+	 * @param NodoElectrico $nodo Nodo a eliminar.
+	 * @return bool `true` si fue eliminado, `false` si no pudo eliminarse,
+	 *                   `null` si el parámetro no es válido.
+	 */
+	public static function eliminar($nodo): bool|null
+	{
+		// Validación del parámetro: debe ser instancia de Nodo
 		if (!($nodo instanceof static)) {
-			static::_error("el parámetro no es de la clase Nodo");
+			static::_error('el parámetro no es de la clase Nodo');
 			return null;
 		}
 
 		// Caso 1: El nodo solo tiene 0 referencia
 		if ($nodo->referencias === 0) {
 			// Se elimina de la superestructura y nodos especiales
-			$enlace=$nodo->id();
+			$enlace = $nodo->id();
 			unset(Nodo::$superestructura[$enlace]);
 			unset(Nodo::$nodos_especiales[$enlace]);
 			// Si el nodo tiene adyacentes, reducir la referencia de cada uno
-			if ($nodo->adyacentes!==null) {
-				foreach ($nodo->adyacentes as $fase=>$adyacentes) {//recorro las fases
-					if ($adyacentes!==null){
-						foreach ($adyacentes as $enlace2=>$nodo2){
-							echo "**n";
+			if ($nodo->adyacentes !== null) {
+				foreach ($nodo->adyacentes as $fase => $adyacentes) {  // recorro las fases
+					if ($adyacentes !== null) {
+						foreach ($adyacentes as $enlace2 => $nodo2) {
+							echo '**n';
 							unset($nodo2->incidentes[$fase][$enlace2]);
-							//$nodo2->eliminar_incidente($enlace2, $fase);
+							// $nodo2->eliminar_incidente($enlace2, $fase);
 							$nodo2->referencias--;
 							unset($nodo->adyacentes[$fase][$enlace2]);
 						}
@@ -674,119 +718,122 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 					unset($nodo->adyacentes[$fase]);
 				}
 			}
-		//	$nodo->imprimir();
+			//	$nodo->imprimir();
 			unset($nodo);
 			return true;
 		}
 		// Caso 3: El nodo tiene más referencias → no se puede eliminar
-		static::_error("debe eliminar todos los enlaces que enlazan hacia el nodo antes de intentar eliminarlo ");
+		static::_error('debe eliminar todos los enlaces que enlazan hacia el nodo antes de intentar eliminarlo ');
 		return false;
 	}
 
-    /**
+	/**
 	 * Elimina un nodo que solo tiene autoenlaces (Interfaz FabricaDeNodosElectricos)
-	 * 
-     * 🔗 Interfaz:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodosElectricos.html FabricaDeNodosElectricos}
-	 * 
+	 *
+	 * 🔗 Interfaz:
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodosElectricos.html FabricaDeNodosElectricos}
+	 *
 	 * Elimina un nodo que solo tiene autoenlaces (enlaces hacia sí mismo).
-	 * 
-     * ⚠️ **Este método está obsoleto**:
-     * 
-     * Ya no corresponde a la responsabilidad de la clase manejar la eliminación de autoenlaces.
-     * El programador debe asegurarse de limpiar manualmente todos los enlaces —incluyendo los
-     * autoenlaces— antes de invocar el 
-     * {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar 
-     * método de eliminación estándar}.
-	 * 
-	 * Si el nodo tiene autoenlaces pueden eliminarse usando el metodo 
-	 * {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente() eliminar_adyacente} 
+	 *
+	 * ⚠️ **Este método está obsoleto**:
+	 *
+	 * Ya no corresponde a la responsabilidad de la clase manejar la eliminación de autoenlaces.
+	 * El programador debe asegurarse de limpiar manualmente todos los enlaces —incluyendo los
+	 * autoenlaces— antes de invocar el
+	 * {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar
+	 * método de eliminación estándar}.
+	 *
+	 * Si el nodo tiene autoenlaces pueden eliminarse usando el metodo
+	 * {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente() eliminar_adyacente}
 	 * que elimina los enlaces uno por uno; o el metodo
 	 * {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes() eliminar_adyacentes}
 	 * que elimina todos los enlaces que salen del nodo, incluyendo los que apuntan a sí mismo
-	 * 
-     * @deprecated Este metodo ya no debe usarse
+	 *
+	 * @deprecated Este metodo ya no debe usarse
 	 * @static
-     * @param NodoElectrico $nodo Nodo a eliminar.
-     * @return bool|null Devuelve true si se eliminó, false si no fue posible, o null si el parámetro no es válido.
-     */
-	static public function eliminar_autoenlazado($nodo) {//VOY POR ACA
+	 * @param NodoElectrico $nodo Nodo a eliminar.
+	 * @return bool|null Devuelve true si se eliminó, false si no fue posible, o null si el parámetro no es válido.
+	 */
+	static public function eliminar_autoenlazado($nodo)
+	{  // VOY POR ACA
 		if (!($nodo instanceof NodoElectrico)) {
-			static::_error("el parámetro no es de la clase NodoElectrico");
+			static::_error('el parámetro no es de la clase NodoElectrico');
 			return null;
 		}
 
 		// Contar enlaces que apuntan al mismo nodo (autoenlaces)
 		$contauto = 0;
-		$contcomunes=0;
+		$contcomunes = 0;
 		$id = $nodo->id();
-		if ($nodo->adyacentes!==null) {
-			foreach ($nodo->adyacentes as $fase=>$adyacentes2) {//recorro cada fase
-				if ($adyacentes2!==null){
-					foreach ($adyacentes2 as $enlace2=>$nodo2){
+		if ($nodo->adyacentes !== null) {
+			foreach ($nodo->adyacentes as $fase => $adyacentes2) {  // recorro cada fase
+				if ($adyacentes2 !== null) {
+					foreach ($adyacentes2 as $enlace2 => $nodo2) {
 						if ($id === $nodo2->id()) {
 							$contauto++;
-						}else{
-							$contcomunes++; //cuenta enlaces comunes, si tiene algun enlace no cumple lo de autoenlazado
+						} else {
+							$contcomunes++;  // cuenta enlaces comunes, si tiene algun enlace no cumple lo de autoenlazado
 						}
 					}
 				}
 			}
 		}
 
-	// Calcular referencias externas (descontando autoenlaces)
+		// Calcular referencias externas (descontando autoenlaces)
 		$numref = $nodo->referencias - $contauto;
-		
-		if ($numref === 0 && $contcomunes===0 ) {
+
+		if ($numref === 0 && $contcomunes === 0) {
 			// Caso normal
-			//Nodo::$superestructura->eliminar_adyacente($id);
+			// Nodo::$superestructura->eliminar_adyacente($id);
 			unset(Nodo::$superestructura[$id]);
 			unset(Nodo::$nodos_especiales[$id]);
 			return true;
-		} /*elseif ($numref === 2 && $nodo->es_especial()) {
-			// Caso nodo especial
-			Nodo::$superestructura->eliminar_adyacente($id);
-			Nodo::$nodos_especiales->eliminar_adyacente($id);
-			return true;
-		}*/
+		}  /*elseif ($numref === 2 && $nodo->es_especial()) {
+			 // Caso nodo especial
+			 Nodo::$superestructura->eliminar_adyacente($id);
+			 Nodo::$nodos_especiales->eliminar_adyacente($id);
+			 return true;
+		 }*/
 
 		// No cumple condiciones para eliminar
 		return false;
-	}	
-    /**********************************************************************************************
-     *  INTERFAZ ADYACENTES (INSTANCIA)
-     * 
-     *  Reemplazo de los metodos existentes
-     **********************************************************************************************/
-   /**
+	}
+
+	/***************************************************************************************
+	 * INTERFAZ ADYACENTES (INSTANCIA)
+	 *
+	 *  Reemplazo de los metodos existentes
+	 **************************************************************************************/
+
+	/**
 	 * Verifica si el nodo tiene al menos un adyacente (Interfaz Adyacentes).
 	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
 	 *
 	 * Este método comprueba si tiene al menos un nodo adyacente. O dicho de otro modo
-	 * si tiene conexiones "salientes"; en tal caso devuelve true; caso contrario devuelve 
+	 * si tiene conexiones "salientes"; en tal caso devuelve true; caso contrario devuelve
 	 * false
-	 * 
+	 *
 	 * Si el nodo está autoenlazado, es decir tiene algun enlace que sale de él hacia él
-	 * mismo tambien devuelve true. 
-	 *  
-	 *⚠️ Importante: verifica las conexiciones de "salida", pero no las de "entrada". Para
+	 * mismo tambien devuelve true.
+	 *
+	 * ⚠️ Importante: verifica las conexiciones de "salida", pero no las de "entrada". Para
 	 * verificar las conexiones de entrada use
 	 * {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente tiene_incidente}
 	 *
-     * ---
-     * 🔗 Método complementario:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente tiene_incidente()}
-     *
-     * ---
-     * 🔗 Otros métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente_a tiene_adyacente_a()}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente_a tiene_incidente_a()}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * ---
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente tiene_incidente()}
+	 *
+	 * ---
+	 * 🔗 Otros métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente_a tiene_adyacente_a()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente_a tiene_incidente_a()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
@@ -812,52 +859,54 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * }
 	 * ```
 	 *
-	 * @note Internamente utiliza la colección `$this->S[NodoElectrico::$fase]`. 
+	 * @note Internamente utiliza la colección `$this->S[NodoElectrico::$fase]`.
 	 * @return bool Devuelve **true** si existe al menos un adyacente, o **false** en caso contrario.
 	 * @public
 	 */
-	public function tiene_adyacente(): bool{
-		//echo "das";
-		if ($this->adyacentes===null){
-			//echo "das1";
+	public function tiene_adyacente(): bool
+	{
+		// echo "das";
+		if ($this->adyacentes === null) {
+			// echo "das1";
 			return false;
 		}
-		if (!count($this->adyacentes)){
-			//echo "das2";
+		if (!count($this->adyacentes)) {
+			// echo "das2";
 			return false;
 		}
-        $faseactual=self::$fase;
-        if (!isset($this->adyacentes[$faseactual])){
-			//echo "das3";
-            return false;
-        }
-        if (!count($this->adyacentes[$faseactual])) {
-		//	echo "das4";
+		$faseactual = self::$fase;
+		if (!isset($this->adyacentes[$faseactual])) {
+			// echo "das3";
 			return false;
 		}
-		//echo "das5";
-        return true;
+		if (!count($this->adyacentes[$faseactual])) {
+			//	echo "das4";
+			return false;
+		}
+		// echo "das5";
+		return true;
 	}
-    /**
-     * Verifica si el nodo tiene como adyacente al nodo indicado (Interfaz Adyacentes).
-     *
-     * 🔗 Interfaz:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacente}
-     *
-     * Comprueba si el nodo actual enlaza directamente hacia el nodo pasado como parámetro.  
-     * Para optimizar, se valida tanto que el nodo actual posea adyacentes salientes 
-     * como que el nodo objetivo tenga conexiones entrantes.
-     *
-     * ---
-     * 🔗 Método complementario:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente_a tiene_incidente_a()}
-     *
-     * ---
+
+	/**
+	 * Verifica si el nodo tiene como adyacente al nodo indicado (Interfaz Adyacentes).
+	 *
+	 * 🔗 Interfaz:
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacente}
+	 *
+	 * Comprueba si el nodo actual enlaza directamente hacia el nodo pasado como parámetro.
+	 * Para optimizar, se valida tanto que el nodo actual posea adyacentes salientes
+	 * como que el nodo objetivo tenga conexiones entrantes.
+	 *
+	 * ---
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente_a tiene_incidente_a()}
+	 *
+	 * ---
 	 * 🔗 Otros métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
@@ -866,69 +915,71 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente tiene_incidente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_validar_nombre_enlace validar_nombre_enlace}
-     *
-     * ---
-     * Ejemplo de uso:
-     * ```php
-     * $n1 = NodoElectrico::crear_con_dato("A");
-     * $n2 = NodoElectrico::crear_con_dato("B");
-     * $n1->_adyacente_en($n2, "enlaceAB");
-     *
-     * if ($n1->tiene_adyacente_a($n2)) {
-     *     echo "A tiene a B como adyacente";
-     * }
-     * ```
-     *
-     * @note Solo devuelve el nombre del enlace si realmente existe; `false` en caso contrario.
-     *
-     * @param Nodo $nodo Nodo a verificar.
-     * @return string|false Nombre del enlace si existe, `false` en caso contrario.
+	 *
+	 * ---
+	 * Ejemplo de uso:
+	 * ```php
+	 * $n1 = NodoElectrico::crear_con_dato("A");
+	 * $n2 = NodoElectrico::crear_con_dato("B");
+	 * $n1->_adyacente_en($n2, "enlaceAB");
+	 *
+	 * if ($n1->tiene_adyacente_a($n2)) {
+	 *     echo "A tiene a B como adyacente";
+	 * }
+	 * ```
+	 *
+	 * @note Solo devuelve el nombre del enlace si realmente existe; `false` en caso contrario.
+	 *
+	 * @param Nodo $nodo Nodo a verificar.
+	 * @return string|false Nombre del enlace si existe, `false` en caso contrario.
 	 * @public
 	 * @since 0.0.1
-     */
-	public function tiene_adyacente_a($nodo){
-        if (!($nodo instanceof Nodo)) {
-            Nodo::_error("El nodo que intenta comprobar no es una instancia de la clase Nodo.");
-            return false;
-        }
-        if (!$this->tiene_adyacente() || !$nodo->tiene_incidente()) {
-            return false;
-        }
-        $idObjetivo = $nodo->id();
-        // Iteración por todas las fases registradas
-        foreach ($this->adyacentes as $fase => $adyacentes) {
-            // Verifica que sea un array y no esté vacío
-            if (!is_array($adyacentes) || empty($adyacentes)) {
-                continue;
-            }
-            // Recorre los enlaces dentro de la fase actual
-            foreach ($adyacentes as $nombreEnlace => $nodoAdyacente) {
-                if ($nodoAdyacente instanceof Nodo && $nodoAdyacente->id() === $idObjetivo) {
-                    //Nodo encontrado!
-                    return $nombreEnlace;
-                }
-            }
-        }
-        // No encontrado
-        return false;
+	 */
+	public function tiene_adyacente_a($nodo)
+	{
+		if (!($nodo instanceof Nodo)) {
+			Nodo::_error('El nodo que intenta comprobar no es una instancia de la clase Nodo.');
+			return false;
+		}
+		if (!$this->tiene_adyacente() || !$nodo->tiene_incidente()) {
+			return false;
+		}
+		$idObjetivo = $nodo->id();
+		// Iteración por todas las fases registradas
+		foreach ($this->adyacentes as $fase => $adyacentes) {
+			// Verifica que sea un array y no esté vacío
+			if (!is_array($adyacentes) || empty($adyacentes)) {
+				continue;
+			}
+			// Recorre los enlaces dentro de la fase actual
+			foreach ($adyacentes as $nombreEnlace => $nodoAdyacente) {
+				if ($nodoAdyacente instanceof Nodo && $nodoAdyacente->id() === $idObjetivo) {
+					// Nodo encontrado!
+					return $nombreEnlace;
+				}
+			}
+		}
+		// No encontrado
+		return false;
 	}
+
 	/**
 	 * Devuelve el nodo adyacente en el enlace especificado (Interfaz Adayacentes)
-	 * 
+	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
 	 *
-	 * Comprueba si existe un nodo en el enlace indicado y lo devuelve;  
+	 * Comprueba si existe un nodo en el enlace indicado y lo devuelve;
 	 * si no existe, devuelve `null`. El enlace debe ser `int` o `string`.
 	 *
 	 * ---
 	 * 🔗 Método complementario:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
-	 * 
+	 *
 	 * ---
 	 * 🔗 Otros métodos relacionados:
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
@@ -955,33 +1006,32 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * @param int|string $enlace El identificador del enlace a consultar
 	 * @return Nodo|null Nodo adyacente si existe, `null` en caso contrario
 	 */
-	public function adyacente($enlace): ?Nodo{
-		echo "b0";
-		if (!Nodo::validar_nombre_enlace($enlace)) {// esto se deja porque si intento acceder al array con algo q no sea un entero o un string en php salta un warning
-			self::_error("El enlace debe ser un string");
+	public function adyacente($enlace): ?Nodo
+	{
+		echo 'b0';
+		if (!Nodo::validar_nombre_enlace($enlace)) {  // esto se deja porque si intento acceder al array con algo q no sea un entero o un string en php salta un warning
+			self::_error('El enlace debe ser un string');
 			return null;
 		}
-				echo "b1";
-		if ($this->adyacentes===null){
+		echo 'b1';
+		if ($this->adyacentes === null) {
 			return null;
 		}
-				echo "b12";
-		if (!count($this->adyacentes)){
+		echo 'b12';
+		if (!count($this->adyacentes)) {
 			return null;
 		}
-				echo "b13";
-        $faseactual=NodoElectrico::$fase;
+		echo 'b13';
+		$faseactual = NodoElectrico::$fase;
 		echo "<br/>$faseactual<br/>";
-        if (!isset($this->adyacentes[$faseactual])){
-            return null;
-			
-        }
-				echo "b14";
-        if (!count($this->adyacentes[$faseactual])) {
+		if (!isset($this->adyacentes[$faseactual])) {
 			return null;
-
 		}
-				echo "b15";
+		echo 'b14';
+		if (!count($this->adyacentes[$faseactual])) {
+			return null;
+		}
+		echo 'b15';
 		return $this->adyacentes[$faseactual][$enlace] ?? null;
 	}
 
@@ -991,19 +1041,19 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html# adyacentes}
 	 *
-	 * Retorna todos los nodos adyacentes del nodo actual en una estructura independiente, 
-	 * asegurando que sea una "foto" del estado al momento de la llamada.  
-	 * Si el nodo no tiene adyacentes, devuelve `null`.  
+	 * Retorna todos los nodos adyacentes del nodo actual en una estructura independiente,
+	 * asegurando que sea una "foto" del estado al momento de la llamada.
+	 * Si el nodo no tiene adyacentes, devuelve `null`.
 	 * Se utiliza para obtener de manera segura los enlaces actuales sin exponer la referencia interna.
 	 *
 	 * ---
 	 * 🔗 Métodos complementario:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
-	 * 
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
+	 *
 	 * ---
 	 * 🔗 Otros métodos relacionados:
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
@@ -1041,16 +1091,16 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 *
 	 * @note Se devuelve una copia superficial del array interno de adyacentes.
 	 * @public
-     * @since V0.0.1
+	 * @since V0.0.1
 	 * @return ?array Array asociativo con enlaces y nodos, o `null` si no hay adyacentes
 	 */
-	public function adyacentes(): array|null{
+	public function adyacentes(): array|null
+	{
 		if (!$this->tiene_adyacente()) {
-				return null;
-		}else {
-			foreach($this->adyacentes[NodoElectrico::$fase] as $enlace=>$incid){
-				echo "<br/>acer: ".$enlace."===>".$incid->id();
-
+			return null;
+		} else {
+			foreach ($this->adyacentes[NodoElectrico::$fase] as $enlace => $incid) {
+				echo '<br/>acer: ' . $enlace . '===>' . $incid->id();
 			}
 			return $this->adyacentes[NodoElectrico::$fase];
 		}
@@ -1062,20 +1112,20 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
 	 *
-	 * Retorna el número total de nodos adyacentes actualmente vinculados al nodo.  
-	 * Si no existen adyacentes, devuelve `0`.  
+	 * Retorna el número total de nodos adyacentes actualmente vinculados al nodo.
+	 * Si no existen adyacentes, devuelve `0`.
 	 * Este método permite conocer de manera rápida el grado de salida del nodo.
 	 *
 	 * ---
 	 * 🔗 Método complementario:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_incidentes cantidad_de_incidentes}
-	 * 
+	 *
 	 * ---
 	 * 🔗 Otros métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
@@ -1098,17 +1148,19 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * ```
 	 *
 	 * @note Si no hay adyacentes inicializados, retorna 0 directamente.
-	 * @param 
+	 * @param
 	 * @return int Cantidad de adyacentes del nodo
 	 * @public
 	 * @sice 0.0.1
 	 */
-	public function cantidad_de_adyacentes(): int{
-		if ($this->adyacentes!==null && count($this->adyacentes)>0 && isset($this->adyacentes[NodoElectrico::$fase])){
+	public function cantidad_de_adyacentes(): int
+	{
+		if ($this->adyacentes !== null && count($this->adyacentes) > 0 && isset($this->adyacentes[NodoElectrico::$fase])) {
 			return count($this->adyacentes[NodoElectrico::$fase]);
 		}
 		return 0;
 	}
+
 	/**
 	 * Asigna un adyacente con nombre único (Interfaz Adyacentes).
 	 *
@@ -1116,12 +1168,12 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
 	 *
 	 * Agrega un nodo como adyacente generando automáticamente un nombre de enlace único
-	 * basado en el `id()` del nodo destino.  
+	 * basado en el `id()` del nodo destino.
 	 * Si ya existe un enlace con ese nombre, se crean variantes incrementales (`id.1`, `id.2`, ...).
 	 *
 	 * ---
-	 * 🔗 Método complementario:	
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 *
 	 * ---
 	 * 🔗 Método relacionado:
@@ -1144,64 +1196,64 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * $nodo = Nodo::crear();
 	 * $otro1 = Nodo::crear_con_id("ejemplo");
 	 * $otro2 = Nodo::crear_con_id("otro_ejemplo");
-	 * 
+	 *
 	 * $enlace1=$nodo->_adyacente($otro1); // crea enlace "ejemplo" a $otro1
 	 * $enlace2=$nodo->_adyacente($otro2); // crea enlace "otro_ejemplo" a $otro2
 	 * $enlace3=$nodo->_adyacente($otro1); // crea enlace "ejemplo.1" a $otro1
-	 * 
+	 *
 	 * echo "En el enlace ".$enlace1." se agrego el nodo ".$nodo->adyacente($enlace1)->id()."<br>"; //ejemplo / ejemplo
-     * echo "En el enlace ".$enlace2." se agrego el nodo ".$nodo->adyacente($enlace2)->id()."<br>"; //otro_ejemplo / otro_ejemplo
-     * echo "En el enlace ".$enlace3." se agrego el nodo ".$nodo->adyacente($enlace3)->id()."<br>"; //ejemplo.1 / ejemplo
+	 * echo "En el enlace ".$enlace2." se agrego el nodo ".$nodo->adyacente($enlace2)->id()."<br>"; //otro_ejemplo / otro_ejemplo
+	 * echo "En el enlace ".$enlace3." se agrego el nodo ".$nodo->adyacente($enlace3)->id()."<br>"; //ejemplo.1 / ejemplo
 	 * ```
 	 *
 	 * @param Nodo $un_nodo Nodo que se desea enlazar
 	 * @return null|string Nodo adyacente recién asignado
 	 * @public
 	 */
-	public function _adyacente($un_nodo):?string{
-		if (!($un_nodo instanceof NodoElectrico)){
-			static::_error("el parametro debe ser una instancia de Nodo");
+	public function _adyacente($un_nodo): ?string
+	{
+		if (!($un_nodo instanceof NodoElectrico)) {
+			static::_error('el parametro debe ser una instancia de Nodo');
 			return null;
 		}
-		//inicializacion perezosa
-		if ($this->adyacentes===null){
-			$this->adyacentes=[];
+		// inicializacion perezosa
+		if ($this->adyacentes === null) {
+			$this->adyacentes = [];
 		}
-		$fase=NodoElectrico::$fase;
-		if (!isset($this->adyacentes[$fase])){
-			$this->adyacentes[$fase]=[];
+		$fase = NodoElectrico::$fase;
+		if (!isset($this->adyacentes[$fase])) {
+			$this->adyacentes[$fase] = [];
 		}
-		$adyacentes=$this->adyacentes[$fase];
-		$cont=1;
-		$id=$un_nodo->id();
-		$enlace=(string)$id;
-		while (isSet($adyacentes[$enlace])){
-			$enlace=$id.".".$cont;
+		$adyacentes = $this->adyacentes[$fase];
+		$cont = 1;
+		$id = $un_nodo->id();
+		$enlace = (string) $id;
+		while (isset($adyacentes[$enlace])) {
+			$enlace = $id . '.' . $cont;
 			$cont++;
 		}
-		//asigno adyacente
-		echo " <br/>J".$fase.$enlace." <br/>";
-		$this->adyacentes[$fase][$enlace]=$un_nodo;
+		// asigno adyacente
+		echo ' <br/>J' . $fase . $enlace . ' <br/>';
+		$this->adyacentes[$fase][$enlace] = $un_nodo;
 
 		$un_nodo->_incidente_en($this, $enlace);
-		//sumo la referencias del nodo enlazado
+		// sumo la referencias del nodo enlazado
 		$un_nodo->referencias++;
 		return $enlace;
-	
 	}
 
-    /**
-     * Establece un nodo adyacente con nombre de enlace específico (Interfaz Adyacentes).
-     *
-     * 🔗 Interfaz:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
-     *
-     * Crea o reemplaza una relación de adyacencia con otro nodo usando un nombre de enlace
-     * específico. Maneja inicialización perezosa de estructuras y actualiza referencias.
-     * 
+	/**
+	 * Establece un nodo adyacente con nombre de enlace específico (Interfaz Adyacentes).
+	 *
+	 * 🔗 Interfaz:
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
+	 *
+	 * Crea o reemplaza una relación de adyacencia con otro nodo usando un nombre de enlace
+	 * específico. Maneja inicialización perezosa de estructuras y actualiza referencias.
+	 *
 	 * ---
-	 * 🔗 Método complementario:	
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 *
 	 * ---
@@ -1217,79 +1269,80 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
 	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_validar_nombre_enlace validar_nombre_enlace}
-	 * 
-     * ---
-     * Ejemplo de uso:
-     * ```php
-     * $nodo1 = NodoElectrico::crear();
-     * $nodo2 = NodoElectrico::crear();
-     * $nodo1->_adyacente_en($nodo2, "enlace_principal", true);
-     * ```
-     *
-     * @note Si $reemplazar es false y el enlace existe, fallará.
-     * @param NodoElectrico $un_nodo Nodo a establecer como adyacente
-     * @param mixed $enlace Nombre del enlace
-     * @param bool $reemplazar Permite reemplazar enlace existente
-     * @return bool True si éxito, false si error
-     * @public
-     * @since 0.0.1
-     */
-	public function _adyacente_en($un_nodo, $enlace, $reemplazar = false): bool{
-		echo "holanaaaa";
-		if (!($un_nodo instanceof NodoElectrico)){
-			static::_error("el nodo que intenta asignar no es un NodoElectrico");
+	 *
+	 * ---
+	 * Ejemplo de uso:
+	 * ```php
+	 * $nodo1 = NodoElectrico::crear();
+	 * $nodo2 = NodoElectrico::crear();
+	 * $nodo1->_adyacente_en($nodo2, "enlace_principal", true);
+	 * ```
+	 *
+	 * @note Si $reemplazar es false y el enlace existe, fallará.
+	 * @param NodoElectrico $un_nodo Nodo a establecer como adyacente
+	 * @param mixed $enlace Nombre del enlace
+	 * @param bool $reemplazar Permite reemplazar enlace existente
+	 * @return bool True si éxito, false si error
+	 * @public
+	 * @since 0.0.1
+	 */
+	public function _adyacente_en($un_nodo, $enlace, $reemplazar = false): bool
+	{
+		echo 'holanaaaa';
+		if (!($un_nodo instanceof NodoElectrico)) {
+			static::_error('el nodo que intenta asignar no es un NodoElectrico');
 			return false;
 		};
 		if (!static::validar_nombre_enlace($enlace)) {
-			static::_error("el enlace al intenta asignar debe ser un string");
+			static::_error('el enlace al intenta asignar debe ser un string');
 			return false;
 		}
-		//inicializacion perezosa
-		if ($this->adyacentes===null) {
-			$this->adyacentes=[];
+		// inicializacion perezosa
+		if ($this->adyacentes === null) {
+			$this->adyacentes = [];
 		}
-		$fase=NodoElectrico::$fase;
-		if (!isset($this->adyacentes[$fase])){
-					echo "ma0";
-			$this->adyacentes[$fase]=[];
+		$fase = NodoElectrico::$fase;
+		if (!isset($this->adyacentes[$fase])) {
+			echo 'ma0';
+			$this->adyacentes[$fase] = [];
 		}
-		$adyacentes=$this->adyacentes[$fase];
-		//reviso a ver si no existia un nodo en esa posicion
-		echo "ma1";
-		if (isset($adyacentes[$enlace])){
-					echo "ma2";
-			if ($reemplazar){
-						echo "ma3";
+		$adyacentes = $this->adyacentes[$fase];
+		// reviso a ver si no existia un nodo en esa posicion
+		echo 'ma1';
+		if (isset($adyacentes[$enlace])) {
+			echo 'ma2';
+			if ($reemplazar) {
+				echo 'ma3';
 				$adyacentes[$enlace]->referencias--;
-				$adyacentes[$enlace]->eliminar_incidente($this,$enlace);
-			}else{
-						echo "ma4";
-				static::_error("ya existia un nodo en el enlace que intenta asignar");
+				$adyacentes[$enlace]->eliminar_incidente($this, $enlace);
+			} else {
+				echo 'ma4';
+				static::_error('ya existia un nodo en el enlace que intenta asignar');
 				return false;
 			}
 		}
-		//asigno adyacente
-		$this->adyacentes[$fase][$enlace]=$un_nodo;
+		// asigno adyacente
+		$this->adyacentes[$fase][$enlace] = $un_nodo;
 		$un_nodo->_incidente_en($this, $enlace);
-		//sumo la referencias del nodo enlazado
+		// sumo la referencias del nodo enlazado
 		$un_nodo->referencias++;
 		return true;
-
 	}
-    /**
-     * Elimina un nodo adyacente específico (Interfaz Adyacentes).
-     *
-     * 🔗 Interfaz:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
-     *
-     * Remueve la relación de adyacencia en el enlace especificado y actualiza las
-     * referencias del nodo eliminado. Devuelve el nodo eliminado o null si no existe.
-     * 
-     * ---
-     * 🔗 Métodos complementarios:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_incidente eliminar_incidente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
-	 * 
+
+	/**
+	 * Elimina un nodo adyacente específico (Interfaz Adyacentes).
+	 *
+	 * 🔗 Interfaz:
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
+	 *
+	 * Remueve la relación de adyacencia en el enlace especificado y actualiza las
+	 * referencias del nodo eliminado. Devuelve el nodo eliminado o null si no existe.
+	 *
+	 * ---
+	 * 🔗 Métodos complementarios:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_incidente eliminar_incidente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
+	 *
 	 * ---
 	 * 🔗 Método relacionado:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
@@ -1305,72 +1358,73 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
 	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_validar_nombre_enlace validar_nombre_enlace}
 	 *
-     * ---
-     * Ejemplo de uso:
-     * ```php
-     * $nodo = NodoElectrico::crear();
-     * $eliminado = $nodo->eliminar_adyacente("enlace_especifico");
-     * ```
-     *
-     * @note También elimina la relación incidente correspondiente.
-     * @param mixed $enlace Nombre del enlace a eliminar
-     * @return Nodo|null Nodo eliminado o null si no existe
-     * @public
-     * @since 0.0.1
-     */
-
-	public function eliminar_adyacente($enlace): Nodo|null{
+	 * ---
+	 * Ejemplo de uso:
+	 * ```php
+	 * $nodo = NodoElectrico::crear();
+	 * $eliminado = $nodo->eliminar_adyacente("enlace_especifico");
+	 * ```
+	 *
+	 * @note También elimina la relación incidente correspondiente.
+	 * @param mixed $enlace Nombre del enlace a eliminar
+	 * @return Nodo|null Nodo eliminado o null si no existe
+	 * @public
+	 * @since 0.0.1
+	 */
+	public function eliminar_adyacente($enlace): Nodo|null
+	{
 		// Validación de tipo
 		if (!static::validar_nombre_enlace($enlace)) {
-			self::_error("el enlace a eliminar no es valido");
+			self::_error('el enlace a eliminar no es valido');
 			return null;
 		}
 		// verificar inicialización perezosa
-		if ($this->adyacentes===null) {
-			self::_alerta("no hay adyacentes para eliminar");
+		if ($this->adyacentes === null) {
+			self::_alerta('no hay adyacentes para eliminar');
 			return null;
 		}
-		if ($this->adyacentes[NodoElectrico::$fase]===null) {
-			self::_alerta("no hay adyacentes para eliminar en la fase");
+		if ($this->adyacentes[NodoElectrico::$fase] === null) {
+			self::_alerta('no hay adyacentes para eliminar en la fase');
 			return null;
 		}
 		// Verificar existencia del enlace
-		if (!array_key_exists($enlace,$this->adyacentes[NodoElectrico::$fase])) {
-			self::_alerta("el enlace ".$enlace." que se intenta eliminar no existe");
+		if (!array_key_exists($enlace, $this->adyacentes[NodoElectrico::$fase])) {
+			self::_alerta('el enlace ' . $enlace . ' que se intenta eliminar no existe');
 			return null;
 		}
-		
-		$eliminado =$this->adyacentes[NodoElectrico::$fase][$enlace];
+
+		$eliminado = $this->adyacentes[NodoElectrico::$fase][$enlace];
 		$eliminado->referencias--;
 		$eliminado->eliminar_incidente($this, $enlace);
 		unset($this->adyacentes[NodoElectrico::$fase][$enlace]);
 		return $eliminado;
 	}
+
 	/**
 	 * Elimina todos los adyacentes del nodo (Interfaz Adyacentes).
 	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
 	 *
-	 * Elimina todas las conexiones salientes del nodo.  
-	 * Si no existen adyacentes, lanza una alerta y devuelve un array vacío.  
-	 * Antes de eliminar, genera una copia de los enlaces actuales y los devuelve. 
+	 * Elimina todas las conexiones salientes del nodo.
+	 * Si no existen adyacentes, lanza una alerta y devuelve un array vacío.
+	 * Antes de eliminar, genera una copia de los enlaces actuales y los devuelve.
 	 *
 	 * ⚠️ Importante: Este método no elimina los nodos del sistema. Si se eliminan
-	 * todos los enlaces que conectan a un nodo este aún permanece en el sistema 
+	 * todos los enlaces que conectan a un nodo este aún permanece en el sistema
 	 * como nodo suelto a menos que se use el metodo estatico
 	 * {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar Nodo::eliminar($nodo)}
-	 * 
+	 *
 	 * ---
 	 * 🔗 Método complementario:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 *
 	 * ---
 	 * 🔗 Otros métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_incidentes cantidad_de_incidentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente tiene_adyacente}
@@ -1417,46 +1471,48 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * @return Nodo[] Array de nodos eliminados, o array vacío si no había adyacentes
 	 * @public
 	 */
-	public function eliminar_adyacentes(): array {
-		if ($this->adyacentes===null or !count($this->adyacentes)>0) {
-			self::_alerta("no hay enlaces para eliminar");
-			return []; 
-		}
-		$fase=NodoElectrico::$fase;
-		if (!isset($this->adyacentes[$fase])){
-			self::_alerta("no hay enlaces a eliminar en la fase actual");
+	public function eliminar_adyacentes(): array
+	{
+		if ($this->adyacentes === null or !count($this->adyacentes) > 0) {
+			self::_alerta('no hay enlaces para eliminar');
 			return [];
 		}
-		$copia=$this->adyacentes[$fase];
-		
-		foreach ($this->adyacentes[$fase] as $enlace=>$eliminado) {
-			echo "Y".$enlace;
+		$fase = NodoElectrico::$fase;
+		if (!isset($this->adyacentes[$fase])) {
+			self::_alerta('no hay enlaces a eliminar en la fase actual');
+			return [];
+		}
+		$copia = $this->adyacentes[$fase];
+
+		foreach ($this->adyacentes[$fase] as $enlace => $eliminado) {
+			echo 'Y' . $enlace;
 			$eliminado->referencias--;
 			$eliminado->eliminar_incidente($this, $enlace);
 		}
-		$this->adyacentes[$fase]=[];
+		$this->adyacentes[$fase] = [];
 		return $copia;
 	}
-/**
-     * Ejecuta una función por cada nodo adyacente (Interfaz Adyacentes).
-     *
-     * 🔗 Interfaz:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
-     *
-     * Itera sobre todos los nodos adyacentes ejecutando una función callback para cada uno.
-     * La función recibe el nodo adyacente, nombre del enlace y parámetros adicionales.
-     * 
-     * ---
-     * 🔗 Métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_incidente_ejecutar por_cada_incidente_ejecutar}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
-	 * 
+
+	/**
+	 * Ejecuta una función por cada nodo adyacente (Interfaz Adyacentes).
+	 *
+	 * 🔗 Interfaz:
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
+	 *
+	 * Itera sobre todos los nodos adyacentes ejecutando una función callback para cada uno.
+	 * La función recibe el nodo adyacente, nombre del enlace y parámetros adicionales.
+	 *
+	 * ---
+	 * 🔗 Métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_incidente_ejecutar por_cada_incidente_ejecutar}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
+	 *
 	 * ---
 	 * 🔗 Otros métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_incidentes cantidad_de_incidentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente tiene_adyacente}
@@ -1466,84 +1522,84 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_validar_nombre_enlace validar_nombre_enlace}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
-     *
-     * ---
-     * Ejemplo de uso:
-     * ```php
-     * $nodo->por_cada_adyacente_ejecutar(function($ady, $enlace) {
-     *     echo "Procesando adyacente en enlace: $enlace";
-     * }, $parametro_extra);
-     * ```
-     *
-     * @note Devuelve array con resultados de cada ejecución.
-     * @param callable $funcion Función a ejecutar
-     * @param mixed ...$parametros Parámetros adicionales para la función
-     * @return array|null Array asociativo con resultados o null si no hay adyacentes
-     * @public
-     * @since 0.0.1
-     */
-
-	public function por_cada_adyacente_ejecutar(callable $funcion, mixed ...$parametros): ?array {
+	 *
+	 * ---
+	 * Ejemplo de uso:
+	 * ```php
+	 * $nodo->por_cada_adyacente_ejecutar(function($ady, $enlace) {
+	 *     echo "Procesando adyacente en enlace: $enlace";
+	 * }, $parametro_extra);
+	 * ```
+	 *
+	 * @note Devuelve array con resultados de cada ejecución.
+	 * @param callable $funcion Función a ejecutar
+	 * @param mixed ...$parametros Parámetros adicionales para la función
+	 * @return array|null Array asociativo con resultados o null si no hay adyacentes
+	 * @public
+	 * @since 0.0.1
+	 */
+	public function por_cada_adyacente_ejecutar(callable $funcion, mixed ...$parametros): ?array
+	{
 		if (!$this->tiene_adyacente()) {
-			static::_alerta("alerta no existe adyacente");
+			static::_alerta('alerta no existe adyacente');
 			return null;
 		}
 
 		$resultados = [];
 		foreach ($this->adyacentes[NodoElectrico::$fase] as $enlace => $nodo) {
-			echo "<br/>fir";
+			echo '<br/>fir';
 			if ($nodo) {
-				echo "<br/>fir1";
+				echo '<br/>fir1';
 				$resultados[$enlace] = $funcion($nodo, $enlace, ...$parametros);
 			}
 		}
-		
+
 		return $resultados;
 	}
 
-    /**********************************************************************************************
-     *  INTERFAZ INCIDENTES (INSTANCIA)
-     * 
-     *  Reemplazo de los metodos existentes
-     *  Esta interfaz talves si valga la pena extraerla y diferenciarla de la de Adyacentes
-     **********************************************************************************************/
+	/*
+	 * INTERFAZ INCIDENTES (INSTANCIA)
+	 *
+	 *  Reemplazo de los metodos existentes
+	 *  Esta interfaz talves si valga la pena extraerla y diferenciarla de la de Adyacentes
+	 */
 
-    /**
+	/**
 	 * Verifica si el nodo es adyacente de al menos un nodo (Interfaz Incidentes).
 	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Incidentes.html Incidentes}
 	 *
-	 * Evalúa si no existe al menos otro nodo que lo tenga él como adyacente. O dicho de 
+	 * Evalúa si no existe al menos otro nodo que lo tenga él como adyacente. O dicho de
 	 * otro modo, si no tiene conexiones "entrantes"; en tal caso se concidera "suelto"
 	 * y devuelve true; caso contrario devuelve false.
-	 * 
+	 *
 	 * Si el nodo está autoenlazado, es decir tiene algun enlace que sale de él hacia él
-	 * mismo ya no se concidera "suelto" y devuelve false. 
-	 * 
+	 * mismo ya no se concidera "suelto" y devuelve false.
+	 *
 	 * ⚠️ Importante: verifica las conexiciones de "entrada", pero no las de "salida".
-	 * Para verificar las conexiones de "salida" utilice 
+	 * Para verificar las conexiones de "salida" utilice
 	 * {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente tiene_incidente}
-	 * 
-     * ---
-     * 🔗 Método complementario:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente tiene_adyacente()}
-     *
-     * ---
-     * 🔗 Otros métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente_a tiene_adyacente_a()}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente_a tiene_incidente_a()}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 *
+	 * ---
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente tiene_adyacente()}
+	 *
+	 * ---
+	 * 🔗 Otros métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente_a tiene_adyacente_a()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente_a tiene_incidente_a()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_incidentes cantidad_de_incidentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_validar_nombre_enlace validar_nombre_enlace}
-	 * 
+	 *
 	 * ---
 	 * Ejemplo de uso:
 	 * ```php
@@ -1560,22 +1616,24 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * }else{
 	 *     echo "El nodo no tiene conexiones entrantes.<br>";
 	 * }
-	 * 
+	 *
 	 * ```
 	 *
 	 * @note Utiliza la propiedad interna `$this->referencias` y el método `es_especial()`.
 	 * @return bool Devuelve **true** si el nodo está considerado suelto, o **false** en caso contrario.
 	 * @public
 	 * @since 0.0.1
-	 */		
-	public function tiene_incidente(){
-		if ($this->incidentes!==null && count($this->incidentes)>0){
-			$idincidentes=$this->incidentes;
-			$fase=NodoElectrico::$fase;
-			foreach ($idincidentes as $idincidente=>$fases){
-				if (isset($fases[$fase])){
-					$res=count($fases[$fase]);
-					if ($res) return true;
+	 */
+	public function tiene_incidente()
+	{
+		if ($this->incidentes !== null && count($this->incidentes) > 0) {
+			$idincidentes = $this->incidentes;
+			$fase = NodoElectrico::$fase;
+			foreach ($idincidentes as $idincidente => $fases) {
+				if (isset($fases[$fase])) {
+					$res = count($fases[$fase]);
+					if ($res)
+						return true;
 				}
 			}
 		}
@@ -1583,25 +1641,25 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	}
 
 	/**
-     * Verifica si el nodo actual es adyacente del nodo indicado (Interfaz Adyacentes).
-     *
-     * 🔗 Interfaz:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
-     *
-     * Comprueba si el nodo actual se encuentra enlazado desde el nodo pasado como parámetro.  
-     * Para optimizar, se valida tanto que el nodo actual posea conexiones entrantes 
-     * como que el nodo objetivo tenga adyacentes salientes.
-     *
-     * ---
-     * 🔗 Método complementario:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente_a tiene_adyacente_a()}
-     *
-     * ---
-     * 🔗 Otros métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * Verifica si el nodo actual es adyacente del nodo indicado (Interfaz Adyacentes).
+	 *
+	 * 🔗 Interfaz:
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacentes}
+	 *
+	 * Comprueba si el nodo actual se encuentra enlazado desde el nodo pasado como parámetro.
+	 * Para optimizar, se valida tanto que el nodo actual posea conexiones entrantes
+	 * como que el nodo objetivo tenga adyacentes salientes.
+	 *
+	 * ---
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente_a tiene_adyacente_a()}
+	 *
+	 * ---
+	 * 🔗 Otros métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
@@ -1610,63 +1668,64 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente tiene_incidente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_validar_nombre_enlace validar_nombre_enlace}
-     *
-     * ---
-     * Ejemplo de uso:
-     * ```php
-     * $nA = Nodo::crear_con_dato("A");
-     * $nB = Nodo::crear_con_dato("B");
-     *
-     * $nB->_adyacente_en($nA, "enlaceBA");
-     *
-     * if ($nA->tiene_incidente_a($nB)) {
-     *     echo "B es incidente de A";
-     * }
-     * ```
-     *
-     * @note Solo devuelve el nombre del enlace si realmente existe; `false` en caso contrario.
-     * @public
+	 *
+	 * ---
+	 * Ejemplo de uso:
+	 * ```php
+	 * $nA = Nodo::crear_con_dato("A");
+	 * $nB = Nodo::crear_con_dato("B");
+	 *
+	 * $nB->_adyacente_en($nA, "enlaceBA");
+	 *
+	 * if ($nA->tiene_incidente_a($nB)) {
+	 *     echo "B es incidente de A";
+	 * }
+	 * ```
+	 *
+	 * @note Solo devuelve el nombre del enlace si realmente existe; `false` en caso contrario.
+	 * @public
 	 * @since 3.2.3
-     * @param Nodo $nodo Nodo a verificar.
-     * @return string|false Nombre del enlace si existe, `false` en caso contrario.
-     */
-	public function tiene_incidente_a($nodo){
-        if (!($nodo instanceof NodoElectrico)) {
-            Nodo::_error("El nodo que intenta comprobar no es una instancia de la clase Nodo.");
-            return false;
-        }
+	 * @param Nodo $nodo Nodo a verificar.
+	 * @return string|false Nombre del enlace si existe, `false` en caso contrario.
+	 */
+	public function tiene_incidente_a($nodo)
+	{
+		if (!($nodo instanceof NodoElectrico)) {
+			Nodo::_error('El nodo que intenta comprobar no es una instancia de la clase Nodo.');
+			return false;
+		}
 
-		if($this->incidentes!==null){
-			$id=(string)$nodo->id();
-			if (isset($this->incidentes[$id])){
-				$fases=$this->incidentes[$id];
-				if (isset($fases[NodoElectrico::$fase])){
+		if ($this->incidentes !== null) {
+			$id = (string) $nodo->id();
+			if (isset($this->incidentes[$id])) {
+				$fases = $this->incidentes[$id];
+				if (isset($fases[NodoElectrico::$fase])) {
 					return true;
 				}
 			}
 		}
 
-        // No encontrado
-        return false;
+		// No encontrado
+		return false;
 	}
 
 	/*
 	 * Devuelve el nodo incidente en el enlace especificado (Interfaz Incidentes)
-	 * 
+	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Incidentes.html Incidentes}
 	 *
-	 * Comprueba si existe un nodo en el enlace indicado y lo devuelve;  
+	 * Comprueba si existe un nodo en el enlace indicado y lo devuelve;
 	 * si no existe, devuelve `null`. El enlace debe ser `int` o `string`.
 	 *
 	 * ---
 	 * 🔗 Método complementario:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_incidentes incidentes}
-	 * 
+	 *
 	 * ---
 	 * 🔗 Otros métodos relacionados:
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
@@ -1692,48 +1751,50 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * @note Devuelve `null` si no hay nodo en el enlace.
 	 * @param int|string $enlace El identificador del enlace a consultar
 	 * @return Nodo|null Nodo adyacente si existe, `null` en caso contrario
-	 *//*
-	public function incidente($enlace): ?Nodo{
-		if (!Nodo::validar_nombre_enlace($enlace)) {// esto se deja porque si intento acceder al array con algo q no sea un entero o un string en php salta un warning
-			self::_error("El enlace debe ser un string");
-			return null;
-		}
-		if ($this->incidentes===null){
-			return null;
-		}
-		if (!count($this->incidentes)){
-			return null;
-		}
-        $faseactual=NodoElectrico::$fase;
-        if (!isset($this->incidentes[$faseactual])){
-            return null;
-        }
-        if (!count($this->incidentes[$faseactual])) {
-			return null;
-		}
+	 */
+	/*
+	 * public function incidente($enlace): ?Nodo{
+	 * 	if (!Nodo::validar_nombre_enlace($enlace)) {// esto se deja porque si intento acceder al array con algo q no sea un entero o un string en php salta un warning
+	 * 		self::_error("El enlace debe ser un string");
+	 * 		return null;
+	 * 	}
+	 * 	if ($this->incidentes===null){
+	 * 		return null;
+	 * 	}
+	 * 	if (!count($this->incidentes)){
+	 * 		return null;
+	 * 	}
+	 *     $faseactual=NodoElectrico::$fase;
+	 *     if (!isset($this->incidentes[$faseactual])){
+	 *         return null;
+	 *     }
+	 *     if (!count($this->incidentes[$faseactual])) {
+	 * 		return null;
+	 * 	}
+	 *
+	 * 	return $this->incidentes[$faseactual][$enlace] ?? null;
+	 * }
+	 */
 
-		return $this->incidentes[$faseactual][$enlace] ?? null;
-	}*/
-
-    	/**
+	/**
 	 * Devuelve una copia de todos los incidentes (Interfaz Incidentes).
 	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Incidentes.html# incidentes}
 	 *
-	 * Retorna todos los nodos incidentes del nodo actual en una estructura independiente, 
-	 * asegurando que sea una "foto" del estado al momento de la llamada.  
-	 * Si el nodo no tiene incidentes, devuelve `null`.  
+	 * Retorna todos los nodos incidentes del nodo actual en una estructura independiente,
+	 * asegurando que sea una "foto" del estado al momento de la llamada.
+	 * Si el nodo no tiene incidentes, devuelve `null`.
 	 * Se utiliza para obtener de manera segura los enlaces actuales sin exponer la referencia interna.
 	 *
 	 * ---
 	 * 🔗 Métodos complementario:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_incidente incidente}
-	 * 
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_incidente incidente}
+	 *
 	 * ---
 	 * 🔗 Otros métodos relacionados:
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
@@ -1771,45 +1832,46 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 *
 	 * @note Se devuelve una copia superficial del array interno de adyacentes.
 	 * @public
-     * @since 0.0.1
+	 * @since 0.0.1
 	 * @return ?array Array asociativo con enlaces y nodos, o `null` si no hay adyacentes
 	 */
-	public function incidentes(): array|null{
-		$res=[];
-		if ($this->incidentes!==null){
-			$idincidentes=$this->incidentes;
-			$faseactual=NodoElectrico::$fase;
-			foreach($idincidentes as $idincidente=>$fases){
-				if (isset($fases[$faseactual])){
-					$fase=$fases[$faseactual];
-					$arrayfase=$fase;
-					$res[$idincidente]=$arrayfase;
+	public function incidentes(): array|null
+	{
+		$res = [];
+		if ($this->incidentes !== null) {
+			$idincidentes = $this->incidentes;
+			$faseactual = NodoElectrico::$fase;
+			foreach ($idincidentes as $idincidente => $fases) {
+				if (isset($fases[$faseactual])) {
+					$fase = $fases[$faseactual];
+					$arrayfase = $fase;
+					$res[$idincidente] = $arrayfase;
 				}
 			}
 		}
 		return $res;
 	}
 
-    /**
+	/**
 	 * Devuelve la cantidad de incidentes (Interfaz Incidentes).
 	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Incidentes.html Incidentes}
 	 *
-	 * Retorna el número total de nodos incidentes actualmente vinculados al nodo.  
-	 * Si no existen incidentes, devuelve `0`.  
+	 * Retorna el número total de nodos incidentes actualmente vinculados al nodo.
+	 * Si no existen incidentes, devuelve `0`.
 	 * Este método permite conocer de manera rápida el grado de salida del nodo.
 	 *
 	 * ---
 	 * 🔗 Método complementario:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
-	 * 
+	 *
 	 * ---
 	 * 🔗 Otros métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}  
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacente adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
@@ -1832,38 +1894,40 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * ```
 	 *
 	 * @note Si no hay adyacentes inicializados, retorna 0 directamente.
-	 * @param 
+	 * @param
 	 * @return int Cantidad de incidentes del nodo
 	 * @public
 	 * @sice 0.0.1
 	 */
-	public function cantidad_de_incidentes(): int{
-		if ($this->incidentes!==null && count($this->incidentes)>0){
-			$total=0;
-			$idincidentes=$this->incidentes;
-			$fase=NodoElectrico::$fase;
-			foreach ($idincidentes as $idincidente=>$fases){
-				if (isset($fases[$fase])){
-					$total+=count($fases[$fase]);
+	public function cantidad_de_incidentes(): int
+	{
+		if ($this->incidentes !== null && count($this->incidentes) > 0) {
+			$total = 0;
+			$idincidentes = $this->incidentes;
+			$fase = NodoElectrico::$fase;
+			foreach ($idincidentes as $idincidente => $fases) {
+				if (isset($fases[$fase])) {
+					$total += count($fases[$fase]);
 				}
 			}
-		//	return count($this->incidentes[NodoElectrico::$fase]);
+			//	return count($this->incidentes[NodoElectrico::$fase]);
 			return $total;
 		}
 		return 0;
 	}
-    /**
-     * Establece un nodo incidente internamente (Interfaz Incidentes).
-     *
-     * 🔗 Interfaz:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-Incidentes.html Incidentes}
-     *
-     * Método interno para establecer la relación incidente correspondiente a una
-     * adyacencia. Verifica que exista previamente la relación de adyacencia.
-     * 
+
+	/**
+	 * Establece un nodo incidente internamente (Interfaz Incidentes).
+	 *
+	 * 🔗 Interfaz:
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Incidentes.html Incidentes}
+	 *
+	 * Método interno para establecer la relación incidente correspondiente a una
+	 * adyacencia. Verifica que exista previamente la relación de adyacencia.
+	 *
 	 * ---
-	 * 🔗 Método complementario:	
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}  
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
 	 *
 	 * ---
 	 * 🔗 Método relacionado:
@@ -1879,54 +1943,56 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
 	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_validar_nombre_enlace validar_nombre_enlace}
-	 * 
-     * @note Solo para uso interno del sistema.
-     * @param NodoElectrico $un_nodo Nodo incidente a establecer
-     * @param mixed $enlace Nombre del enlace
-     * @return bool True si éxito, false si error
-     * @private
-     * @since 0.0.1
-     */
-	private function _incidente_en($un_nodo, $enlace): bool{
-		if (!$un_nodo->adyacente($enlace)){//verifico que ya se haya agregado el enlace de ida
-			static::_alerta("No se puede agregar el enlace de vuelta antes que el de ida");
+	 *
+	 * @note Solo para uso interno del sistema.
+	 * @param NodoElectrico $un_nodo Nodo incidente a establecer
+	 * @param mixed $enlace Nombre del enlace
+	 * @return bool True si éxito, false si error
+	 * @private
+	 * @since 0.0.1
+	 */
+	private function _incidente_en($un_nodo, $enlace): bool
+	{
+		if (!$un_nodo->adyacente($enlace)) {  // verifico que ya se haya agregado el enlace de ida
+			static::_alerta('No se puede agregar el enlace de vuelta antes que el de ida');
 			return false;
 		}
-		echo "<br/>_inidente_en".$enlace."<br/>";
-		//inicializacion perezosa
-		if ($this->incidentes===null) {
-			$this->incidentes=[];
+		echo '<br/>_inidente_en' . $enlace . '<br/>';
+		// inicializacion perezosa
+		if ($this->incidentes === null) {
+			$this->incidentes = [];
 		}
-		$idstring=(string)$un_nodo->id();
-		if (!isset($this->incidentes[$idstring])){//una entrada por cada nodo incidente
-			$this->incidentes[$idstring]=[];
+		$idstring = (string) $un_nodo->id();
+		if (!isset($this->incidentes[$idstring])) {  // una entrada por cada nodo incidente
+			$this->incidentes[$idstring] = [];
 		}
-		$fases=$this->incidentes[$idstring];
-		$fase=NodoElectrico::$fase;
-		//asigno adyacente
-		if (!isset($fases[$fase])){
-			$this->incidentes[$idstring][$fase]=[];
+		$fases = $this->incidentes[$idstring];
+		$fase = NodoElectrico::$fase;
+		// asigno adyacente
+		if (!isset($fases[$fase])) {
+			$this->incidentes[$idstring][$fase] = [];
 		}
-		echo "<br/>_inidente_333en".$idstring.$fase.$enlace."<br/>";
-		$this->incidentes[$idstring][$fase][$enlace]=$un_nodo;
+		echo '<br/>_inidente_333en' . $idstring . $fase . $enlace . '<br/>';
+		$this->incidentes[$idstring][$fase][$enlace] = $un_nodo;
 		return true;
 	}
-    /**
-     * Elimina un nodo incidente específico internamente (Interfaz Incidentes).
-     *
-     * 🔗 Interfaz:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-Incidentes.html Incidentes}
-     *
-     * Método interno para remover una relación incidente. Verifica que previamente
-     * se haya eliminado la relación de adyacencia correspondiente.
-     * 
-     * ---
-     * 🔗 Métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__incidente_en _incidente_en}
-	 * 
+
+	/**
+	 * Elimina un nodo incidente específico internamente (Interfaz Incidentes).
+	 *
+	 * 🔗 Interfaz:
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Incidentes.html Incidentes}
+	 *
+	 * Método interno para remover una relación incidente. Verifica que previamente
+	 * se haya eliminado la relación de adyacencia correspondiente.
+	 *
 	 * ---
-	 * 
+	 * 🔗 Métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__incidente_en _incidente_en}
+	 *
+	 * ---
+	 *
 	 * 🔗 Método relacionado:
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_incidentes cantidad_de_incidentes}
@@ -1940,93 +2006,95 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
 	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_validar_nombre_enlace validar_nombre_enlace}
 	 *
-	 * 
-     * @note Solo para uso interno del sistema.
+	 *
+	 * @note Solo para uso interno del sistema.
 	 * @param NodoElectrico $incidente Nodo incidente
-     * @param string $enlace Nombre del enlace a eliminar
-     * @private
-     * @since 0.0.1
-     */
-	private function eliminar_incidente($incidente, $enlace){
+	 * @param string $enlace Nombre del enlace a eliminar
+	 * @private
+	 * @since 0.0.1
+	 */
+	private function eliminar_incidente($incidente, $enlace)
+	{
 		// Validación de tipo
 		/*if (!static::validar_nombre_enlace($enlace)) {
 			self::_error("el enlace a eliminar no es valido");
 			return null;
 		}*/
-		echo "*eliminar*";
+		echo '*eliminar*';
 		// verificar inicialización perezosa
-		if ($this->incidentes===null) {
-			self::_alerta("no hay incidente para eliminar");
+		if ($this->incidentes === null) {
+			self::_alerta('no hay incidente para eliminar');
 			return null;
 		}
-		$id=(string)$incidente->id();
-		if (!isset($this->incidentes[$id])){
-			self::_alerta("no hay incidente para eliminar 2");
+		$id = (string) $incidente->id();
+		if (!isset($this->incidentes[$id])) {
+			self::_alerta('no hay incidente para eliminar 2');
 			return null;
 		}
-		$fase=self::$fase;
-		$fases=$this->incidentes[$id];
-		
+		$fase = self::$fase;
+		$fases = $this->incidentes[$id];
+
 		if (!isset($fases[$fase])) {
-			self::_alerta("no hay incidnetes para eliminar en la fase");
+			self::_alerta('no hay incidnetes para eliminar en la fase');
 			return null;
 		}
-		//echo $this->incidentes[$fase];
-		$incidentes=$fases[$fase];
-	/*	foreach ($incidentes as $en=>$no){
+		// echo $this->incidentes[$fase];
+		$incidentes = $fases[$fase];
+		/*	foreach ($incidentes as $en=>$no){
 			echo "</br>fase: ".$fase." enlace: ".$en." nodo: ".$no->id()." busco: ".$enlace;
 		}*/
 		// Verificar existencia del enlace
 		if (!isset($incidentes[$enlace])) {
-			self::_alerta("el enlace ".$enlace." que se intenta eliminar no existe");
+			self::_alerta('el enlace ' . $enlace . ' que se intenta eliminar no existe');
 			return null;
 		}
-		$eliminado =$incidentes[$enlace];
+		$eliminado = $incidentes[$enlace];
 		unset($this->incidentes[$id][$fase][$enlace]);
 		return $eliminado;
 		/*if ($eliminado->adyacentes[$fase][$enlace]!==null){//verifico que ya se haya eliminado el enlace de ida
 			static::_alerta("No se puede eliminar el enlace de vuelta antes que el de ida");
 			return null;
-		}*/		
+		}*/
 	}
 
-/*	private function eliminar_incidentes(): ?array{
+	/*	private function eliminar_incidentes(): ?array{
 
-		if ($this->E===null or !count($this->E)>0) {
-			self::_alerta("no hay incidentes para eliminar");
-			return []; 
-		}
-		if ($this->E[NodoElectrico::$fase]===null or !count($this->E[NodoElectrico::$fase])){
-			self::_alerta("no hay incidentes para eliminar en esta fase");
-			return [];
-		}
-		$incidentes=$this->E[NodoElectrico::$fase];
-		$copia=[...$incidentes];
-		foreach ($incidentes as $eliminado) {
-			$eliminado->referencias--;
-		}
-		$this->adyacentes=[];
-		return $copia;
-	
-	}*/
+			if ($this->E===null or !count($this->E)>0) {
+				self::_alerta("no hay incidentes para eliminar");
+				return [];
+			}
+			if ($this->E[NodoElectrico::$fase]===null or !count($this->E[NodoElectrico::$fase])){
+				self::_alerta("no hay incidentes para eliminar en esta fase");
+				return [];
+			}
+			$incidentes=$this->E[NodoElectrico::$fase];
+			$copia=[...$incidentes];
+			foreach ($incidentes as $eliminado) {
+				$eliminado->referencias--;
+			}
+			$this->adyacentes=[];
+			return $copia;
+
+		}*/
+
 	/**
-     * Ejecuta una función por cada nodo incidente (Interfaz IncidentesDobleVia).
-     *
-     * 🔗 Interfaz:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-IncidentesDobleVia.html IncidentesDobleVia}
-     *
-     * Itera sobre todos los nodos incidentes ejecutando una función callback para cada uno.
-     * La función recibe el nodo incidente, nombre del enlace y parámetros adicionales.
-     * 
-     * ---
-     * 🔗 Métodos complementarios:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_incidentes incidentes}
-	 * 
-     * ---
-     * 🔗 Métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
-     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__incidente_en _incidente_en}
+	 * Ejecuta una función por cada nodo incidente (Interfaz IncidentesDobleVia).
+	 *
+	 * 🔗 Interfaz:
+	 * - {@link ./classes/Iteradores-Nodos-Interfaces-IncidentesDobleVia.html IncidentesDobleVia}
+	 *
+	 * Itera sobre todos los nodos incidentes ejecutando una función callback para cada uno.
+	 * La función recibe el nodo incidente, nombre del enlace y parámetros adicionales.
+	 *
+	 * ---
+	 * 🔗 Métodos complementarios:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_incidentes incidentes}
+	 *
+	 * ---
+	 * 🔗 Métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__incidente_en _incidente_en}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_incidentes cantidad_de_incidentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente tiene_incidente}
@@ -2037,96 +2105,104 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente_a tiene_incidente_a}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_validar_nombre_enlace validar_nombre_enlace}
-     * ---
-     * Ejemplo de uso:
-     * ```php
-     * $nodo->por_cada_incidente_ejecutar(function($inc, $enlace) {
-     *     echo "Procesando incidente en enlace: $enlace";
-     * }, $parametro_extra);
-     * ```
-     *
-     * @note Devuelve array con resultados de cada ejecución.
-     * @param callable $funcion Función a ejecutar
-     * @param mixed ...$parametros Parámetros adicionales para la función
-     * @return array|null Array asociativo con resultados o null si no hay incidentes
-     * @public
-     * @since 0.0.1
-     */
-	public function por_cada_incidente_ejecutar(callable $funcion, mixed ...$parametros): ?array{
-		if ($this->incidentes===null || count($this->incidentes)<1) {
-			static::_alerta("alerta no existe incidente");
+	 * ---
+	 * Ejemplo de uso:
+	 * ```php
+	 * $nodo->por_cada_incidente_ejecutar(function($inc, $enlace) {
+	 *     echo "Procesando incidente en enlace: $enlace";
+	 * }, $parametro_extra);
+	 * ```
+	 *
+	 * @note Devuelve array con resultados de cada ejecución.
+	 * @param callable $funcion Función a ejecutar
+	 * @param mixed ...$parametros Parámetros adicionales para la función
+	 * @return array|null Array asociativo con resultados o null si no hay incidentes
+	 * @public
+	 * @since 0.0.1
+	 */
+	public function por_cada_incidente_ejecutar(callable $funcion, mixed ...$parametros): ?array
+	{
+		if ($this->incidentes === null || count($this->incidentes) < 1) {
+			static::_alerta('alerta no existe incidente');
 			return [];
 		}
 		$resultados = [];
-		$fase=NodoElectrico::$fase;
+		$fase = NodoElectrico::$fase;
 		foreach ($this->incidentes as $idincidente => $fases) {
-			if (isset($fases[$fase])){
-				$resultados[$idincidente]=[];
-				$faseaux=$fases[$fase];
-				foreach($faseaux as $enlace=>$incidente){
-					$resultados[$idincidente][$enlace]=$funcion($incidente, $enlace, ...$parametros);
+			if (isset($fases[$fase])) {
+				$resultados[$idincidente] = [];
+				$faseaux = $fases[$fase];
+				foreach ($faseaux as $enlace => $incidente) {
+					$resultados[$idincidente][$enlace] = $funcion($incidente, $enlace, ...$parametros);
 				}
 			}
 		}
-		
+
 		return $resultados;
 	}
 
-	/**********************************************************************************************
-     *  INTERFAZ ENERGIA (TEMPORAL)
-     * 
-     **********************************************************************************************/
+	/*
+	 * INTERFAZ ENERGIA (TEMPORAL)
+	 */
 
-	/////////////////////////////////Propiedades para la interfaz Energia
-	
+	// ///////////////////////////////Propiedades para la interfaz Energia
+
 	/**
 	 * Energia del nodo
-	 * @var 
-	 * */
-	private $energia=[];
+	 * @var
+	 */
+	private $energia = [];
+
 	/**
 	 * Capacidad de energia maxima del nodo
 	 * Contante
 	 * @var
-	 * */
-	private $capacidad=256;
+	 */
+	private $capacidad = 256;
+
 	/**
 	 * Fuga de energia del nodo en el tiempo
 	 * Constante
-	 * @var 
+	 * @var
 	 */
-	private $fuga=0; 
+	private $fuga = 0;
+
 	/**
-	 * funciones a llamar cuando satura (a nivel instancia, si no esta definida se debe 
+	 * funciones a llamar cuando satura (a nivel instancia, si no esta definida se debe
 	 * en la Clase)
 	 * @var array
 	 */
-	private $ejecutar_cuando_satura=null;
+	private $ejecutar_cuando_satura = null;
+
 	/**
-	 * funes a llamar cuando se queda sin energia(a nivel instancia, si no esta definida se debe 
+	 * funes a llamar cuando se queda sin energia(a nivel instancia, si no esta definida se debe
 	 * en la Clase)
 	 * @var array
 	 */
-	private $ejecutar_cuando_agota=null;
+	private $ejecutar_cuando_agota = null;
+
 	/**
 	 * funciones a llamar cuando satura (funciones compartidas por toda la fase, si se declara una
 	 * a nivel instancia se prioriza esa)
 	 * @var array
 	 */
-	private static $ejecutar_cuando_satura_por_defecto_por_fase=[];
+	private static $ejecutar_cuando_satura_por_defecto_por_fase = [];
+
 	/**
 	 * funes a llamar cuando se queda sin energia (funciones compartidas por toda la fase, si se declara una
 	 * a nivel instancia se prioriza esa)
 	 * @var array
 	 */
-	private static  $ejecutar_cuando_agota_por_defecto_por_fase=[];
-	//──────────────────────────────────────────────
-    // Métodos de configuración de callbacks
-    //──────────────────────────────────────────────
+	private static $ejecutar_cuando_agota_por_defecto_por_fase = [];
+
+	// ──────────────────────────────────────────────
+	// Métodos de configuración de callbacks
+	// ──────────────────────────────────────────────
+
 	/**
 	 * Asigna la funcion a ejecutar cuando el nodo se satura de energia (por defecto para toda
 	 * la fase)
-	 * 
+	 *
 	 * esta funcion se va a ejecutar cuando se satura la energia de un nodo en una de las fases.
 	 * si dicho nodo no tiene definida una funcion individual en la instancia, se buscara ejecutar
 	 * ésta que está compartida por todos los nodos en la misma fase.
@@ -2134,59 +2210,66 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * @param string|null $fase (opcional) si no se pasa toma la fase actual
 	 * @return void
 	 */
-	public static function _ejecutar_cuando_satura_por_fase(callable $funcion, string|null $fase=null): void{
-		if ($fase===null){
-			$fase=self::$fase;
+	public static function _ejecutar_cuando_satura_por_fase(callable $funcion, string|null $fase = null): void
+	{
+		if ($fase === null) {
+			$fase = self::$fase;
 		}
-		//inicializacion perezosa
-		if (self::$ejecutar_cuando_satura_por_defecto_por_fase===null) {
-			self::$ejecutar_cuando_satura_por_defecto_por_fase=[];
+		// inicializacion perezosa
+		if (self::$ejecutar_cuando_satura_por_defecto_por_fase === null) {
+			self::$ejecutar_cuando_satura_por_defecto_por_fase = [];
 		}
-		self::$ejecutar_cuando_satura_por_defecto_por_fase[$fase]=$funcion;
+		self::$ejecutar_cuando_satura_por_defecto_por_fase[$fase] = $funcion;
 	}
+
 	/**
 	 * devuelve la funcion a ejecutar cuando el nodo se satura de energia (por defecto para toda
 	 * la fase)
-	 * 
+	 *
 	 * esta funcion se va a ejecutar cuando se satura la energia de un nodo en una de las fases.
 	 * si dicho nodo no tiene definida una funcion individual en la instancia, se buscara ejecutar
 	 * ésta que está compartida por todos los nodos en la misma fase.
 	 * @param string|null $fase (opcional) si no se pasa devuelve el de la fase actual
 	 * @return callable|null
 	 */
-	public static function ejecutar_cuando_satura_por_fase(string|null $fase=null): callable|null{
-		if ($fase===null){
-			$fase=self::$fase;
+	public static function ejecutar_cuando_satura_por_fase(string|null $fase = null): callable|null
+	{
+		if ($fase === null) {
+			$fase = self::$fase;
 		}
-		if (self::$ejecutar_cuando_satura_por_defecto_por_fase===null) {
+		if (self::$ejecutar_cuando_satura_por_defecto_por_fase === null) {
 			return null;
 		}
-		if (isset(self::$ejecutar_cuando_satura_por_defecto_por_fase[$fase])){
+		if (isset(self::$ejecutar_cuando_satura_por_defecto_por_fase[$fase])) {
 			return self::$ejecutar_cuando_satura_por_defecto_por_fase[$fase];
-		}else{
+		} else {
 			return null;
 		}
 	}
+
 	/**
 	 * Asigna la funcion a ejecutar cuando el nodo se satura de energia (para la instancia)
-	 * 
+	 *
 	 * esta funcion se fa a priorizar antes de la compartida por toda la fase al momento de
 	 * elegir una para ejectur si estan las dos definidas.
 	 * @param callable $funcion
 	 * @return void
 	 */
-	public function _ejecutar_cuando_satura(callable $funcion){
-				//inicializacion perezosa
-		if ($this->ejecutar_cuando_satura===null) {
-			$this->ejecutar_cuando_satura=[];
+	public function _ejecutar_cuando_satura(callable $funcion)
+	{
+		// inicializacion perezosa
+		if ($this->ejecutar_cuando_satura === null) {
+			$this->ejecutar_cuando_satura = [];
 		}
-		$this->ejecutar_cuando_satura[self::$fase]=$funcion;
+		$this->ejecutar_cuando_satura[self::$fase] = $funcion;
 	}
+
 	/**
 	 * devuelve la funcion a ejecutar cuando se satura el nodo de energia (para la instancia)
 	 * @return callable|mixed
 	 */
-	public function ejecutar_cuando_satura(){
+	public function ejecutar_cuando_satura()
+	{
 		return $this->ejecutar_cuando_satura[NodoElectrico::$fase] ?? null;;
 	}
 
@@ -2195,169 +2278,179 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * @param callable $funcion
 	 * @return void
 	 */
-	public function _ejecutar_cuando_agota(callable $funcion){
-				//inicializacion perezosa
-		if ($this->ejecutar_cuando_agota===null) {
-			$this->ejecutar_cuando_agota=[];
-		}		
-		echo "_fase".self::$fase;
-		$this->ejecutar_cuando_agota[self::$fase]=$funcion;
+	public function _ejecutar_cuando_agota(callable $funcion)
+	{
+		// inicializacion perezosa
+		if ($this->ejecutar_cuando_agota === null) {
+			$this->ejecutar_cuando_agota = [];
+		}
+		echo '_fase' . self::$fase;
+		$this->ejecutar_cuando_agota[self::$fase] = $funcion;
 	}
+
 	/**
 	 * Asigna la funcion a ejecutar cuando el nodo se satura de energia (por defecto para toda
 	 * la fase)
-	 * 
+	 *
 	 * esta funcion se va a ejecutar cuando se satura la energia de un nodo en una de las fases.
 	 * si dicho nodo no tiene definida una funcion individual en la instancia, se buscara ejecutar
 	 * ésta que está compartida por todos los nodos en la misma fase.
-	 * 
+	 *
 	 * si no se le pasa ninguna fase asigna la funcion a la fase actual
 	 * @param callable $funcion
 	 * @param string|null $fase (opcional) la fase a la que se le quiere asignar la funcion, si es null
 	 * 							se toma por defecto la fase actual
 	 * @return void
 	 */
-	public static function _ejecutar_cuando_agota_por_fase(callable $funcion, string|null $fase=null): void{
-		if ($fase===null){
-			$fase=self::$fase;
+	public static function _ejecutar_cuando_agota_por_fase(callable $funcion, string|null $fase = null): void
+	{
+		if ($fase === null) {
+			$fase = self::$fase;
 		}
-		echo "Faseee:".$fase;
-		//inicializacion perezosa
-		if (self::$ejecutar_cuando_agota_por_defecto_por_fase===null) {
-			self::$ejecutar_cuando_agota_por_defecto_por_fase=[];
+		echo 'Faseee:' . $fase;
+		// inicializacion perezosa
+		if (self::$ejecutar_cuando_agota_por_defecto_por_fase === null) {
+			self::$ejecutar_cuando_agota_por_defecto_por_fase = [];
 		}
-		self::$ejecutar_cuando_agota_por_defecto_por_fase[$fase]=$funcion;
+		self::$ejecutar_cuando_agota_por_defecto_por_fase[$fase] = $funcion;
 	}
+
 	/**
 	 * devuelve la funcion a ejecutar cuando el nodo se agota de energia (por defecto para toda
 	 * la fase)
-	 * 
+	 *
 	 * esta funcion se va a ejecutar cuando se agota la energia de un nodo en una de las fases.
 	 * si dicho nodo no tiene definida una funcion individual en la instancia, se buscara ejecutar
 	 * ésta que está compartida por todos los nodos en la misma fase.
 	 * @param string|null $fase (opcional) si no se pasa devuelve el de la fase actual
 	 * @return callable|null
 	 */
-	public static function ejecutar_cuando_agota_por_fase(string|null $fase=null): callable|null{
-		if (self::$ejecutar_cuando_agota_por_defecto_por_fase===null) {
+	public static function ejecutar_cuando_agota_por_fase(string|null $fase = null): callable|null
+	{
+		if (self::$ejecutar_cuando_agota_por_defecto_por_fase === null) {
 			return null;
 		}
-		if ($fase===null){
-			$fase=self::$fase;
+		if ($fase === null) {
+			$fase = self::$fase;
 		}
-		echo "FGAseee".$fase;
-		if (isset(self::$ejecutar_cuando_agota_por_defecto_por_fase[$fase])){
-			echo "FGA!";
+		echo 'FGAseee' . $fase;
+		if (isset(self::$ejecutar_cuando_agota_por_defecto_por_fase[$fase])) {
+			echo 'FGA!';
 			return self::$ejecutar_cuando_agota_por_defecto_por_fase[$fase];
-		}else{
-			echo "FGH!";
+		} else {
+			echo 'FGH!';
 			return null;
 		}
 	}
+
 	/**
 	 * devuelve la funcion a ejecutar cuando se satura el nodo de energia
 	 * @return callable|mixed
 	 */
-	function ejecutar_cuando_agota(){
+	function ejecutar_cuando_agota()
+	{
 		return $this->ejecutar_cuando_agota[self::$fase] ?? null;;
 	}
 
-    //──────────────────────────────────────────────
-    // Gestión de energía
-    //────────────────────────────────────────────
+	// ──────────────────────────────────────────────
+	// Gestión de energía
+	// ────────────────────────────────────────────
 
 	/**
 	 * Da energia al nodo para que este la sume a su energia
-	 * 
-	 * 
+	 *
+	 *
 	 * @param int $cantidad_energia
 	 * @return void
 	 */
-	public function _energia(int $cantidad_energia){
-		echo "energia";
-		//$this->energia[NodoElectrico::$fase]+=$cantidad_energia;
-		//inicializacion perezosa
-		if ($this->energia===null) {
-			echo "energia1";
-			$this->energia=[];
-		}	
+	public function _energia(int $cantidad_energia)
+	{
+		echo 'energia';
+		// $this->energia[NodoElectrico::$fase]+=$cantidad_energia;
+		// inicializacion perezosa
+		if ($this->energia === null) {
+			echo 'energia1';
+			$this->energia = [];
+		}
 		if (!isset($this->energia[self::$fase])) {
-			echo "energia2";
-            $this->energia[self::$fase] = 0;
-        }
+			echo 'energia2';
+			$this->energia[self::$fase] = 0;
+		}
 
-        $this->energia[self::$fase] += $cantidad_energia;
+		$this->energia[self::$fase] += $cantidad_energia;
 
-        // Fuga (si corresponde)
-       /* if ($this->fuga > 0) {
-            $this->energia[self::$fase] -= $this->fuga;
-        }*/
+		// Fuga (si corresponde)
+		/* if ($this->fuga > 0) {
+			$this->energia[self::$fase] -= $this->fuga;
+		}*/
 
-        // Saturación
-        if ($this->energia[self::$fase] > $this->capacidad) {
-			echo "energia3";
-            $this->energia[self::$fase] = $this->capacidad;
-            $funcion = $this->ejecutar_cuando_satura();
-            if (is_callable($funcion)) {
-				echo "energia4";
-                $funcion($this);
-            }else{
+		// Saturación
+		if ($this->energia[self::$fase] > $this->capacidad) {
+			echo 'energia3';
+			$this->energia[self::$fase] = $this->capacidad;
+			$funcion = $this->ejecutar_cuando_satura();
+			if (is_callable($funcion)) {
+				echo 'energia4';
+				$funcion($this);
+			} else {
 				$funcion = self::ejecutar_cuando_satura_por_fase();
-				echo "energia5";
+				echo 'energia5';
 				if (is_callable($funcion)) {
-					echo "energia6";
-                	$funcion($this);
-            	}
+					echo 'energia6';
+					$funcion($this);
+				}
 			}
-        }
+		}
 
-        // Agotamiento
-        if ($this->energia[self::$fase] <= 0) {
-			echo "energia7";
-            $this->energia[self::$fase] = 0;
-            $funcion = $this->ejecutar_cuando_agota();
-            if (is_callable($funcion)) {
-				echo "energia8";
-                $funcion($this);
-            }else{
+		// Agotamiento
+		if ($this->energia[self::$fase] <= 0) {
+			echo 'energia7';
+			$this->energia[self::$fase] = 0;
+			$funcion = $this->ejecutar_cuando_agota();
+			if (is_callable($funcion)) {
+				echo 'energia8';
+				$funcion($this);
+			} else {
 				$funcion = self::ejecutar_cuando_agota_por_fase();
-				echo "energia9";
+				echo 'energia9';
 				if (is_callable($funcion)) {
-					echo "energia10";
-                	$funcion($this);
-            	}
+					echo 'energia10';
+					$funcion($this);
+				}
 			}
-        }
+		}
 	}
 
 	/**
 	 * Retorna el nivel de energia del nodo
-	 * 
+	 *
 	 * @return int
 	 */
-	public function energia():int{
-		//return energia (fuga)
+	public function energia(): int
+	{
+		// return energia (fuga)
 		return $this->energia[self::$fase] ?? 0;
 	}
 
 	/*************************************************************************************************************/
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
-	//INTERFACE PARA IMPRIMIR LOS NODOS*************************************************/////////////////////////*/
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+	// ///////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+	// ///////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+	// INTERFACE PARA IMPRIMIR LOS NODOS*************************************************/////////////////////////*/
+	// ///////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+	// ///////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 	/*************************************************************************************************************/
+
 	/**
 	 * Imprime el nodo en formato HTML (Interfaz Impresion).
 	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Impresion.html Interfaz Impresion}
 	 *
-	 * Muestra en pantalla una representación visual del nodo con su id, su dato, 
-	 * los adyacentes y el número de referencias. Se utiliza principalmente con fines 
+	 * Muestra en pantalla una representación visual del nodo con su id, su dato,
+	 * los adyacentes y el número de referencias. Se utiliza principalmente con fines
 	 * de depuración y diagnóstico visual del grafo en un entorno web.
 	 *
-	 * ⚠️ Debe ser usada únicamente por programadores o herramientas de depuración.  
+	 * ⚠️ Debe ser usada únicamente por programadores o herramientas de depuración.
 	 * No se recomienda para salida de usuario final.
 	 *
 	 * ---
@@ -2376,75 +2469,78 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * @note Utiliza `echo` para generar directamente HTML. No devuelve valor.
 	 * @return void
 	 */
-	public function imprimir() {
+	public function imprimir()
+	{
 		echo "<div id='nodo-" . $this->id() . "' style='margin-bottom:20px;'>";
-		echo ">>NODOELECTRICO4 " . $this->id();
-		if ($this->es_especial()) echo " (ESP)";
-		echo " - Dato: ";
+		echo '>>NODOELECTRICO4 ' . $this->id();
+		if ($this->es_especial())
+			echo ' (ESP)';
+		echo ' - Dato: ';
 
 		$dato = $this->dato();
 		if (is_string($dato)) {
 			echo $dato;
 		} elseif ($dato === null) {
-			echo "null";
+			echo 'null';
 		} else {
-			echo "este dato no es un string";
+			echo 'este dato no es un string';
 		}
-		echo "<br/>Referencias: ".$this->referencias;
-		echo "<br/>Capacidad: ".$this->capacidad;
-		echo "<br/>Fuga: ".$this->fuga;
-		//if ($this->energia!==null && count($this->energia)>0){
-		echo "<br/>Energia: ".$this->energia();
-		
-	/*	}else{
+		echo '<br/>Referencias: ' . $this->referencias;
+		echo '<br/>Capacidad: ' . $this->capacidad;
+		echo '<br/>Fuga: ' . $this->fuga;
+		// if ($this->energia!==null && count($this->energia)>0){
+		echo '<br/>Energia: ' . $this->energia();
+
+		/*	}else{
 			echo "<br/>Energia: 0";
 		}*/
-		echo "<br/>Adyacentes:<br/>";
-		if ($this->adyacentes!==null) {
-			echo "<ul>";
+		echo '<br/>Adyacentes:<br/>';
+		if ($this->adyacentes !== null) {
+			echo '<ul>';
 			foreach ($this->adyacentes as $fase => $adyacentes) {
-				echo "<h3>fase: ".$fase."</h3>";
-				echo "<ul>";
-				foreach ($adyacentes as $enlace => $nodo){
-					echo "<li>[$enlace] => <a href='#nodo-" . $nodo->id() . "'>" . $nodo->id() . "</a></li>";
+				echo '<h3>fase: ' . $fase . '</h3>';
+				echo '<ul>';
+				foreach ($adyacentes as $enlace => $nodo) {
+					echo "<li>[$enlace] => <a href='#nodo-" . $nodo->id() . "'>" . $nodo->id() . '</a></li>';
 				}
-				echo "</ul>";
+				echo '</ul>';
 			}
 			/*$this->por_cada_adyacente_ejecutar(function($nodo,$enlace){
 				echo "<li>[$enlace] => <a href='#nodo-" . $nodo->id() . "'>" . $nodo->id() . "</a></li>";
 			});*/
-			echo "</ul>";
+			echo '</ul>';
 		} else {
-			echo "No tiene<br/>";
+			echo 'No tiene<br/>';
 		}
 
-		echo "Incidentes:<br/>";
-		if ($this->incidentes!==null) {
-			echo "<ul>";
-			$nodos=$this->incidentes;
-			foreach ($nodos as $idnodo=>$fases){
-				echo "<h3>idnodo: ".$idnodo."</h3>";
-				echo "<ul>";
-				foreach ($fases as $fase=>$incidentes){
-					echo "<h4>fase: ".$fase."</h4>";
-					echo "<ul>";
-					foreach($incidentes as $enlace=>$incidente){
-							echo "<li>[".$enlace."] => <a href='#nodo-".$incidente->id()."'>".$incidente->id()."</a></li>";
+		echo 'Incidentes:<br/>';
+		if ($this->incidentes !== null) {
+			echo '<ul>';
+			$nodos = $this->incidentes;
+			foreach ($nodos as $idnodo => $fases) {
+				echo '<h3>idnodo: ' . $idnodo . '</h3>';
+				echo '<ul>';
+				foreach ($fases as $fase => $incidentes) {
+					echo '<h4>fase: ' . $fase . '</h4>';
+					echo '<ul>';
+					foreach ($incidentes as $enlace => $incidente) {
+						echo '<li>[' . $enlace . "] => <a href='#nodo-" . $incidente->id() . "'>" . $incidente->id() . '</a></li>';
 					}
-					echo "</ul>";
+					echo '</ul>';
 				}
-				echo "</ul>";
+				echo '</ul>';
 			}
-			echo "</ul>";
+			echo '</ul>';
 		} else {
-			echo "No tiene<br/>";
+			echo 'No tiene<br/>';
 		}
 		echo "Fin Nodo <a href='#inicio'>↑ Volver al inicio</a></div><br/>";
 	}
+
 	/**
 	 * Imprime todos los nodos de la superestructura en formato HTML.
 	 *
-	 * Esta función está destinada a tareas de depuración visual.  
+	 * Esta función está destinada a tareas de depuración visual.
 	 * Recorre todos los nodos de la superestructura y ejecuta la función `imprimir()` de cada uno,
 	 * generando una representación HTML completa de toda la red de nodos.
 	 *
@@ -2469,6 +2565,7 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 		self::establecer_fase(self::$token,$faseoriginal);
 		return true;
 	}*/
+
 	/**
 	 * Imprime el nodo en formato texto plano (Interfaz Impresion).
 	 *
@@ -2493,22 +2590,24 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 * @note Devuelve `true` si se ejecutó correctamente.
 	 * @return bool
 	 */
-	public function imprimir2() {
+	public function imprimir2()
+	{
 		echo "\n>>NODO " . $this->id();
-		if ($this->es_especial()) echo " (ESP)";
-		echo " - Dato: ";
+		if ($this->es_especial())
+			echo ' (ESP)';
+		echo ' - Dato: ';
 
 		$dato = $this->dato();
 		if (is_string($dato) || is_numeric($dato)) {
 			echo $dato;
 		} elseif ($dato === null) {
-			echo "null";
+			echo 'null';
 		} else {
-			echo "este dato no es un string";
+			echo 'este dato no es un string';
 		}
-		echo "\nCapacidad: ".$this->capacidad;
-		echo "\nFufa: ".$this->fuga;
-		echo "\nEnergia: ".$this->energia();
+		echo "\nCapacidad: " . $this->capacidad;
+		echo "\nFufa: " . $this->fuga;
+		echo "\nEnergia: " . $this->energia();
 		echo "\nAdyacentes:\n";
 
 		if ($this->tiene_adyacente()) {
@@ -2518,7 +2617,7 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 					echo "\n[$enlace] => " . $nodo->id();
 				}
 			}*/
-			$this->por_cada_adyacente_ejecutar(function($nodo, $enlace){
+			$this->por_cada_adyacente_ejecutar(function ($nodo, $enlace) {
 				echo "\n[$enlace] => " . $nodo->id();
 			});
 		} else {
@@ -2528,13 +2627,13 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 		echo "\nIncidentes:\n";
 
 		if ($this->tiene_incidente()) {
-		/*	foreach ($this->incidentes as $fase=>$incidentes){//fases
+			/*	foreach ($this->incidentes as $fase=>$incidentes){//fases
 				echo '\nIncidentes fase "'.$fase.'":\n';
 				foreach ($incidentes as $enlace => $nodo) {
 					echo "\n[$enlace] => " . $nodo->id();
 				}
 			}*/
-			$this->por_cada_incidente_ejecutar(function($nodo, $enlace){
+			$this->por_cada_incidente_ejecutar(function ($nodo, $enlace) {
 				echo "\n[$enlace] => " . $nodo->id();
 			});
 		} else {
@@ -2544,6 +2643,7 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 		echo "\nFin Nodo\n";
 		return true;
 	}
+
 	/**
 	 * Imprime todos los nodos de la superestructura en formato de texto (modo consola).
 	 *
@@ -2552,23 +2652,25 @@ public function por_cada_fase_ejecutar(string $token, callable $funcion): void
 	 *
 	 * @return bool Devuelve `true` si se imprimieron nodos, `false` si la superestructura está vacía.
 	 */
-	/*static public function imprimir_superestructura2() { 
-		if (!Nodo::hay_nodos_en_superestructura()) {
-			static::_alerta("Nodo::imprimir_superestructura2() — la superestructura está vacía");
-			return false;
-		}
 
-		$funcion = function($nodo) {
-			$nodo->imprimir2();
-		};
-		$faseoriginal=self::$fase;
-		foreach(self::$fases as $fase=>$valor){
-			self::establecer_fase(self::$token, $fase);
-			echo "\nFase: ".$fase."\n";
-			self::por_cada_nodo_ejecutar(self::$token, $funcion, null);
-		}
-		self::establecer_fase(self::$token, $faseoriginal);
-		return true;
-	}
-*/
+	/*
+	 * static public function imprimir_superestructura2() {
+	 * 	if (!Nodo::hay_nodos_en_superestructura()) {
+	 * 		static::_alerta("Nodo::imprimir_superestructura2() — la superestructura está vacía");
+	 * 		return false;
+	 * 	}
+	 *
+	 * 	$funcion = function($nodo) {
+	 * 		$nodo->imprimir2();
+	 * 	};
+	 * 	$faseoriginal=self::$fase;
+	 * 	foreach(self::$fases as $fase=>$valor){
+	 * 		self::establecer_fase(self::$token, $fase);
+	 * 		echo "\nFase: ".$fase."\n";
+	 * 		self::por_cada_nodo_ejecutar(self::$token, $funcion, null);
+	 * 	}
+	 * 	self::establecer_fase(self::$token, $faseoriginal);
+	 * 	return true;
+	 * }
+	 */
 }

@@ -12,39 +12,49 @@ namespace Iteradores\Nodos\Interfaces;
  * @package Iteradores\Nodos\Interfaces
  * @since V1.2.3
  */
-interface Fase{
+interface Fase
+{
+    // ================== ESTÁTICOS ==================
 
-    //ESTATICOS/////////////////////////////////////////////////////////////
     /**
-     * Establece la fase en la que van a trabajar todos los nodos
-     * 
-     * Se necesita acceso autorizado por token
-     * @param string $token autorizacion
-     * @param string $fase nombre de la fase
+     * Establece la fase en la que van a trabajar todos los nodos.
+     * Se necesita acceso autorizado por token.
+     *
+     * @param string $token Token de autorización
+     * @param string $fase  Nombre de la nueva fase
      * @return void
      */
-    public static function establecer_fase(string $token, string $fase);
+    public static function _fase(string $token, string $fase);
 
-    //INSTANCIA////////////////////////////////////////////////////////////////////
     /**
-     * Ejecuta una función por cada fase registrada en el nodo (Interfaz Fase).
+     * Devuelve la fase actual de trabajo (global).
+     * El acceso autorizado es para establecer la fase, pero no para leerla,
+     * por lo que no es necesario el token de seguridad.
      *
+     * @return string
+     */
+    public static function fase(): string;
+
+    /**
+     * Ejecuta una función por cada fase registrada en el sistema (global).
+     * Requiere token de seguridad.
      *
-     * Permite iterar sobre todas las fases registradas en el nodo ejecutando una función
-     * callback en cada una. Requiere token de seguridad por ser una operación sensible.
-     * 
-     * ---
-     * 🔗 Métodos relacionados:
-     * - {@link ./classes/Iteradores-Nodos-Interfaces-Fase.html#method_establecer_fase establecer_fase}
-     *
-     *
-     * @note Requiere token de seguridad válido.
-     * @param string token Token de autorización
-     * @param callable $funcion Función a ejecutar en cada fase
+     * @param string   $token   Token de autorización
+     * @param callable $funcion Función que recibe (string $fase) => void
      * @return void
-     * @public
-     * @since 1.2.0
+     * @since V1.2.6
+     */
+    public static function por_cada_fase_global_ejecutar(string $token, callable $funcion);
+
+    // ================== INSTANCIA ==================
+
+    /**
+     * Ejecuta una función por cada fase en la que el nodo tiene actividad.
+     * Requiere token de seguridad.
+     *
+     * @param string   $token   Token de autorización
+     * @param callable $funcion Función a ejecutar en cada fase (recibe el nombre de la fase)
+     * @return void
      */
     public function por_cada_fase_ejecutar(string $token, callable $funcion);
 }
-?>

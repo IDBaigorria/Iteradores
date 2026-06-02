@@ -1,0 +1,204 @@
+{
+    // ============================================================
+    // TU RUTA DE PHP (no la modifiques)
+    // ============================================================
+    "php.executablePath": "C:/xampp8/php/php.exe",
+
+    // ============================================================
+    // ACTIVAR RESALTADO SEMÁNTICO
+    // ============================================================
+    "editor.semanticHighlighting.enabled": true,
+
+    // ============================================================
+    // TOKENS SEMÁNTICOS (modernos, globales)
+    // Basados en tus colores, pero mejorados para distinguir mejor
+    // ============================================================
+    "editor.semanticTokenColorCustomizations": {
+        "enabled": true,
+        "rules": {
+            // Funciones (amarillo/mostaza, como querías originalmente)
+            "function": "#fff9a8",
+            "function.declaration": "#fff9a8",
+            // Métodos (amarillo un poco más claro para diferenciar)
+            "method": "#fff9a8",
+            "method.declaration": "#fff9a8",
+
+            // Variables y parámetros (naranja terroso, no igual que los métodos)
+            "variable": "#ffc863",
+            "parameter": "#ffc863",
+            "property": "#ffc863",
+            "variable.readonly": "#ffc863",
+
+            // Operadores (cian eléctrico, como tenías)
+            "operator": "#66EDFF",
+
+            // Clases y tipos (azul oscuro intenso, pero legible)
+            "class": "#13cf90",
+            "type": "#13cf90",
+            "interface": "#13cf90",
+
+            // Constantes (morado, lo dejamos)
+            "constant": "#6fffff",
+
+            // Números (verde pistacho)
+            "number": "#beffff",
+
+            // Strings (magenta suave, menos agresivo que el #a339a7)
+            "string": "#C97DC3",
+
+            // Comentarios (verde musgo, pero más suave)
+            "comment": "#6A9955",
+
+            // Palabras clave (rosa púrpura)
+            "keyword": "#C678DD"
+        }
+    },
+
+    // ============================================================
+    // TOKENS SINTÁCTICOS (TextMate, para lenguajes sin semántica completa)
+    // ============================================================
+    "editor.tokenColorCustomizations": {
+        "textMateRules": [
+            // ---------- FUNCIONES Y MÉTODOS (amarillo mostaza) ----------
+            {
+                "scope": [
+                    "entity.name.function",
+                    "entity.name.function.member",
+                    "meta.function entity.name.function",
+                    "support.function",
+                    "meta.method entity.name.function",
+                    "entity.name.method"
+                ],
+                "settings": {
+                    "foreground": "#fff9a8"
+                }
+            },
+
+            // ---------- VARIABLES, PARÁMETROS, PROPIEDADES (naranja) ----------
+            {
+                "scope": [
+                    "variable",
+                    "variable.other",
+                    "variable.parameter",
+                    "variable.other.property",
+                    "variable.other.member",
+                    "variable.other.object.property",
+                    "variable.other.readwrite",
+                    "meta.parameter.variable"
+                ],
+                "settings": {
+                    "foreground": "#ffc863"
+                }
+            },
+
+            // ---------- CLASES, TIPOS (azul oscuro ajustado) ----------
+            {
+                "scope": [
+                    "entity.name.type",
+                    "entity.name.class",
+                    "entity.name.type.class",
+                    "support.class",
+                    "storage.type.class"
+                ],
+                "settings": {
+                    "foreground": "#13cf90"
+                }
+            },
+
+            // ---------- OPERADORES (cian) ----------
+            {
+                "scope": [
+                    "keyword.operator",
+                    "keyword.operator.assignment",
+                    "keyword.operator.comparison",
+                    "keyword.operator.logical",
+                    "keyword.operator.arithmetic",
+                    "punctuation.operator"
+                ],
+                "settings": {
+                    "foreground": "#66EDFF"
+                }
+            },
+
+            // ---------- CONSTANTES (morado) ----------
+            {
+                "scope": [
+                    "constant",
+                    "constant.language",
+                    "support.constant"
+                ],
+                "settings": {
+                    "foreground": "#6fffff"
+                }
+            },
+
+            // ---------- NÚMEROS (verde pistacho) ----------
+            {
+                "scope": ["constant.numeric"],
+                "settings": {
+                    "foreground": "#beffff"
+                }
+            },
+
+            // ---------- STRINGS (magenta) ----------
+            {
+                "scope": ["string"],
+                "settings": {
+                    "foreground": "#C97DC3"
+                }
+            },
+
+            // ---------- COMENTARIOS (verde musgo, cursiva) ----------
+            {
+                "scope": ["comment"],
+                "settings": {
+                    "foreground": "#6A9955",
+                    "fontStyle": "italic"
+                }
+            },
+
+            // ---------- PALABRAS CLAVE (rosa púrpura) ----------
+            {
+                "scope": ["keyword"],
+                "settings": {
+                    "foreground": "#C678DD"
+                }
+            },
+
+            // ---------- PUNTO Y COMA (rojo oscuro, como tenías) ----------
+            {
+                "scope": [
+                    "punctuation.terminator",
+                    "punctuation.terminator.expression"
+                ],
+                "settings": {
+                    "foreground": "#2b55af"
+                }
+            },
+
+            // ---------- THIS, SELF, PARENT (naranja fuerte) ----------
+            {
+                "scope": ["variable.language"],
+                "settings": {
+                    "foreground": "#E06C75"
+                }
+            },
+
+            // ---------- ETIQUETAS HTML/JSX (ámbar) ----------
+            {
+                "scope": ["entity.name.tag"],
+                "settings": {
+                    "foreground": "#E5C07B"
+                }
+            },
+
+            // ---------- ATRIBUTOS HTML (celeste) ----------
+            {
+                "scope": ["entity.other.attribute-name"],
+                "settings": {
+                    "foreground": "#61AFEF"
+                }
+            }
+        ]
+    }
+}
