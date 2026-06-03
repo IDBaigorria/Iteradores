@@ -283,7 +283,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 */
 	function __destruct()
 	{
-		self::$cant--;
+		//self::$cant--;
 		echo '</br>destruccion!</br>';
 	}
 
@@ -458,8 +458,10 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	public static function crear_con_id($id, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null
 	{
 		$nodo = parent::crear_con_id($id);
-		$nodo->capacidad = $capacidad;
-		$nodo->fuga = $fuga;
+		if ($nodo !== null) {
+			$nodo->capacidad = $capacidad;
+			$nodo->fuga = $fuga;
+		}
 		return $nodo;
 	}
 
@@ -520,8 +522,10 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	public static function crear_con_dato_e_id($dato, $id, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null
 	{
 		$nodo = parent::crear_con_dato_e_id($dato, $id);
-		$nodo->capacidad = $capacidad;
-		$nodo->fuga = $fuga;
+		if ($nodo !== null) {
+			$nodo->capacidad = $capacidad;
+			$nodo->fuga = $fuga;
+		}
 		return $nodo;
 	}
 
@@ -621,10 +625,10 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 *
 	 * @since V2.9.3
 	 */
-	public static function nodo($elemento = null, &$es_nodo = null, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null
+	public static function nodo($elemento = null, &$es_nodo = null, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico
 	{
 		$nodo = parent::nodo($elemento, $es_nodo);
-		if (!$es_nodo) {
+		if ($nodo !== null && !$es_nodo) {
 			$nodo->capacidad = $capacidad;
 			$nodo->fuga = $fuga;
 		}
@@ -719,8 +723,12 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 				}
 			}
 			//	$nodo->imprimir();
+			// Decrementar contador global AHORA, no esperar al destructor
+			self::$cant--;
+			
+			// Eliminar la referencia local (opcional, el destructor hará limpieza final)
 			unset($nodo);
-			return true;
+				return true;
 		}
 		// Caso 3: El nodo tiene más referencias → no se puede eliminar
 		static::_error('debe eliminar todos los enlaces que enlazan hacia el nodo antes de intentar eliminarlo ');
@@ -1557,6 +1565,59 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		return $resultados;
 	}
 
+	/**
+	 * Devuelve la cantidad total de adyacentes (salientes) sumando todas las fases.
+	 *
+	 * A diferencia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes()}
+	 * que solo cuenta en la **fase actual**, este método recorre todas las fases
+	 * en las que el nodo tiene actividad y suma la totalidad de enlaces salientes.
+	 *
+	 * Es especialmente útil cuando se trabaja con múltiples fases y se necesita
+	 * conocer el grado de salida global del nodo, independientemente de la fase activa.
+	 *
+	 * La implementación es **opcional** según la interfaz, pero en `NodoElectrico`
+	 * se implementa completamente.
+	 *
+	 * ---
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes cantidad_de_adyacentes()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_incidentes_global cantidad_de_incidentes_global()}
+	 *
+	 * ---
+	 * 🔗 Otros métodos relacionados (adyacentes):
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente _adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__adyacente_en _adyacente_en}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_adyacentes adyacentes}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente tiene_adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
+	 *
+	 * ---
+	 * @example
+	 * // Supongamos dos fases con diferentes enlaces
+	 * Controlador::_fase($token, 'fase1');
+	 * $nodo->_adyacente_en($otro, 'enlace1');
+	 * Controlador::_fase($token, 'fase2');
+	 * $nodo->_adyacente_en($otro2, 'enlace2');
+	 *
+	 * echo $nodo->cantidad_de_adyacentes_global(); // 2
+	 * echo $nodo->cantidad_de_adyacentes(); // 1 (solo fase actual 'fase2')
+	 *
+	 * @return int
+	 * @public
+	 * @since V1.2.7
+	 */
+	public function cantidad_de_adyacentes_global(): int {
+		$total = 0;
+		if (is_array($this->adyacentes)) {
+			foreach ($this->adyacentes as $adyacentesFase) {
+				if (is_array($adyacentesFase)) {
+					$total += count($adyacentesFase);
+				}
+			}
+		}
+		return $total;
+	}
 	/*
 	 * INTERFAZ INCIDENTES (INSTANCIA)
 	 *
@@ -1640,6 +1701,63 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		return false;
 	}
 
+	/**
+	 * Devuelve la cantidad total de incidentes (entrantes) sumando todas las fases.
+	 *
+	 * A diferencia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_incidentes cantidad_de_incidentes()}
+	 * que solo cuenta en la **fase actual**, este método recorre todas las fases
+	 * en las que el nodo recibe enlaces y suma la totalidad de conexiones entrantes.
+	 *
+	 * Es útil cuando se necesita conocer el grado de entrada global del nodo,
+	 * independientemente de la fase activa.
+	 *
+	 * La implementación es **opcional** según la interfaz, pero en `NodoElectrico`
+	 * se implementa completamente.
+	 *
+	 * ---
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_incidentes cantidad_de_incidentes()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_cantidad_de_adyacentes_global cantidad_de_adyacentes_global()}
+	 *
+	 * ---
+	 * 🔗 Otros métodos relacionados (incidentes):
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__incidente_en _incidente_en}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_incidentes incidentes}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente tiene_incidente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente_a tiene_incidente_a}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_incidente eliminar_incidente}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_incidente_ejecutar por_cada_incidente_ejecutar}
+	 *
+	 * ---
+	 * @example
+	 * // Supongamos dos fases con diferentes incidentes
+	 * Controlador::_fase($token, 'faseA');
+	 * $otroNodo->_adyacente_en($nodo, 'entrada1');
+	 * Controlador::_fase($token, 'faseB');
+	 * $otroNodo2->_adyacente_en($nodo, 'entrada2');
+	 *
+	 * echo $nodo->cantidad_de_incidentes_global(); // 2
+	 * echo $nodo->cantidad_de_incidentes(); // 1 (solo fase actual 'faseB')
+	 *
+	 * @return int
+	 * @public
+	 * @since V1.2.7
+	 */
+	public function cantidad_de_incidentes_global(): int {
+		$total = 0;
+		if (is_array($this->incidentes)) {
+			foreach ($this->incidentes as $fasesPorNodo) {
+				if (is_array($fasesPorNodo)) {
+					foreach ($fasesPorNodo as $incidentesFase) {
+						if (is_array($incidentesFase)) {
+							$total += count($incidentesFase);
+						}
+					}
+				}
+			}
+		}
+		return $total;
+	}
 	/**
 	 * Verifica si el nodo actual es adyacente del nodo indicado (Interfaz Adyacentes).
 	 *
@@ -2158,15 +2276,64 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * Contante
 	 * @var
 	 */
-	private $capacidad = 256;
+	protected $capacidad = 256;
 
 	/**
 	 * Fuga de energia del nodo en el tiempo
 	 * Constante
 	 * @var
 	 */
-	private $fuga = 0;
+	protected $fuga = 0;
 
+	/**
+	 * Devuelve la capacidad máxima de energía del nodo.
+	 *
+	 * Este valor se establece en el momento de la creación del nodo
+	 * (a través de los métodos estáticos de fábrica) y no puede modificarse
+	 * durante la vida del nodo.
+	 *
+	 * ---
+	 * 🔗 Métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_fuga fuga()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_energia energia()}
+	 *
+	 * ---
+	 * @example
+	 * $nodo = NodoElectrico::crear(1000, 0.5);
+	 * echo $nodo->getCapacidad(); // 1000
+	 *
+	 * @return int
+	 * @public
+	 * @since V1.2.7
+	 */
+	public function capacidad(): int {
+		return $this->capacidad;
+	}
+
+	/**
+	 * Devuelve la fuga de energía por ciclo del nodo.
+	 *
+	 * Este valor se establece en la creación del nodo (a través de los métodos
+	 * estáticos de fábrica). Representa la cantidad de energía que el nodo pierde
+	 * espontáneamente en cada ciclo de simulación.
+	 *
+	 * ---
+	 * 🔗 Métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_capacidad capacidad()}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_energia energia()}
+	 *
+	 * ---
+	 * @example
+	 * $nodo = NodoElectrico::crear(1000, 0.5);
+	 * echo $nodo->getFuga(); // 0.5
+	 *
+	 * @return float
+	 * @public
+	 * @since V1.2.7
+	 */
+	public function fuga(): float {
+		return $this->fuga;
+	}
 	/**
 	 * funciones a llamar cuando satura (a nivel instancia, si no esta definida se debe
 	 * en la Clase)

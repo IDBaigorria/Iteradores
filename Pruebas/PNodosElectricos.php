@@ -9,12 +9,16 @@
 // ============================================================
 
 require_once "Nodos/NodoElectrico.php";
+require_once "Nodos/Nodo.php";
 require_once "Controlador/Controlador.php";
 require_once "Configuracion/Entorno.php";
+require_once "Configuracion/Configuracion.php";
 
 use Iteradores\Nodos\NodoElectrico;
+use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
 use Iteradores\Configuracion\Entorno;
+use Iteradores\Configuracion\Conf;
 
 // Forzar modo desarrollo si no está definido
 if (!Entorno::es_desarrollo()) {
@@ -22,7 +26,7 @@ if (!Entorno::es_desarrollo()) {
 }
 
 echo "🚀 Inicio de pruebas para NodoElectrico (PHP)<br>";
-
+/*
 // ──────────────────────────────────────────────────────────
 // 1. PRUEBAS EXHAUSTIVAS DE LA INTERFAZ FASE
 // ──────────────────────────────────────────────────────────
@@ -93,37 +97,124 @@ Controlador::ejecutar_prueba(function($token) {
         echo "   Nodo solo NO debería tener fases, pero apareció: $fase<br>";
     });
     echo "   (Si no se ve ningún listado, correcto)<br>";
-});
-/*
+});*/
+
 // ──────────────────────────────────────────────────────────
-// 2. FÁBRICA DE NODOS ELÉCTRICOS
+// 2. PRUEBAS EXHAUSTIVAS DE FÁBRICA DE NODOS ELÉCTRICOS
 // ──────────────────────────────────────────────────────────
-echo "<br>🔹 Fábrica de Nodos Eléctricos<br>";
-$nodo_vacio = NodoElectrico::crear();
-echo "crear() -> id: {$nodo_vacio->id()}, dato: {$nodo_vacio->dato()}<br>";
+echo "\n🔹 Fábrica de Nodos Eléctricos<br>";
 
-$nodo_con_dato = NodoElectrico::crear_con_dato("Hola PHP");
-echo "crear_con_dato() -> id: {$nodo_con_dato->id()}, dato: {$nodo_con_dato->dato()}<br>";
+// 2.1 Creación básica
+echo "▶ 2.1 Creación básica<br>";
+$nodoVacio = NodoElectrico::crear();
+echo "   crear() -> id: {$nodoVacio->id()}, dato: {$nodoVacio->dato()}<br>";
 
-$nodo_con_id = NodoElectrico::crear_con_id("especial_php");
-echo "crear_con_id() -> id: {$nodo_con_id->id()}, es_especial: " . ($nodo_con_id->es_especial() ? 'si' : 'no') . "<br>";
+$nodoConCapacidad = NodoElectrico::crear(500, 0.3);
+echo "   crear(500, 0.3) -> capacidad: {$nodoConCapacidad->capacidad()}, fuga: {$nodoConCapacidad->fuga()}<br>";
 
-$nodo_completo = NodoElectrico::crear_con_dato_e_id("Dato especial", "id_compuesto");
-echo "crear_con_dato_e_id() -> id: {$nodo_completo->id()}, dato: {$nodo_completo->dato()}<br>";
+// 2.2 Crear con dato (con y sin capacidad/fuga)
+echo "▶ 2.2 crear_con_dato<br>";
+$nodoConDato = NodoElectrico::crear_con_dato("Hola PHP");
+echo "   crear_con_dato(\"Hola PHP\") -> id: {$nodoConDato->id()}, dato: {$nodoConDato->dato()}<br>";
 
+$nodoConDatoYCapacidad = NodoElectrico::crear_con_dato("Sensor", false, 1000, 0.5);
+echo "   crear_con_dato(\"Sensor\", false, 1000, 0.5) -> capacidad: {$nodoConDatoYCapacidad->capacidad()}, fuga: {$nodoConDatoYCapacidad->fuga()}<br>";
+
+// 2.3 Crear con ID especial
+echo "▶ 2.3 crear_con_id<br>";
+$nodoConIdValido = NodoElectrico::crear_con_id("especial_php");
+echo "   crear_con_id(\"especial_php\") -> id: {$nodoConIdValido->id()}, es_especial: " . ($nodoConIdValido->es_especial() ? 'si' : 'no') . "<br>";
+
+$nodoConIdInvalido = NodoElectrico::crear_con_id(5465); // No cumple es_id_especial
+echo "   crear_con_id(\"no_especial\") (debe fallar) -> " . ($nodoConIdInvalido === null ? "null (correcto)" : "ERROR: debería ser null") . "<br>";
+
+// 2.4 Crear con dato e ID especial
+echo "▶ 2.4 crear_con_dato_e_id<br>";
+$nodoCompleto = NodoElectrico::crear_con_dato_e_id("Dato especial", "id_compuesto");
+echo "   crear_con_dato_e_id() -> id: {$nodoCompleto->id()}, dato: {$nodoCompleto->dato()}<br>";
+
+$nodoCompletoInvalido = NodoElectrico::crear_con_dato_e_id("Dato", 342);
+echo "   crear_con_dato_e_id con ID inválido -> " . ($nodoCompletoInvalido === null ? "null (correcto)" : "ERROR: debería ser null") . "<br>";
+
+// 2.5 Método nodo() (con diferentes entradas)
+echo "▶ 2.5 nodo()<br>";
 $nodo0 = NodoElectrico::nodo();
-echo "nodo() sin params -> id: {$nodo0->id()}, dato: {$nodo0->dato()}<br>";
+echo "   nodo() sin params -> id: {$nodo0->id()}, dato: {$nodo0->dato()}<br>";
 
-$es_nodo = null;
-$nodo1 = NodoElectrico::nodo("Texto", $es_nodo);
-echo "nodo() con referencia -> es_nodo: " . ($es_nodo ? 'true' : 'false') . ", id: {$nodo1->id()}<br>";
+$esNodo = null;
+$nodo1 = NodoElectrico::nodo("Texto", $esNodo);
+echo "   nodo(\"Texto\", \$esNodo) -> esNodo: " . ($esNodo ? 'true' : 'false') . ", id: {$nodo1->id()}<br>";
 
-$es_nodo2 = null;
-$nodo2 = NodoElectrico::nodo($nodo1, $es_nodo2);
-echo "nodo() reutilizando nodo -> es_nodo: " . ($es_nodo2 ? 'true' : 'false') . ", id: {$nodo2->id()}<br>";
+$esNodo2 = null;
+$nodo2 = NodoElectrico::nodo($nodo1, $esNodo2);
+echo "   nodo(\$nodo1, \$esNodo) -> esNodo: " . ($esNodo2 ? 'true' : 'false') . ", id: {$nodo2->id()} (debe coincidir con nodo1)<br>";
 
-echo "Cantidad de nodos: " . NodoElectrico::cantidad_de_nodos() . "<br>";
+$nodoNull = NodoElectrico::nodo(null);
+echo "   nodo(null) -> dato: " . var_export($nodoNull->dato(), true) . " (debería ser null)<br>";
 
+// 2.6 Capacidad y fuga por defecto vs personalizada
+echo "▶ 2.6 Verificar capacidad y fuga por defecto<br>";
+$nodoDefault = NodoElectrico::crear();
+echo "   capacidad por defecto: {$nodoDefault->capacidad()} (esperado: " . Conf::CAPACIDAD_NODO_ELECTRICO . ")<br>";
+echo "   fuga por defecto: {$nodoDefault->fuga()} (esperado: " . Conf::FUGA_NODO_ELECTRICO . ")<br>";
+
+// 2.7 Conteo de nodos y superestructura
+echo "▶ 2.7 Conteo de nodos y superestructura<br>";
+$cantidadAntes = NodoElectrico::cantidad_de_nodos();
+echo "   cantidad_de_nodos() antes de crear más: $cantidadAntes<br>";
+$tempNode = NodoElectrico::crear();
+echo "   después de crear 1 nodo más: " . NodoElectrico::cantidad_de_nodos() . " (debe ser " . ($cantidadAntes + 1) . ")<br>";
+NodoElectrico::eliminar($tempNode);
+echo "   después de eliminarlo: " . NodoElectrico::cantidad_de_nodos() . " (debe volver a $cantidadAntes)<br>";
+
+// 2.8 Prueba de eliminación (nodo sin referencias)
+echo "▶ 2.8 Eliminar nodo sin referencias<br>";
+$nodoEliminar = NodoElectrico::crear_con_dato("Para eliminar");
+$idEliminar = $nodoEliminar->id();
+echo "   Nodo creado, id: $idEliminar<br>";
+$resultadoEliminar = NodoElectrico::eliminar($nodoEliminar);
+echo "   eliminar() -> " . ($resultadoEliminar === true ? "true (correcto)" : "ERROR") . "<br>";
+echo "   ¿Sigue en superestructura? " . (NodoElectrico::existe($idEliminar) ? "SÍ (error)" : "NO (correcto)") . "<br>";
+
+// 2.9 Eliminar nodo con referencias (debe fallar)
+echo "▶ 2.9 Eliminar nodo con referencias<br>";
+$nodoA = NodoElectrico::crear_con_dato('A');
+$nodoB = NodoElectrico::crear_con_dato('B');
+$nodoA->_adyacente_en($nodoB, 'enlaceAB');
+$resultadoEliminarConRef = NodoElectrico::eliminar($nodoB);
+echo "   eliminar(nodoB) (tiene incidente desde nodoA) -> " . ($resultadoEliminarConRef === false ? "false (correcto)" : "ERROR") . "<br>";
+// Limpiar para no afectar otras pruebas
+$nodoA->eliminar_adyacente('enlaceAB');
+
+// 2.10 eliminar_autoenlazado (obsoleto, pero se prueba)
+echo "▶ 2.10 eliminar_autoenlazado<br>";
+$nodoAuto = NodoElectrico::crear_con_dato("Autoenlazado");
+$nodoAuto->_adyacente($nodoAuto); // autoenlace
+echo "   Nodo con autoenlace, referencias: {$nodoAuto->cantidad_de_incidentes_global()}<br>";
+$resAuto = NodoElectrico::eliminar_autoenlazado($nodoAuto);
+echo "   eliminar_autoenlazado() -> " . ($resAuto === true ? "true (correcto)" : "ERROR") . "<br>";
+echo "   ¿Sigue en superestructura? " . (NodoElectrico::existe($idEliminar) ? "SÍ (error)" : "NO (correcto)") . "<br>";
+
+echo "Cantidad final de nodos: " . NodoElectrico::cantidad_de_nodos() . "<br>";
+
+// 2.11 Probar getters globales de adyacentes/incidentes
+echo "▶ 2.11 cantidad_de_adyacentes_global y cantidad_de_incidentes_global<br>";
+$nodoGlobal = NodoElectrico::crear();
+$aux1 = NodoElectrico::crear();
+$aux2 = NodoElectrico::crear();
+Controlador::ejecutar_prueba(function($token) use ($nodoGlobal, $aux1, $aux2) {
+    NodoElectrico::_fase($token, 'faseX');
+    $nodoGlobal->_adyacente_en($aux1, 'x');        // aux1 recibe un incidente
+    NodoElectrico::_fase($token, 'faseY');
+    $nodoGlobal->_adyacente_en($aux2, 'y');        // aux2 recibe un incidente
+});
+echo "   adyacentes global de nodoGlobal (debe ser 2): " . $nodoGlobal->cantidad_de_adyacentes_global() . "<br>";
+echo "   adyacentes fase actual de nodoGlobal (debe ser 1, faseY): " . $nodoGlobal->cantidad_de_adyacentes() . "<br>";
+echo "   incidentes de aux1 (debe ser 0, por enlace 'x'): " . $aux1->cantidad_de_incidentes() . "<br>";
+echo "   incidentes de aux2 (debe ser 1, por enlace 'y'): " . $aux2->cantidad_de_incidentes() . "<br>";
+echo "   incidentes global de aux1 (debe ser 1, por enlace 'x'): " . $aux1->cantidad_de_incidentes_global() . "<br>";
+echo "   incidentes global de aux2 (debe ser 1, por enlace 'y'): " . $aux2->cantidad_de_incidentes_global() . "<br>";
+/*
 // ──────────────────────────────────────────────────────────
 // 3. ADYACENTES
 // ──────────────────────────────────────────────────────────

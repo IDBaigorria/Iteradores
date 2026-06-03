@@ -199,7 +199,20 @@ interface Adyacentes {
      * @since 2.9.4
      */
     public function cantidad_de_adyacentes(): int;
-
+    
+    /**
+     * Devuelve la cantidad total de nodos incidentes (entrantes) sumando todas las fases.
+     *
+     * Este método es útil cuando se trabaja con múltiples fases y se necesita conocer
+     * el grado de entrada total del nodo, independientemente de la fase actual.
+     *
+     * La implementación es **opcional**; si la clase no soporta fases, puede lanzar
+     * una excepción o simplemente devolver lo mismo que `cantidad_de_incidentes()`.
+     *
+     * @return int
+     * @since V1.3.0
+     */
+    public function cantidad_de_incidentes_global(): int;
 
     /**
      * Ejecuta una función sobre cada nodo adyacente.

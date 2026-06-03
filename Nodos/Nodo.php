@@ -263,6 +263,7 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	 * @return void
 	 */
 	function __destruct() {
+		echo ".destuido.";
 		self::$cant--;
 	}
 	
@@ -493,7 +494,39 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 		static::_error("Para asignar un id, este debe ser especial");
 		return null;
 	}
-
+	/**
+	 * Verifica si existe un nodo con el identificador dado en la superestructura.
+	 *
+	 * A diferencia de {@link ./classes/Iteradores-Nodos-Nodo.html#method_nodo_por_id nodo_por_id()},
+	 * este método no genera alertas ni devuelve el nodo. Solo retorna un booleano.
+	 *
+	 * ---
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_nodo_por_id nodo_por_id()}
+	 *
+	 * ---
+	 * 🔗 Otros métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_hay_nodos_en_superestructura hay_nodos_en_superestructura()}
+	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_agregar_a_superestructura agregar_a_superestructura()}
+	 *
+	 * ---
+	 * @example
+	 * if (Nodo::existe("A12")) {
+	 *     $nodo = Nodo::nodo_por_id("A12");
+	 *     echo "Nodo encontrado: " . $nodo->id();
+	 * } else {
+	 *     echo "El nodo no existe";
+	 * }
+	 *
+	 * @param string $id Identificador del nodo a verificar.
+	 * @return bool
+	 * @static
+	 * @since V1.3.0
+	 */
+	public static function existe(string $id): bool
+	{
+		return isset(self::$superestructura[$id]);
+	}
 	/**
 	 * Crear un nuevo nodo encapsulando un dato y asignándole un identificado *especial* (Interfaz FabricaDeNodos).
 	 *
@@ -645,7 +678,7 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	 *
 	 * @since V2.9.3
 	 */
-	public static function nodo($elemento=null, &$es_nodo=null): mixed{
+	public static function nodo($elemento=null, &$es_nodo=null): Nodo{
 		if ($elemento instanceof static){
 			$es_nodo=true;
 			return $elemento;
@@ -2311,6 +2344,28 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 		return 0;
 	}
 
+	/**
+	 * Devuelve la cantidad total de adyacentes (salientes) de forma global.
+	 *
+	 * **NOTA:** En la clase base `Nodo` no existe el concepto de fases o similar,
+	 * por lo que este método es meramente **testimonial** para cumplir con la interfaz.
+	 * Su comportamiento es idéntico a {@link ./classes/Iteradores-Nodos-Nodo.html#method_cantidad_de_adyacentes cantidad_de_adyacentes()}
+	 * (cuenta los adyacentes en la única estructura disponible).
+	 *
+	 * En subclases con soporte de fases (como `NodoElectrico`), este método debe ser
+	 * sobrescrito para devolver la suma de adyacentes en **todas** las fases.
+	 *
+	 * ---
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_cantidad_de_adyacentes cantidad_de_adyacentes()}
+	 *
+	 * @return int
+	 * @public
+	 * @since V1.2.7	 
+	 * */
+	public function cantidad_de_adyacentes_global(): int {
+		return $this->cantidad_de_adyacentes();
+	}
     /**
 	 * Ejecuta una función sobre cada nodo adyacente (Interfaz Adyacentes).
 	 *
@@ -2622,6 +2677,28 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 		return $this->referencias;
 	}
 
+	/**
+	 * Devuelve la cantidad total de incidentes (entrantes) de forma global.
+	 *
+	 * **NOTA:** En la clase base `Nodo` no existe el concepto de fases o similar,
+	 * por lo que este método es meramente **testimonial** para cumplir con la interfaz.
+	 * Su comportamiento es idéntico a {@link ./classes/Iteradores-Nodos-Nodo.html#method_cantidad_de_incidentes cantidad_de_incidentes()}
+	 * (cuenta los incidentes en la única estructura disponible).
+	 *
+	 * En subclases con soporte de fases (como `NodoElectrico`), este método debe ser
+	 * sobrescrito para devolver la suma de incidentes en **todas** las fases.
+	 *
+	 * ---
+	 * 🔗 Método complementario:
+	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_cantidad_de_incidentes cantidad_de_incidentes()}
+	 *
+	 * @return int
+	 * @public
+	 * @since V1.2.6
+	 */
+	public function cantidad_de_incidentes_global(): int {
+		return $this->cantidad_de_incidentes();
+	}
 	/*************************************************************************************************************/
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////*/

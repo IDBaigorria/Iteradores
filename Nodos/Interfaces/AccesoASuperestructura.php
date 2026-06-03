@@ -30,7 +30,20 @@ interface AccesoASuperestructura {
      * @return mixed Nodo encontrado o null si no existe.
      */
     public static function nodo_por_id(string $id);
-
+    /**
+     * Verifica si existe un nodo con el identificador dado en la superestructura.
+     *
+     * A diferencia de {@link ./classes/Iteradores-Nodos-Interfaces-AccesoASuperestructura.html#method_nodo_por_id nodo_por_id()},
+     * este método no devuelve el nodo ni genera alertas; solo indica si existe o no.
+     * Es útil para comprobaciones rápidas sin riesgo de errores o mensajes.
+     *
+     *
+     * @param string $id Identificador del nodo a verificar.
+     * @return bool
+     * @static
+     * @since V1.3.0
+     */
+    public static function existe(string $id): bool;
     /**
      * Ejecuta una función sobre cada nodo especial.
      *
