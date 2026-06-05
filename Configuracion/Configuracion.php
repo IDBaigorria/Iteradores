@@ -200,6 +200,12 @@ class Conf {
      */
     public const FUGA_NODO_ELECTRICO=0;
     
+    /**
+     * Tiempo base de un ciclo de simulación (en segundos).
+     * Se usa para calcular la fuga de energía proporcional al tiempo real.
+     * @var float
+     */
+    public const TIEMPO_CICLO = 1.0;    
 
 
 }

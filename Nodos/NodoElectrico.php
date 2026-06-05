@@ -927,12 +927,15 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * ---
 	 * Ejemplo de uso:
 	 * ```php
-	 * $n1 = NodoElectrico::crear_con_dato("A");
-	 * $n2 = NodoElectrico::crear_con_dato("B");
-	 * $n1->_adyacente_en($n2, "enlaceAB");
+	 * $nodoA = NodoElectrico::crear_con_dato("A");
+	 * $nodoB = NodoElectrico::crear_con_dato("B");
+	 * $nodoA->_adyacente_en($nodoB, "enlaceAB");
 	 *
-	 * if ($n1->tiene_adyacente_a($n2)) {
-	 *     echo "A tiene a B como adyacente";
+	 * $enlace = $nodoA->tiene_adyacente_a($nodoB);
+	 * if ($enlace !== false) {
+	 *     echo "Existe el enlace '$enlace' desde A hacia B";
+	 * } else {
+	 *     echo "No existe enlace";
 	 * }
 	 * ```
 	 *
@@ -945,29 +948,20 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 */
 	public function tiene_adyacente_a($nodo)
 	{
-		if (!($nodo instanceof Nodo)) {
-			Nodo::_error('El nodo que intenta comprobar no es una instancia de la clase Nodo.');
+		if (!($nodo instanceof NodoElectrico)) {
+			Nodo::_error('El nodo que intenta comprobar no es una instancia de la clase NodoElectrico.');
 			return false;
 		}
-		if (!$this->tiene_adyacente() || !$nodo->tiene_incidente()) {
+		$faseActual = NodoElectrico::$fase;
+		if (!isset($this->adyacentes[$faseActual])) {
 			return false;
 		}
 		$idObjetivo = $nodo->id();
-		// Iteración por todas las fases registradas
-		foreach ($this->adyacentes as $fase => $adyacentes) {
-			// Verifica que sea un array y no esté vacío
-			if (!is_array($adyacentes) || empty($adyacentes)) {
-				continue;
-			}
-			// Recorre los enlaces dentro de la fase actual
-			foreach ($adyacentes as $nombreEnlace => $nodoAdyacente) {
-				if ($nodoAdyacente instanceof Nodo && $nodoAdyacente->id() === $idObjetivo) {
-					// Nodo encontrado!
-					return $nombreEnlace;
-				}
+		foreach ($this->adyacentes[$faseActual] as $nombreEnlace => $nodoAdyacente) {
+			if ($nodoAdyacente->id() === $idObjetivo) {
+				return $nombreEnlace;
 			}
 		}
-		// No encontrado
 		return false;
 	}
 
@@ -1102,16 +1096,16 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * @since V0.0.1
 	 * @return ?array Array asociativo con enlaces y nodos, o `null` si no hay adyacentes
 	 */
-	public function adyacentes(): array|null
+	public function adyacentes(): ?array
 	{
 		if (!$this->tiene_adyacente()) {
 			return null;
-		} else {
-			foreach ($this->adyacentes[NodoElectrico::$fase] as $enlace => $incid) {
-				echo '<br/>acer: ' . $enlace . '===>' . $incid->id();
-			}
-			return $this->adyacentes[NodoElectrico::$fase];
 		}
+		$faseActual = NodoElectrico::$fase;
+		if (!isset($this->adyacentes[$faseActual]) || empty($this->adyacentes[$faseActual])) {
+			return null;
+		}
+		return $this->adyacentes[$faseActual];
 	}
 
 	/**
@@ -1790,13 +1784,16 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * ---
 	 * Ejemplo de uso:
 	 * ```php
-	 * $nA = Nodo::crear_con_dato("A");
-	 * $nB = Nodo::crear_con_dato("B");
+	 * $nodoA = NodoElectrico::crear_con_dato("A");
+	 * $nodoB = NodoElectrico::crear_con_dato("B");
+	 * $nodoA->_adyacente_en($nodoB, "enlaceAB");  // desde A hacia B
 	 *
-	 * $nB->_adyacente_en($nA, "enlaceBA");
-	 *
-	 * if ($nA->tiene_incidente_a($nB)) {
-	 *     echo "B es incidente de A";
+	 * // En nodoB, ver si existe incidente desde A
+	 * $enlace = $nodoB->tiene_incidente_a($nodoA);
+	 * if ($enlace !== false) {
+	 *     echo "Existe el enlace '$enlace' desde A hacia B (incidente en B)";
+	 * } else {
+	 *     echo "No existe incidente";
 	 * }
 	 * ```
 	 *
@@ -1817,13 +1814,16 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 			$id = (string) $nodo->id();
 			if (isset($this->incidentes[$id])) {
 				$fases = $this->incidentes[$id];
-				if (isset($fases[NodoElectrico::$fase])) {
-					return true;
+				$faseActual = NodoElectrico::$fase;
+				if (isset($fases[$faseActual])) {
+					$enlaces = $fases[$faseActual];
+					if (!empty($enlaces)) {
+						// Devolvemos el primer nombre de enlace (el que sea)
+						return array_key_first($enlaces);
+					}
 				}
 			}
 		}
-
-		// No encontrado
 		return false;
 	}
 
@@ -1953,21 +1953,19 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * @since 0.0.1
 	 * @return ?array Array asociativo con enlaces y nodos, o `null` si no hay adyacentes
 	 */
-	public function incidentes(): array|null
+	public function incidentes(): ?array
 	{
+		if (!$this->tiene_incidente()) {
+			return null;
+		}
 		$res = [];
-		if ($this->incidentes !== null) {
-			$idincidentes = $this->incidentes;
-			$faseactual = NodoElectrico::$fase;
-			foreach ($idincidentes as $idincidente => $fases) {
-				if (isset($fases[$faseactual])) {
-					$fase = $fases[$faseactual];
-					$arrayfase = $fase;
-					$res[$idincidente] = $arrayfase;
-				}
+		$faseActual = NodoElectrico::$fase;
+		foreach ($this->incidentes as $idIncidente => $fases) {
+			if (isset($fases[$faseActual]) && !empty($fases[$faseActual])) {
+				$res[$idIncidente] = $fases[$faseActual];
 			}
 		}
-		return $res;
+		return empty($res) ? null : $res;
 	}
 
 	/**
@@ -2259,346 +2257,546 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		return $resultados;
 	}
 
-	/*
-	 * INTERFAZ ENERGIA (TEMPORAL)
-	 */
+    // =================================================================
+    // INTERFAZ ENERGÍA
+    // =================================================================
 
-	// ///////////////////////////////Propiedades para la interfaz Energia
+    // -----------------------------------------------------------------
+    // Propiedades privadas
+    // -----------------------------------------------------------------
 
-	/**
-	 * Energia del nodo
-	 * @var
-	 */
-	private $energia = [];
+    /**
+     * Energía actual por fase.
+     * @var array<string, int>
+     */
+    private $energia = [];
 
-	/**
-	 * Capacidad de energia maxima del nodo
-	 * Contante
-	 * @var
-	 */
-	protected $capacidad = 256;
+    /**
+     * Último timestamp (microtime) en que se aplicó fuga por fase.
+     * @var array<string, float>
+     */
+    private $ultima_fuga = [];
 
-	/**
-	 * Fuga de energia del nodo en el tiempo
-	 * Constante
-	 * @var
-	 */
-	protected $fuga = 0;
+    /**
+     * Capacidad máxima de energía del nodo (valor fijo).
+     * @var int
+     */
+    protected $capacidad = 256;
 
-	/**
-	 * Devuelve la capacidad máxima de energía del nodo.
-	 *
-	 * Este valor se establece en el momento de la creación del nodo
-	 * (a través de los métodos estáticos de fábrica) y no puede modificarse
-	 * durante la vida del nodo.
-	 *
-	 * ---
-	 * 🔗 Métodos relacionados:
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_fuga fuga()}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_energia energia()}
-	 *
-	 * ---
-	 * @example
-	 * $nodo = NodoElectrico::crear(1000, 0.5);
-	 * echo $nodo->getCapacidad(); // 1000
-	 *
-	 * @return int
-	 * @public
-	 * @since V1.2.7
-	 */
-	public function capacidad(): int {
-		return $this->capacidad;
-	}
+    /**
+     * Fuga de energía por ciclo de tiempo (valor fijo).
+     * @var float
+     */
+    protected $fuga = 0;
 
-	/**
-	 * Devuelve la fuga de energía por ciclo del nodo.
-	 *
-	 * Este valor se establece en la creación del nodo (a través de los métodos
-	 * estáticos de fábrica). Representa la cantidad de energía que el nodo pierde
-	 * espontáneamente en cada ciclo de simulación.
-	 *
-	 * ---
-	 * 🔗 Métodos relacionados:
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_capacidad capacidad()}
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_energia energia()}
-	 *
-	 * ---
-	 * @example
-	 * $nodo = NodoElectrico::crear(1000, 0.5);
-	 * echo $nodo->getFuga(); // 0.5
-	 *
-	 * @return float
-	 * @public
-	 * @since V1.2.7
-	 */
-	public function fuga(): float {
-		return $this->fuga;
-	}
-	/**
-	 * funciones a llamar cuando satura (a nivel instancia, si no esta definida se debe
-	 * en la Clase)
-	 * @var array
-	 */
-	private $ejecutar_cuando_satura = null;
+    /**
+     * Callbacks de saturación registrados por instancia y fase.
+     * Estructura: [fase => [callable $callback, bool $reemplazar]]
+     * @var array<string, array{0: callable, 1: bool}>|null
+     */
+    private $ejecutar_cuando_satura = null;
 
-	/**
-	 * funes a llamar cuando se queda sin energia(a nivel instancia, si no esta definida se debe
-	 * en la Clase)
-	 * @var array
-	 */
-	private $ejecutar_cuando_agota = null;
+    /**
+     * Callbacks de agotamiento registrados por instancia y fase.
+     * Estructura: [fase => [callable $callback, bool $reemplazar]]
+     * @var array<string, array{0: callable, 1: bool}>|null
+     */
+    private $ejecutar_cuando_agota = null;
 
-	/**
-	 * funciones a llamar cuando satura (funciones compartidas por toda la fase, si se declara una
-	 * a nivel instancia se prioriza esa)
-	 * @var array
-	 */
-	private static $ejecutar_cuando_satura_por_defecto_por_fase = [];
+    /**
+     * Callbacks por defecto de saturación asociados a una fase (estáticos).
+     * @var array<string, callable>|null
+     */
+    private static $ejecutar_cuando_satura_por_defecto_por_fase = null;
 
-	/**
-	 * funes a llamar cuando se queda sin energia (funciones compartidas por toda la fase, si se declara una
-	 * a nivel instancia se prioriza esa)
-	 * @var array
-	 */
-	private static $ejecutar_cuando_agota_por_defecto_por_fase = [];
+    /**
+     * Callbacks por defecto de agotamiento asociados a una fase (estáticos).
+     * @var array<string, callable>|null
+     */
+    private static $ejecutar_cuando_agota_por_defecto_por_fase = null;
 
-	// ──────────────────────────────────────────────
-	// Métodos de configuración de callbacks
-	// ──────────────────────────────────────────────
+    /**
+     * Callback global cuando todas las fases del nodo están sin energía.
+     * @var callable|null
+     */
+    private static $ejecutar_cuando_agota_global = null;
 
-	/**
-	 * Asigna la funcion a ejecutar cuando el nodo se satura de energia (por defecto para toda
-	 * la fase)
-	 *
-	 * esta funcion se va a ejecutar cuando se satura la energia de un nodo en una de las fases.
-	 * si dicho nodo no tiene definida una funcion individual en la instancia, se buscara ejecutar
-	 * ésta que está compartida por todos los nodos en la misma fase.
-	 * @param callable $funcion
-	 * @param string|null $fase (opcional) si no se pasa toma la fase actual
-	 * @return void
-	 */
-	public static function _ejecutar_cuando_satura_por_fase(callable $funcion, string|null $fase = null): void
-	{
-		if ($fase === null) {
-			$fase = self::$fase;
-		}
-		// inicializacion perezosa
-		if (self::$ejecutar_cuando_satura_por_defecto_por_fase === null) {
-			self::$ejecutar_cuando_satura_por_defecto_por_fase = [];
-		}
-		self::$ejecutar_cuando_satura_por_defecto_por_fase[$fase] = $funcion;
-	}
+    // -----------------------------------------------------------------
+    // Getters básicos
+    // -----------------------------------------------------------------
 
-	/**
-	 * devuelve la funcion a ejecutar cuando el nodo se satura de energia (por defecto para toda
-	 * la fase)
-	 *
-	 * esta funcion se va a ejecutar cuando se satura la energia de un nodo en una de las fases.
-	 * si dicho nodo no tiene definida una funcion individual en la instancia, se buscara ejecutar
-	 * ésta que está compartida por todos los nodos en la misma fase.
-	 * @param string|null $fase (opcional) si no se pasa devuelve el de la fase actual
-	 * @return callable|null
-	 */
-	public static function ejecutar_cuando_satura_por_fase(string|null $fase = null): callable|null
-	{
-		if ($fase === null) {
-			$fase = self::$fase;
-		}
-		if (self::$ejecutar_cuando_satura_por_defecto_por_fase === null) {
-			return null;
-		}
-		if (isset(self::$ejecutar_cuando_satura_por_defecto_por_fase[$fase])) {
-			return self::$ejecutar_cuando_satura_por_defecto_por_fase[$fase];
-		} else {
-			return null;
-		}
-	}
+    /**
+     * Devuelve la capacidad máxima de energía del nodo.
+     *
+     * Este valor se establece en el momento de la creación del nodo
+     * (a través de los métodos estáticos de fábrica) y no puede modificarse
+     * durante la vida del nodo.
+     *
+     * ---
+     * 🔗 Métodos relacionados:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_fuga fuga()}
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_energia energia()}
+     *
+     * ---
+     * @example
+     * $nodo = NodoElectrico::crear(1000, 0.5);
+     * echo $nodo->capacidad(); // 1000
+     *
+     * @return int
+     * @public
+     * @since V1.2.8
+     */
+    public function capacidad(): int {
+        return $this->capacidad;
+    }
 
-	/**
-	 * Asigna la funcion a ejecutar cuando el nodo se satura de energia (para la instancia)
-	 *
-	 * esta funcion se fa a priorizar antes de la compartida por toda la fase al momento de
-	 * elegir una para ejectur si estan las dos definidas.
-	 * @param callable $funcion
-	 * @return void
-	 */
-	public function _ejecutar_cuando_satura(callable $funcion)
-	{
-		// inicializacion perezosa
-		if ($this->ejecutar_cuando_satura === null) {
-			$this->ejecutar_cuando_satura = [];
-		}
-		$this->ejecutar_cuando_satura[self::$fase] = $funcion;
-	}
+    /**
+     * Devuelve la fuga de energía por ciclo del nodo.
+     *
+     * Este valor se establece en la creación del nodo (a través de los métodos
+     * estáticos de fábrica). Representa la cantidad de energía que el nodo pierde
+     * espontáneamente en cada ciclo de simulación (definido por `Conf::TIEMPO_CICLO`).
+     *
+     * ---
+     * 🔗 Métodos relacionados:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_capacidad capacidad()}
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_energia energia()}
+     *
+     * ---
+     * @example
+     * $nodo = NodoElectrico::crear(1000, 0.5);
+     * echo $nodo->fuga(); // 0.5
+     *
+     * @return float
+     * @public
+     * @since V1.2.8
+     */
+    public function fuga(): float {
+        return $this->fuga;
+    }
 
-	/**
-	 * devuelve la funcion a ejecutar cuando se satura el nodo de energia (para la instancia)
-	 * @return callable|mixed
-	 */
-	public function ejecutar_cuando_satura()
-	{
-		return $this->ejecutar_cuando_satura[NodoElectrico::$fase] ?? null;;
-	}
+    /**
+     * Devuelve la energía actual del nodo en la fase activa,
+     * aplicando previamente todas las fugas pendientes según el tiempo real transcurrido.
+     *
+     * Este método llama internamente a `fugar()` para actualizar la energía
+     * de todas las fases antes de devolver el valor de la fase actual.
+     *
+     * ---
+     * 🔗 Método complementario:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__energia _energia()}
+     *
+     * ---
+     * @example
+     * $nodo->_energia(100);
+     * sleep(2); // espera 2 segundos (2 ciclos de 1 segundo)
+     * echo $nodo->energia(); // 100 - (fuga * 2)
+     *
+     * @return int Energía en la fase actual (0 <= valor <= capacidad)
+     * @public
+     * @since V1.2.8
+     */
+    public function energia(): int {
+        $this->fugar();
+        return $this->energia[self::$fase] ?? 0;
+    }
 
-	/**
-	 * Asigna la funcion a ejecutar cuando el nodo se satura de energia
-	 * @param callable $funcion
-	 * @return void
-	 */
-	public function _ejecutar_cuando_agota(callable $funcion)
-	{
-		// inicializacion perezosa
-		if ($this->ejecutar_cuando_agota === null) {
-			$this->ejecutar_cuando_agota = [];
-		}
-		echo '_fase' . self::$fase;
-		$this->ejecutar_cuando_agota[self::$fase] = $funcion;
-	}
+    // -----------------------------------------------------------------
+    // Método de fuga (privado)
+    // -----------------------------------------------------------------
 
-	/**
-	 * Asigna la funcion a ejecutar cuando el nodo se satura de energia (por defecto para toda
-	 * la fase)
-	 *
-	 * esta funcion se va a ejecutar cuando se satura la energia de un nodo en una de las fases.
-	 * si dicho nodo no tiene definida una funcion individual en la instancia, se buscara ejecutar
-	 * ésta que está compartida por todos los nodos en la misma fase.
-	 *
-	 * si no se le pasa ninguna fase asigna la funcion a la fase actual
-	 * @param callable $funcion
-	 * @param string|null $fase (opcional) la fase a la que se le quiere asignar la funcion, si es null
-	 * 							se toma por defecto la fase actual
-	 * @return void
-	 */
-	public static function _ejecutar_cuando_agota_por_fase(callable $funcion, string|null $fase = null): void
-	{
-		if ($fase === null) {
-			$fase = self::$fase;
-		}
-		echo 'Faseee:' . $fase;
-		// inicializacion perezosa
-		if (self::$ejecutar_cuando_agota_por_defecto_por_fase === null) {
-			self::$ejecutar_cuando_agota_por_defecto_por_fase = [];
-		}
-		self::$ejecutar_cuando_agota_por_defecto_por_fase[$fase] = $funcion;
-	}
+    /**
+     * Aplica la fuga de energía basada en el tiempo real transcurrido.
+     *
+     * Para cada fase con energía registrada, calcula cuántos ciclos completos
+     * han pasado desde la última actualización (según `Conf::TIEMPO_CICLO`)
+     * y resta `fuga * ciclos`. Si la energía llega a 0, se ejecuta el callback
+     * de agotamiento correspondiente (instancia o fase). Al final, si todas
+     * las fases tienen energía 0, se ejecuta el callback global.
+     *
+     * Este método es llamado automáticamente desde `energia()` y `_energia()`.
+     *
+     * ---
+     * 🔗 Métodos relacionados:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__energia _energia()}
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_energia energia()}
+     *
+     * ---
+     * @return void
+     * @private
+     * @since V1.2.8
+     */
+    private function fugar(): void {
+        $ahora = microtime(true);
+        $todas_cero = true;
 
-	/**
-	 * devuelve la funcion a ejecutar cuando el nodo se agota de energia (por defecto para toda
-	 * la fase)
-	 *
-	 * esta funcion se va a ejecutar cuando se agota la energia de un nodo en una de las fases.
-	 * si dicho nodo no tiene definida una funcion individual en la instancia, se buscara ejecutar
-	 * ésta que está compartida por todos los nodos en la misma fase.
-	 * @param string|null $fase (opcional) si no se pasa devuelve el de la fase actual
-	 * @return callable|null
-	 */
-	public static function ejecutar_cuando_agota_por_fase(string|null $fase = null): callable|null
-	{
-		if (self::$ejecutar_cuando_agota_por_defecto_por_fase === null) {
-			return null;
-		}
-		if ($fase === null) {
-			$fase = self::$fase;
-		}
-		echo 'FGAseee' . $fase;
-		if (isset(self::$ejecutar_cuando_agota_por_defecto_por_fase[$fase])) {
-			echo 'FGA!';
-			return self::$ejecutar_cuando_agota_por_defecto_por_fase[$fase];
-		} else {
-			echo 'FGH!';
-			return null;
-		}
-	}
+        foreach ($this->energia as $fase => &$energia) {
+            $ultimo = $this->ultima_fuga[$fase] ?? $ahora;
+            $delta = $ahora - $ultimo;
+            $ciclos = (int)floor($delta / Conf::TIEMPO_CICLO);
+            if ($ciclos > 0 && $this->fuga > 0) {
+                $perdida = $this->fuga * $ciclos;
+                $energia = max(0, $energia - $perdida);
+                $this->ultima_fuga[$fase] = $ahora;
 
-	/**
-	 * devuelve la funcion a ejecutar cuando se satura el nodo de energia
-	 * @return callable|mixed
-	 */
-	function ejecutar_cuando_agota()
-	{
-		return $this->ejecutar_cuando_agota[self::$fase] ?? null;;
-	}
+                if ($energia === 0 && $perdida > 0) {
+                    $this->ejecutar_callback_agotamiento($fase);
+                }
+            }
+            if ($energia > 0) {
+                $todas_cero = false;
+            }
+        }
+        unset($energia);
 
-	// ──────────────────────────────────────────────
-	// Gestión de energía
-	// ────────────────────────────────────────────
+        if ($todas_cero && self::$ejecutar_cuando_agota_global !== null) {
+            call_user_func(self::$ejecutar_cuando_agota_global, $this);
+        }
+    }
 
-	/**
-	 * Da energia al nodo para que este la sume a su energia
-	 *
-	 *
-	 * @param int $cantidad_energia
-	 * @return void
-	 */
-	public function _energia(int $cantidad_energia)
-	{
-		echo 'energia';
-		// $this->energia[NodoElectrico::$fase]+=$cantidad_energia;
-		// inicializacion perezosa
-		if ($this->energia === null) {
-			echo 'energia1';
-			$this->energia = [];
-		}
-		if (!isset($this->energia[self::$fase])) {
-			echo 'energia2';
-			$this->energia[self::$fase] = 0;
-		}
+    // -----------------------------------------------------------------
+    // Ejecución de callbacks (privados)
+    // -----------------------------------------------------------------
 
-		$this->energia[self::$fase] += $cantidad_energia;
+    /**
+     * Ejecuta el callback de saturación para la fase actual.
+     *
+     * Respeta el modo `reemplazar` (true = solo instancia si existe, si no la de fase;
+     * false = ambos, instancia primero y luego fase).
+     *
+     * @return void
+     * @private
+     * @since V1.2.8
+     */
+    private function ejecutar_callback_saturacion(): void {
+        $fase = self::$fase;
+        $instanciaData = ($this->ejecutar_cuando_satura !== null && isset($this->ejecutar_cuando_satura[$fase]))
+            ? $this->ejecutar_cuando_satura[$fase]
+            : [null, true];
+        $fase_cb = self::ejecutar_cuando_satura_por_fase($fase);
+        [$instancia_cb, $reemplazar] = $instanciaData;
 
-		// Fuga (si corresponde)
-		/* if ($this->fuga > 0) {
-			$this->energia[self::$fase] -= $this->fuga;
-		}*/
+        if ($reemplazar) {
+            if ($instancia_cb) {
+                $instancia_cb($this);
+            } elseif ($fase_cb) {
+                $fase_cb($this);
+            }
+        } else {
+            if ($instancia_cb) {
+                $instancia_cb($this);
+            }
+            if ($fase_cb) {
+                $fase_cb($this);
+            }
+        }
+    }
 
-		// Saturación
-		if ($this->energia[self::$fase] > $this->capacidad) {
-			echo 'energia3';
-			$this->energia[self::$fase] = $this->capacidad;
-			$funcion = $this->ejecutar_cuando_satura();
-			if (is_callable($funcion)) {
-				echo 'energia4';
-				$funcion($this);
-			} else {
-				$funcion = self::ejecutar_cuando_satura_por_fase();
-				echo 'energia5';
-				if (is_callable($funcion)) {
-					echo 'energia6';
-					$funcion($this);
-				}
-			}
-		}
+    /**
+     * Ejecuta el callback de agotamiento para una fase específica.
+     *
+     * Respeta el modo `reemplazar` (true = solo instancia si existe, si no la de fase;
+     * false = ambos, instancia primero y luego fase).
+     *
+     * @param string $fase Nombre de la fase en la que se ha agotado la energía.
+     * @return void
+     * @private
+     * @since V1.2.8
+     */
+    private function ejecutar_callback_agotamiento(string $fase): void {
+        $instanciaData = ($this->ejecutar_cuando_agota !== null && isset($this->ejecutar_cuando_agota[$fase]))
+            ? $this->ejecutar_cuando_agota[$fase]
+            : [null, true];
+        $fase_cb = self::ejecutar_cuando_agota_por_fase($fase);
+        [$instancia_cb, $reemplazar] = $instanciaData;
 
-		// Agotamiento
-		if ($this->energia[self::$fase] <= 0) {
-			echo 'energia7';
-			$this->energia[self::$fase] = 0;
-			$funcion = $this->ejecutar_cuando_agota();
-			if (is_callable($funcion)) {
-				echo 'energia8';
-				$funcion($this);
-			} else {
-				$funcion = self::ejecutar_cuando_agota_por_fase();
-				echo 'energia9';
-				if (is_callable($funcion)) {
-					echo 'energia10';
-					$funcion($this);
-				}
-			}
-		}
-	}
+        if ($reemplazar) {
+            if ($instancia_cb) {
+                $instancia_cb($this);
+            } elseif ($fase_cb) {
+                $fase_cb($this);
+            }
+        } else {
+            if ($instancia_cb) {
+                $instancia_cb($this);
+            }
+            if ($fase_cb) {
+                $fase_cb($this);
+            }
+        }
+    }
 
-	/**
-	 * Retorna el nivel de energia del nodo
-	 *
-	 * @return int
-	 */
-	public function energia(): int
-	{
-		// return energia (fuga)
-		return $this->energia[self::$fase] ?? 0;
-	}
+    // -----------------------------------------------------------------
+    // Método público de energía
+    // -----------------------------------------------------------------
 
+    /**
+     * Añade energía al nodo en la fase activa.
+     *
+     * **Secuencia de operaciones:**
+     * 1. Aplica las fugas pendientes llamando a `fugar()`.
+     * 2. Incrementa la energía de la fase actual con `$cantidad_energia`.
+     * 3. Si supera la capacidad, la ajusta y ejecuta el callback de saturación.
+     * 4. Si queda en cero (o se vuelve cero), ejecuta el callback de agotamiento.
+     *
+     * ---
+     * 🔗 Método complementario:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_energia energia()}
+     *
+     * ---
+     * @param int $cantidad_energia Cantidad a añadir (puede ser negativa, aunque se recomienda usar la fuga para decrementar).
+     * @return void
+     * @public
+     * @since V1.2.8
+     */
+    public function _energia(int $cantidad_energia): void {
+        $this->fugar();
+
+        $fase = self::$fase;
+        if (!isset($this->energia[$fase])) {
+            $this->energia[$fase] = 0;
+            $this->ultima_fuga[$fase] = microtime(true);
+        }
+
+        $this->energia[$fase] += $cantidad_energia;
+
+        if ($this->energia[$fase] > $this->capacidad) {
+            $this->energia[$fase] = $this->capacidad;
+            $this->ejecutar_callback_saturacion();
+        }
+
+        if ($this->energia[$fase] <= 0) {
+            $this->energia[$fase] = 0;
+            $this->ejecutar_callback_agotamiento($fase);
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Callbacks por instancia
+    // -----------------------------------------------------------------
+
+    /**
+     * Registra un callback para cuando el nodo se satura (por instancia).
+     *
+     * **Modos de ejecución:**
+     * - `$reemplazar = true` (por defecto): este callback **reemplaza** al callback por defecto de la fase.
+     *   Solo se ejecutará este, a menos que sea null, en cuyo caso se ejecuta el de fase.
+     * - `$reemplazar = false`: este callback **complementa** al de fase. Se ejecutan ambos,
+     *   primero el de instancia y luego el de fase (si existe).
+     *
+     * ---
+     * 🔗 Métodos relacionados:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_ejecutar_cuando_satura ejecutar_cuando_satura()}
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__ejecutar_cuando_satura_por_fase _ejecutar_cuando_satura_por_fase()}
+     *
+     * ---
+     * @param callable $funcion Callback que recibirá el nodo como único argumento.
+     * @param bool $reemplazar Si `true`, reemplaza; si `false`, complementa.
+     * @return void
+     * @public
+     * @since V1.2.8
+     */
+    public function _ejecutar_cuando_satura(callable $funcion, bool $reemplazar = true): void {
+        if ($this->ejecutar_cuando_satura === null) {
+            $this->ejecutar_cuando_satura = [];
+        }
+        $this->ejecutar_cuando_satura[self::$fase] = [$funcion, $reemplazar];
+    }
+
+    /**
+     * Devuelve el callback de saturación registrado para la instancia (fase actual)
+     * junto con el indicador de si reemplaza o complementa.
+     *
+     * El valor devuelto es un array con dos elementos: `[callable|null $callback, bool $reemplazar]`.
+     *
+     * ---
+     * 🔗 Método complementario:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__ejecutar_cuando_satura _ejecutar_cuando_satura()}
+     *
+     * ---
+     * @return array{0: callable|null, 1: bool}
+     * @public
+     * @since V1.2.8
+     */
+    public function ejecutar_cuando_satura(): array {
+        return ($this->ejecutar_cuando_satura !== null && isset($this->ejecutar_cuando_satura[self::$fase]))
+            ? $this->ejecutar_cuando_satura[self::$fase]
+            : [null, true];
+    }
+
+    /**
+     * Registra un callback para cuando el nodo se agota (energía llega a 0) por instancia.
+     *
+     * **Modos de ejecución:**
+     * - `$reemplazar = true`: reemplaza al callback por defecto de la fase.
+     * - `$reemplazar = false`: complementa (se ejecutan ambos, primero este).
+     *
+     * ---
+     * 🔗 Métodos relacionados:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_ejecutar_cuando_agota ejecutar_cuando_agota()}
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__ejecutar_cuando_agota_por_fase _ejecutar_cuando_agota_por_fase()}
+     *
+     * ---
+     * @param callable $funcion Callback que recibirá el nodo como único argumento.
+     * @param bool $reemplazar Si `true`, reemplaza; si `false`, complementa.
+     * @return void
+     * @public
+     * @since V1.2.8
+     */
+    public function _ejecutar_cuando_agota(callable $funcion, bool $reemplazar = true): void {
+        if ($this->ejecutar_cuando_agota === null) {
+            $this->ejecutar_cuando_agota = [];
+        }
+        $this->ejecutar_cuando_agota[self::$fase] = [$funcion, $reemplazar];
+    }
+
+    /**
+     * Devuelve el callback de agotamiento registrado para la instancia (fase actual)
+     * junto con el indicador de si reemplaza o complementa.
+     *
+     * El valor devuelto es un array con dos elementos: `[callable|null $callback, bool $reemplazar]`.
+     *
+     * ---
+     * 🔗 Método complementario:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method__ejecutar_cuando_agota _ejecutar_cuando_agota()}
+     *
+     * ---
+     * @return array{0: callable|null, 1: bool}
+     * @public
+     * @since V1.2.8
+     */
+    public function ejecutar_cuando_agota(): array {
+        return ($this->ejecutar_cuando_agota !== null && isset($this->ejecutar_cuando_agota[self::$fase]))
+            ? $this->ejecutar_cuando_agota[self::$fase]
+            : [null, true];
+    }
+
+    // -----------------------------------------------------------------
+    // Callbacks por defecto por fase (estáticos)
+    // -----------------------------------------------------------------
+
+    /**
+     * Registra un callback por defecto de saturación para una fase determinada.
+     *
+     * Este callback se ejecutará cuando un nodo en esa fase se sature,
+     * **siempre que no exista un callback de instancia que lo reemplace**.
+     *
+     * ---
+     * 🔗 Método complementario:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_ejecutar_cuando_satura_por_fase ejecutar_cuando_satura_por_fase()}
+     *
+     * ---
+     * @param callable $funcion Callback que recibirá el nodo como argumento.
+     * @param string|null $fase Nombre de la fase. Si es `null`, se usa la fase actual del sistema.
+     * @return void
+     * @public
+     * @static
+     * @since V1.2.8
+     */
+    public static function _ejecutar_cuando_satura_por_fase(callable $funcion, ?string $fase = null): void {
+        if ($fase === null) {
+            $fase = self::$fase;
+        }
+        if (self::$ejecutar_cuando_satura_por_defecto_por_fase === null) {
+            self::$ejecutar_cuando_satura_por_defecto_por_fase = [];
+        }
+        self::$ejecutar_cuando_satura_por_defecto_por_fase[$fase] = $funcion;
+    }
+
+    /**
+     * Obtiene el callback por defecto de saturación registrado para una fase.
+     *
+     * @param string|null $fase Nombre de la fase. Si es `null`, se usa la fase actual.
+     * @return callable|null El callback, o `null` si no hay ninguno registrado.
+     * @public
+     * @static
+     * @since V1.2.8
+     */
+    public static function ejecutar_cuando_satura_por_fase(?string $fase = null): ?callable {
+        if ($fase === null) {
+            $fase = self::$fase;
+        }
+        if (self::$ejecutar_cuando_satura_por_defecto_por_fase === null) {
+            return null;
+        }
+        return self::$ejecutar_cuando_satura_por_defecto_por_fase[$fase] ?? null;
+    }
+
+    /**
+     * Registra un callback por defecto de agotamiento para una fase determinada.
+     *
+     * @param callable $funcion Callback que recibirá el nodo como argumento.
+     * @param string|null $fase Nombre de la fase. Si es `null`, se usa la fase actual.
+     * @return void
+     * @public
+     * @static
+     * @since V1.2.8
+     */
+    public static function _ejecutar_cuando_agota_por_fase(callable $funcion, ?string $fase = null): void {
+        if ($fase === null) {
+            $fase = self::$fase;
+        }
+        if (self::$ejecutar_cuando_agota_por_defecto_por_fase === null) {
+            self::$ejecutar_cuando_agota_por_defecto_por_fase = [];
+        }
+        self::$ejecutar_cuando_agota_por_defecto_por_fase[$fase] = $funcion;
+    }
+
+    /**
+     * Obtiene el callback por defecto de agotamiento registrado para una fase.
+     *
+     * @param string|null $fase Nombre de la fase. Si es `null`, se usa la fase actual.
+     * @return callable|null
+     * @public
+     * @static
+     * @since V1.2.8
+     */
+    public static function ejecutar_cuando_agota_por_fase(?string $fase = null): ?callable {
+        if ($fase === null) {
+            $fase = self::$fase;
+        }
+        if (self::$ejecutar_cuando_agota_por_defecto_por_fase === null) {
+            return null;
+        }
+        return self::$ejecutar_cuando_agota_por_defecto_por_fase[$fase] ?? null;
+    }
+
+    // -----------------------------------------------------------------
+    // Callback global (todas las fases)
+    // -----------------------------------------------------------------
+
+    /**
+     * Registra un callback global que se ejecutará cuando **todas las fases**
+     * del nodo se queden sin energía (energía = 0).
+     *
+     * Este callback es útil para detectar que el nodo ha quedado completamente inactivo.
+     *
+     * ---
+     * 🔗 Método complementario:
+     * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_ejecutar_cuando_agota_global ejecutar_cuando_agota_global()}
+     *
+     * ---
+     * @param callable $funcion Callback que recibirá el nodo como argumento.
+     * @return void
+     * @public
+     * @static
+     * @since V1.2.8
+     */
+    public static function _ejecutar_cuando_agota_global(callable $funcion): void {
+        self::$ejecutar_cuando_agota_global = $funcion;
+    }
+
+    /**
+     * Devuelve el callback global de agotamiento (si está registrado).
+     *
+     * @return callable|null
+     * @public
+     * @static
+     * @since V1.2.8
+     */
+    public static function ejecutar_cuando_agota_global(): ?callable {
+        return self::$ejecutar_cuando_agota_global;
+    }
 	/*************************************************************************************************************/
 	// ///////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 	// ///////////////////////////////////////////////////////////////////////////////////////////////////////////*/
