@@ -8,6 +8,8 @@ use Iteradores\Nodos\Interfaces\FabricaDeNodosElectricos;
 use Iteradores\Nodos\Interfaces\Fase;
 use Iteradores\Nodos\Interfaces\Incidentes;
 use Iteradores\Nodos\Interfaces\IncidentesDobleVia;
+use Iteradores\Nodos\Interfaces\Peso;
+use Iteradores\Nodos\Interfaces\AdyacenteConPeso;
 use Iteradores\Nodos\Nodo;
 
 include_once ('Nodo.php');
@@ -15,6 +17,50 @@ include_once ('Interfaces/IncidentesDobleVia.php');
 include_once ('Interfaces/FabricaDeNodosElectricos.php');
 include_once ('Interfaces/Energia.php');
 include_once ('Interfaces/Fase.php');
+include_once ('Interfaces/Peso.php');
+include_once ('Interfaces/AdyacenteConPeso.php');
+
+
+/**
+ * Clase Enlace (contenedor de enlace con peso perezoso)
+ *
+ * Representa un enlace entre el nodo actual y un nodo destino, pudiendo almacenar
+ * opcionalmente uno o varios pesos dimensionales.
+ *
+ * **Inicialización perezosa de pesos**:
+ * - La propiedad `$pesos` es `null` hasta que se asigna el primer peso.
+ * - Si solo hay un peso (sin dimensión explícita) se guarda como escalar.
+ * - Si se añade una segunda dimensión, se migra a un array asociativo (clave '' para el default).
+ *
+ * @class
+ * @package Iteradores\Nodos
+ * @version 0.0.0
+ * @since 1.2.9
+ */
+class Enlace
+{
+    /**
+     * Nodo destino del enlace.
+     * @var NodoElectrico
+     */
+    public $nodo;
+
+    /**
+     * Pesos asociados (null, escalar o array asociativo).
+     * @var mixed
+     */
+    public $pesos = null;
+
+    /**
+     * Constructor.
+     *
+     * @param NodoElectrico $nodo Nodo destino
+     */
+    public function __construct(NodoElectrico $nodo)
+    {
+        $this->nodo = $nodo;
+    }
+}
 
 /**
  * Clase NodoElectrico
@@ -80,21 +126,24 @@ include_once ('Interfaces/Fase.php');
  *
  * 					FALTAN DOS INTERFACES FABRICADENODOSELECTRICOS Y ENERGIA
  *
- *
+ * **V0.0.4.260529:**	Retomo otra vez
+ * **V0.1.0.260605:**	Finalizadas y probadas Interfaces FabricaDeNodosElectricos, Fase, Adyacentes e Incidentes y a punto de comenzar con la interfaz Peso
  *
  *
  * @class
  * @author Ignacio David Baigorria
  * @package Iteradores\Nodos
- * @version 0.0.3
+ * @version 0.1.0
  * @since 1.2
  * @extends Nodo
  * @implements Interfaces\IncidentesDobleVia
  * @implements Interfaces\FabricaDeNodosElectricos
  * @implements Interfaces\Energia
  * @implements Interfaces\Fase
+ * @implements Interfaces\Peso
+ * @implements Interfaces\AdyacenteConPeso
  */
-class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosElectricos, Energia, Fase
+class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosElectricos, Energia, Fase, Peso, AdyacenteConPeso
 {
 	/**
 	 * Manejador de Incidentes
@@ -902,8 +951,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Adyacentes.html Adyacente}
 	 *
 	 * Comprueba si el nodo actual enlaza directamente hacia el nodo pasado como parámetro.
-	 * Para optimizar, se valida tanto que el nodo actual posea adyacentes salientes
-	 * como que el nodo objetivo tenga conexiones entrantes.
+     * Se adapta para manejar la posibilidad de que el valor sea un Enlace.
 	 *
 	 * ---
 	 * 🔗 Método complementario:
@@ -946,7 +994,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * @public
 	 * @since 0.0.1
 	 */
-	public function tiene_adyacente_a($nodo)
+    public function tiene_adyacente_a($nodo)
 	{
 		if (!($nodo instanceof NodoElectrico)) {
 			Nodo::_error('El nodo que intenta comprobar no es una instancia de la clase NodoElectrico.');
@@ -957,13 +1005,15 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 			return false;
 		}
 		$idObjetivo = $nodo->id();
-		foreach ($this->adyacentes[$faseActual] as $nombreEnlace => $nodoAdyacente) {
-			if ($nodoAdyacente->id() === $idObjetivo) {
+		foreach ($this->adyacentes[$faseActual] as $nombreEnlace => $valor) {
+			$nodoAdy = ($valor instanceof Enlace) ? $valor->nodo : $valor;
+			if ($nodoAdy->id() === $idObjetivo) {
 				return $nombreEnlace;
 			}
 		}
 		return false;
 	}
+
 
 	/**
 	 * Devuelve el nodo adyacente en el enlace especificado (Interfaz Adayacentes)
@@ -1010,31 +1060,25 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 */
 	public function adyacente($enlace): ?Nodo
 	{
-		echo 'b0';
-		if (!Nodo::validar_nombre_enlace($enlace)) {  // esto se deja porque si intento acceder al array con algo q no sea un entero o un string en php salta un warning
-			self::_error('El enlace debe ser un string');
-			return null;
-		}
-		echo 'b1';
-		if ($this->adyacentes === null) {
-			return null;
-		}
-		echo 'b12';
-		if (!count($this->adyacentes)) {
-			return null;
-		}
-		echo 'b13';
-		$faseactual = NodoElectrico::$fase;
-		echo "<br/>$faseactual<br/>";
-		if (!isset($this->adyacentes[$faseactual])) {
-			return null;
-		}
-		echo 'b14';
-		if (!count($this->adyacentes[$faseactual])) {
-			return null;
-		}
-		echo 'b15';
-		return $this->adyacentes[$faseactual][$enlace] ?? null;
+        if (!Nodo::validar_nombre_enlace($enlace)) {
+            self::_error('El enlace debe ser un string');
+            return null;
+        }
+        if ($this->adyacentes === null) {
+            return null;
+        }
+        if (!count($this->adyacentes)) {
+            return null;
+        }
+        $faseactual = NodoElectrico::$fase;
+        if (!isset($this->adyacentes[$faseactual])) {
+            return null;
+        }
+        if (!count($this->adyacentes[$faseactual])) {
+            return null;
+        }
+		$valor = $this->adyacentes[$faseactual][$enlace] ?? null;
+		return ($valor !== null) ? (($valor instanceof Enlace) ? $valor->nodo : $valor) : null;
 	}
 
 	/**
@@ -1105,7 +1149,11 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		if (!isset($this->adyacentes[$faseActual]) || empty($this->adyacentes[$faseActual])) {
 			return null;
 		}
-		return $this->adyacentes[$faseActual];
+		$result = [];
+		foreach ($this->adyacentes[$faseActual] as $enlace => $valor) {
+			$result[$enlace] = ($valor instanceof Enlace) ? $valor->nodo : $valor;
+		}
+		return $result;
 	}
 
 	/**
@@ -1290,43 +1338,43 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 */
 	public function _adyacente_en($un_nodo, $enlace, $reemplazar = false): bool
 	{
-		echo 'holanaaaa';
 		if (!($un_nodo instanceof NodoElectrico)) {
 			static::_error('el nodo que intenta asignar no es un NodoElectrico');
 			return false;
-		};
+		}
 		if (!static::validar_nombre_enlace($enlace)) {
-			static::_error('el enlace al intenta asignar debe ser un string');
+			static::_error('el enlace que intenta asignar debe ser un string');
 			return false;
 		}
-		// inicializacion perezosa
 		if ($this->adyacentes === null) {
 			$this->adyacentes = [];
 		}
 		$fase = NodoElectrico::$fase;
 		if (!isset($this->adyacentes[$fase])) {
-			echo 'ma0';
 			$this->adyacentes[$fase] = [];
 		}
-		$adyacentes = $this->adyacentes[$fase];
-		// reviso a ver si no existia un nodo en esa posicion
-		echo 'ma1';
+		$adyacentes = &$this->adyacentes[$fase]; // referencia para mejor legibilidad
+
 		if (isset($adyacentes[$enlace])) {
-			echo 'ma2';
 			if ($reemplazar) {
-				echo 'ma3';
-				$adyacentes[$enlace]->referencias--;
-				$adyacentes[$enlace]->eliminar_incidente($this, $enlace);
+				// Obtener el nodo original (puede estar dentro de un Enlace)
+				$nodoExistente = ($adyacentes[$enlace] instanceof Enlace) ? $adyacentes[$enlace]->nodo : $adyacentes[$enlace];
+				
+				// 1. Eliminamos el enlace de ida primero
+				unset($adyacentes[$enlace]);
+				
+				// 2. Ahora es seguro eliminar el incidente (el enlace de ida ya no existe)
+				$nodoExistente->referencias--;
+				$nodoExistente->eliminar_incidente($this, $enlace);
 			} else {
-				echo 'ma4';
-				static::_error('ya existia un nodo en el enlace que intenta asignar');
+				static::_error('ya existía un nodo en el enlace que intenta asignar');
 				return false;
 			}
 		}
-		// asigno adyacente
+
+		// Asignamos el nuevo nodo (sin envolver en Enlace todavía)
 		$this->adyacentes[$fase][$enlace] = $un_nodo;
 		$un_nodo->_incidente_en($this, $enlace);
-		// sumo la referencias del nodo enlazado
 		$un_nodo->referencias++;
 		return true;
 	}
@@ -1373,34 +1421,27 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * @public
 	 * @since 0.0.1
 	 */
-	public function eliminar_adyacente($enlace): Nodo|null
-	{
-		// Validación de tipo
-		if (!static::validar_nombre_enlace($enlace)) {
-			self::_error('el enlace a eliminar no es valido');
-			return null;
-		}
-		// verificar inicialización perezosa
-		if ($this->adyacentes === null) {
-			self::_alerta('no hay adyacentes para eliminar');
-			return null;
-		}
-		if ($this->adyacentes[NodoElectrico::$fase] === null) {
-			self::_alerta('no hay adyacentes para eliminar en la fase');
-			return null;
-		}
-		// Verificar existencia del enlace
-		if (!array_key_exists($enlace, $this->adyacentes[NodoElectrico::$fase])) {
-			self::_alerta('el enlace ' . $enlace . ' que se intenta eliminar no existe');
-			return null;
-		}
-
-		$eliminado = $this->adyacentes[NodoElectrico::$fase][$enlace];
+    public function eliminar_adyacente($enlace): Nodo|null
+    {
+        if (!static::validar_nombre_enlace($enlace)) {
+            self::_error('el enlace a eliminar no es valido');
+            return null;
+        }
+        if ($this->adyacentes === null || !isset($this->adyacentes[NodoElectrico::$fase])) {
+            self::_alerta('no hay adyacentes para eliminar');
+            return null;
+        }
+        if (!array_key_exists($enlace, $this->adyacentes[NodoElectrico::$fase])) {
+            self::_alerta('el enlace ' . $enlace . ' que se intenta eliminar no existe');
+            return null;
+        }
+		$valor = $this->adyacentes[NodoElectrico::$fase][$enlace];
+		$eliminado = ($valor instanceof Enlace) ? $valor->nodo : $valor;
 		$eliminado->referencias--;
 		$eliminado->eliminar_incidente($this, $enlace);
 		unset($this->adyacentes[NodoElectrico::$fase][$enlace]);
 		return $eliminado;
-	}
+    }
 
 	/**
 	 * Elimina todos los adyacentes del nodo (Interfaz Adyacentes).
@@ -1475,7 +1516,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 */
 	public function eliminar_adyacentes(): array
 	{
-		if ($this->adyacentes === null or !count($this->adyacentes) > 0) {
+		if ($this->adyacentes === null || !count($this->adyacentes) > 0) {
 			self::_alerta('no hay enlaces para eliminar');
 			return [];
 		}
@@ -1484,13 +1525,24 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 			self::_alerta('no hay enlaces a eliminar en la fase actual');
 			return [];
 		}
-		$copia = $this->adyacentes[$fase];
-
-		foreach ($this->adyacentes[$fase] as $enlace => $eliminado) {
-			echo 'Y' . $enlace;
+		
+		$copia = [];
+		// Iteramos sobre una copia de las claves para poder eliminar durante el recorrido
+		$enlaces = array_keys($this->adyacentes[$fase]);
+		foreach ($enlaces as $enlace) {
+			$valor = $this->adyacentes[$fase][$enlace];
+			$eliminado = ($valor instanceof Enlace) ? $valor->nodo : $valor;
+			$copia[$enlace] = $eliminado;
+			
+			// 1. Eliminamos el enlace de ida primero
+			unset($this->adyacentes[$fase][$enlace]);
+			
+			// 2. Ahora es seguro eliminar el incidente (el enlace de ida ya no existe)
 			$eliminado->referencias--;
 			$eliminado->eliminar_incidente($this, $enlace);
 		}
+		
+		// El array ya debería estar vacío, pero forzamos a [] por seguridad
 		$this->adyacentes[$fase] = [];
 		return $copia;
 	}
@@ -1540,24 +1592,19 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * @public
 	 * @since 0.0.1
 	 */
-	public function por_cada_adyacente_ejecutar(callable $funcion, mixed ...$parametros): ?array
-	{
+    public function por_cada_adyacente_ejecutar(callable $funcion, mixed ...$parametros): ?array
+    {
 		if (!$this->tiene_adyacente()) {
 			static::_alerta('alerta no existe adyacente');
 			return null;
 		}
-
 		$resultados = [];
-		foreach ($this->adyacentes[NodoElectrico::$fase] as $enlace => $nodo) {
-			echo '<br/>fir';
-			if ($nodo) {
-				echo '<br/>fir1';
-				$resultados[$enlace] = $funcion($nodo, $enlace, ...$parametros);
-			}
+		foreach ($this->adyacentes[NodoElectrico::$fase] as $enlace => $valor) {
+			$nodo = ($valor instanceof Enlace) ? $valor->nodo : $valor;
+			$resultados[$enlace] = $funcion($nodo, $enlace, ...$parametros);
 		}
-
 		return $resultados;
-	}
+    }
 
 	/**
 	 * Devuelve la cantidad total de adyacentes (salientes) sumando todas las fases.
@@ -2797,6 +2844,417 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
     public static function ejecutar_cuando_agota_global(): ?callable {
         return self::$ejecutar_cuando_agota_global;
     }
+
+	 /***************************************************************************************
+     * INTERFAZ PESO				 **		**					*****************************
+	 * 									---
+     ***************************************************************************************/
+
+	/**
+	 * Asigna o acumula peso en un enlace de la fase actual.
+	 *
+	 * Este método unifica la asignación directa y la acumulación de pesos.
+	 * El comportamiento predeterminado (`$acumular = true`) **suma** el valor al peso
+	 * existente, lo que es ideal para contadores, distancias, costes acumulativos, etc.
+	 * Si se desea un reemplazo completo, se pasa `false` en el último parámetro.
+	 *
+	 * **Proceso interno:**
+	 * 1. Si el valor almacenado en el enlace aún es un `NodoElectrico` (sin pesos previos),
+	 *    se envuelve en un objeto `Enlace` (migración perezosa).
+	 * 2. En modo acumulación, si el peso actual es escalar y se pide una dimensión distinta,
+	 *    se migra automáticamente a un array multidimensional.
+	 * 3. En modo asignación, se sobreescribe cualquier estructura anterior.
+	 *
+	 * ---
+	 * 🔹 **Parámetros:**
+	 * - `$nombre_enlace`: Nombre del enlace. Debe existir en la fase actual.
+	 * - `$peso`: Valor numérico a asignar o sumar (puede ser negativo para restar).
+	 * - `$dimension`: Clave de la dimensión. Si es `null`, se usa la dimensión por defecto (internamente clave vacía).
+	 * - `$acumular`: `true` para sumar al valor existente (por defecto), `false` para reemplazar.
+	 *
+	 * ---
+	 * 🔹 **Retorno:**
+	 * - El nuevo valor del peso tras la operación.
+	 * - `null` si el enlace no existe o el nombre de enlace es inválido.
+	 *
+	 * ---
+	 * 🔹 **Ejemplos de uso:**
+	 *
+	 * **Ejemplo 1 – Acumular (comportamiento por defecto)**
+	 * ```php
+	 * $nodo->_peso('ruta', 10);                     // crea/ suma 10 en dimensión por defecto
+	 * $nodo->_peso('ruta', 5);                      // ahora el peso por defecto es 15
+	 * $nodo->_peso('ruta', -2);                     // resta 2 → 13
+	 * ```
+	 *
+	 * **Ejemplo 2 – Dimensión específica acumulando**
+	 * ```php
+	 * $nodo->_peso('ruta', 7.5, 'distancia', true); // inicia 'distancia' en 7.5
+	 * $nodo->_peso('ruta', 2.5, 'distancia');        // acumula → 10.0
+	 * ```
+	 *
+	 * **Ejemplo 3 – Asignación directa (reemplazar)**
+	 * ```php
+	 * $nodo->_peso('ruta', 100, null, false);       // la dimensión por defecto pasa a 100
+	 * $nodo->_peso('ruta', 20, 'coste', false);     // la dimensión 'coste' se fija en 20
+	 * ```
+	 *
+	 * **Ejemplo 4 – Migración automática de escalar a array**
+	 * ```php
+	 * $nodo->_peso('ruta', 5);                       // default = 5 (escalar)
+	 * $nodo->_peso('ruta', 3, 'coste');              // ahora default=5, coste=3 (array)
+	 * ```
+	 *
+	 * **Ejemplo 5 – Enlace sin nodo previo**
+	 * ```php
+	 * // Si el enlace 'nuevo' apunta a un Nodo, _peso lo convierte en Enlace y asigna.
+	 * $nodo->_adyacente_en($otro, 'nuevo');
+	 * $nodo->_peso('nuevo', 42);                     // ahora 'nuevo' tiene peso 42
+	 * ```
+	 *
+	 * ---
+	 * 🔗 **Métodos relacionados:**
+	 * - {@link peso()} para consultar un peso.
+	 * - {@link pesos()} para obtener todos los pesos de un enlace.
+	 * - {@link adyacentes_ordenados_por_peso()} para ordenar adyacentes por peso.
+	 * - {@link _adyacente_con_peso()} y {@link _adyacente_con_peso_en()} para crear enlaces con peso en un paso.
+	 *
+	 * @param string      $nombre_enlace Nombre del enlace.
+	 * @param int|float   $peso          Valor a asignar o sumar.
+	 * @param string|null $dimension     Dimensión. `null` para la dimensión por defecto.
+	 * @param bool        $acumular      `true` para acumular (por defecto), `false` para reemplazar.
+	 *
+	 * @return int|float|null Nuevo valor del peso, o `null` si falla.
+	 *
+	 * @throws _alerta si el enlace no existe en la fase actual.
+	 *
+	 * @since 1.2.9
+	 */
+	public function _peso(string $nombre_enlace, $peso, ?string $dimension = null, bool $acumular = true)
+	{
+		if (!Nodo::validar_nombre_enlace($nombre_enlace)) {
+			self::_error('El nombre de enlace no es válido.');
+			return null;
+		}
+		$fase = self::$fase;
+		if (!isset($this->adyacentes[$fase][$nombre_enlace])) {
+			self::_alerta("No existe el enlace '$nombre_enlace' en la fase actual.");
+			return null;
+		}
+		
+		$valor = &$this->adyacentes[$fase][$nombre_enlace];
+		
+		// Migración perezosa a Enlace si es necesario
+		if ($valor instanceof NodoElectrico) {
+			$enlace_obj = new Enlace($valor);
+			$valor = $enlace_obj;
+		}
+		$enlace_obj = $valor;
+		
+		$dim = $dimension ?? '';
+		
+		if ($acumular) {
+			// --- MODO SUMA ---
+			if ($enlace_obj->pesos === null) {
+				if ($dimension === null) {
+					$enlace_obj->pesos = $peso;
+				} else {
+					$enlace_obj->pesos = [$dim => $peso];
+				}
+				return $peso;
+			}
+			if (is_array($enlace_obj->pesos)) {
+				if (!isset($enlace_obj->pesos[$dim])) {
+					$enlace_obj->pesos[$dim] = 0;
+				}
+				$enlace_obj->pesos[$dim] += $peso;
+				return $enlace_obj->pesos[$dim];
+			} else {
+				// Escalar previo
+				if ($dimension === null || $dim === '') {
+					$enlace_obj->pesos += $peso;
+					return $enlace_obj->pesos;
+				} else {
+					// Migrar a array porque se pide una dimensión distinta
+					$anterior = $enlace_obj->pesos;
+					$enlace_obj->pesos = [
+						'' => $anterior,
+						$dim => $peso
+					];
+					return $peso;
+				}
+			}
+		} else {
+			// --- MODO ASIGNACIÓN DIRECTA ---
+			if ($dimension === null) {
+				if ($enlace_obj->pesos === null) {
+					$enlace_obj->pesos = $peso;
+				} elseif (is_array($enlace_obj->pesos)) {
+					$enlace_obj->pesos[''] = $peso;
+				} else {
+					$enlace_obj->pesos = $peso;
+				}
+			} else {
+				if ($enlace_obj->pesos === null) {
+					$enlace_obj->pesos = [$dimension => $peso];
+				} elseif (is_array($enlace_obj->pesos)) {
+					$enlace_obj->pesos[$dimension] = $peso;
+				} else {
+					$anterior = $enlace_obj->pesos;
+					$enlace_obj->pesos = [
+						'' => $anterior,
+						$dimension => $peso
+					];
+				}
+			}
+			return $peso;
+		}
+	}
+	    /**
+     * Obtiene el peso de un enlace en una dimensión determinada.
+     *
+     * Si el enlace no tiene asignado un objeto Enlace (es decir, nunca se le asignó peso)
+     * o no existe la dimensión solicitada, devuelve `null`.
+     *
+     * @param string      $nombreEnlace Nombre del enlace.
+     * @param string|null $dimension    Dimensión del peso. Si es null, se usa 'default'.
+     *
+     * @return mixed|null El peso almacenado, o `null` si no existe.
+     *
+     * @example
+     * $peso = $nodo->peso('enlace1');                 // peso en dimensión 'default'
+     * $dist = $nodo->peso('enlace1', 'distancia');    // peso en dimensión 'distancia'
+     *
+     * @see _peso()
+     * @since V1.2.9
+     */
+    public function peso(string $nombreEnlace, ?string $dimension = null)
+    {
+		if (!Nodo::validar_nombre_enlace($nombreEnlace)) {
+			self::_error('El nombre de enlace no es válido.');
+			return null;
+		}
+		$fase = self::$fase;
+		$valor = $this->adyacentes[$fase][$nombreEnlace] ?? null;
+		
+		if ($valor instanceof Enlace) {
+			if ($valor->pesos === null) {
+				return null;
+			}
+			if (is_array($valor->pesos)) {
+				// Buscar por dimensión (si es null, clave '')
+				return $valor->pesos[$dimension ?? ''] ?? null;
+			} else {
+				// Escalar: si no se pide dimensión, devolvemos el escalar; si se pide dimensión, null
+				return ($dimension === null) ? $valor->pesos : null;
+			}
+		}
+		return null;
+    }
+
+
+    /**
+     * Devuelve una copia del mapa completo de pesos de un enlace.
+     *
+     * Si el enlace no tiene pesos (es un Nodo directo), retorna un array vacío.
+     *
+     * @param string $nombreEnlace Nombre del enlace.
+     * @return array<string, mixed> Mapa de pesos (clave = dimensión, valor = peso). Copia independiente.
+     *
+     * @example
+     * $todosPesos = $nodo->pesos('enlace1');
+     * // $todosPesos podría ser ['default' => 10, 'distancia' => 5.5]
+     *
+     * @see _peso()
+     * @since V1.2.9
+     */
+	public function pesos(string $nombreEnlace): array
+	{
+		if (!Nodo::validar_nombre_enlace($nombreEnlace)) {
+			self::_error('El nombre de enlace no es válido.');
+			return [];
+		}
+		$fase = self::$fase;
+		$valor = $this->adyacentes[$fase][$nombreEnlace] ?? null;
+		
+		if ($valor instanceof Enlace && $valor->pesos !== null) {
+			if (is_array($valor->pesos)) {
+				return $valor->pesos; // ya es copia (array por valor en PHP)
+			} else {
+				return ['' => $valor->pesos];
+			}
+		}
+		return [];
+	}
+
+	/**
+	 * Ordena los adyacentes de la fase actual según el valor del peso en una dimensión.
+	 *
+	 * Recorre todos los enlaces salientes del nodo en la fase activa y los ordena
+	 * por el valor del peso asociado a la dimensión indicada. Los enlaces que **no
+	 * poseen** esa dimensión de peso reciben un valor implícito de `0` para el
+	 * ordenamiento, lo que significa que:
+	 * - En orden **ascendente** (`$ascendente = true`) aparecen **al principio**.
+	 * - En orden **descendente** (`$ascendente = false`) aparecen **al final**.
+	 *
+	 * El parámetro `$incluir_sin_peso` controla si los enlaces sin la dimensión
+	 * solicitada se incluyen o no en el resultado.
+	 *
+	 * ---
+	 * 🔹 **Parámetros:**
+	 * - `$dimension`: Dimensión del peso por la que ordenar.
+	 *   Si es `null`, se utiliza la dimensión por defecto (internamente clave vacía).
+	 * - `$ascendente`: `true` para orden ascendente (por defecto), `false` para descendente.
+	 * - `$incluir_sin_peso`: `true` para incluir en el resultado los enlaces que no
+	 *   poseen la dimensión de peso (con peso implícito 0). Por defecto `false` (solo
+	 *   se devuelven los enlaces que sí tienen la dimensión).
+	 *
+	 * ---
+	 * 🔹 **Retorno:**
+	 * Un array de arrays asociativos con las claves:
+	 * - `'nombre_enlace'` → nombre del enlace.
+	 * - `'nodo'` → instancia de `NodoElectrico` destino.
+	 * - `'peso'` → valor del peso (o `null` si no existe, aunque internamente se trata como 0 para ordenar).
+	 *
+	 * ---
+	 * 🔹 **Ejemplos de uso:**
+	 *
+	 * **Ejemplo 1 – Orden ascendente por dimensión 'coste' (sin incluir sin peso)**
+	 * ```php
+	 * $ordenados = $nodo->adyacentes_ordenados_por_peso('coste', true, false);
+	 * // Solo aparecen enlaces que tienen la dimensión 'coste'.
+	 * // Ordenados del coste más bajo al más alto.
+	 * ```
+	 *
+	 * **Ejemplo 2 – Orden descendente incluyendo todos (los sin peso como 0)**
+	 * ```php
+	 * $ordenados = $nodo->adyacentes_ordenados_por_peso(null, false, true);
+	 * // Los que no tienen peso en la dimensión por defecto se consideran peso 0
+	 * // y aparecen al final (por ser los menores en orden descendente).
+	 * ```
+	 *
+	 * **Ejemplo 3 – Iterar resultados**
+	 * ```php
+	 * foreach ($nodo->adyacentes_ordenados_por_peso('distancia') as $item) {
+	 *     echo "Enlace: {$item['nombre_enlace']}, Nodo: {$item['nodo']->id()}, Peso: {$item['peso']}\n";
+	 * }
+	 * ```
+	 *
+	 * ---
+	 * 🔗 **Métodos relacionados:**
+	 * - {@link peso()} para consultar un peso individual.
+	 * - {@link pesos()} para obtener todos los pesos de un enlace.
+	 * - {@link _peso()} para asignar o acumular pesos.
+	 *
+	 * @param string|null $dimension         Dimensión por la que ordenar. `null` para la por defecto.
+	 * @param bool        $ascendente        `true` para ascendente (por defecto), `false` para descendente.
+	 * @param bool        $incluir_sin_peso  `true` para incluir enlaces sin la dimensión (peso 0 implícito).
+	 *
+	 * @return array Lista de entradas con claves `'nombre_enlace'`, `'nodo'`, `'peso'`.
+	 *
+	 * @since 1.2.9
+	 */
+	public function adyacentes_ordenados_por_peso(
+		?string $dimension = null,
+		bool $ascendente = true,
+		bool $incluir_sin_peso = false
+	): array {
+		$fase = self::$fase;
+		if (!isset($this->adyacentes[$fase]) || empty($this->adyacentes[$fase])) {
+			return [];
+		}
+
+		$items = [];
+
+		foreach ($this->adyacentes[$fase] as $nombre_enlace => $valor) {
+			$nodo = ($valor instanceof Enlace) ? $valor->nodo : $valor;
+			$peso = null;
+
+			if ($valor instanceof Enlace && $valor->pesos !== null) {
+				if (is_array($valor->pesos)) {
+					$clave = $dimension ?? '';
+					$peso = $valor->pesos[$clave] ?? null;
+				} else {
+					if ($dimension === null) {
+						$peso = $valor->pesos;
+					}
+				}
+			}
+
+			// Solo incluimos si tiene peso o si se pide incluir sin peso
+			if ($peso !== null || $incluir_sin_peso) {
+				$items[] = [
+					'nombre_enlace' => $nombre_enlace,
+					'nodo'          => $nodo,
+					'peso'          => $peso,
+				];
+			}
+		}
+
+		usort($items, function ($a, $b) use ($ascendente) {
+			$pesoA = $a['peso'] ?? 0; // implícito 0 si no existe
+			$pesoB = $b['peso'] ?? 0;
+			if ($pesoA == $pesoB) return 0;
+			return $ascendente
+				? ($pesoA < $pesoB ? -1 : 1)
+				: ($pesoA > $pesoB ? -1 : 1);
+		});
+
+		return $items;
+	}
+
+	 /**
+	 * Asigna un adyacente con nombre único y además le asigna un peso (fase actual).
+	 *
+	 * Combina {@link _adyacente()} y {@link _peso()}. El nombre del enlace se genera
+	 * automáticamente a partir del id del nodo destino.
+	 *
+	 * @param NodoElectrico $un_nodo   Nodo que se desea enlazar.
+	 * @param mixed         $peso      Peso a asignar al nuevo enlace.
+	 * @param string|null   $dimension Dimensión del peso (null para la por defecto).
+	 *
+	 * @return string|null Nombre del enlace generado, o null si hubo error.
+	 *
+	 * @see _adyacente()
+	 * @see _peso()
+	 * @since 1.2.9
+	 */
+	public function _adyacente_con_peso(NodoElectrico $un_nodo, $peso, ?string $dimension = null): ?string
+	{
+		$nombre_enlace = $this->_adyacente($un_nodo);
+		if ($nombre_enlace !== null) {
+			$this->_peso($nombre_enlace, $peso, $dimension);
+		}
+		return $nombre_enlace;
+	}
+
+	/**
+	 * Establece un nodo adyacente con nombre de enlace específico y le asigna un peso.
+	 *
+	 * Combina {@link _adyacente_en()} y {@link _peso()}. Si el enlace ya existía
+	 * y se permite reemplazar, el peso se asigna al nuevo enlace.
+	 *
+	 * @param NodoElectrico $un_nodo    Nodo a establecer como adyacente.
+	 * @param mixed         $enlace     Nombre del enlace.
+	 * @param mixed         $peso       Peso a asignar.
+	 * @param string|null   $dimension  Dimensión del peso (null para la por defecto).
+	 * @param bool          $reemplazar Si true, reemplaza un enlace existente.
+	 *
+	 * @return bool True si se creó/reemplazó correctamente, false si hubo error.
+	 *
+	 * @see _adyacente_en()
+	 * @see _peso()
+	 * @since 1.2.9
+	 */
+	public function _adyacente_con_peso_en(NodoElectrico $un_nodo,  $enlace, $peso, ?string $dimension = null, bool $reemplazar = false): bool
+	{
+		$exito = $this->_adyacente_en($un_nodo, $enlace, $reemplazar);
+		if ($exito) {
+			$this->_peso($enlace, $peso, $dimension,false); // asignación directa
+		}
+		return $exito;
+	}
+
 	/*************************************************************************************************************/
 	// ///////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 	// ///////////////////////////////////////////////////////////////////////////////////////////////////////////*/
@@ -2861,22 +3319,20 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		}*/
 		echo '<br/>Adyacentes:<br/>';
 		if ($this->adyacentes !== null) {
-			echo '<ul>';
-			foreach ($this->adyacentes as $fase => $adyacentes) {
-				echo '<h3>fase: ' . $fase . '</h3>';
-				echo '<ul>';
-				foreach ($adyacentes as $enlace => $nodo) {
+            echo '<ul>';
+            foreach ($this->adyacentes as $fase => $adyacentes) {
+                echo '<h3>fase: ' . $fase . '</h3>';
+                echo '<ul>';
+				foreach ($adyacentes as $enlace => $valor) {
+					$nodo = ($valor instanceof Enlace) ? $valor->nodo : $valor;
 					echo "<li>[$enlace] => <a href='#nodo-" . $nodo->id() . "'>" . $nodo->id() . '</a></li>';
 				}
-				echo '</ul>';
-			}
-			/*$this->por_cada_adyacente_ejecutar(function($nodo,$enlace){
-				echo "<li>[$enlace] => <a href='#nodo-" . $nodo->id() . "'>" . $nodo->id() . "</a></li>";
-			});*/
-			echo '</ul>';
-		} else {
-			echo 'No tiene<br/>';
-		}
+                echo '</ul>';
+            }
+            echo '</ul>';
+        } else {
+            echo 'No tiene<br/>';
+        }
 
 		echo 'Incidentes:<br/>';
 		if ($this->incidentes !== null) {
@@ -2975,19 +3431,14 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		echo "\nEnergia: " . $this->energia();
 		echo "\nAdyacentes:\n";
 
-		if ($this->tiene_adyacente()) {
-			/*foreach ($this->adyacentes as $fase=>$adyacentes){//fases
-				echo '\nAdyacentes fase "'.$fase.'":\n';
-				foreach ($adyacentes as $enlace => $nodo) {
-					echo "\n[$enlace] => " . $nodo->id();
-				}
-			}*/
-			$this->por_cada_adyacente_ejecutar(function ($nodo, $enlace) {
-				echo "\n[$enlace] => " . $nodo->id();
-			});
-		} else {
-			echo "No tiene\n";
-		}
+        echo "\nAdyacentes:\n";
+        if ($this->tiene_adyacente()) {
+            $this->por_cada_adyacente_ejecutar(function ($nodo, $enlace) {
+                echo "\n[$enlace] => " . $nodo->id();
+            });
+        } else {
+            echo "No tiene\n";
+        }
 
 		echo "\nIncidentes:\n";
 

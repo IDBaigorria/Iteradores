@@ -218,6 +218,7 @@ echo "   incidentes global de aux2 (debe ser 1, por enlace 'y'): " . $aux2->cant
 // ──────────────────────────────────────────────────────────
 // 3. PRUEBAS EXHAUSTIVAS DE ADYACENTES
 // ──────────────────────────────────────────────────────────
+/*
 echo "\n🔹 Adyacentes<br>";
 
 // 3.1 Preparación
@@ -476,7 +477,284 @@ echo "   callback agotamiento fase actual: " . ($cb_agot ? "registrado" : "ningu
 $global_cb = NodoElectrico::ejecutar_cuando_agota_global();
 echo "   callback global: " . ($global_cb ? "registrado" : "ninguno") . "<br>";
 
-echo "✅ Pruebas de energía completadas<br>";
+echo "✅ Pruebas de energía completadas<br>";*/
+// ──────────────────────────────────────────────────────────
+// 5. PRUEBAS EXHAUSTIVAS DE PESOS Y ADYACENTE CON PESO
+// ──────────────────────────────────────────────────────────
+echo "\n🔹 Pesos y AdyacenteConPeso<br>";
+/*
+echo "▶ 5.0 Preparación de nodos limpios<br>";
+$pA = NodoElectrico::crear_con_dato('PA');
+$pB = NodoElectrico::crear_con_dato('PB');
+$pC = NodoElectrico::crear_con_dato('PC');
+
+// Crear enlaces simples primero
+$pA->_adyacente_en($pB, 'e1');
+$pA->_adyacente_en($pC, 'e2');
+
+// ─── 5.1 Asignar y leer pesos (unidimensional) ───
+echo "▶ 5.1 _peso() y peso() básicos<br>";
+$pA->_peso('e1', 10);
+echo "   peso('e1') sin dimensión: " . var_export($pA->peso('e1'), true) . " (debe ser 10)<br>";
+echo "   peso('e2') (sin peso): " . var_export($pA->peso('e2'), true) . " (debe ser NULL)<br>";
+
+$pA->_peso('e2', 5.5, 'distancia');
+echo "   peso('e2','distancia'): " . var_export($pA->peso('e2','distancia'), true) . " (debe ser 5.5)<br>";
+echo "   peso('e2') sin dimensión (ahora debe ser NULL porque solo tiene 'distancia'): " . var_export($pA->peso('e2'), true) . " (debe ser NULL)<br>";
+
+// ─── 5.2 Migración perezosa: de Nodo a Enlace y pesos multidimensionales ───
+echo "▶ 5.2 Migración perezosa y múltiples dimensiones<br>";
+$pA->_peso('e1', 20);                               // pisa el escalar
+$pA->_peso('e1', 99, 'coste');                       // ahora migra a array: '' => 20, 'coste' => 99
+echo "   peso('e1') (default): " . var_export($pA->peso('e1'), true) . " (debe ser 20)<br>";
+echo "   peso('e1','coste'): " . var_export($pA->peso('e1','coste'), true) . " (debe ser 99)<br>";
+echo "   pesos('e1') completo: " . var_export($pA->pesos('e1'), true) . " (debe tener ''=>20, 'coste'=>99)<br>";
+
+// ─── 5.3 pesos() y consultas sobre enlaces sin peso ───
+echo "▶ 5.3 pesos() en enlace sin peso<br>";
+$vacio = $pA->pesos('e2'); // e2 tiene solo 'distancia'
+echo "   pesos('e2'): " . var_export($vacio, true) . " (debe tener 'distancia'=>5.5)<br>";
+$sin_peso = $pA->pesos('enlace_inexistente');
+echo "   pesos('enlace_inexistente'): " . var_export($sin_peso, true) . " (debe ser array vacío)<br>";
+
+// ─── 5.4 Ordenamiento por peso ───
+echo "▶ 5.4 adyacentes_ordenados_por_peso()<br>";
+// Añadir más enlaces con diferentes pesos
+$pD = NodoElectrico::crear_con_dato('PD');
+$pE = NodoElectrico::crear_con_dato('PE');
+$pA->_adyacente_en($pD, 'e3');
+$pA->_adyacente_en($pE, 'e4');
+$pA->_peso('e1', 20);        // ya tiene 20 (default)
+$pA->_peso('e2', 5, 'coste'); // añadimos coste a e2 también
+$pA->_peso('e3', 50);
+$pA->_peso('e4', 30);
+
+// Por defecto (excluye sin peso)
+$ordenados_asc = $pA->adyacentes_ordenados_por_peso(null, true);
+echo "   Orden ascendente por default (sin incluir sin peso):<br>";
+foreach ($ordenados_asc as $item) {
+    echo "      enlace: {$item['nombre_enlace']}, nodo: {$item['nodo']->id()}, peso: {$item['peso']}<br>";
+}
+// Debe mostrar solo e2(5), e1(20), e4(30), e3(50) — no debe aparecer ningún otro enlace (porque todos los que creamos tienen peso, pero si hubiera alguno sin peso, no saldría)
+
+// Probar incluyendo los sin peso explícitamente
+$ordenados_con_sin_peso = $pA->adyacentes_ordenados_por_peso(null, true, true);
+echo "   Orden ascendente (incluyendo sin peso):<br>";
+foreach ($ordenados_con_sin_peso as $item) {
+    echo "      enlace: {$item['nombre_enlace']}, peso: {$item['peso']}<br>";
+}
+// Ahora sí deberían aparecer todos, los sin peso al final
+
+// Orden descendente
+$ordenados_desc = $pA->adyacentes_ordenados_por_peso(null, false);
+echo "   Orden descendente por default (sin incluir sin peso):<br>";
+foreach ($ordenados_desc as $item) {
+    echo "      enlace: {$item['nombre_enlace']}, peso: {$item['peso']}<br>";
+}
+
+// Ordenar por dimensión 'coste' (e1 tiene 99, e2 tiene 5)
+$ordenados_coste = $pA->adyacentes_ordenados_por_peso('coste', true);
+echo "   Orden ascendente por 'coste' (sin incluir sin peso):<br>";
+foreach ($ordenados_coste as $item) {
+    echo "      enlace: {$item['nombre_enlace']}, peso: {$item['peso']}<br>";
+}
+// Debe mostrar e2(5) y e1(99) si ambos tienen coste, pero no los demás que no tienen coste
+
+// ─── 5.5 Compatibilidad con métodos de Adyacentes (deben seguir devolviendo Nodo) ───
+echo "▶ 5.5 Métodos de Adyacentes no afectados por pesos<br>";
+$ady = $pA->adyacente('e1');
+echo "   adyacente('e1') devuelve Nodo id: " . ($ady ? $ady->id() : 'null') . " (debe ser PB)<br>";
+$todos_ady = $pA->adyacentes();
+echo "   adyacentes() devuelve array con " . count($todos_ady) . " elementos (todos Nodo)<br>";
+$tiene = $pA->tiene_adyacente_a($pB);
+echo "   tiene_adyacente_a(pB): " . ($tiene ? "'$tiene'" : 'false') . " (debe devolver 'e1')<br>";
+$result = $pA->por_cada_adyacente_ejecutar(function($n, $e) { return $n->id(); });
+echo "   por_cada_adyacente_ejecutar: " . implode(',', $result) . "<br>";
+
+// eliminar_adyacente debe eliminar el Enlace (con pesos) y devolver el Nodo
+$eliminado_con_peso = $pA->eliminar_adyacente('e1');
+echo "   eliminar_adyacente('e1') devuelve: " . ($eliminado_con_peso ? $eliminado_con_peso->id() : 'null') . " (debe ser PB)<br>";
+echo "   ¿sigue existiendo e1? " . ($pA->adyacente('e1') ? 'SI (error)' : 'NO (correcto)') . "<br>";
+
+$pA->eliminar_adyacentes(); // limpia todos
+echo "   después de eliminar_adyacentes, cantidad: " . $pA->cantidad_de_adyacentes() . " (debe ser 0)<br>";
+
+// ─── 5.6 _adyacente_con_peso() y _adyacente_con_peso_en() ───
+echo "▶ 5.6 _adyacente_con_peso() y _adyacente_con_peso_en()<br>";
+$pX = NodoElectrico::crear_con_dato('PX');
+$pY = NodoElectrico::crear_con_dato('PY');
+$pZ = NodoElectrico::crear_con_dato('PZ');
+
+// _adyacente_con_peso
+$enlaceCreado = $pX->_adyacente_con_peso($pY, 42, 'vitalidad');
+echo "   _adyacente_con_peso genera enlace '$enlaceCreado'<br>";
+echo "   peso('$enlaceCreado', 'vitalidad'): " . var_export($pX->peso($enlaceCreado, 'vitalidad'), true) . " (debe ser 42)<br>";
+
+// _adyacente_con_peso_en (nombre explícito)
+$pX->_adyacente_con_peso_en($pZ,   'especial', 7.5);
+echo "   peso('especial') (default): " . var_export($pX->peso('especial'), true) . " (debe ser 7.5)<br>";
+
+// Reemplazar con peso
+$pX->_adyacente_con_peso_en($pY,  'especial', 99,'coste', true);
+$nodoEnEspecial = $pX->adyacente('especial');
+echo "   después de reemplazar, nodo en 'especial': " . ($nodoEnEspecial ? $nodoEnEspecial->id() : 'null') . " (debe ser PY)<br>";
+echo "   peso('especial','coste'): " . var_export($pX->peso('especial','coste'), true) . " (debe ser 99)<br>";
+
+// ─── 5.7 Casos extremos ───
+echo "▶ 5.7 Casos extremos<br>";
+// Peso a enlace inexistente
+echo "   _peso('inexistente', 1): " . var_export($pX->_peso('inexistente', 1), true) . " (debe ser false)<br>";
+// peso() con dimensión cuando solo hay escalar
+$pAux = NodoElectrico::crear();
+$pAux2 = NodoElectrico::crear();
+$pAux->_adyacente_en($pAux2, 'unico');
+$pAux->_peso('unico', 123);
+echo "   peso('unico', 'inexistente') sobre escalar: " . var_export($pAux->peso('unico', 'inexistente'), true) . " (debe ser NULL)<br>";
+echo "   peso('unico') default: " . var_export($pAux->peso('unico'), true) . " (debe ser 123)<br>";
+*/
+// ─── 5.8 sumar_peso() ───
+// ─── 5.8 _peso() con acumular = true (ex sumar_peso) ───
+// ──────────────────────────────────────────────────────────
+// 5. PRUEBAS EXHAUSTIVAS DE PESOS Y ADYACENTE CON PESO
+// ──────────────────────────────────────────────────────────
+echo "\n🔹 Pesos y AdyacenteConPeso<br>";
+
+echo "▶ 5.0 Preparación de nodos limpios<br>";
+$pA = NodoElectrico::crear_con_dato('PA');
+$pB = NodoElectrico::crear_con_dato('PB');
+$pC = NodoElectrico::crear_con_dato('PC');
+
+// Crear enlaces simples primero
+$pA->_adyacente_en($pB, 'e1');
+$pA->_adyacente_en($pC, 'e2');
+
+// ─── 5.1 Asignación directa (acumular = false) ───
+echo "▶ 5.1 Asignación directa (_peso con acumular=false)<br>";
+$pA->_peso('e1', 10, null);
+echo "   peso('e1') tras asignación directa: " . var_export($pA->peso('e1'), true) . " (debe ser 10)<br>";
+
+$pA->_peso('e2', 5.5, 'distancia');
+echo "   peso('e2','distancia'): " . var_export($pA->peso('e2','distancia'), true) . " (debe ser 5.5)<br>";
+echo "   peso('e2') default sin asignar: " . var_export($pA->peso('e2'), true) . " (debe ser NULL)<br>";
+
+// ─── 5.2 Acumulación (comportamiento por defecto) ───
+echo "▶ 5.2 Acumulación (_peso con acumular=true, explícito y por defecto)<br>";
+// Acumular sobre el peso existente (10) → 15
+$res1 = $pA->_peso('e1', 5, null, true);
+echo "   _peso('e1', 5, null, true) devuelve: " . var_export($res1, true) . " (debe ser 15)<br>";
+echo "   peso('e1'): " . var_export($pA->peso('e1'), true) . " (debe ser 15)<br>";
+
+// Usando el valor por defecto (true) – mismo comportamiento
+$res2 = $pA->_peso('e1', -3);
+echo "   _peso('e1', -3) devuelve: " . var_export($res2, true) . " (debe ser 12)<br>";
+echo "   peso('e1'): " . var_export($pA->peso('e1'), true) . " (debe ser 12)<br>";
+
+// Acumular sobre dimensión que no existía (parte de 0)
+$res3 = $pA->_peso('e2', 2.5, 'energia');
+echo "   _peso('e2', 2.5, 'energia') devuelve: " . var_export($res3, true) . " (debe ser 2.5)<br>";
+$res4 = $pA->_peso('e2', 1.5, 'energia');
+echo "   acumular de nuevo -> " . var_export($res4, true) . " (debe ser 4.0)<br>";
+
+// ─── 5.3 Migración automática de escalar a array ───
+echo "▶ 5.3 Migración de escalar a array al acumular en nueva dimensión<br>";
+// e1 actualmente es escalar (12). Si acumulamos en dimensión 'coste', migra a array.
+$res5 = $pA->_peso('e1', 7, 'coste');
+echo "   _peso('e1', 7, 'coste') devuelve: " . var_export($res5, true) . " (debe ser 7)<br>";
+echo "   pesos('e1'): " . var_export($pA->pesos('e1'), true) . " (debe tener ''=>12, 'coste'=>7)<br>";
+echo "   peso('e1') default: " . var_export($pA->peso('e1'), true) . " (debe ser 12)<br>";
+
+// ─── 5.4 Ordenamiento por peso (con y sin incluir sin peso) ───
+echo "▶ 5.4 adyacentes_ordenados_por_peso()<br>";
+$pD = NodoElectrico::crear_con_dato('PD');
+$pE = NodoElectrico::crear_con_dato('PE');
+$pA->_adyacente_en($pD, 'e3');
+$pA->_adyacente_en($pE, 'e4');
+// Ahora e1 default=12, e2 no tiene default (tiene distancia y energia), e3 y e4 sin peso aún
+// Asignamos pesos a e3 y e4 con asignación directa para control
+$pA->_peso('e3', 50, null, false);
+$pA->_peso('e4', 30, null, false);
+// e2 no tiene default, así que quedará sin peso en la dimensión por defecto
+
+echo "   Pesos actuales:<br>";
+echo "      e1 default: " . var_export($pA->peso('e1'), true) . " (12)<br>";
+echo "      e2 default: " . var_export($pA->peso('e2'), true) . " (NULL)<br>";
+echo "      e3 default: " . var_export($pA->peso('e3'), true) . " (50)<br>";
+echo "      e4 default: " . var_export($pA->peso('e4'), true) . " (30)<br>";
+
+// Orden ascendente sin incluir sin peso (e2 no aparece)
+$ordenados1 = $pA->adyacentes_ordenados_por_peso(null, false, false);
+echo "   Orden ascendente default (sin incluir sin peso):<br>";
+foreach ($ordenados1 as $item) {
+    echo "      enlace: {$item['nombre_enlace']}, nodo: {$item['nodo']->id()}, peso: {$item['peso']}<br>";
+}
+// debe ser: e1(12), e4(30), e3(50)
+
+// Incluyendo sin peso (aparece e2 al final)
+$ordenados2 = $pA->adyacentes_ordenados_por_peso(null, false, true);
+echo "   Incluyendo sin peso:<br>";
+foreach ($ordenados2 as $item) {
+    echo "      enlace: {$item['nombre_enlace']}, peso: {$item['peso']}<br>";
+}
+
+// Ordenar por 'coste' (solo e1 tiene, 7)
+$ordenados3 = $pA->adyacentes_ordenados_por_peso('coste', false, false);
+echo "   Por 'coste' (sin incluir sin peso):<br>";
+foreach ($ordenados3 as $item) {
+    echo "      enlace: {$item['nombre_enlace']}, peso: {$item['peso']}<br>";
+}
+
+// ─── 5.5 Compatibilidad con métodos de Adyacentes (no afectados) ───
+echo "▶ 5.5 Métodos de Adyacentes no afectados por pesos<br>";
+$ady = $pA->adyacente('e1');
+echo "   adyacente('e1') devuelve Nodo id: " . ($ady ? $ady->id() : 'null') . " (debe ser PB)<br>";
+$todos_ady = $pA->adyacentes();
+echo "   adyacentes() devuelve array con " . count($todos_ady) . " elementos (todos Nodo)<br>";
+$tiene = $pA->tiene_adyacente_a($pB);
+echo "   tiene_adyacente_a(pB): " . ($tiene ? "'$tiene'" : 'false') . " (debe devolver 'e1')<br>";
+$result = $pA->por_cada_adyacente_ejecutar(function($n, $e) { return $n->id(); });
+echo "   por_cada_adyacente_ejecutar: " . implode(',', $result) . "<br>";
+
+// eliminar_adyacente con peso
+$eliminado_con_peso = $pA->eliminar_adyacente('e1');
+echo "   eliminar_adyacente('e1') devuelve: " . ($eliminado_con_peso ? $eliminado_con_peso->id() : 'null') . " (debe ser PB)<br>";
+echo "   ¿sigue existiendo e1? " . ($pA->adyacente('e1') ? 'SI (error)' : 'NO (correcto)') . "<br>";
+
+$pA->eliminar_adyacentes();
+echo "   después de eliminar_adyacentes, cantidad: " . $pA->cantidad_de_adyacentes() . " (debe ser 0)<br>";
+
+// ─── 5.6 _adyacente_con_peso y _adyacente_con_peso_en (asignan, no acumulan) ───
+echo "▶ 5.6 _adyacente_con_peso() y _adyacente_con_peso_en()<br>";
+$pX = NodoElectrico::crear_con_dato('PX');
+$pY = NodoElectrico::crear_con_dato('PY');
+$pZ = NodoElectrico::crear_con_dato('PZ');
+
+// _adyacente_con_peso asigna el peso en el momento de crear el enlace
+$enlaceCreado = $pX->_adyacente_con_peso($pY, 42, 'vitalidad');
+echo "   _adyacente_con_peso genera enlace '$enlaceCreado'<br>";
+echo "   peso('$enlaceCreado', 'vitalidad'): " . var_export($pX->peso($enlaceCreado, 'vitalidad'), true) . " (debe ser 42)<br>";
+// Llamar de nuevo no debe acumular
+$pX->_adyacente_con_peso_en($pZ, 'especial', 7.5);
+echo "   _adyacente_con_peso_en('especial', 7.5) -> peso: " . var_export($pX->peso('especial'), true) . " (debe ser 7.5)<br>";
+// Reemplazar con otro nodo y peso
+$pX->_adyacente_con_peso_en($pY, 'especial', 99, 'coste', true);
+echo "   tras reemplazar, nodo en 'especial': " . $pX->adyacente('especial')->id() . " (debe ser PY)<br>";
+echo "   peso('especial','coste'): " . var_export($pX->peso('especial','coste'), true) . " (debe ser 99)<br>";
+
+// ─── 5.7 Casos extremos ───
+echo "▶ 5.7 Casos extremos<br>";
+echo "   _peso('inexistente', 1): " . var_export($pX->_peso('inexistente', 1), true) . " (debe ser NULL)<br>";
+$pAux = NodoElectrico::crear();
+$pAux2 = NodoElectrico::crear();
+$pAux->_adyacente_en($pAux2, 'unico');
+$pAux->_peso('unico', 123, null, false);       // asignación directa
+echo "   peso('unico','inexistente') sobre escalar: " . var_export($pAux->peso('unico', 'inexistente'), true) . " (debe ser NULL)<br>";
+echo "   peso('unico') default: " . var_export($pAux->peso('unico'), true) . " (debe ser 123)<br>";
+// Acumular con valor negativo desde cero
+$pAux->_peso('unico', -50);  // acumula sobre 123 → 73
+echo "   tras acumular -50: " . var_export($pAux->peso('unico'), true) . " (debe ser 73)<br>";
+
+echo "✅ Pruebas de pesos completadas<br>";
+
 /*
 // ──────────────────────────────────────────────────────────
 // 6. ELIMINACIÓN DE NODOS
