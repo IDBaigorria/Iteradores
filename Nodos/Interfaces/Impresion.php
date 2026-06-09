@@ -1,15 +1,31 @@
 <?php
 namespace Iteradores\Nodos\Interfaces;
-interface Impresion {
+/**
+ * Interfaz de impresión de un nodo.
+ *
+ * Define un único método `imprimir()` que se adapta automáticamente al tipo de
+ * salida configurado en {@link Configuracion.Entorno Entorno} (HTML o consola).
+ *
+ * @package Iteradores\Nodos\Interfaces
+ * @since V3.2.5
+ */
+interface Impresion
+{
     /**
-     * Imprime el nodo en formato HTML.
+     * Imprime el nodo en el formato adecuado según el tipo de salida del entorno.
+     * 
+	 * **Restricción de entorno:** solo se ejecuta en desarrollo o pruebas.
+	 * En producción, emite una alerta y no genera salida, ya que este método está pensado
+	 * exclusivamente para depuración.
      *
-     * Genera una representación visual del nodo en HTML con su id, dato y adyacencias.
-     * Usado para depuración en entorno web.
-     *
+     * Si `Entorno::es_consola()` → salida texto plano (CLI).
+     * Si `Entorno::es_html()` → bloque HTML con datos de la fase actual.
+     * 
      * @return void
+     * @since 1.3.0 Unificado con entorno; desaparece imprimir2.
      */
-    public function imprimir();
+    public function imprimir(): void;
+
     /**
      * Imprime todos los nodos de la superestructura.
      * 
@@ -19,7 +35,7 @@ interface Impresion {
      *
      * @return bool Devuelve `true` si existen nodos y se imprimen correctamente, `false` en caso contrario.
      */
-    static public function imprimir_superestructura();
+ //   static public function imprimir_superestructura();
 
     /**
      * Imprime el nodo en formato texto plano.
@@ -28,7 +44,7 @@ interface Impresion {
      *
      * @return bool Devuelve `true` si se imprimió correctamente.
      */
-    public function imprimir2();
+ //   public function imprimir2();
     /**
      * Imprime todos los nodos de la superestructura en formato de texto.
      * 
@@ -39,6 +55,6 @@ interface Impresion {
      * @return bool Devuelve `true` si se imprimieron nodos, `false` si no existen.
      * @since V3.2.5
      */
-    static public function imprimir_superestructura2();
+  //  static public function imprimir_superestructura2();
 
 }

@@ -5,6 +5,7 @@ use Iteradores\Nodos\Interfaces\AccesoAEspeciales;
 use Iteradores\Nodos\Interfaces\AccesoASuperestructura;
 use Iteradores\Nucleo\Objeto;
 use Iteradores\Configuracion\Conf;
+use Iteradores\Configuracion\Entorno;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructura;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL;
 use Iteradores\Nodos\Interfaces\FabricaDeNodos;
@@ -2707,24 +2708,29 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 	/*************************************************************************************************************/
 
-		//*AGREGO FUNCION PARA IMPRIMIR UN NODO EN PANTALLA, ESTA OPCION DEBERIA SER USADA SOLO POR PROGRAMADORES
 
 	/**
-	 * Imprime el nodo en formato HTML (Interfaz Impresion).
+	 * Imprime el nodo en el formato adecuado (HTML o consola) según el entorno configurado.
 	 *
 	 * 🔗 Interfaz:
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Impresion.html Interfaz Impresion}
 	 *
-	 * Muestra en pantalla una representación visual del nodo con su id, su dato, 
-	 * los adyacentes y el número de referencias. Se utiliza principalmente con fines 
-	 * de depuración y diagnóstico visual del grafo en un entorno web.
+	 * **Restricción de entorno:** solo se ejecuta en desarrollo o pruebas.
+	 * En producción, emite una alerta y no genera salida, ya que este método está pensado
+	 * exclusivamente para depuración.
 	 *
-	 * ⚠️ Debe ser usada únicamente por programadores o herramientas de depuración.  
-	 * No se recomienda para salida de usuario final.
+	 * Delega en los métodos privados {@link imprimir_consola()} o {@link imprimir_html()}
+	 * dependiendo de {@link Configuracion.Entorno::es_consola()}.
+	 * Solo se muestra la información de la **fase actual** si la implementación la soporta
+	 * (en esta clase base no hay fases, por lo que se muestran todos los adyacentes).
 	 *
+	 * La representación visual del nodo se rige por las constantes definidas en
+	 * {@link Configuracion.Conf::NODOS_COLORES} (fondo, texto, borde y códigos ANSI
+	 * para el modo consola). Ajuste esos valores para cambiar la apariencia de la
+	 * salida.
+	 * 
 	 * ---
 	 * 🔗 Otros métodos complementarios:
-	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_imprimir2 imprimir2()} — versión en texto plano.
 	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_id id()} — obtiene el identificador del nodo.
 	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_dato dato()} — obtiene el dato asociado al nodo.
 	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_tiene_adyacente tiene_adyacente()} — comprueba adyacencias.
@@ -2734,39 +2740,124 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	 * ```php
 	 * $nodo->imprimir(); // imprime el nodo como bloque HTML
 	 * ```
-	 *
-	 * @note Utiliza `echo` para generar directamente HTML. No devuelve valor.
+	 * 
 	 * @return void
+	 * @since 1.3.0 Unificado; eliminado imprimir2.
+	 *
+	 * @see imprimir_consola()
+	 * @see imprimir_html()
+	 * @see Configuracion.Entorno
 	 */
-	public function imprimir() {
-		$id=$this->id();
-		echo "<div id='nodo-" . $id . "' style='margin-bottom:20px;'>";
-		echo ">>NODO " . $id;
-		if ($this->es_especial()) echo " (ESP)";
-		echo " - Dato: ";
+	public function imprimir(): void
+	{
+		if (!Entorno::permite_pruebas()) {
+			self::_alerta('Impresión de nodos no permitida en entorno de producción.');
+			return;
+		}
 
+		if (Entorno::es_consola()) {
+			$this->imprimir_consola();
+		} else {
+			$this->imprimir_html();
+		}
+	}
+
+	/**
+	 * Imprime el nodo en formato texto plano (consola).
+	 *
+	 * Muestra id, dato, adyacentes y número de referencias.
+	 *
+	 * Los códigos ANSI utilizados en la terminal se toman de `ansi_fondo` y
+	 * `ansi_texto` de {@link Configuracion.Conf::NODOS_COLORES}. Modifique esas
+	 * constantes si desea otra combinación cromática.
+	 * 
+	 * @return void
+	 * @private
+	 * @since 1.3.0
+	 */
+	private function imprimir_consola(): void
+	{
+		$colores = Conf::NODOS_COLORES;
+		$ansi_texto = $colores['ansi_texto'] ?? '34';
+		$ansi_fondo = $colores['ansi_fondo'] ?? null;
+
+		$color_texto   = Entorno::color_ansi($ansi_texto);
+		$color_fondo   = $ansi_fondo ? Entorno::color_ansi($ansi_fondo) : '';
+		$reset         = ($color_texto || $color_fondo) ? Entorno::color_ansi('0') : '';
+
+		echo $color_fondo . $color_texto;
+		echo "\n>>NODO " . $this->id();
+		if ($this->es_especial()) {
+			echo ' (ESP)';
+		}
+		echo ' - Dato: ';
 		$dato = $this->dato();
-		if (is_string($dato)) {
+		if (is_string($dato) || is_numeric($dato)) {
 			echo $dato;
 		} elseif ($dato === null) {
-			echo "null";
+			echo 'null';
 		} else {
-			echo "este dato no es un string";
-		}
-		
-		echo "<br/>Adyacentes:<br/>";
-		if ($this->tiene_adyacente()) {
-			echo "<ul>";
-			foreach ($this->adyacentes as $enlace => $nodo) {
-				echo "<li>[$enlace] => <a href='#nodo-" . $nodo->id() . "'>" . $nodo->id() . "</a></li>";
-			}
-			echo "</ul>";
-		} else {
-			echo "No tiene<br/>";
+			echo 'este dato no es un string';
 		}
 
-		echo "Número de referencias a él: " . $this->referencias . "<br/>";
-		echo "Fin Nodo <a href='#inicio'>↑ Volver al inicio</a></div><br/>";
+		echo "\nAdyacentes:\n";
+		if ($this->tiene_adyacente()) {
+			foreach ($this->adyacentes as $enlace => $nodo) {
+				echo "  [$enlace] => " . $nodo->id() . "\n";
+			}
+		} else {
+			echo "  No tiene\n";
+		}
+
+		echo "Número de referencias a él: " . $this->referencias . "\n";
+		echo "Fin Nodo\n";
+		echo $reset;
+	}
+
+	/**
+	 * Imprime el nodo en formato HTML.
+	 *
+	 * Genera un bloque HTML con id, dato, adyacentes y referencias.
+	 * 
+	 * El bloque HTML emplea los valores de fondo, texto y borde definidos en
+	 * {@link Configuracion.Conf::NODOS_COLORES}. Para personalizar la apariencia,
+	 * cambie esas constantes.
+	 *
+	 * @return void
+	 * @private
+	 * @since 1.3.0
+	 */
+	private function imprimir_html(): void
+	{
+		$colores = Conf::NODOS_COLORES;
+		$fondo = htmlspecialchars($colores['fondo']);
+		$texto = htmlspecialchars($colores['texto']);
+		$borde = htmlspecialchars($colores['borde']);
+
+		$id = $this->id();
+		echo "<div style='background:{$fondo}; color:{$texto}; padding:1em; margin:1em 0; border:1px solid {$borde}; font-family:monospace; white-space:pre-wrap;'>";
+		echo '<strong>NODO ' . $id;
+		if ($this->es_especial()) echo ' (ESP)';
+		echo ' - Dato: ';
+		$dato = $this->dato();
+		if (is_string($dato)) echo htmlspecialchars($dato);
+		elseif ($dato === null) echo 'null';
+		else echo 'este dato no es un string';
+		echo '</strong><br>';
+
+		echo 'Adyacentes:<br>';
+		if ($this->tiene_adyacente()) {
+			echo '<ul>';
+			foreach ($this->adyacentes as $enlace => $nodo) {
+				echo "<li>[$enlace] => <a href='#nodo-{$nodo->id()}' style='color:{$texto};'>" . $nodo->id() . '</a></li>';
+			}
+			echo '</ul>';
+		} else {
+			echo 'No tiene<br>';
+		}
+
+		echo 'Número de referencias a él: ' . $this->referencias . '<br>';
+		echo '</div>';
 	}
 
 	/**
@@ -2792,57 +2883,7 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	}
 
 
-	/**
-	 * Imprime el nodo en formato texto plano (Interfaz Impresion).
-	 *
-	 * 🔗 Interfaz:
-	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Impresion.html Interfaz Impresion}
-	 *
-	 * Presenta una salida en consola (shell) del nodo con su id, dato y enlaces adyacentes.
-	 * Es útil para depuración en entornos sin salida gráfica (CLI).
-	 *
-	 * ---
-	 * 🔗 Otros métodos complementarios:
-	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_imprimir imprimir()} — versión HTML.
-	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_id id()} — obtiene el identificador del nodo.
-	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_dato dato()} — obtiene el dato asociado al nodo.
-	 *
-	 * ---
-	 * Ejemplo de uso:
-	 * ```php
-	 * $nodo->imprimir2(); // imprime el nodo en la shell
-	 * ```
-	 *
-	 * @note Devuelve `true` si se ejecutó correctamente.
-	 * @return bool
-	 */
-	public function imprimir2() {
-		echo "\n>>NODO " . $this->id();
-		if ($this->es_especial()) echo " (ESP)";
-		echo " - Dato: ";
 
-		$dato = $this->dato();
-		if (is_string($dato) || is_numeric($dato)) {
-			echo $dato;
-		} elseif ($dato === null) {
-			echo "null";
-		} else {
-			echo "este dato no es un string";
-		}
-
-		echo "\nAdyacentes:\n";
-		if ($this->tiene_adyacente()) {
-			foreach ($this->adyacentes as $enlace => $nodo) {
-				echo "\n[$enlace] => " . $nodo->id();
-			}
-		} else {
-			echo "No tiene\n";
-		}
-
-		echo "\nNúmero de referencias a él: " . $this->referencias;
-		echo "\nFin Nodo\n";
-		return true;
-	}
 	/**
 	 * Imprime todos los nodos de la superestructura en formato de texto (modo consola).
 	 *

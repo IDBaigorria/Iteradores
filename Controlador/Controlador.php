@@ -160,9 +160,46 @@ class Controlador extends Objeto implements PerdurarSuperestructura {
         return (bool) static::delegar('existe', $nombre);
     }
 
-    /** @return bool */
-    public static function imprimir($nombre): bool {
-        return (bool) static::delegar('imprimir', $nombre);
+    /**
+     * Imprime todos los nodos de la superestructura en el formato adecuado
+     * según el entorno configurado (HTML o consola).
+     *
+     * Delega en {@link NodoElectrico::imprimir()} (o el método correspondiente de
+     * cada nodo) para la representación individual. La iteración se realiza a
+     * través del método protegido {@link Nodo::por_cada_nodo_ejecutar()}, usando el
+     * token interno que {@link Controlador} recibió durante la inicialización.
+     *
+     * Si la superestructura está vacía, emite una alerta y retorna `false`.
+     *
+     * @return bool `true` si se imprimió al menos un nodo, `false` en caso contrario.
+     *
+     * @since 1.3.0 Unifica imprimir_superestructura e imprimir_superestructura2.
+     *
+     * @see Nodo::imprimir()
+     * @see Configuracion.Entorno
+     */
+    public static function imprimir_superestructura(): bool
+    {
+        if (!Nodo::hay_nodos_en_superestructura()) {
+            self::_alerta("Controlador::imprimir_superestructura() — la superestructura está vacía");
+            return false;
+        }
+
+        // Encabezado opcional para consola
+        if (Entorno::es_consola()) {
+            $colores = Conf::NODOS_COLORES;
+            $color   = Entorno::color_ansi($colores['ansi_texto'] ?? '34');
+            $reset   = $color ? Entorno::color_ansi('0') : '';
+            echo $color . "===== SUPERESTRUCTURA =====\n" . $reset;
+        }
+
+        // Iterar sobre todos los nodos llamando a su imprimir()
+        $funcion = function($nodo) {
+            $nodo->imprimir();
+        };
+        Nodo::por_cada_nodo_ejecutar(self::$token, $funcion, null);
+
+        return true;
     }
     /**
      * Indica si el controlador ya ha sido inicializado.

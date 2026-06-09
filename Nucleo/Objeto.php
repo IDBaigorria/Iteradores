@@ -1,11 +1,13 @@
 <?php
 namespace Iteradores\Nucleo;
 use Iteradores\Configuracion\Conf;
+use Iteradores\Configuracion\Entorno;
 use Iteradores\Nucleo\Interfaces\Id;
 use Iteradores\Nucleo\Interfaces\ErroresYAlertas;
 session_start();
 header("Cache-control: no-cache, must-revalidate");
 require_once(".\configuracion\Configuracion.php");
+require_once(".\configuracion\Entorno.php");
 require_once(".\Nucleo\Interfaces\Id.php");
 require_once(".\Nucleo\Interfaces\ErroresYAlertas.php");
 /**
@@ -72,7 +74,6 @@ require_once(".\Nucleo\Interfaces\ErroresYAlertas.php");
  *
  * - Visualización de los errores y alertas acumulados:
  *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
- *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores_consola imprimir_errores_consola()}
  *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_errores html_errores()}
  *   - Y sus equivalentes para alertas
  *
@@ -265,7 +266,6 @@ class Objeto implements Id, ErroresYAlertas
 	 * 
 	 * La lista de errores puede luego visualizarse usando métodos como:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores_consola imprimir_errores_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_errores html_errores()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_errores json_errores()}
 	 *
@@ -333,8 +333,7 @@ class Objeto implements Id, ErroresYAlertas
 	}
 
 	/**
-	 * Imprime en consola (o en la salida estándar) la lista de errores
-	 * registrados (interfaz Errores)
+	 * Imprime todos los errores registrados adaptándose al entorno.
 	 * 
 	 * Este metodo pertenece a las interfaces:
 	 *  - {@link ./classes/Iteradores-Nucleo-Interfaces-Errores.html Interfaz Errores}
@@ -346,8 +345,19 @@ class Objeto implements Id, ErroresYAlertas
 	 * permitiendo al programador diagnosticar y depurar más fácilmente el
 	 * origen de los problemas.
 	 *
+	 * La elección del formato de salida se basa en la configuración establecida en
+	 * {@link ./classes/Iteradores-Configuracion-Entorno.html Entorno}.
+	 * Si {@link ./classes/Iteradores-Configuracion-Entorno.html#method_es_consola Entorno::es_consola()}
+	 * En caso contrario, se utiliza {@link _imprimir_errores_html()}.
+	 *
+	 * Para modificar el tipo de salida durante la ejecución, invoque
+	 * {@link ./classes/Iteradores-Configuracion-Entorno.html#method_establecer_tipo_salida Entorno::establecer_tipo_salida()}.
+	 * 
+	 * El formato de salida se controla con las constantes de 
+	 * {@link Configuracion.Conf::ERRORES_COLORES} (fondo, texto, borde y códigos ANSI 
+	 * para consola). Consulte esa sección de la configuración para personalizarlo.
+	 * 
 	 * La lista de errores puede visualizarse usando también:
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores_consola imprimir_errores_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_errores html_errores()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_errores json_errores()}
 	 *
@@ -389,150 +399,138 @@ class Objeto implements Id, ErroresYAlertas
 	 *```
 	 * @return void No devuelve ningún valor.
 	 */
-	public static function imprimir_errores()
+	public static function imprimir_errores(): void
 	{
-		//self::_error(45);
+		if (Entorno::es_consola()) {
+			self::imprimir_errores_consola();
+		} else {
+			self::imprimir_errores_html();
+		}
+	}
+
+	/**
+	 * Imprime los errores en formato HTML dentro del cuerpo del documento.
+	 *
+	 * Método auxiliar invocado internamente por {@link imprimir_errores()} cuando el
+	 * tipo de salida del entorno es HTML.
+	 *
+	 * Genera un bloque visual con cada error, su fecha, mensaje, origen y pila de
+	 * llamadas, insertándolo directamente en la página.
+	 *
+	 * El contenedor HTML utiliza los valores de fondo, texto y borde almacenados en
+	 * {@link Configuracion.Conf::ERRORES_COLORES}. Modifique esas constantes para
+	 * cambiar la presentación.
+	 * 
+	 * @return void
+	 * @private
+	 * @since 1.3.0
+	 *
+	 * @see imprimir_errores()
+	 * @see Configuracion.Entorno::es_consola()
+	 */
+	private static function imprimir_errores_html(): void
+	{
 		if (empty(self::$errores)) {
 			echo "<p><i>No hay errores registrados.</i></p>";
 			return;
 		}
-		echo "<ul id='inicio_errores'><strong style='font-size:xx-large'>Errores:</strong>";
+
+		// Contenedor principal con estilo similar al de JS
+		echo '<div style="background:#fee; color:#900; padding:1em; margin:1em 0; border:1px solid #c00; font-family:monospace; white-space:pre-wrap;">';
+		echo "<h3>===== ERRORES =====</h3>";
 
 		foreach (self::$errores as $error) {
 			$pila = $error['pila'];
 			$cant = count($pila);
-			// Nivel de origen
-			$ini = $cant>=3?2:1;//2
-			//echo $ini;
-			//echo $cant."hg";
+			$ini = $cant >= 3 ? 2 : 1;
 			$origen = $pila[$ini] ?? null;
-			//$origen = $pila[2] ?? null;
 			$firma_origen = $origen ? self::obtener_firma_funcion($origen) : '';
 
-			echo "<li style='margin-bottom:25px' >";
-			echo "<strong>[{$error['fecha']}] " . htmlspecialchars($error['mensaje']) . "</strong>";
+			echo '<div style="margin-bottom:1em;">';
+			echo '<strong>[' . $error['fecha'] . '] ' . htmlspecialchars($error['mensaje']) . '</strong><br>';
+
 			$archivo = $origen['file'] ?? '';
 			$linea = $origen['line'] ?? '';
 			if ($archivo) {
-				echo " en <strong>$archivo:$linea</strong>";
+				echo ' en <strong>' . $archivo . ':' . $linea . '</strong>';
 			}
+
 			if ($firma_origen) {
-				echo "<br><em>Origen:</em> " . htmlspecialchars($firma_origen);
+				echo '<br><em>Origen:</em> ' . htmlspecialchars($firma_origen);
 				if ($obj = $origen['object'] ?? null) {
-					echo "<pre>" . htmlspecialchars(print_r($obj, true)) . "</pre>";
+					echo '<pre>' . htmlspecialchars(print_r($obj, true)) . '</pre>';
 				} else {
-					echo "<br/><br/>";
+					echo '<br><br>';
 				}
 			}
-			echo "<a href='#inicio_errores'>↑ Volver al primer error</a> </div>  <br>";
 
 			// Pila de llamadas
 			if ($ini + 1 < $cant) {
-				echo "<br><u>Pila de llamadas:</u>";
+				echo '<br><u>Pila de llamadas:</u><ul>';
 			}
-			echo "<ul>";
 			for ($i = $ini + 1; $i < $cant; $i++) {
 				$nivel = $pila[$i];
 				$firma = self::obtener_firma_funcion($nivel);
 				$archivo = $nivel['file'] ?? '';
 				$linea = $nivel['line'] ?? '';
 
-				echo "<li style=margin-bottom:25px>" . htmlspecialchars($firma);
+				echo '<li style="margin-bottom:25px">' . htmlspecialchars($firma);
 				if ($archivo) {
-					echo " en <strong>$archivo:$linea</strong>";
+					echo ' en <strong>' . $archivo . ':' . $linea . '</strong>';
 				}
-				if ($obj = $origen['object'] ?? null) {
-					echo "<pre>" . htmlspecialchars(print_r($obj, true)) . "</pre>";
+				if ($obj = $nivel['object'] ?? null) {
+					echo '<pre>' . htmlspecialchars(print_r($obj, true)) . '</pre>';
 				} else {
-					echo "<br/><br/>";
+					echo '<br><br>';
 				}
-				echo "<a href='#inicio_errores'>↑ Volver al primer error</a> </div>  <br/>";
-				echo "</li>";
+				echo "<a href='#inicio_errores'>↑ Volver al primer error</a></li>";
 			}
-			echo "</ul>";
-			echo "</li>";
+			if ($ini + 1 < $cant) {
+				echo '</ul>';
+			}
+
+			echo '</div>';
 		}
-		echo "</ul>";
+
+		echo '</div>';
 	}
 
 	/**
-	 * Imprime en la consola (salida estándar con formato) todos los errores
-	 * registrados (Interfaz Errores).
+	 * Imprime los errores en la consola (salida estándar con formato).
 	 *
-	 * Este metodo pertenece a las interfaces:
-	 *  - {@link ./classes/Iteradores-Nucleo-Interfaces-Errores.html Interfaz Errores}
-	 *  - {@link ./classes/Iteradores-Nucleo-Interfaces-ErroresYAlertas.html Interfaz ErroresYAlertas}
-	 * 
-	 * Este método muestra todos los mensajes de error que fueron agregados
-	 * con llamadas a {@link ./classes/Iteradores-Nucleo-Objeto.html#method__error _error()}, al sistema 
-	 * centralizado, junto con la pila de llamadas, 
-	 * permitiendo al programador diagnosticar y depurar más fácilmente el
-	 * origen de los problemas.
-	 * 
-	 * A diferencia de {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()},
-	 * este método está pensado para mostrar los errores directamente en la
-	 * consola del entorno de desarrollo (CLI o navegador con consola activa)
-	 * en un formato más claro y legible.
+	 * Método auxiliar invocado internamente por {@link imprimir_errores()} cuando el
+	 * tipo de salida del entorno es consola.
 	 *
-	 * La lista de errores puede visualizarse usando también:
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_errores html_errores()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_errores json_errores()}
-	 * 
-	 * Configuración relacionada:
-	 * - Para activar o desactivar la recoleccion de forma predeterminada (tambien puede hacerse dinamicamente con los metodos relacionados de mas abajo)
-	 *      - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ACTIVAR_ERRORES Conf::ACTIVAR_ERRORES}
-	 * - Para determinar cuánta información de la pila de llamadas se incluye junto al error registrado.     		
-	 *      - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_ARGUMENTOS Conf::ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_ARGUMENTOS}
-	 *      - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_OBJETOS Conf::ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_OBJETOS}
-	 *      - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__LIMITE Conf::ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__LIMITE}
-	 * 
-	 * Dependiendo de dicha configuración, se puede reducir el consumo de memoria impidiendo la recoleccion 
-	 * y limitando la profundidad de la traza o excluyendo argumentos y objetos
-	 * 
-	 * Métodos relacionados:
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method__error _error()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_activar_errores activar_errores()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_desactivar_errores desactivar_errores()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_activar_errores_y_alertas activar_errores_y_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_desactivar_errores_y_alertas desactivar_errores_y_alertas()}
-	 * Ejemplo de uso:
-	 * ```php
-	 * class MiClase extends Objeto {
-	 *     public function una_funcion() {
-	 *         if (...) {
-	 *             self::_error("Error desde MiClase");
-	 *             return false;
-	 *         }
-	 *         return true;
-	 *     }
-	 * }
+	 * Muestra cada error con su fecha, mensaje, origen y la pila de llamadas,
+	 * ayudando al diagnóstico rápido en entornos CLI o de desarrollo.
 	 *
-	 * $miObjeto = new MiClase();
-	 * if (!$miObjeto->una_funcion()) {
-	 *     // ✅ Imprime los errores en la consola
-	 *     MiClase::imprimir_errores_consola();
-	 * }
-	 * ```
+	 * Los códigos ANSI de color se obtienen de `ansi_fondo` y `ansi_texto` en 
+	 * {@link Configuracion.Conf::ERRORES_COLORES}. Cambie esos valores para variar la
+	 * apariencia en terminal.
+	 * 
+	 * @return void
+	 * @private
+	 * @since 1.3.0
 	 *
-	 * @return void No devuelve ningún valor.
+	 * @see imprimir_errores()
+	 * @see Configuracion.Entorno::es_consola()
 	 */
-	public static function imprimir_errores_consola()
-	{
+	private static function imprimir_errores_consola()
+		{
+		$colores = Conf::ERRORES_COLORES;
+		$color = Entorno::color_ansi($colores['ansi_texto'] ?? '');
+		$reset = $color ? Entorno::color_ansi('0') : '';
+
 		if (empty(self::$errores)) {
-			echo "(No hay errores registrados)\n";
+			echo $color . "(No hay errores registrados)\n" . $reset;
 			return;
 		}
 
-		echo "===== ERRORES =====\n";
+		echo $color . "===== ERRORES =====\n";
 		foreach (self::$errores as $error) {
 			$pila = $error['pila'];
-
-			// Nivel de origen
 			$cant = count($pila);
-			// Nivel de origen
-			$ini = $cant>=3?2:1;//2
-			//echo $cant."hg";
+			$ini = $cant >= 3 ? 2 : 1;
 			$origen = $pila[$ini] ?? null;
 			$firma_origen = $origen ? self::obtener_firma_funcion($origen) : '';
 
@@ -546,13 +544,12 @@ class Objeto implements Id, ErroresYAlertas
 				echo "  Origen: $firma_origen\n";
 				if ($obj = $origen['object'] ?? null) {
 					echo "  Objeto:\n";
-					print_r($obj); // lo dejamos en formato crudo
+					print_r($obj);
 				} else {
 					echo "\n\n";
 				}
 			}
 
-			// Pila de llamadas
 			if ($ini + 1 < $cant) {
 				echo "  Pila de llamadas:\n";
 			}
@@ -578,6 +575,7 @@ class Objeto implements Id, ErroresYAlertas
 
 			echo "------------------------\n";
 		}
+		echo $reset;
 	}
 
 	/**
@@ -594,14 +592,12 @@ class Objeto implements Id, ErroresYAlertas
 	 * origen de los problemas.
 	 * 
 	 * A diferencia de {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
-	 * y {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores_consola imprimir_errores_consola()},
 	 * este método no imprime directamente los errores, sino que devuelve
 	 * una cadena HTML que puede insertarse en una página para mostrar
 	 * la información de los errores al usuario o desarrollador.
 	 *
 	 * La lista de errores puede visualizarse usando también:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores_consola imprimir_errores_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_errores json_errores()}
 	 *
 	 * Configuración relacionada:
@@ -663,14 +659,12 @@ class Objeto implements Id, ErroresYAlertas
 	 * origen de los problemas.
 	 * 
 	 * A diferencia de {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
-	 * y {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores_consola imprimir_errores_consola()},
 	 * este método no imprime directamente los errores, sino que devuelve
 	 * una cadena JSON.
 	 * Esto permite transportar o almacenar la información de errores de manera estructurada.
 	 *
 	 * La lista de errores puede luego visualizarse usando métodos como:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores_consola imprimir_errores_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_errores html_errores()}
 	 *
 	 * Configuración relacionada:
@@ -777,7 +771,6 @@ class Objeto implements Id, ErroresYAlertas
 	 * 
 	 * La lista de errores puede luego visualizarse usando métodos como:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores_consola imprimir_errores_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_errores html_errores()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_errores json_errores()} 
 	 *
@@ -947,7 +940,6 @@ class Objeto implements Id, ErroresYAlertas
 	 * 
 	 * La lista de alertas puede luego visualizarse usando métodos como:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas_consola imprimir_alertas_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_alertas html_alertas()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_alertas json_alertas()}
 	 *
@@ -1016,8 +1008,7 @@ class Objeto implements Id, ErroresYAlertas
 	}
 
 	/**
-	 * Imprime en consola (o en la salida estándar) la lista de alertas
-	 * registrados (interfaz Alertas)
+	 * Imprime todas las alertas registradas adaptándose al entorno (interfaz Alertas)
 	 * 
 	 * Este metodo pertenece a las interfaces:
 	 *  - {@link ./classes/Iteradores-Nucleo-Interfaces-Alertas.html Interfaz Alertas}
@@ -1029,8 +1020,20 @@ class Objeto implements Id, ErroresYAlertas
 	 * permitiendo al programador diagnosticar y depurar más fácilmente el
 	 * origen de los problemas.
 	 *
+	 * La elección del formato de salida se basa en la configuración establecida en
+	 * {@link ./classes/Iteradores-Configuracion-Entorno.html Entorno}.
+	 * Si {@link ./classes/Iteradores-Configuracion-Entorno.html#method_es_consola Entorno::es_consola()}
+	 * En caso contrario, se utiliza {@link _imprimir_alertas_html()}.
+	 *
+	 * Para modificar el tipo de salida durante la ejecución, invoque
+	 * {@link ./classes/Iteradores-Configuracion-Entorno.html#method_establecer_tipo_salida Entorno::establecer_tipo_salida()}.
+	 * 
+	 * La presentación visual de las alertas se rige por las constantes definidas en
+	 * {@link Configuracion.Conf::ALERTAS_COLORES} (fondo, texto, borde y códigos ANSI
+	 * para el modo consola). Modifique esas constantes para alterar la apariencia de
+	 * la salida generada por este método y sus auxiliares.
+ 	 * 
 	 * La lista de alertas puede visualizarse usando también:
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas_consola imprimir_alertas_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_alertas html_alertas()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_alertas json_alertas()}
 	 *
@@ -1072,47 +1075,77 @@ class Objeto implements Id, ErroresYAlertas
 	 *```
 	 * @return void No devuelve ningún valor.
 	 */
-	public static function imprimir_alertas()
+	public static function imprimir_alertas(): void
+	{
+		if (Entorno::es_consola()) {
+			self::imprimir_alertas_consola();
+		} else {
+			self::imprimir_alertas_html();
+		}
+	}
+
+	/**
+	 * Imprime las alertas en formato HTML dentro del cuerpo del documento.
+	 *
+	 * Método auxiliar invocado internamente por {@link imprimir_alertas()} cuando el
+	 * tipo de salida del entorno es HTML.
+	 *
+	 * Genera un bloque visual con cada alerta, su fecha, mensaje, origen y pila de
+	 * llamadas, insertándolo directamente en la página.
+	 * 
+	 * El bloque HTML emplea los valores de fondo, texto y borde definidos en
+	 * {@link Configuracion.Conf::ALERTAS_COLORES}. Para modificar el estilo visual, 
+	 * ajuste dichas constantes.
+	 *
+	 * @return void
+	 * @private
+	 * @since 1.3.0
+	 *
+	 * @see imprimir_alertas()
+	 * @see Configuracion.Entorno::es_consola()
+	 */
+	private static function imprimir_alertas_html(): void
 	{
 		if (empty(self::$alertas)) {
 			echo "<p><i>No hay alertas registrados.</i></p>";
 			return;
 		}
-		echo "<a ></a>";
-		echo "<ul id='inicio_alertas'><strong style='font-size:xx-large'>Alertas:</strong>";
+
+		$colores = Conf::ALERTAS_COLORES;
+		$fondo = htmlspecialchars($colores['fondo']);
+		$texto = htmlspecialchars($colores['texto']);
+		$borde = htmlspecialchars($colores['borde']);
+
+		echo "<div style='background:{$fondo}; color:{$texto}; padding:1em; margin:1em 0; border:1px solid {$borde}; font-family:monospace; white-space:pre-wrap;'>";
+		echo "<h3>===== ALERTAS =====</h3>";
+
 		foreach (self::$alertas as $alerta) {
 			$pila = $alerta['pila'];
 			$cant = count($pila);
-			// Nivel de origen
-			$ini = 2;//$cant>=3?2:1;
-			//echo $cant."hg";
-			$origen = $pila[$ini] ?? null;
-			// Nivel de origen
-			$ini = $cant>=3?2:1;//2
-			//echo $cant."hg";
+			$ini = $cant >= 3 ? 2 : 1;
 			$origen = $pila[$ini] ?? null;
 			$firma_origen = $origen ? self::obtener_firma_funcion($origen) : '';
 
-			echo "<li style=margin-bottom:25px>";
-			echo "<strong>[{$alerta['fecha']}] " . htmlspecialchars($alerta['mensaje']) . "</strong>";
+			echo '<div style="margin-bottom:1em;">';
+			echo '<strong>[' . $alerta['fecha'] . '] ' . htmlspecialchars($alerta['mensaje']) . '</strong><br>';
+
 			$archivo = $origen['file'] ?? '';
 			$linea = $origen['line'] ?? '';
 			if ($archivo) {
-				echo " en <strong>$archivo:$linea</strong>";
+				echo ' en <strong>' . $archivo . ':' . $linea . '</strong>';
 			}
+
 			if ($firma_origen) {
-				echo "<br><em>Origen:</em> " . htmlspecialchars($firma_origen);
+				echo '<br><em>Origen:</em> ' . htmlspecialchars($firma_origen);
 				if ($obj = $origen['object'] ?? null) {
-					echo "<pre>" . htmlspecialchars(print_r($obj, true)) . "</pre>";
+					echo '<pre>' . htmlspecialchars(print_r($obj, true)) . '</pre>';
 				} else {
-					echo "<br/><br/>";
+					echo '<br><br>';
 				}
 			}
-			echo "<a href='#inicio_alertas'>↑ Volver al primer alerta</a> </div>  <br/>";
 
-			// Pila de llamadas
 			if ($ini + 1 < $cant) {
-				echo "<br><u>Pila de llamadas:</u><ul>";
+				echo '<br><u>Pila de llamadas:</u><ul>';
 			}
 			for ($i = $ini + 1; $i < $cant; $i++) {
 				$nivel = $pila[$i];
@@ -1120,102 +1153,62 @@ class Objeto implements Id, ErroresYAlertas
 				$archivo = $nivel['file'] ?? '';
 				$linea = $nivel['line'] ?? '';
 
-				echo "<li style=margin-bottom:25px>" . htmlspecialchars($firma);
+				echo '<li style="margin-bottom:25px">' . htmlspecialchars($firma);
 				if ($archivo) {
-					echo " en <strong>$archivo:$linea</strong>";
+					echo ' en <strong>' . $archivo . ':' . $linea . '</strong>';
 				}
-				if ($obj = $origen['object'] ?? null) {
-					echo "<pre>" . htmlspecialchars(print_r($obj, true)) . "</pre>";
+				if ($obj = $nivel['object'] ?? null) {
+					echo '<pre>' . htmlspecialchars(print_r($obj, true)) . '</pre>';
 				} else {
-					echo "<br/><br/>";
+					echo '<br><br>';
 				}
-				echo "<a href='#inicio_alertas'>↑ Volver al primer alerta</a> </div>  <br/>";
-				echo "</li>";
+				echo "<a href='#inicio_alertas'>↑ Volver al primer alerta</a></li>";
 			}
-			echo "</ul>";
-			echo "</li>";
+			if ($ini + 1 < $cant) {
+				echo '</ul>';
+			}
+
+			echo '</div>';
 		}
-		echo "</ul>";
+		echo '</div>';
 	}
 
 	/**
-	 * Imprime en la consola (salida estándar con formato) todos los alertas
-	 * registrados (Interfaz Alertas).
+	 * Imprime las alertas en la consola (salida estándar con formato).
 	 *
-	 * Este metodo pertenece a las interfaces:
-	 *  - {@link ./classes/Iteradores-Nucleo-Interfaces-Alertas.html Interfaz Alertas}
-	 *  - {@link ./classes/Iteradores-Nucleo-Interfaces-ErroresYAlertas.html Interfaz ErroresYAlertas}
-	 * 
-	 * Este método muestra todos los mensajes de alerta que fueron agregados
-	 * con llamadas a {@link ./classes/Iteradores-Nucleo-Objeto.html#method__alerta _alerta()}, al sistema 
-	 * centralizado, junto con la pila de llamadas, 
-	 * permitiendo al programador diagnosticar y depurar más fácilmente el
-	 * origen de los problemas.
-	 * 
-	 * A diferencia de {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()},
-	 * este método está pensado para mostrar los alertas directamente en la
-	 * consola del entorno de desarrollo (CLI o navegador con consola activa)
-	 * en un formato más claro y legible.
+	 * Método auxiliar invocado internamente por {@link imprimir_alertas()} cuando el
+	 * tipo de salida del entorno es consola.
 	 *
-	 * La lista de alertas puede visualizarse usando también:
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_alertas html_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_alertas json_alertas()}
-	 * 
-	 * Configuración relacionada:
-	 * - Para activar o desactivar la recoleccion de forma predeterminada (tambien puede hacerse dinamicamente con los metodos relacionados de mas abajo)
-	 *     - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ACTIVAR_ALERTAS Conf::ACTIVAR_ALERTAS}
-	 * - Para determinar cuánta información de la pila de llamadas se incluye junto al alerta registrado. 
-	 *     - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_ARGUMENTOS Conf::ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_ARGUMENTOS}
-	 *     - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_OBJETOS Conf::ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_OBJETOS}
-	 *     - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__LIMITE Conf::ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__LIMITE}
-	 * 
-	 * Dependiendo de dicha configuración, se puede reducir el consumo de memoria impidiendo la recoleccion 
-	 * y limitando la profundidad de la traza o excluyendo argumentos y objetos
-	 * 
-	 * Métodos relacionados:
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method__alerta _alerta()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_activar_alertas activar_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_desactivar_alertas desactivar_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_activar_errores_y_alertas activar_errores_y_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_desactivar_errores_y_alertas desactivar_errores_y_alertas()}
-	 * Ejemplo de uso:
-	 * ```php
-	 * class MiClase extends Objeto {
-	 *     public function una_funcion() {
-	 *         if (...) {
-	 *             self::_alerta("Alerta desde MiClase");
-	 *             return false;
-	 *         }
-	 *         return true;
-	 *     }
-	 * }
+	 * Muestra cada alerta con su fecha, mensaje, origen y la pila de llamadas,
+	 * facilitando la depuración en entornos CLI o de desarrollo.
 	 *
-	 * $miObjeto = new MiClase();
-	 * if (!$miObjeto->una_funcion()) {
-	 *     // ✅ Imprime los alertas en la consola
-	 *     MiClase::imprimir_alertas_consola();
-	 * }
-	 * ```
+	 * Los colores aplicados en la terminal provienen de las claves `ansi_fondo` y 
+	 * `ansi_texto` de {@link Configuracion.Conf::ALERTAS_COLORES}. Puede cambiar esas
+	 * constantes para adaptar la salida a sus preferencias.
+	 * 
+	 * @return void
+	 * @private
+	 * @since 1.3.0
 	 *
-	 * @return void No devuelve ningún valor.
+	 * @see imprimir_alertas()
+	 * @see Configuracion.Entorno::es_consola()
 	 */
-	public static function imprimir_alertas_consola()
+	private static function imprimir_alertas_consola()
 	{
+		$colores = Conf::ALERTAS_COLORES;
+		$color = Entorno::color_ansi($colores['ansi_texto'] ?? '');
+		$reset = $color ? Entorno::color_ansi('0') : '';
+
 		if (empty(self::$alertas)) {
-			echo "(No hay alertas registrados)\n";
+			echo $color . "(No hay alertas registrados)\n" . $reset;
 			return;
 		}
 
-		echo "===== ALERTAS =====\n";
+		echo $color . "===== ALERTAS =====\n";
 		foreach (self::$alertas as $alerta) {
 			$pila = $alerta['pila'];
-
-			// Nivel de origen
 			$cant = count($pila);
-			// Nivel de origen
-			$ini = $cant>=3?2:1;//2
-			//echo $cant."hg";
+			$ini = $cant >= 3 ? 2 : 1;
 			$origen = $pila[$ini] ?? null;
 			$firma_origen = $origen ? self::obtener_firma_funcion($origen) : '';
 
@@ -1229,13 +1222,12 @@ class Objeto implements Id, ErroresYAlertas
 				echo "  Origen: $firma_origen\n";
 				if ($obj = $origen['object'] ?? null) {
 					echo "  Objeto:\n";
-					print_r($obj); // lo dejamos en formato crudo
+					print_r($obj);
 				} else {
 					echo "\n\n";
 				}
 			}
 
-			// Pila de llamadas
 			if ($ini + 1 < $cant) {
 				echo "  Pila de llamadas:\n";
 			}
@@ -1261,6 +1253,7 @@ class Objeto implements Id, ErroresYAlertas
 
 			echo "------------------------\n";
 		}
+		echo $reset;
 	}
 
 	/**
@@ -1277,14 +1270,12 @@ class Objeto implements Id, ErroresYAlertas
 	 * origen de los problemas.
 	 * 
 	 * A diferencia de {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
-	 * y {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas_consola imprimir_alertas_consola()},
 	 * este método no imprime directamente los alertas, sino que devuelve
 	 * una cadena HTML que puede insertarse en una página para mostrar
 	 * la información de los alertas al usuario o desarrollador.
 	 *
 	 * La lista de alertas puede visualizarse usando también:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas_consola imprimir_alertas_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_alertas json_alertas()}
 	 *
 	 * Configuración relacionada:
@@ -1329,7 +1320,7 @@ class Objeto implements Id, ErroresYAlertas
 	public static function html_alertas()
 	{
 		ob_start();
-		self::imprimir_alertas();
+		self::imprimir_alertas_html();
 		return ob_get_clean();
 	}
 	/**
@@ -1346,14 +1337,12 @@ class Objeto implements Id, ErroresYAlertas
 	 * origen de los problemas.
 	 * 
 	 * A diferencia de {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
-	 * y {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas_consola imprimir_alertas_consola()},
 	 * este método no imprime directamente los alertas, sino que devuelve
 	 * una cadena JSON.
 	 * Esto permite transportar o almacenar la información de alertas de manera estructurada.
 	 *
 	 * La lista de alertas puede luego visualizarse usando métodos como:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas_consola imprimir_alertas_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_alertas html_alertas()}
 	 *
 	 * Configuración relacionada:
@@ -1459,7 +1448,6 @@ class Objeto implements Id, ErroresYAlertas
 	 * 
 	 * La lista de alertas puede luego visualizarse usando métodos como:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas_consola imprimir_alertas_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_alertas html_alertas()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_alertas json_alertas()} 
 	 *
@@ -1514,7 +1502,6 @@ class Objeto implements Id, ErroresYAlertas
 	 * 
 	 * La lista de alertas puede luego visualizarse usando métodos como:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas_consola imprimir_alertas_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_alertas html_alertas()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_alertas json_alertas()} 
 	 *
@@ -1559,7 +1546,6 @@ class Objeto implements Id, ErroresYAlertas
 	 * @see Objeto::imprimir_errores()
 	 * @see Objeto::imprimir_errores_consola()
 	 * @see Objeto::imprimir_alertas()
-	 * @see Objeto::imprimir_alertas_consola()
 	 * @param array $nivel profundidad de nivel de pila de llamadas (debug_backtrace).
 	 * @return string Firma generada de la función o método.
 	 */
@@ -1642,11 +1628,9 @@ class Objeto implements Id, ErroresYAlertas
    	 * 
 	 * Las listas de errores y de alertas puede luego visualizarse usando métodos como:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores_consola imprimir_errores_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_errores html_errores()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_errores json_errores()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas_consola imprimir_alertas_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_alertas html_alertas()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_alertas json_alertas()}
 	 *
@@ -1708,11 +1692,9 @@ class Objeto implements Id, ErroresYAlertas
 	 *  
 	 * Las listas de errores y de alertas puede luego visualizarse usando métodos como:
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores_consola imprimir_errores_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_errores html_errores()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_errores json_errores()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
-	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas_consola imprimir_alertas_consola()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_alertas html_alertas()}
 	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_alertas json_alertas()}
 	 *

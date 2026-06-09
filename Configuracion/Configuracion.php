@@ -207,6 +207,48 @@ class Conf {
      */
     public const TIEMPO_CICLO = 1.0;    
 
+    // ═══════════════════════════════════════════════════════════
+    // APARIENCIA DE BLOQUES DE DEPURACIÓN
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Colores de fondo, texto y borde para el bloque de errores.
+     *
+     * @var array{ fondo: string, texto: string, borde: string }
+     */
+    public const ERRORES_COLORES = [
+        'fondo' => '#fee',
+        'texto' => '#900',
+        'borde' => '#c00',
+        'ansi_fondo' => '41',   // rojo
+        'ansi_texto' => '31',   // rojo
+    ];
+
+    /**
+     * Colores para el bloque de alertas.
+     *
+     * @var array{ fondo: string, texto: string, borde: string }
+     */
+    public const ALERTAS_COLORES = [
+        'fondo' => '#fffde7',
+        'texto' => '#864100',
+        'borde' => '#ffc107',
+        'ansi_fondo' => '43',   // amarillo
+        'ansi_texto' => '33',
+    ];
+
+    /**
+     * Colores para el bloque de impresión de nodos.
+     *
+     * @var array{ fondo: string, texto: string, borde: string }
+     */
+    public const NODOS_COLORES = [
+        'fondo' => '#eef6ff',
+        'texto' => '#003366',
+        'borde' => '#0066cc',
+        'ansi_fondo' => '44',   // azul
+        'ansi_texto' => '34',
+    ];
 
 }
 

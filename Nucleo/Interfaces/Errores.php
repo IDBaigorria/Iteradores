@@ -6,7 +6,12 @@ namespace Iteradores\Nucleo\Interfaces;
  *
  * Las clases que implementen esta interfaz deberán proporcionar mecanismos
  * para registrar, imprimir y obtener errores formateados.
- *  * Ejemplo de uso:
+ * 
+ * Las clases que implementen esta interfaz deberán proporcionar mecanismos
+ * para registrar y mostrar errores, adaptando el formato de salida al entorno
+ * configurado en {@link Configuracion.Entorno}.
+ * 
+ * Ejemplo de uso:
  * ```php
  * class Mi_clase extends Objeto{ //Objeto implementa la inteface Errores
  * ... 
@@ -32,8 +37,8 @@ namespace Iteradores\Nucleo\Interfaces;
  * ...
  * $mi_objeto->una_funcion() or die(Mi_clase::imprimir_errores());
  * ```
- * @example 
  * 
+ * @version 0.0.1 (1.3.0) Unificado el método de impresión.
  * 
  * @package Iteradores\Nucleo\Interfaces
  */
@@ -53,34 +58,27 @@ interface Errores
     public static function _error($error);
 
     /**
-     * Imprime en HTML la lista de errores registrados.
+     * Imprime todos los errores registrados
      *
      * Este método muestra todos los mensajes de error que fueron agregados
 	 * con llamadas a {@link ./classes/Iteradores-Nucleo-Interfaces-Errores.html#method__error _error()}, al sistema 
      * centralizado, junto con la pila de llamadas, 
 	 * permitiendo al programador diagnosticar y depurar más fácilmente el
 	 * origen de los problemas. 
+     * 
+     * La elección del formato de salida se basa en la configuración establecida en
+     * {@link ./classes/Iteradores-Configuracion-Entorno.html Entorno}.
+     * Si {@link ./classes/Iteradores-Configuracion-Entorno.html#method_es_consola Entorno::es_consola()}
+     * retorna `true`, se delega en {@link _imprimir_errores_consola()}.
+     * En caso contrario, se utiliza {@link _imprimir_errores_html()}.
+     *
+     * Para modificar el tipo de salida durante la ejecución, invoque
+     * {@link ./classes/Iteradores-Configuracion-Entorno.html#method_establecer_tipo_salida Entorno::establecer_tipo_salida()}.
      * 
      * @return void
      */
     public static function imprimir_errores();
 
-    /**
-     * Imprime en consola la lista de errores registrados.
-     *
-     * Este método muestra todos los mensajes de error que fueron agregados
-	 * con llamadas a {@link ./classes/Iteradores-Nucleo-Interfaces-Errores.html#method__error _error()}, al sistema 
-     * centralizado, junto con la pila de llamadas, 
-	 * permitiendo al programador diagnosticar y depurar más fácilmente el
-	 * origen de los problemas. 
-     * 
-     * A diferencia de {@link ./classes/Iteradores-Nucleo-Interfaces-Errores.html#method_imprimir_errores imprimir_errores()},
-     * este método está pensado para mostrar los errores directamente en la
-     * consola del entorno de desarrollo (CLI o navegador con consola activa)
-     * en un formato más claro y legible.
-     * @return void
-     */
-    public static function imprimir_errores_consola();
 
     /**
      * Devuelve un string HTML con la lista de errores registrados.

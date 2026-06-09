@@ -3,6 +3,7 @@
 namespace Iteradores\Nodos;
 
 use Iteradores\Configuracion\Conf;
+use Iteradores\Configuracion\Entorno;
 use Iteradores\Nodos\Interfaces\Energia;
 use Iteradores\Nodos\Interfaces\FabricaDeNodosElectricos;
 use Iteradores\Nodos\Interfaces\Fase;
@@ -3264,100 +3265,257 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	/*************************************************************************************************************/
 
 	/**
-	 * Imprime el nodo en formato HTML (Interfaz Impresion).
+	 * Imprime el nodo en el formato adecuado (HTML o consola) según el entorno configurado.
 	 *
-	 * 🔗 Interfaz:
-	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Impresion.html Interfaz Impresion}
+	 * 
+	 * **Restricción de entorno:** solo se ejecuta en desarrollo o pruebas.
+	 * En producción, emite una alerta y no genera salida, ya que este método está pensado
+	 * exclusivamente para depuración.
+	 * 
+	 * Delega en los métodos privados {@link imprimir_consola()} o {@link imprimir_html()}
+	 * dependiendo de {@link Configuracion.Entorno::es_consola()}.
+	 * **Solo se muestra la información de la fase activa** (propiedad estática `$fase`).
 	 *
-	 * Muestra en pantalla una representación visual del nodo con su id, su dato,
-	 * los adyacentes y el número de referencias. Se utiliza principalmente con fines
-	 * de depuración y diagnóstico visual del grafo en un entorno web.
-	 *
-	 * ⚠️ Debe ser usada únicamente por programadores o herramientas de depuración.
-	 * No se recomienda para salida de usuario final.
-	 *
-	 * ---
-	 * 🔗 Otros métodos complementarios:
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_imprimir2 imprimir2()} — versión en texto plano.
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_id id()} — obtiene el identificador del nodo.
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_dato dato()} — obtiene el dato asociado al nodo.
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_adyacente tiene_adyacente()} — comprueba adyacencias.
-	 *
-	 * ---
-	 * Ejemplo de uso:
-	 * ```php
-	 * $nodo->imprimir(); // imprime el nodo como bloque HTML
-	 * ```
-	 *
-	 * @note Utiliza `echo` para generar directamente HTML. No devuelve valor.
+	 * La representación visual del nodo se rige por las constantes definidas en 
+	 * {@link Configuracion.Conf::NODOS_COLORES} (fondo, texto, borde y códigos ANSI
+	 * para el modo consola). Ajuste esos valores para cambiar la apariencia de la
+	 * salida.
+	 * 
+	 * Si Entorno es el tipo de salida no es Consola y es HTML 
 	 * @return void
+	 * @since 1.3.0 Unificado; eliminado imprimir2.
+	 *
+	 * @see imprimir_consola()
+	 * @see imprimir_html()
+	 * @see Configuracion.Entorno
 	 */
-	public function imprimir()
+	public function imprimir(): void
 	{
-		echo "<div id='nodo-" . $this->id() . "' style='margin-bottom:20px;'>";
-		echo '>>NODOELECTRICO4 ' . $this->id();
-		if ($this->es_especial())
-			echo ' (ESP)';
-		echo ' - Dato: ';
+		// ─── Guarda de seguridad: no imprimir en producción ───
+		if (!Entorno::permite_pruebas()) {
+			self::_alerta(
+				'Impresión de nodos no permitida en entorno de producción.'
+			);
+			return;
+		}
 
+		if (Entorno::es_consola()) {
+			$this->imprimir_consola();
+		} else {
+			$this->imprimir_html();
+		}
+	}
+
+	/**
+	 * Imprime el nodo en formato texto plano (consola).
+	 *
+	 * Muestra todos los datos relevantes del nodo **en la fase actual**:
+	 * id, dato, referencias, capacidad, fuga, energía, adyacentes (con pesos),
+	 * e incidentes.
+	 *
+	 * Los códigos ANSI utilizados en la terminal se toman de `ansi_fondo` y
+	 * `ansi_texto` de {@link Configuracion.Conf::NODOS_COLORES}. Modifique esas
+	 * constantes si desea otra combinación cromática.
+	 * 
+	 * @return void
+	 * @private
+	 * @since 1.3.0
+	 */
+	private function imprimir_consola(): void
+	{
+		$colores = Conf::NODOS_COLORES;
+		$ansi_texto = $colores['ansi_texto'] ?? '34';
+		$ansi_fondo = $colores['ansi_fondo'] ?? null;
+
+		$color_texto   = Entorno::color_ansi($ansi_texto);
+		$color_fondo   = $ansi_fondo ? Entorno::color_ansi($ansi_fondo) : '';
+		$reset         = ($color_texto || $color_fondo) ? Entorno::color_ansi('0') : '';
+
+		echo $color_fondo . $color_texto;
+		$fase = self::$fase;
+
+		echo "\n>>NODO ELECTRICO " . $this->id();
+		if ($this->es_especial()) {
+			echo ' (ESP)';
+		}
+		echo ' - Dato: ';
 		$dato = $this->dato();
-		if (is_string($dato)) {
+		if (is_string($dato) || is_numeric($dato)) {
 			echo $dato;
 		} elseif ($dato === null) {
 			echo 'null';
 		} else {
 			echo 'este dato no es un string';
 		}
-		echo '<br/>Referencias: ' . $this->referencias;
-		echo '<br/>Capacidad: ' . $this->capacidad;
-		echo '<br/>Fuga: ' . $this->fuga;
-		// if ($this->energia!==null && count($this->energia)>0){
-		echo '<br/>Energia: ' . $this->energia();
 
-		/*	}else{
-			echo "<br/>Energia: 0";
-		}*/
-		echo '<br/>Adyacentes:<br/>';
-		if ($this->adyacentes !== null) {
-            echo '<ul>';
-            foreach ($this->adyacentes as $fase => $adyacentes) {
-                echo '<h3>fase: ' . $fase . '</h3>';
-                echo '<ul>';
-				foreach ($adyacentes as $enlace => $valor) {
-					$nodo = ($valor instanceof Enlace) ? $valor->nodo : $valor;
-					echo "<li>[$enlace] => <a href='#nodo-" . $nodo->id() . "'>" . $nodo->id() . '</a></li>';
-				}
-                echo '</ul>';
-            }
-            echo '</ul>';
-        } else {
-            echo 'No tiene<br/>';
-        }
+		echo "\nReferencias: " . $this->referencias;
+		echo "\nCapacidad: " . $this->capacidad;
+		echo "\nFuga: " . $this->fuga;
+		echo "\nEnergía: " . $this->energia();
 
-		echo 'Incidentes:<br/>';
+		echo "\nAdyacentes (fase: $fase):\n";
+		if (isset($this->adyacentes[$fase]) && !empty($this->adyacentes[$fase])) {
+			foreach ($this->adyacentes[$fase] as $enlace => $valor) {
+				$nodo = ($valor instanceof Enlace) ? $valor->nodo : $valor;
+				echo "  [$enlace] => " . $nodo->id();
+				$this->_imprimir_pesos_consola($valor);
+				echo "\n";
+			}
+		} else {
+			echo "  No tiene\n";
+		}
+
+		echo "Incidentes (fase: $fase):\n";
 		if ($this->incidentes !== null) {
-			echo '<ul>';
-			$nodos = $this->incidentes;
-			foreach ($nodos as $idnodo => $fases) {
-				echo '<h3>idnodo: ' . $idnodo . '</h3>';
-				echo '<ul>';
-				foreach ($fases as $fase => $incidentes) {
-					echo '<h4>fase: ' . $fase . '</h4>';
-					echo '<ul>';
-					foreach ($incidentes as $enlace => $incidente) {
-						echo '<li>[' . $enlace . "] => <a href='#nodo-" . $incidente->id() . "'>" . $incidente->id() . '</a></li>';
-					}
-					echo '</ul>';
+			$tiene = false;
+			foreach ($this->incidentes as $idnodo => $fases) {
+				if (!isset($fases[$fase]) || empty($fases[$fase])) {
+					continue;
 				}
-				echo '</ul>';
+				$tiene = true;
+				echo "  Desde nodo $idnodo:\n";
+				foreach ($fases[$fase] as $enlace => $incidente) {
+					echo "    [$enlace] => " . $incidente->id() . "\n";
+				}
+			}
+			if (!$tiene) {
+				echo "  No tiene\n";
+			}
+		} else {
+			echo "  No tiene\n";
+		}
+
+		echo "Fin Nodo\n";
+		echo $reset;
+	}
+
+	/**
+	 * Imprime el nodo en formato HTML.
+	 *
+	 * Genera un bloque HTML con todos los datos del nodo **en la fase activa**,
+	 * incluyendo enlaces navegables entre nodos y la visualización de pesos.
+	 *
+	 * El bloque HTML emplea los valores de fondo, texto y borde definidos en
+	 * {@link Configuracion.Conf::NODOS_COLORES}. Para personalizar la apariencia,
+	 * cambie esas constantes.
+	 * 
+	 * @return void
+	 * @private
+	 * @since 1.3.0
+	 */
+	private function imprimir_html(): void
+	{
+		$colores = Conf::NODOS_COLORES;
+		$fondo = htmlspecialchars($colores['fondo']);
+		$texto = htmlspecialchars($colores['texto']);
+		$borde = htmlspecialchars($colores['borde']);
+
+		$fase = self::$fase;
+
+		echo "<div style='background:{$fondo}; color:{$texto}; padding:1em; margin:1em 0; border:1px solid {$borde}; font-family:monospace; white-space:pre-wrap;'>";
+		echo '<strong>NODOELECTRICO ' . $this->id();
+		if ($this->es_especial()) echo ' (ESP)';
+		echo ' - Dato: ';
+		$dato = $this->dato();
+		if (is_string($dato)) echo htmlspecialchars($dato);
+		elseif ($dato === null) echo 'null';
+		else echo 'este dato no es un string';
+		echo '</strong><br>';
+
+		echo 'Referencias: ' . $this->referencias . '<br>';
+		echo 'Capacidad: ' . $this->capacidad . '<br>';
+		echo 'Fuga: ' . $this->fuga . '<br>';
+		echo 'Energía: ' . $this->energia() . '<br>';
+
+		echo 'Adyacentes (fase: ' . $fase . '):<br>';
+		if (isset($this->adyacentes[$fase]) && !empty($this->adyacentes[$fase])) {
+			echo '<ul>';
+			foreach ($this->adyacentes[$fase] as $enlace => $valor) {
+				$nodo = ($valor instanceof Enlace) ? $valor->nodo : $valor;
+				echo "<li>[$enlace] => <a href='#nodo-{$nodo->id()}' style='color:{$texto};'>" . $nodo->id() . '</a>';
+				$this->_imprimir_pesos_html($valor);
+				echo '</li>';
 			}
 			echo '</ul>';
 		} else {
-			echo 'No tiene<br/>';
+			echo 'No tiene<br>';
 		}
-		echo "Fin Nodo <a href='#inicio'>↑ Volver al inicio</a></div><br/>";
+
+		echo 'Incidentes (fase: ' . $fase . '):<br>';
+		if ($this->incidentes !== null) {
+			$tiene = false;
+			echo '<ul>';
+			foreach ($this->incidentes as $idnodo => $fases) {
+				if (!isset($fases[$fase]) || empty($fases[$fase])) continue;
+				$tiene = true;
+				echo '<li>Desde nodo ' . $idnodo . ': ';
+				foreach ($fases[$fase] as $enlace => $incidente) {
+					echo "[$enlace] => <a href='#nodo-{$incidente->id()}' style='color:{$texto};'>" . $incidente->id() . '</a> ';
+				}
+				echo '</li>';
+			}
+			echo '</ul>';
+			if (!$tiene) echo 'No tiene<br>';
+		} else {
+			echo 'No tiene<br>';
+		}
+
+		echo '</div>';
 	}
 
+	/* ──── Helpers privados para la impresión de pesos ──── */
+
+	/**
+	 * Agrega la representación textual de los pesos (consola).
+	 *
+	 * @param Enlace|NodoElectrico $valor
+	 * @return void
+	 * @private
+	 */
+	private function _imprimir_pesos_consola($valor): void
+	{
+		if (!($valor instanceof Enlace) || $valor->pesos === null) {
+			return;
+		}
+		echo ' [Pesos: ';
+		if (is_array($valor->pesos)) {
+			$pares = [];
+			foreach ($valor->pesos as $dim => $p) {
+				$etiqueta = ($dim === '') ? "''" : $dim;
+				$pares[] = "$etiqueta: " . var_export($p, true);
+			}
+			echo implode(', ', $pares);
+		} else {
+			echo "'': " . var_export($valor->pesos, true);
+		}
+		echo ']';
+	}
+
+	/**
+	 * Agrega la representación HTML de los pesos.
+	 *
+	 * @param Enlace|NodoElectrico $valor
+	 * @return void
+	 * @private
+	 */
+	private function _imprimir_pesos_html($valor): void
+	{
+		if (!($valor instanceof Enlace) || $valor->pesos === null) {
+			return;
+		}
+		echo ' <span style="color:#555;">[Pesos: ';
+		if (is_array($valor->pesos)) {
+			$pares = [];
+			foreach ($valor->pesos as $dim => $p) {
+				$etiqueta = ($dim === '') ? "''" : $dim;
+				$pares[] = "$etiqueta: " . var_export($p, true);
+			}
+			echo implode(', ', $pares);
+		} else {
+			echo "'': " . var_export($valor->pesos, true);
+		}
+		echo ']</span>';
+	}
 	/**
 	 * Imprime todos los nodos de la superestructura en formato HTML.
 	 *
@@ -3386,79 +3544,6 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		self::establecer_fase(self::$token,$faseoriginal);
 		return true;
 	}*/
-
-	/**
-	 * Imprime el nodo en formato texto plano (Interfaz Impresion).
-	 *
-	 * 🔗 Interfaz:
-	 * - {@link ./classes/Iteradores-Nodos-Interfaces-Impresion.html Interfaz Impresion}
-	 *
-	 * Presenta una salida en consola (shell) del nodo con su id, dato y enlaces adyacentes.
-	 * Es útil para depuración en entornos sin salida gráfica (CLI).
-	 *
-	 * ---
-	 * 🔗 Otros métodos complementarios:
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_imprimir imprimir()} — versión HTML.
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_id id()} — obtiene el identificador del nodo.
-	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_dato dato()} — obtiene el dato asociado al nodo.
-	 *
-	 * ---
-	 * Ejemplo de uso:
-	 * ```php
-	 * $nodo->imprimir2(); // imprime el nodo en la shell
-	 * ```
-	 *
-	 * @note Devuelve `true` si se ejecutó correctamente.
-	 * @return bool
-	 */
-	public function imprimir2()
-	{
-		echo "\n>>NODO " . $this->id();
-		if ($this->es_especial())
-			echo ' (ESP)';
-		echo ' - Dato: ';
-
-		$dato = $this->dato();
-		if (is_string($dato) || is_numeric($dato)) {
-			echo $dato;
-		} elseif ($dato === null) {
-			echo 'null';
-		} else {
-			echo 'este dato no es un string';
-		}
-		echo "\nCapacidad: " . $this->capacidad;
-		echo "\nFufa: " . $this->fuga;
-		echo "\nEnergia: " . $this->energia();
-		echo "\nAdyacentes:\n";
-
-        echo "\nAdyacentes:\n";
-        if ($this->tiene_adyacente()) {
-            $this->por_cada_adyacente_ejecutar(function ($nodo, $enlace) {
-                echo "\n[$enlace] => " . $nodo->id();
-            });
-        } else {
-            echo "No tiene\n";
-        }
-
-		echo "\nIncidentes:\n";
-
-		if ($this->tiene_incidente()) {
-			/*	foreach ($this->incidentes as $fase=>$incidentes){//fases
-				echo '\nIncidentes fase "'.$fase.'":\n';
-				foreach ($incidentes as $enlace => $nodo) {
-					echo "\n[$enlace] => " . $nodo->id();
-				}
-			}*/
-			$this->por_cada_incidente_ejecutar(function ($nodo, $enlace) {
-				echo "\n[$enlace] => " . $nodo->id();
-			});
-		} else {
-			echo "No tiene\n";
-		}
-
-		echo "\nFin Nodo\n";
-		return true;
-	}
 
 	/**
 	 * Imprime todos los nodos de la superestructura en formato de texto (modo consola).
