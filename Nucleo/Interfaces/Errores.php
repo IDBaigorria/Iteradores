@@ -38,7 +38,7 @@ namespace Iteradores\Nucleo\Interfaces;
  * $mi_objeto->una_funcion() or die(Mi_clase::imprimir_errores());
  * ```
  * 
- * @version 0.0.1 (1.3.0) Unificado el método de impresión.
+ * @version 0.0.2 (1.3.1) Unificado el método de impresión.
  * 
  * @package Iteradores\Nucleo\Interfaces
  */
@@ -56,6 +56,18 @@ interface Errores
      * @return void
      */
     public static function _error($error);
+
+    /**
+     * Elimina todos los errores registrados en el sistema.
+     *
+     * Vacía por completo la pila de errores acumulados, permitiendo
+     * comenzar un nuevo ciclo de diagnóstico sin interferencias
+     * de mensajes anteriores.
+     *
+     * @return void
+     * @since 1.3.1
+     */
+    public static function limpiar_errores(): void;
 
     /**
      * Imprime todos los errores registrados

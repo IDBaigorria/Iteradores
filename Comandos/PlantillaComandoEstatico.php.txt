@@ -1,0 +1,100 @@
+<?php
+namespace Iteradores\Comandos\[Categoria];
+
+use Iteradores\Comandos\Comando;
+use Iteradores\Controlador\Controlador;
+use Iteradores\Configuracion\Entorno;
+use Iteradores\Configuracion\Conf;
+use Iteradores\Nucleo\Objeto;
+
+/**
+ * [Descripción breve del comando].
+ *
+ * [Explicación detallada de qué hace el comando, cuándo usarlo
+ * y cualquier consideración especial].
+ *
+ * **Entorno:** solo disponible en desarrollo (o indicar si también en pruebas/producción).
+ * **Reversible:** [Sí/No] – [si es reversible, explicar cómo se deshace].
+ *
+ * @package Iteradores\Comandos\[Categoria]
+ * @since 1.3.1
+ */
+class [Nombre] implements Comando
+{
+    /**
+     * Nombre único del comando.
+     *
+     * Debe seguir la convención `categoria:accion` (ej. 'debug:limpiar').
+     *
+     * @return string
+     */
+    public static function nombre(): string
+    {
+        return 'categoria:accion';
+    }
+
+    /**
+     * Indica si el comando solo debe registrarse en entorno de desarrollo.
+     *
+     * Si retorna `true`, el comando no se registrará en producción.
+     *
+     * @return bool
+     */
+    public static function solo_desarrollo(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Ejecuta la lógica del comando.
+     *
+     * @param string $token Token de seguridad proporcionado por Controlador.
+     * @param mixed  ...$args Argumentos adicionales para el comando.
+     * @return mixed Resultado de la ejecución (puede ser bool, string, array, etc.).
+     */
+    public function ejecutar(string $token, ...$args)
+    {
+        // TODO: Implementar la lógica del comando
+
+        // Ejemplo de guarda de entorno
+        if (!Entorno::permite_pruebas()) {
+            echo "El comando '" . static::nombre() . "' solo está disponible en desarrollo o pruebas.\n";
+            return false;
+        }
+
+        // Ejemplo de uso de token para operaciones protegidas
+        // Controlador::imprimir_superestructura($token);
+
+        // Ejemplo de uso de Objeto para diagnóstico
+        // Objeto::imprimir_errores();
+        // Objeto::imprimir_alertas();
+
+        return true;
+    }
+
+    /**
+     * Proporciona la función de reversa, o `null` si el comando no es reversible.
+     *
+     * La función devuelta debe aceptar el mismo token y argumentos que {@link ejecutar()}.
+     *
+     * @return callable|null
+     */
+    public function reversa(): ?callable
+    {
+        // Si el comando no es reversible:
+        return null;
+
+        // Si es reversible, ejemplo:
+        /*
+        return function(string $token, ...$args) {
+            // Lógica para deshacer lo que hizo ejecutar()
+            return true;
+        };
+        */
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// AUTOENCOLACIÓN: No debe faltar esta línea
+// ═══════════════════════════════════════════════════════════
+Controlador::encolar_comando([Nombre]::class);

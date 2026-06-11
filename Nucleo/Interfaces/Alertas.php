@@ -35,7 +35,7 @@ namespace Iteradores\Nucleo\Interfaces;
  * $mi_objeto->una_funcion() or die(Mi_clase::imprimir_alertas());
  * ```
  * 
- * @version 0.0.1 (1.3.0) Unificado el método de impresión.
+ * @version 0.0.2 (1.3.1) Unificado el método de impresión.
  * 
  * @package Iteradores\Nucleo\Interfaces
  */
@@ -53,6 +53,17 @@ interface Alertas
      * @return void
      */
     public static function _alerta($alerta);
+    /**
+     * Elimina todas las alertas registradas en el sistema.
+     *
+     * Vacía por completo la pila de alertas acumuladas, permitiendo
+     * comenzar un nuevo ciclo de diagnóstico sin interferencias
+     * de mensajes anteriores.
+     *
+     * @return void
+     * @since 1.3.1
+     */
+    public static function limpiar_alertas(): void;
 
     /**
      * Imprime todas las alertas registradas.

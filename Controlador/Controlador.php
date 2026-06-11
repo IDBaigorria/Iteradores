@@ -10,6 +10,8 @@ use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraString
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringJSON;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringXML;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL;
+use Iteradores\Controlador\interfaces\Comandos;
+use Iteradores\Comandos\Comando;
 require_once(".\configuracion\Configuracion.php");
 include_once(".\Nucleo\Objeto.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructura.php");
@@ -17,6 +19,8 @@ require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringSQL.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringJSON.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringXML.php");
+require_once("interfaces\Comandos.php");
+require_once(".\Comandos\Comando.php");
 require_once(".\Nodos\NodoElectrico.php");
 /**
  * Clase Controlador
@@ -29,9 +33,10 @@ require_once(".\Nodos\NodoElectrico.php");
  * autorizadas puedan ejecutar operaciones sobre la superestructura.
  *
  * @implements PerdurarSuperestructura
+ * @implements Comandos
  * @since V3.4.0
  */
-class Controlador extends Objeto implements PerdurarSuperestructura {
+class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
 
     /** 
      * @var string Método de persistencia activo por defecto 
@@ -240,8 +245,13 @@ class Controlador extends Objeto implements PerdurarSuperestructura {
             Controlador::registrar_implementacion("ESQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL");
             Controlador::establecer_metodo("ESQL");
             NodoElectrico::_fase(self::$token, "a");
-            Controlador::$inicializo=true;
-            
+            // ──────────────────────────────────────────────
+            // Carga y registro de comandos (siempre)
+            // ──────────────────────────────────────────────
+            require_once (__DIR__."/../Comandos/index.php");
+            self::cargar_comandos_pendientes();
+
+            static::$inicializo = true;
         }
     }
 
@@ -305,6 +315,262 @@ class Controlador extends Objeto implements PerdurarSuperestructura {
         $callback(self::$token);
     }
 
+    // ══════════════════════════════════════════════════════
+    // INTERFAZ COMANDOS
+    // ══════════════════════════════════════════════════════
+
+    /** @var array<string, array{manejador: callable, reversa: ?callable}> Mapa de comandos registrados. */
+    private static array $comandos = [];
+
+    /** @var array<callable> Pila de reversiones para deshacer. */
+    private static array $historial = [];
+
+    /** @var array<string, array{clase?: string, instancia?: Comando}> Lista de comandos pendientes de registro. */
+    private static array $registro_pendiente = [];
+
+    /**
+     * Registra un nuevo comando en el sistema.
+     *
+     * El registro se permite en todos los entornos de forma predeterminada.
+     * Si se establece `$solo_desarrollo = true`, el comando solo se registrará
+     * en modo desarrollo, evitando exponer herramientas de depuración en producción.
+     *
+     * Si el comando ya existía, se sobrescribe y se emite una alerta.
+     *
+     * @param string        $nombre          Nombre único del comando (ej. 'debug:imprimir').
+     * @param callable      $manejador       Función que ejecuta el comando.
+     * @param callable|null $reversa         Función opcional para deshacer el comando.
+     * @param bool          $solo_desarrollo Si `true`, el comando no se registra en producción.
+     *
+     * @return bool `true` si se registró correctamente, `false` si fue bloqueado por el entorno.
+     *
+     * @example
+     * Controlador::registrar_comando('debug:imprimir', function($token) {
+     *     if (!Entorno::permite_pruebas()) { ... }
+     *     Objeto::imprimir_errores();
+     * }, null, true);
+     *
+     * @see ejecutar_comando()
+     * @see deshacer_ultimo()
+     * @since 1.3.1
+     */
+    public static function registrar_comando(
+        string $nombre,
+        callable $manejador,
+        ?callable $reversa = null,
+        bool $solo_desarrollo = false
+    ): bool {
+        if ($solo_desarrollo && !Entorno::es_desarrollo()) {
+            self::_alerta(
+                "El comando '$nombre' es de desarrollo y no puede registrarse en el entorno actual."
+            );
+            return false;
+        }
+
+        if (isset(self::$comandos[$nombre])) {
+            self::_alerta("El comando '$nombre' ya está registrado y será sobrescrito.");
+        }
+
+        self::$comandos[$nombre] = [
+            'manejador' => $manejador,
+            'reversa'   => $reversa,
+        ];
+        return true;
+    }
+
+    /**
+     * Registra un comando a partir de una instancia que implementa {@link Comando}.
+     *
+     * Extrae los metadatos (nombre, reversa, desarrollo) de la instancia,
+     * construye los callables necesarios y los registra internamente.
+     *
+     * @param Comando $comando Instancia del comando.
+     * @return bool
+     *
+     * @since 1.3.1
+     */
+    public static function registrar_comando_desde_instancia(Comando $comando): bool
+    {
+        $nombre = $comando::nombre();
+        $solo_desarrollo = $comando::solo_desarrollo();
+
+        $manejador = function(string $token, ...$args) use ($comando) {
+            return $comando->ejecutar($token, ...$args);
+        };
+
+        $reversa = null;
+        $reversa_callable = $comando->reversa();
+        if ($reversa_callable !== null) {
+            $reversa = function(string $token, ...$args) use ($comando) {
+                return $comando->reversa()($token, ...$args);
+            };
+        }
+
+        return self::registrar_comando($nombre, $manejador, $reversa, $solo_desarrollo);
+    }
+
+    /**
+     * Registra un comando a partir de una clase que implementa {@link Comando}.
+     *
+     * Instancia la clase y delega en {@link registrar_comando_desde_instancia()}.
+     *
+     * @param string $clase Nombre cualificado de la clase.
+     * @return bool
+     *
+     * @since 1.3.1
+     */
+    public static function registrar_comando_desde_clase(string $clase): bool
+    {
+        if (!is_subclass_of($clase, Comando::class)) {
+            self::_error("La clase '$clase' no implementa la interfaz Comando.");
+            return false;
+        }
+
+        $instancia = new $clase();
+        return self::registrar_comando_desde_instancia($instancia);
+    }
+
+    /**
+     * Encola un comando para registro diferido o inmediato.
+     *
+     * Acepta tanto un string (nombre de clase) como una instancia de {@link Comando}.
+     * Si el Controlador ya está inicializado, el comando se registra de inmediato;
+     * en caso contrario, se almacena en la lista de registro pendiente.
+     *
+     * @param string|Comando $comando Clase o instancia.
+     * @return void
+     *
+     * @since 1.3.1
+     */
+    public static function encolar_comando(string|Comando $comando): void
+    {
+        if (self::$inicializo) {
+            if ($comando instanceof Comando) {
+                self::registrar_comando_desde_instancia($comando);
+            } else {
+                self::registrar_comando_desde_clase($comando);
+            }
+            return;
+        }
+
+        if ($comando instanceof Comando) {
+            self::$registro_pendiente[] = ['instancia' => $comando];
+        } else {
+            self::$registro_pendiente[] = ['clase' => $comando];
+        }
+    }
+
+    /**
+     * Procesa la lista de comandos autoencolados y los registra.
+     *
+     * @return int Número de comandos registrados exitosamente.
+     *
+     * @since 1.3.1
+     */
+    public static function cargar_comandos_pendientes(): int
+    {
+        $contador = 0;
+        foreach (self::$registro_pendiente as $entrada) {
+            if (isset($entrada['instancia'])) {
+                if (self::registrar_comando_desde_instancia($entrada['instancia'])) {
+                    $contador++;
+                }
+            } elseif (isset($entrada['clase'])) {
+                if (self::registrar_comando_desde_clase($entrada['clase'])) {
+                    $contador++;
+                }
+            }
+        }
+        self::$registro_pendiente = [];
+        return $contador;
+    }
+
+    /**
+     * Ejecuta un comando previamente registrado.
+     *
+     * Busca el manejador asociado al nombre, verifica los permisos
+     * mediante {@link tiene_permiso()} y lo invoca con el token interno
+     * y los argumentos proporcionados.
+     *
+     * Si el comando tiene definida una reversa, esta se guarda en el
+     * historial para poder deshacerla posteriormente con {@link deshacer_ultimo()}.
+     *
+     * @param string $nombre Nombre del comando.
+     * @param mixed  ...$args Argumentos adicionales para el manejador.
+     *
+     * @return mixed El resultado del manejador, o `null` si falla.
+     *
+     * @example
+     * Controlador::ejecutar_comando('debug:imprimir');
+     *
+     * @see registrar_comando()
+     * @see tiene_permiso()
+     * @see deshacer_ultimo()
+     * @since 1.3.1
+     */
+    public static function ejecutar_comando(string $nombre, ...$args)
+    {
+        if (!isset(self::$comandos[$nombre])) {
+            self::_error("Comando desconocido: '$nombre'.");
+            return null;
+        }
+
+        if (!self::tiene_permiso($nombre)) {
+            self::_error("Permiso denegado para el comando '$nombre'.");
+            return null;
+        }
+
+        $registro = self::$comandos[$nombre];
+        $manejador = $registro['manejador'];
+        $reversa   = $registro['reversa'] ?? null;
+
+        $token = self::$token;
+        $resultado = $manejador($token, ...$args);
+
+        if ($reversa !== null) {
+            self::$historial[] = function() use ($reversa, $token, $args) {
+                return $reversa($token, ...$args);
+            };
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * Verifica si el usuario actual tiene permiso para ejecutar el comando.
+     *
+     * **Placeholder:** actualmente retorna `true` para cualquier comando.
+     *
+     * @param string $nombre_comando Nombre del comando.
+     * @return bool
+     *
+     * @see ejecutar_comando()
+     * @since 1.3.1
+     */
+    public static function tiene_permiso(string $nombre_comando): bool
+    {
+        return true;
+    }
+
+    /**
+     * Deshace el último comando ejecutado que tuviera reversa.
+     *
+     * @return mixed El resultado de la reversa, o `null` si no hay nada que deshacer.
+     *
+     * @see ejecutar_comando()
+     * @see registrar_comando()
+     * @since 1.3.1
+     */
+    public static function deshacer_ultimo()
+    {
+        if (empty(self::$historial)) {
+            self::_alerta('No hay comandos para deshacer.');
+            return null;
+        }
+
+        $reversa = array_pop(self::$historial);
+        return $reversa();
+    }
 
 }
 

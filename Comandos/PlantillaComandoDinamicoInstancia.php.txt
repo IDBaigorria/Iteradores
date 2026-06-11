@@ -1,0 +1,28 @@
+<?php
+// ═══════════════════════════════════════════════════════════
+// PLANTILLA DE COMANDO DINÁMICO (INSTANCIA EXISTENTE)
+// ═══════════════════════════════════════════════════════════
+// Úsela cuando reciba una instancia que ya implementa la interfaz
+// Comando (por ejemplo, generada desde un nodo o recuperada de
+// un almacenamiento) y desee registrarla en el sistema.
+
+use Iteradores\Comandos\Comando;
+use Iteradores\Controlador\Controlador;
+
+/** @var Comando $comandoExistente */
+$comandoExistente = obtenerComandoDeAlgunaFuente(); // ejemplo
+
+if ($comandoExistente instanceof Comando) {
+    // Opción A: registro inmediato
+    Controlador::registrar_comando_desde_instancia($comandoExistente);
+
+    // Opción B: encolar (recomendado si hay posibilidad de que
+    // el Controlador aún no esté inicializado)
+    // Controlador::encolar_comando($comandoExistente);
+
+    // Ejecutar
+    // Controlador::ejecutar_comando($comandoExistente::nombre(), 'arg1');
+} else {
+    // Manejar error
+    echo "La instancia no implementa la interfaz Comando.\n";
+}

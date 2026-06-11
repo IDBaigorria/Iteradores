@@ -331,7 +331,46 @@ class Objeto implements Id, ErroresYAlertas
 			}
 		}
 	}
-
+	/**
+	 * Elimina todos los errores registrados (Interfaz Errores).
+	 *
+	 * Este metodo pertenece a la interfaz:
+	 * - {@link ./classes/Iteradores-Nucleo-Interfaces-Errores.html Interfaz Errores}
+	 *
+	 * Vacía la pila interna de errores y reinicia el contador asociado,
+	 * permitiendo liberar memoria y comenzar una nueva fase de depuración
+	 * sin arrastrar mensajes previos.
+	 *
+	 * Es útil al inicio de cada prueba unitaria o al cambiar de contexto
+	 * de ejecución, para asegurarse de que los errores mostrados
+	 * corresponden exclusivamente al escenario actual.
+	 *
+	 * ---
+	 * 🔗 Métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method__error _error()}
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_limpiar_alertas limpiar_alertas()}
+	 *
+	 * ---
+	 * Ejemplo de uso:
+	 * ```php
+	 * // Al iniciar una prueba
+	 * MiClase::limpiar_errores();
+	 *
+	 * // ... ejecutar código que puede fallar ...
+	 *
+	 * // Mostrar solo los errores de esta prueba
+	 * MiClase::imprimir_errores();
+	 * ```
+	 *
+	 * @return void
+	 * @since 1.3.1
+	 */
+	public static function limpiar_errores(): void
+	{
+		self::$errores = [];
+		self::$contador_errores = 0;
+	}
 	/**
 	 * Imprime todos los errores registrados adaptándose al entorno.
 	 * 
@@ -1006,7 +1045,46 @@ class Objeto implements Id, ErroresYAlertas
 			}
 		}
 	}
-
+	/**
+	 * Elimina todas las alertas registradas (Interfaz Alertas).
+	 *
+	 * Este metodo pertenece a la interfaz:
+	 * - {@link ./classes/Iteradores-Nucleo-Interfaces-Alertas.html Interfaz Alertas}
+	 *
+	 * Vacía la pila interna de alertas y reinicia el contador asociado,
+	 * permitiendo liberar memoria y comenzar una nueva fase de diagnóstico
+	 * sin arrastrar mensajes previos.
+	 *
+	 * Es útil al inicio de cada prueba unitaria o al cambiar de contexto
+	 * de ejecución, para asegurarse de que las alertas mostradas
+	 * corresponden exclusivamente al escenario actual.
+	 *
+	 * ---
+	 * 🔗 Métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method__alerta _alerta()}
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_alertas imprimir_alertas()}
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_limpiar_errores limpiar_errores()}
+	 *
+	 * ---
+	 * Ejemplo de uso:
+	 * ```php
+	 * // Al iniciar una prueba
+	 * MiClase::limpiar_alertas();
+	 *
+	 * // ... ejecutar código que puede generar avisos ...
+	 *
+	 * // Mostrar solo las alertas de esta prueba
+	 * MiClase::imprimir_alertas();
+	 * ```
+	 *
+	 * @return void
+	 * @since 1.3.1
+	 */
+	public static function limpiar_alertas(): void
+	{
+		self::$alertas = [];
+		self::$contador_alertas = 0;
+	}
 	/**
 	 * Imprime todas las alertas registradas adaptándose al entorno (interfaz Alertas)
 	 * 

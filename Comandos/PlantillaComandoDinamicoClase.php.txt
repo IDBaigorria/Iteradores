@@ -1,0 +1,53 @@
+<?php
+// ═══════════════════════════════════════════════════════════
+// PLANTILLA DE COMANDO DINÁMICO (CLASE ANÓNIMA)
+// ═══════════════════════════════════════════════════════════
+// Úsela cuando necesite crear un comando en tiempo de ejecución
+// sin definir una clase en un archivo aparte.
+// La clase anónima implementa la interfaz Comando y se registra
+// inmediatamente (o se encola si el Controlador aún no está inicializado).
+
+use Iteradores\Comandos\Comando;
+use Iteradores\Controlador\Controlador;
+
+$comando = new class implements Comando {
+    public static function nombre(): string
+    {
+        return 'dinamico:accion';
+    }
+
+    public static function solo_desarrollo(): bool
+    {
+        return false; // true si solo debe existir en desarrollo
+    }
+
+    public function ejecutar(string $token, ...$args)
+    {
+        // Lógica del comando aquí
+        echo "Ejecutando comando dinámico\n";
+        return true;
+    }
+
+    public function reversa(): ?callable
+    {
+        // Si no es reversible:
+        return null;
+
+        // Si es reversible, ejemplo:
+        /*
+        return function(string $token, ...$args) {
+            // deshacer cambios
+            return true;
+        };
+        */
+    }
+};
+
+// Opción A: registro inmediato (si el Controlador ya está inicializado)
+Controlador::registrar_comando_desde_instancia($comando);
+
+// Opción B: registro diferido/inmediato automático (recomendado)
+// Controlador::encolar_comando($comando);
+
+// Ahora puede ejecutarse
+// Controlador::ejecutar_comando('dinamico:accion', 'arg1');
