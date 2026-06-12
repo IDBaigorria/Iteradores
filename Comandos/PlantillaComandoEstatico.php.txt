@@ -17,14 +17,15 @@ use Iteradores\Nucleo\Objeto;
  * **Reversible:** [Sí/No] – [si es reversible, explicar cómo se deshace].
  *
  * @package Iteradores\Comandos\[Categoria]
- * @since 1.3.1
+ * @since [versión]
+ * @version [Versión]
  */
 class [Nombre] implements Comando
 {
     /**
      * Nombre único del comando.
      *
-     * Debe seguir la convención `categoria:accion` (ej. 'debug:limpiar').
+     * Debe seguir la convención `categoria:accion` (ej. 'depuracion:limpiar').
      *
      * @return string
      */
@@ -46,26 +47,122 @@ class [Nombre] implements Comando
     }
 
     /**
+     * Breve descripción de lo que hace el comando.
+     *
+     * Se utiliza en la ayuda generada automáticamente por el Controlador.
+     *
+     * @return string
+     */
+    public static function descripcion(): string
+    {
+        return 'Descripción corta de la funcionalidad del comando.';
+    }
+
+    /**
+     * Define los parámetros que acepta el comando.
+     *
+     * Cada entrada del array es un array asociativo con las claves:
+     * - 'nombre'      (string)  Nombre del parámetro (sin guiones).
+     * - 'tipo'        (string)  'posicional', 'bandera' u 'opcion'.
+     * - 'obligatorio' (bool)    Si es obligatorio (solo para posicionales y opciones).
+     * - 'defecto'     (mixed)   Valor por defecto si no se proporciona.
+     * - 'descripcion' (string)  Texto explicativo para la ayuda.
+     * - 'valores'     (array)   (Opcional) Lista de valores permitidos.
+     *
+     * ⚠️ Los nombres de los parámetros no pueden coincidir con las palabras
+     * reservadas definidas en {@link \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS}
+     * (actualmente 'man', 'help', 'h').
+     *
+     * @return array
+     */
+    public static function parametros(): array
+    {
+        return [
+            /*
+            // Ejemplo de una bandera booleana
+            [
+                'nombre'      => 'errores',
+                'tipo'        => 'bandera',
+                'obligatorio' => false,
+                'defecto'     => false,
+                'descripcion' => 'Muestra solo los errores.',
+            ],
+            // Ejemplo de una opción con valor
+            [
+                'nombre'      => 'formato',
+                'tipo'        => 'opcion',
+                'obligatorio' => false,
+                'defecto'     => 'json',
+                'descripcion' => 'Formato de salida (json, texto, html).',
+                'valores'     => ['json', 'texto', 'html'],
+            ],
+            // Ejemplo de un argumento posicional
+            [
+                'nombre'      => 'accion',
+                'tipo'        => 'posicional',
+                'obligatorio' => true,
+                'descripcion' => 'Acción a realizar (activar, desactivar).',
+                'valores'     => ['activar', 'desactivar'],
+            ],
+            */
+        ];
+    }
+
+    /**
+     * Proporciona uno o varios ejemplos de uso del comando.
+     *
+     * Cada entrada es un string con un ejemplo completo (incluyendo el nombre
+     * del comando y los argumentos).
+     *
+     * @return string[]
+     */
+    public static function ejemplos(): array
+    {
+        return [
+            'categoria:accion --bandera1',
+            'categoria:accion --bandera1 --opcion=valor',
+        ];
+    }
+
+    /**
      * Ejecuta la lógica del comando.
      *
-     * @param string $token Token de seguridad proporcionado por Controlador.
-     * @param mixed  ...$args Argumentos adicionales para el comando.
-     * @return mixed Resultado de la ejecución (puede ser bool, string, array, etc.).
+     * Recibe los argumentos ya validados y normalizados por el Controlador.
+     * La estructura del parámetro `$args` depende de si ha declarado una
+     * definición de parámetros:
+     *
+     * - **Con definición:** `$args` es un array asociativo con las claves
+     *   `'posicionales'` (array numérico), `'banderas'` (array asociativo
+     *   `nombre => bool`) y `'opciones'` (array asociativo `nombre => valor`).
+     * - **Sin definición:** `$args` es un array numérico con los argumentos crudos.
+     *
+     * @param string $token Token de seguridad proporcionado por el Controlador.
+     * @param array  $args  Argumentos normalizados.
+     * @return mixed Resultado de la ejecución.
      */
-    public function ejecutar(string $token, ...$args)
+    public function ejecutar(string $token, array $args): mixed
     {
         // TODO: Implementar la lógica del comando
 
-        // Ejemplo de guarda de entorno
+        // ─── Ejemplo de acceso a los argumentos ─────────────────
+        // $banderas = $args['banderas'];
+        // $opciones = $args['opciones'];
+        // $posicionales = $args['posicionales'];
+        //
+        // if ($banderas['errores'] ?? false) { ... }
+        // $formato = $opciones['formato'] ?? 'json';
+        // $accion = $posicionales[0] ?? null;
+
+        // ─── Ejemplo de guarda de entorno ──────────────────────
         if (!Entorno::permite_pruebas()) {
             echo "El comando '" . static::nombre() . "' solo está disponible en desarrollo o pruebas.\n";
             return false;
         }
 
-        // Ejemplo de uso de token para operaciones protegidas
+        // ─── Ejemplo de uso de token para operaciones protegidas ─
         // Controlador::imprimir_superestructura($token);
 
-        // Ejemplo de uso de Objeto para diagnóstico
+        // ─── Ejemplo de uso de Objeto para diagnóstico ─────────
         // Objeto::imprimir_errores();
         // Objeto::imprimir_alertas();
 
@@ -75,7 +172,8 @@ class [Nombre] implements Comando
     /**
      * Proporciona la función de reversa, o `null` si el comando no es reversible.
      *
-     * La función devuelta debe aceptar el mismo token y argumentos que {@link ejecutar()}.
+     * La función devuelta debe aceptar el mismo token y la misma estructura
+     * de argumentos que {@link ejecutar()}.
      *
      * @return callable|null
      */
@@ -86,7 +184,7 @@ class [Nombre] implements Comando
 
         // Si es reversible, ejemplo:
         /*
-        return function(string $token, ...$args) {
+        return function(string $token, array $args) {
             // Lógica para deshacer lo que hizo ejecutar()
             return true;
         };
@@ -97,4 +195,4 @@ class [Nombre] implements Comando
 // ═══════════════════════════════════════════════════════════
 // AUTOENCOLACIÓN: No debe faltar esta línea
 // ═══════════════════════════════════════════════════════════
-Controlador::encolar_comando([Nombre]::class);
+\Iteradores\Controlador\Controlador::encolar_comando([Nombre]::class);

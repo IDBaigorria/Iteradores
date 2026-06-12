@@ -169,40 +169,63 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
      * Imprime todos los nodos de la superestructura en el formato adecuado
      * según el entorno configurado (HTML o consola).
      *
-     * Delega en {@link NodoElectrico::imprimir()} (o el método correspondiente de
+     * Delega en {@link Nodo::imprimir()} (o el método correspondiente de
      * cada nodo) para la representación individual. La iteración se realiza a
      * través del método protegido {@link Nodo::por_cada_nodo_ejecutar()}, usando el
      * token interno que {@link Controlador} recibió durante la inicialización.
      *
-     * Si la superestructura está vacía, emite una alerta y retorna `false`.
+     * Si la superestructura está vacía, muestra un mensaje informativo
+     * en lugar de una alerta.
      *
-     * @return bool `true` si se imprimió al menos un nodo, `false` en caso contrario.
+     * @return bool `true` si se ejecutó sin errores, `false` en caso de problema.
      *
      * @since 1.3.0 Unifica imprimir_superestructura e imprimir_superestructura2.
+     * @version 1.3.2 Añadido mensaje informativo cuando la superestructura está vacía.
      *
      * @see Nodo::imprimir()
      * @see Configuracion.Entorno
      */
     public static function imprimir_superestructura(): bool
     {
-        if (!Nodo::hay_nodos_en_superestructura()) {
-            self::_alerta("Controlador::imprimir_superestructura() — la superestructura está vacía");
-            return false;
-        }
+        $encabezado = "===== SUPERESTRUCTURA =====";
+        $colores = Conf::NODOS_COLORES;
 
-        // Encabezado opcional para consola
+        // Modo consola: aplicar color ANSI si es posible
         if (Entorno::es_consola()) {
-            $colores = Conf::NODOS_COLORES;
-            $color   = Entorno::color_ansi($colores['ansi_texto'] ?? '34');
-            $reset   = $color ? Entorno::color_ansi('0') : '';
-            echo $color . "===== SUPERESTRUCTURA =====\n" . $reset;
+            $color = Entorno::color_ansi($colores['ansi_texto'] ?? '34');
+            $reset = $color ? Entorno::color_ansi('0') : '';
+            echo $color . $encabezado . "\n" . $reset;
+        } else {
+            // Modo HTML: usar estilos definidos en Conf
+            $fondo = htmlspecialchars($colores['fondo'] ?? '#eef6ff');
+            $texto = htmlspecialchars($colores['texto'] ?? '#003366');
+            $borde = htmlspecialchars($colores['borde'] ?? '#0066cc');
+            echo "<div style='background:{$fondo}; color:{$texto}; padding:1em; margin:1em 0; border:1px solid {$borde}; font-family:monospace; white-space:pre-wrap;'>";
+            echo "<h3>{$encabezado}</h3>";
         }
 
-        // Iterar sobre todos los nodos llamando a su imprimir()
+        // Verificar si hay nodos
+        if (!Nodo::hay_nodos_en_superestructura()) {
+            $mensaje = "No hay nodos en la superestructura.";
+            if (Entorno::es_consola()) {
+                echo $mensaje . "\n";
+            } else {
+                echo "<p>{$mensaje}</p>";
+                echo "</div>"; // cerrar el contenedor HTML
+            }
+            return false; // No es un error, solo informativo
+        }
+
+        // Iterar sobre los nodos
         $funcion = function($nodo) {
             $nodo->imprimir();
         };
         Nodo::por_cada_nodo_ejecutar(self::$token, $funcion, null);
+
+        // En HTML, cerrar el contenedor después de la lista de nodos
+        if (!Entorno::es_consola()) {
+            echo "</div>";
+        }
 
         return true;
     }
@@ -319,7 +342,15 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
     // INTERFAZ COMANDOS
     // ══════════════════════════════════════════════════════
 
-    /** @var array<string, array{manejador: callable, reversa: ?callable}> Mapa de comandos registrados. */
+    /**
+     * Mapa de comandos registrados.
+     *
+     * @var array<string, array{
+     *     manejador: callable,
+     *     reversa: ?callable,
+     *     clase: ?string
+     * }>
+     */    
     private static array $comandos = [];
 
     /** @var array<callable> Pila de reversiones para deshacer. */
@@ -337,7 +368,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
      *
      * Si el comando ya existía, se sobrescribe y se emite una alerta.
      *
-     * @param string        $nombre          Nombre único del comando (ej. 'debug:imprimir').
+     * @param string        $nombre          Nombre único del comando (ej. 'depuracion:imprimir').
      * @param callable      $manejador       Función que ejecuta el comando.
      * @param callable|null $reversa         Función opcional para deshacer el comando.
      * @param bool          $solo_desarrollo Si `true`, el comando no se registra en producción.
@@ -345,7 +376,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
      * @return bool `true` si se registró correctamente, `false` si fue bloqueado por el entorno.
      *
      * @example
-     * Controlador::registrar_comando('debug:imprimir', function($token) {
+     * Controlador::registrar_comando('depuracion:imprimir', function($token) {
      *     if (!Entorno::permite_pruebas()) { ... }
      *     Objeto::imprimir_errores();
      * }, null, true);
@@ -384,40 +415,65 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
      * Extrae los metadatos (nombre, reversa, desarrollo) de la instancia,
      * construye los callables necesarios y los registra internamente.
      *
+     * Además, valida que los nombres de los parámetros definidos por el comando
+     * no colisionen con las {@link \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS
+     * palabras reservadas}. Si se detecta una colisión, el registro se rechaza
+     * y se emite un error.
+     *
      * @param Comando $comando Instancia del comando.
      * @return bool
      *
      * @since 1.3.1
+     * @version 1.3.2
      */
     public static function registrar_comando_desde_instancia(Comando $comando): bool
     {
         $nombre = $comando::nombre();
         $solo_desarrollo = $comando::solo_desarrollo();
+        $clase = get_class($comando);
 
-        $manejador = function(string $token, ...$args) use ($comando) {
-            return $comando->ejecutar($token, ...$args);
+        // Verificar palabras reservadas
+        if (!self::validar_parametros_reservados($clase)) {
+            return false;
+        }
+
+        $manejador = function(string $token, $args) use ($comando) {
+            return $comando->ejecutar($token, $args);
         };
 
         $reversa = null;
         $reversa_callable = $comando->reversa();
         if ($reversa_callable !== null) {
-            $reversa = function(string $token, ...$args) use ($comando) {
-                return $comando->reversa()($token, ...$args);
+            $reversa = function(string $token, $args) use ($comando) {
+                return $comando->reversa()($token, $args);
             };
         }
 
-        return self::registrar_comando($nombre, $manejador, $reversa, $solo_desarrollo);
+        // Guardar también la clase para el parseo
+        self::$comandos[$nombre] = [
+            'manejador' => $manejador,
+            'reversa'   => $reversa,
+            'clase'     => $clase,
+        ];
+
+        return true;
     }
 
     /**
      * Registra un comando a partir de una clase que implementa {@link Comando}.
      *
      * Instancia la clase y delega en {@link registrar_comando_desde_instancia()}.
+     * 
+     * Además, valida que los nombres de los parámetros definidos por el comando
+     * no colisionen con las {@link \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS
+     * palabras reservadas}. Si se detecta una colisión, el registro se rechaza
+     * y se emite un error.
      *
      * @param string $clase Nombre cualificado de la clase.
      * @return bool
      *
      * @since 1.3.1
+     * @version 1.3.2
      */
     public static function registrar_comando_desde_clase(string $clase): bool
     {
@@ -426,8 +482,38 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
             return false;
         }
 
+        // Verificar palabras reservadas
+        if (!self::validar_parametros_reservados($clase)) {
+            return false;
+        }
+
         $instancia = new $clase();
         return self::registrar_comando_desde_instancia($instancia);
+    }
+
+    /**
+     * Verifica que los parámetros del comando no usen palabras reservadas.
+     *
+     * @param string $clase Nombre de la clase comando.
+     * @return bool
+     */
+    private static function validar_parametros_reservados(string $clase): bool
+    {
+        if (!method_exists($clase, 'parametros')) {
+            return true;
+        }
+
+        $reservadas = Conf::PALABRAS_RESERVADAS_COMANDOS;
+        $parametros = $clase::parametros();
+        foreach ($parametros as $param) {
+            if (in_array($param['nombre'], $reservadas, true)) {
+                self::_error(
+                    "El comando '{$clase::nombre()}' usa una palabra reservada como parámetro: '{$param['nombre']}'."
+                );
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -488,25 +574,95 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
     /**
      * Ejecuta un comando previamente registrado.
      *
-     * Busca el manejador asociado al nombre, verifica los permisos
-     * mediante {@link tiene_permiso()} y lo invoca con el token interno
-     * y los argumentos proporcionados.
+     * Este método es el punto central de ejecución del sistema de comandos.
+     * Se encarga de localizar el manejador asociado al comando, verificar
+     * permisos, parsear y validar argumentos, mostrar ayuda cuando se solicita
+     * y, finalmente, invocar la lógica del comando.
      *
-     * Si el comando tiene definida una reversa, esta se guarda en el
-     * historial para poder deshacerla posteriormente con {@link deshacer_ultimo()}.
+     * **Flujo de ejecución detallado:**
      *
-     * @param string $nombre Nombre del comando.
-     * @param mixed  ...$args Argumentos adicionales para el manejador.
+     * 1. **Búsqueda del comando:** Busca el nombre en el mapa interno de
+     *    comandos registrados. Si no existe, registra un error con
+     *    {@link _error()} y retorna `null`.
      *
-     * @return mixed El resultado del manejador, o `null` si falla.
+     * 2. **Verificación de permisos:** Invoca {@link tiene_permiso()} para
+     *    comprobar si el usuario actual está autorizado. Si no lo está,
+     *    registra un error y retorna `null`. Por ahora, {@link tiene_permiso()}
+     *    es un placeholder que retorna `true`.
+     *
+     * 3. **Detección de solicitud de ayuda:** Examina cada argumento en
+     *    busca de las palabras reservadas definidas en
+     *    {@link \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS}
+     *    (`man`, `help`, `h`). Si encuentra alguna, invoca
+     *    {@link mostrar_ayuda()} con la clase del comando y retorna `true`
+     *    sin ejecutar el comando.
+     *
+     * 4. **Parseo y validación de argumentos:** Si el comando tiene una clase
+     *    asociada y ésta implementa el método {@link Comando::parametros()},
+     *    se obtiene la definición de parámetros y se invoca
+     *    {@link parsear_y_validar_args()} para convertir los argumentos
+     *    crudos en una estructura normalizada. Si hay errores de validación
+     *    (flags/opciones desconocidas, parámetros obligatorios faltantes),
+     *    se registran con {@link _error()}, se muestra la ayuda y se retorna
+     *    `null`.
+     *
+     * 5. **Ejecución del manejador:** Invoca el manejador del comando con el
+     *    token de seguridad interno y los argumentos parseados (o crudos, si
+     *    no hay definición de parámetros).
+     *
+     * 6. **Registro de reversa:** Si el comando tiene definida una función de
+     *    reversa (proporcionada durante el registro), la almacena en la pila
+     *    de historial para que pueda ser deshecha posteriormente con
+     *    {@link deshacer_ultimo()}.
+     *
+     * **Solicitudes de ayuda:**
+     * Las palabras reservadas (`--man`, `--help`, `-h`) están centralizadas
+     * en {@link \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS}.
+     * Al detectar cualquiera de ellas, el sistema muestra automáticamente
+     * la ayuda generada a partir de {@link Comando::descripcion()},
+     * {@link Comando::parametros()} y {@link Comando::ejemplos()}, adaptando
+     * el formato al entorno (consola o HTML). La ejecución del comando **no**
+     * se realiza.
+     *
+     * **Validación de argumentos:**
+     * Si el comando define parámetros, el método {@link parsear_y_validar_args()}
+     * compara cada argumento recibido contra la definición. Los argumentos
+     * que no coinciden con ningún parámetro declarado se registran como error
+     * y provocan la visualización de la ayuda.
+     *
+     * ⚠️ **Importante para desarrolladores de comandos:**
+     * No utilice ninguna de las palabras reservadas como nombre de un
+     * parámetro en {@link Comando::parametros()}. El sistema rechazará el
+     * registro de comandos que infrinjan esta regla mediante
+     * {@link registrar_comando_desde_instancia()} o
+     * {@link registrar_comando_desde_clase()}.
+     *
+     * @param string $nombre Nombre del comando (ej. 'depuracion:imprimir').
+     * @param mixed  ...$args Argumentos para el manejador (crudos, serán parseados).
+     *
+     * @return mixed El resultado devuelto por el manejador del comando, o
+     *               `null` si el comando no existe, no hay permiso o los
+     *               argumentos son inválidos. Retorna `true` si se mostró
+     *               la ayuda.
      *
      * @example
-     * Controlador::ejecutar_comando('debug:imprimir');
+     * // Ejecución básica
+     * Controlador::ejecutar_comando('depuracion:imprimir');
+     *
+     * // Con argumentos
+     * Controlador::ejecutar_comando('depuracion:imprimir', '--errores');
+     *
+     * // Solicitar ayuda
+     * Controlador::ejecutar_comando('depuracion:imprimir', '--man');
      *
      * @see registrar_comando()
      * @see tiene_permiso()
      * @see deshacer_ultimo()
+     * @see mostrar_ayuda()
+     * @see parsear_y_validar_args()
+     * @see \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS
      * @since 1.3.1
+     * @version 1.3.2
      */
     public static function ejecutar_comando(string $nombre, ...$args)
     {
@@ -521,19 +677,213 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
         }
 
         $registro = self::$comandos[$nombre];
+        $clase = $registro['clase'] ?? null;
         $manejador = $registro['manejador'];
-        $reversa   = $registro['reversa'] ?? null;
+
+        // Detectar solicitud de ayuda (palabras reservadas)
+        $ayuda_flags = Conf::PALABRAS_RESERVADAS_COMANDOS;
+        foreach ($args as $arg) {
+            $sin_guiones = ltrim((string)$arg, '-');
+            if (in_array($sin_guiones, $ayuda_flags, true)) {
+                if ($clase !== null) {
+                    self::mostrar_ayuda($clase);
+                } else {
+                    echo "Comando '$nombre' (sin ayuda disponible).\n";
+                }
+                return true;
+            }
+        }
+
+        // Parsear y validar argumentos solo si el comando tiene definición
+        if ($clase && method_exists($clase, 'parametros')) {
+            $definicion = $clase::parametros();
+            $args_parseados = self::parsear_y_validar_args($definicion, $args, $clase);
+            if ($args_parseados === null) {
+                // Los errores ya se registraron y la ayuda se mostró
+                return null;
+            }
+        } else {
+            // Sin definición de parámetros: pasar los argumentos tal cual
+            $args_parseados = $args;
+        }
 
         $token = self::$token;
-        $resultado = $manejador($token, ...$args);
+        $reversa = $registro['reversa'] ?? null;
+
+        $resultado = $manejador($token, $args_parseados);
 
         if ($reversa !== null) {
-            self::$historial[] = function() use ($reversa, $token, $args) {
-                return $reversa($token, ...$args);
+            self::$historial[] = function() use ($reversa, $token, $args_parseados) {
+                return $reversa($token, $args_parseados);
             };
         }
 
         return $resultado;
+    }
+    /**
+     * Valida los argumentos crudos contra la definición de parámetros del comando.
+     *
+     * Si se encuentran errores de validación, los registra con {@link _error()}
+     * y muestra la ayuda del comando.
+     *
+     * @param array  $definicion Definición de parámetros del comando.
+     * @param array  $args       Argumentos crudos.
+     * @param string $clase      Nombre de la clase del comando (para mostrar ayuda).
+     *
+     * @return array|null Estructura con 'posicionales', 'banderas' y 'opciones',
+     *                    o `null` si hay errores.
+     *
+     * @since 1.3.2
+     */
+    private static function parsear_y_validar_args(array $definicion, array $args, string $clase): ?array
+    {
+        $posicionales = [];
+        $banderas = [];
+        $opciones = [];
+
+        // Inicializar valores por defecto
+        foreach ($definicion as $param) {
+            $nombre = $param['nombre'];
+            switch ($param['tipo']) {
+                case 'bandera':
+                    $banderas[$nombre] = $param['defecto'] ?? false;
+                    break;
+                case 'opcion':
+                    if (array_key_exists('defecto', $param)) {
+                        $opciones[$nombre] = $param['defecto'];
+                    }
+                    break;
+            }
+        }
+
+        // Parsear argumentos crudos
+        $pos_index = 0;
+        foreach ($args as $arg) {
+            if (is_string($arg) && str_starts_with($arg, '--')) {
+                $sin_guiones = substr($arg, 2);
+                if (str_contains($sin_guiones, '=')) {
+                    [$clave, $valor] = explode('=', $sin_guiones, 2);
+                    $opciones[$clave] = $valor;
+                } else {
+                    $banderas[$sin_guiones] = true;
+                }
+            } else {
+                $posicionales[$pos_index++] = $arg;
+            }
+        }
+
+        $errores = [];
+        $nombres_conocidos = array_column($definicion, 'nombre');
+
+        // Validar banderas desconocidas
+        foreach ($banderas as $nombre => $_) {
+            if (!in_array($nombre, $nombres_conocidos, true)) {
+                $errores[] = "Flag desconocido: '--$nombre'.";
+            }
+        }
+
+        // Validar opciones desconocidas
+        foreach ($opciones as $nombre => $_) {
+            if (!in_array($nombre, $nombres_conocidos, true)) {
+                $errores[] = "Opción desconocida: '--$nombre'.";
+            }
+        }
+
+        // Validar parámetros según la definición
+        $pos_def = 0; // índice para los posicionales en la definición
+        foreach ($definicion as $param) {
+            $nombre = $param['nombre'];
+            $tipo = $param['tipo'];
+            $obligatorio = $param['obligatorio'] ?? false;
+            $valores_permitidos = $param['valores'] ?? null;
+
+            if ($tipo === 'posicional') {
+                // ¿Está presente?
+                if ($obligatorio && !isset($posicionales[$pos_def])) {
+                    $errores[] = "Falta el argumento posicional '{$nombre}' (obligatorio). Valores permitidos: ". implode(', ', $valores_permitidos) . ".";
+                } elseif (isset($posicionales[$pos_def]) && $valores_permitidos !== null) {
+                    // Validar valor permitido
+                    if (!in_array($posicionales[$pos_def], $valores_permitidos, true)) {
+                        $errores[] = "Valor inválido para '{$nombre}': '{$posicionales[$pos_def]}'. Valores permitidos: " . implode(', ', $valores_permitidos) . ".";
+                    }
+                }
+                $pos_def++;
+            } elseif ($tipo === 'opcion' && $valores_permitidos !== null && isset($opciones[$nombre])) {
+                // Validar valor de opción
+                if (!in_array($opciones[$nombre], $valores_permitidos, true)) {
+                    $errores[] = "Valor inválido para '--{$nombre}': '{$opciones[$nombre]}'. Valores permitidos: " . implode(', ', $valores_permitidos) . ".";
+                }
+            }
+        }
+
+        if (!empty($errores)) {
+            foreach ($errores as $error) {
+                self::_error($error);
+            }
+            self::mostrar_ayuda($clase);
+            return null;
+        }
+
+        return [
+            'posicionales' => $posicionales,
+            'banderas'     => $banderas,
+            'opciones'     => $opciones,
+        ];
+    }
+
+    /**
+     * Muestra la ayuda de un comando en el formato adecuado según el entorno.
+     *
+     * La ayuda se genera dinámicamente consultando los métodos
+     * {@link Comando::descripcion()}, {@link Comando::parametros()} y
+     * {@link Comando::ejemplos()} de la clase del comando. Si alguno de estos
+     * métodos no está definido, se omite la sección correspondiente.
+     *
+     * @param string $clase Nombre cualificado de la clase comando.
+     *
+     * @return void
+     *
+     * @since 1.3.2
+     */
+    private static function mostrar_ayuda(string $clase): void
+    {
+        $nombre = $clase::nombre();
+        $ayuda = "Comando: $nombre\n";
+
+        // Descripción (opcional)
+        if (method_exists($clase, 'descripcion')) {
+            $ayuda .= $clase::descripcion() . "\n";
+        }
+
+        // Parámetros (opcionales)
+        if (method_exists($clase, 'parametros')) {
+            $parametros = $clase::parametros();
+            if (!empty($parametros)) {
+                $ayuda .= "\nParámetros:\n";
+                foreach ($parametros as $p) {
+                    $obligatorio = !empty($p['obligatorio']) ? ' (obligatorio)' : '';
+                    $ayuda .= "  --{$p['nombre']} [{$p['tipo']}]$obligatorio: {$p['descripcion']}\n";
+                }
+            }
+        }
+
+        // Ejemplos (opcionales)
+        if (method_exists($clase, 'ejemplos')) {
+            $ejemplos = $clase::ejemplos();
+            if (!empty($ejemplos)) {
+                $ayuda .= "\nEjemplos:\n";
+                foreach ($ejemplos as $ej) {
+                    $ayuda .= "  $ej\n";
+                }
+            }
+        }
+
+        // Salida según entorno
+        if (Entorno::es_consola()) {
+            echo $ayuda;
+        } else {
+            echo '<pre>' . htmlspecialchars($ayuda) . '</pre>';
+        }
     }
 
     /**

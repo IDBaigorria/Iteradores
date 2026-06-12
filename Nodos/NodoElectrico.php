@@ -312,7 +312,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 *
 	 * @note Incluye un mecanismo para contar la cantidad de nodos existentes con la variable estática $cant
 	 *
-	 * @return Nodo
+	 * @return NodoElectrico
 	 */
 	protected function __construct()
 	{
@@ -320,7 +320,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	}
 
 	/**
-	 * Destructor de la clase Nodo
+	 * Destructor de la clase NodoElectrico
 	 *
 	 * Interfaz: Construcción y destrucción
 	 * Caso de uso: Destruye internamente un nodo
@@ -368,8 +368,8 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * ---
 	 * Ejemplo de uso en un script PHP
 	 * ```php
-	 * $n1 = Nodo::crear();
-	 * $n2 = Nodo::crear();
+	 * $n1 = NodoElectrico::crear();
+	 * $n2 = NodoElectrico::crear();
 	 *
 	 * echo "Nodos actuales: " . Nodo::cantidad_de_nodos();
 	 * // Salida esperada: 2
@@ -428,7 +428,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * ---
 	 * Ejemplo de uso:
 	 * ```php
-	 * $nodo = Nodo::crear_con_dato("Hola Mundo");
+	 * $nodo = NodoElectrico::crear_con_dato("Hola Mundo");
 	 * echo $nodo->dato(); // Devuelve: "Hola Mundo"
 	 * ```
 	 * @note Este método incrementa el contador estático de nodos
@@ -465,7 +465,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * criterios internos de validez. Si el identificador no supera la verificación,
 	 * el nodo no será creado y se deberá manejar el error en consecuencia.
 	 *
-	 * El constructor de la clase Nodo es privado, por lo que esta función constituye
+	 * El constructor de la clase NodoElectrico es privado, por lo que esta función constituye
 	 * una de las formas válidas de construir nodos desde el exterior.
 	 *
 	 * Redefino en la clase hija NodoElectrico y como el resto de los crear tendra dos parametros
@@ -489,12 +489,12 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * ---
 	 * Ejemplo de uso:
 	 * ```php
-	 * $nodo = Nodo::crear_con_id("soy_especial");
+	 * $nodo = NodoElectrico::crear_con_id("soy_especial");
 	 * echo $nodo->id(); // Devuelve: "soy_especial"
 	 * ```
 	 *
 	 * @note Este método incrementa el contador estático de nodos
-	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant Nodo::$cant})
+	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant NodoElectrico::$cant})
 	 *       y lo agrega a la Superestructura.
 	 *
 	 * @static
@@ -527,7 +527,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * un identificador único *especial* que debe pasar la validación de
 	 * {@link ./classes/Iteradores-Nucleo-Objeto.html#method_es_id_especial es_id_especial()}.
 	 *
-	 * El constructor de la clase Nodo es privado, de modo que esta función constituye una de las formas válidas de creación de nodos.
+	 * El constructor de la clase NodoElectrico es privado, de modo que esta función constituye una de las formas válidas de creación de nodos.
 	 *
 	 * Redefino en la clase hija NodoElectrico y como el resto de los crear tendra dos parametros
 	 * extra: $capacidad y $fuga, si no se les asigna ningun valor se les asignara el valo por defecto
@@ -550,13 +550,13 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * ---
 	 * Ejemplo de uso:
 	 * ```php
-	 * $nodo = Nodo::crear_con_dato_e_id("Hola Mundo", "soy_especial");
+	 * $nodo = NodoElectrico::crear_con_dato_e_id("Hola Mundo", "soy_especial");
 	 * echo $nodo->dato(); // Devuelve: "Hola Mundo"
 	 * echo $nodo->id();   // Devuelve: "soy_especial"
 	 * ```
 	 *
 	 * @note Este método incrementa el contador estático de nodos
-	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant Nodo::$cant}),
+	 *       ({@link ./classes/Iteradores-Nodos-NodoElectrico.html#$cant NodoElectrico::$cant}),
 	 *       y lo registra en la Superestructura para un seguimiento global.
 	 *
 	 * @static
@@ -586,20 +586,20 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * - {@link ./classes/Iteradores-Nodos-Interfaces-FabricaDeNodosElectricos.html FabricaDeNodosElectricos}
 	 *
 	 * Este método recibe un valor cualquiera (o ninguno) o un posible nodo y asegura que el resultado final
-	 * sea siempre una instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html Nodo}.
-	 * - Si no recibe ningun parámetro crea un Nodo vacío totalmente válido
-	 * - Si el parámetro recibido **ya es un Nodo**, simplemente lo retorna y marca la variable
+	 * sea siempre una instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico}.
+	 * - Si no recibe ningun parámetro crea un NodoElectrico vacío totalmente válido
+	 * - Si el parámetro recibido **ya es un NodoElectrico**, simplemente lo retorna y marca la variable
 	 *   de referencia `$es_nodo` como `true`.
-	 * - Si el parámetro **no es un Nodo**, crea uno nuevo con
+	 * - Si el parámetro **no es un NodoElectrico**, crea uno nuevo con
 	 *   {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_crear_con_dato crear_con_dato()},
 	 *   lo retorna y establece `$es_nodo` como `false`.
 	 * - Si no se pasa ningún valor en el parámetro `$elemento`, crea un nodo vacío totalmente valido
 	 *   encapsulando `null`.
 	 *
 	 * Este método es especialmente útil cuando se procesan entradas heterogéneas, ya que garantiza
-	 * que siempre se trabaje con un Nodo válido sin tener que comprobarlo manualmente.
+	 * que siempre se trabaje con un NodoElectrico válido sin tener que comprobarlo manualmente.
 	 *
-	 * El constructor de la clase Nodo es privado, de modo que esta función constituye una de las
+	 * El constructor de la clase NodoElectrico es privado, de modo que esta función constituye una de las
 	 * formas válidas de creación de nodos.
 	 *
 	 * Redefino en la clase hija NodoElectrico y como el resto de los crear tendra dos parametros
@@ -623,25 +623,25 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * Ejemplo de uso
 	 * ```php
 	 * // Caso 0: se llama sin ningun parametro(crea nodo vacio completamente valido):
-	 * $nodo0= Nodo::nodo();
+	 * $nodo0= NodoElectrico::nodo();
 	 * echo $nodo0->dato(); //
 	 * echo $nodo0->id(); //0
 	 *
-	 * // Caso 1: se le pasa un parámetro no Nodo (crea un nodo con el dato pasado por parametro)
-	 * $nodo1=Nodo::nodo("Soy el nodo 1");
+	 * // Caso 1: se le pasa un parámetro no NodoElectrico (crea un nodo con el dato pasado por parametro)
+	 * $nodo1=NodoElectrico::nodo("Soy el nodo 1");
 	 * echo $nodo1->dato(); // "Soy el nodo 1"
 	 * echo $nodo1->id();//1
 	 *
 	 * // Caso 2: se le pasa un parametro que es un nodo (no crea ningun nodo, devuelve el mismo nodo)
-	 * $nodo2=Nodo::nodo($nodo1);
+	 * $nodo2=NodoElectrico::nodo($nodo1);
 	 * echo $nodo2->dato(); // "soy el nodo 1"
 	 * echo $nodo2->id(); //1
 	 *
-	 * // Caso 3: se le pasa un parametro no Nodo y un segundo parametro por referencia (crea una
-	 * //nueva instancia de Nodo con el dato pasado en el primer parametro. Además asigna un valor
-	 * //booleano al segundo parámetro para que se pueda verificar si el primer parametro era un Nodo o no.
+	 * // Caso 3: se le pasa un parametro no NodoElectrico y un segundo parametro por referencia (crea una
+	 * //nueva instancia de NodoElectrico con el dato pasado en el primer parametro. Además asigna un valor
+	 * //booleano al segundo parámetro para que se pueda verificar si el primer parametro era un NodoElectrico o no.
 	 * $esNodo=null;
-	 * $nodo3 = Nodo::Nodo("soy nodo 3", $esNodo);
+	 * $nodo3 = NodoElectrico::nodo("soy nodo 3", $esNodo);
 	 * if ($esNodo){
 	 *    echo "el parametro de entrada era un nodo";
 	 * }else{
@@ -649,11 +649,11 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * }
 	 * echo $nodo3->id();//2
 	 *
-	 * // Caso 4: se le pasa un parametro Nodo y un segundo parametro por referencia (crea una
-	 * //nueva instancia de Nodo con el dato pasado en el primer parametro. Además asigna un valor
-	 * //booleano al segundo parámetro para que se pueda verificar si el primer parametro era un Nodo o no.
+	 * // Caso 4: se le pasa un parametro NodoElectrico y un segundo parametro por referencia (crea una
+	 * //nueva instancia de NodoElectrico con el dato pasado en el primer parametro. Además asigna un valor
+	 * //booleano al segundo parámetro para que se pueda verificar si el primer parametro era un NodoElectrico o no.
 	 * $esNodo=null;
-	 * $nodo3 = Nodo::Nodo($nodo3, $esNodo);
+	 * $nodo3 = NodoElectrico::nodo($nodo3, $esNodo);
 	 * if ($esNodo){
 	 *    echo "el parametro de entrada era un nodo"; // Imprime esto
 	 * }else{
@@ -725,29 +725,29 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * Ejemplo de uso:
 	 * ```php
 	 * // Crear un nodo
-	 * $nodo = Nodo::crear_con_dato("Eliminarme");
+	 * $nodo = NodoElectrico::crear_con_dato("Eliminarme");
 	 *
 	 * // Eliminar el nodo
-	 * $resultado = Nodo::eliminar($nodo);
+	 * $resultado = NodoElectrico::eliminar($nodo);
 	 * var_dump($resultado); // true
 	 *
 	 * // Intentar eliminar un nodo con referencias
-	 * $nodoA = Nodo::crear_con_dato("A");
-	 * $nodoB = Nodo::crear_con_dato("B");
+	 * $nodoA = NodoElectrico::crear_con_dato("A");
+	 * $nodoB = NodoElectrico::crear_con_dato("B");
 	 * $nodoA->_adyacente($nodoB);
-	 * var_dump(Nodo::eliminar($nodoB)); // false
+	 * var_dump(NodoElectrico::eliminar($nodoB)); // false
 	 * ```
 	 *
 	 * @static
-	 * @param NodoElectrico $nodo Nodo a eliminar.
+	 * @param NodoElectrico $nodo NodoElectrico a eliminar.
 	 * @return bool `true` si fue eliminado, `false` si no pudo eliminarse,
 	 *                   `null` si el parámetro no es válido.
 	 */
 	public static function eliminar($nodo): bool|null
 	{
-		// Validación del parámetro: debe ser instancia de Nodo
+		// Validación del parámetro: debe ser instancia de NodoElectrico
 		if (!($nodo instanceof static)) {
-			static::_error('el parámetro no es de la clase Nodo');
+			static::_error('el parámetro no es de la clase NodoElectrico');
 			return null;
 		}
 
@@ -990,7 +990,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 *
 	 * @note Solo devuelve el nombre del enlace si realmente existe; `false` en caso contrario.
 	 *
-	 * @param Nodo $nodo Nodo a verificar.
+	 * @param NodoElectrico $nodo Nodo a verificar.
 	 * @return string|false Nombre del enlace si existe, `false` en caso contrario.
 	 * @public
 	 * @since 0.0.1
@@ -998,7 +998,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
     public function tiene_adyacente_a($nodo)
 	{
 		if (!($nodo instanceof NodoElectrico)) {
-			Nodo::_error('El nodo que intenta comprobar no es una instancia de la clase NodoElectrico.');
+			NodoElectrico::_error('El nodo que intenta comprobar no es una instancia de la clase NodoElectrico.');
 			return false;
 		}
 		$faseActual = NodoElectrico::$fase;
@@ -1052,7 +1052,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * $n1->_adyacente_en($n2, "enlaceAB");
 	 *
 	 * $ady = $n1->adyacente("enlaceAB");
-	 * if ($ady) echo "Nodo adyacente: ".$ady->dato();
+	 * if ($ady) echo "NodoElectrico adyacente: ".$ady->dato();
 	 * ```
 	 *
 	 * @note Devuelve `null` si no hay nodo en el enlace.
@@ -1121,18 +1121,18 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * $todos = $nodo->adyacentes();
 	 * if ($todos !== null) {
 	 *     foreach ($todos as $enlace => $ady) {
-	 *         echo "Enlace: $enlace, Nodo ID: " . $ady->id() . ", Nodo Dato: ". $ady->dato() ."<br>";// imprimo
+	 *         echo "Enlace: $enlace, NodoElectrico ID: " . $ady->id() . ", NodoElectrico Dato: ". $ady->dato() ."<br>";// imprimo
 	 * 	       unset($todos[$enlace]); //no modifico los enlaces en el nodo original
 	 *     }
 	 * }
 	 * echo "compruebo eliminacion en resultado<br>";
 	 * foreach ($todos as $enlace => $ady) {
-	 *     echo "Enlace: $enlace, Nodo ID: " . $ady->id() . ", Nodo Dato: ". $ady->dato() ."<br>";// imprimo
+	 *     echo "Enlace: $enlace, NodoElectrico ID: " . $ady->id() . ", NodoElectrico Dato: ". $ady->dato() ."<br>";// imprimo
 	 * }
 	 * echo "comprobacion nuevo resultado<br>";
 	 * $todos2 = $nodo->adyacentes();
 	 * foreach ($todos2 as $enlace => $ady) {
-	 *    echo "Enlace: $enlace, Nodo ID: " . $ady->id() . ", Nodo Dato: ". $ady->dato() ."<br>";// imprimo
+	 *    echo "Enlace: $enlace, NodoElectrico ID: " . $ady->id() . ", NodoElectrico Dato: ". $ady->dato() ."<br>";// imprimo
 	 * }
 	 * ```
 	 *
@@ -1239,14 +1239,14 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacente eliminar_adyacente}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
-	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_validar_nombre_enlace validar_nombre_enlace}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_validar_nombre_enlace validar_nombre_enlace}
 	 *
 	 * ---
 	 * Ejemplo de uso:
 	 * ```php
-	 * $nodo = Nodo::crear();
-	 * $otro1 = Nodo::crear_con_id("ejemplo");
-	 * $otro2 = Nodo::crear_con_id("otro_ejemplo");
+	 * $nodo = NodoElectrico::crear();
+	 * $otro1 = NodoElectrico::crear_con_id("ejemplo");
+	 * $otro2 = NodoElectrico::crear_con_id("otro_ejemplo");
 	 *
 	 * $enlace1=$nodo->_adyacente($otro1); // crea enlace "ejemplo" a $otro1
 	 * $enlace2=$nodo->_adyacente($otro2); // crea enlace "otro_ejemplo" a $otro2
@@ -1257,14 +1257,14 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * echo "En el enlace ".$enlace3." se agrego el nodo ".$nodo->adyacente($enlace3)->id()."<br>"; //ejemplo.1 / ejemplo
 	 * ```
 	 *
-	 * @param Nodo $un_nodo Nodo que se desea enlazar
-	 * @return null|string Nodo adyacente recién asignado
+	 * @param NodoElectrico $un_nodo Nodo que se desea enlazar
+	 * @return null|string NodoElectrico adyacente recién asignado
 	 * @public
 	 */
 	public function _adyacente($un_nodo): ?string
 	{
 		if (!($un_nodo instanceof NodoElectrico)) {
-			static::_error('el parametro debe ser una instancia de Nodo');
+			static::_error('el parametro debe ser una instancia de NodoElectrico');
 			return null;
 		}
 		// inicializacion perezosa
@@ -1319,7 +1319,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_tiene_incidente_a tiene_incidente_a}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar_adyacentes eliminar_adyacentes}
 	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_por_cada_adyacente_ejecutar por_cada_adyacente_ejecutar}
-	 * - {@link ./classes/Iteradores-Nodos-Nodo.html#method_validar_nombre_enlace validar_nombre_enlace}
+	 * - {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_validar_nombre_enlace validar_nombre_enlace}
 	 *
 	 * ---
 	 * Ejemplo de uso:
@@ -1330,7 +1330,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * ```
 	 *
 	 * @note Si $reemplazar es false y el enlace existe, fallará.
-	 * @param NodoElectrico $un_nodo Nodo a establecer como adyacente
+	 * @param NodoElectrico $un_nodo NodoElectrico a establecer como adyacente
 	 * @param mixed $enlace Nombre del enlace
 	 * @param bool $reemplazar Permite reemplazar enlace existente
 	 * @return bool True si éxito, false si error
@@ -1418,11 +1418,11 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 *
 	 * @note También elimina la relación incidente correspondiente.
 	 * @param mixed $enlace Nombre del enlace a eliminar
-	 * @return Nodo|null Nodo eliminado o null si no existe
+	 * @return NodoElectrico|null Nodo eliminado o null si no existe
 	 * @public
 	 * @since 0.0.1
 	 */
-    public function eliminar_adyacente($enlace): Nodo|null
+    public function eliminar_adyacente($enlace): NodoElectrico|null
     {
         if (!static::validar_nombre_enlace($enlace)) {
             self::_error('el enlace a eliminar no es valido');
@@ -1457,7 +1457,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * ⚠️ Importante: Este método no elimina los nodos del sistema. Si se eliminan
 	 * todos los enlaces que conectan a un nodo este aún permanece en el sistema
 	 * como nodo suelto a menos que se use el metodo estatico
-	 * {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar Nodo::eliminar($nodo)}
+	 * {@link ./classes/Iteradores-Nodos-NodoElectrico.html#method_eliminar NodoElectrico::eliminar($nodo)}
 	 *
 	 * ---
 	 * 🔗 Método complementario:
@@ -1490,14 +1490,14 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * $todos = $nodo->adyacentes();
 	 * if ($todos) {
 	 *     foreach ($todos as $enlace => $ady) {
-	 *         echo "Enlace: $enlace, Nodo ID: " . $ady->id() . ", Nodo Dato: ". $ady->dato() ."<br>";// imprimo
+	 *         echo "Enlace: $enlace, NodoElectrico ID: " . $ady->id() . ", NodoElectrico Dato: ". $ady->dato() ."<br>";// imprimo
 	 *     }
 	 * }
 	 * $copia = $nodo->eliminar_adyacentes();
 	 * echo "Se aliminaron enlaces: <br>";
 	 * if ($copia){
 	 * 	  foreach ($copia as $enlace => $ady) {
-	 *       echo "Enlace: $enlace, Nodo ID: " . $ady->id() . ", Nodo Dato: ". $ady->dato() ."<br>";// imprimo
+	 *       echo "Enlace: $enlace, NodoElectrico ID: " . $ady->id() . ", NodoElectrico Dato: ". $ady->dato() ."<br>";// imprimo
 	 * 	  }
 	 * }
 	 * echo "Comprobacion<br>";
@@ -1512,7 +1512,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * @note Se devuelve una copia de todos los adyacentes conectados por los enlaces eliminados.
 	 *
 	 * @param
-	 * @return Nodo[] Array de nodos eliminados, o array vacío si no había adyacentes
+	 * @return NodoElectrico[] Array de nodos eliminados, o array vacío si no había adyacentes
 	 * @public
 	 */
 	public function eliminar_adyacentes(): array
@@ -1848,13 +1848,13 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * @note Solo devuelve el nombre del enlace si realmente existe; `false` en caso contrario.
 	 * @public
 	 * @since 3.2.3
-	 * @param Nodo $nodo Nodo a verificar.
+	 * @param NodoElectrico $nodo Nodo a verificar.
 	 * @return string|false Nombre del enlace si existe, `false` en caso contrario.
 	 */
 	public function tiene_incidente_a($nodo)
 	{
 		if (!($nodo instanceof NodoElectrico)) {
-			Nodo::_error('El nodo que intenta comprobar no es una instancia de la clase Nodo.');
+			NodoElectrico::_error('El nodo que intenta comprobar no es una instancia de la clase NodoElectrico.');
 			return false;
 		}
 
@@ -1911,16 +1911,16 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * $n1->_adyacente_en($n2, "enlaceAB");
 	 *
 	 * $ady = $n1->adyacente("enlaceAB");
-	 * if ($ady) echo "Nodo adyacente: ".$ady->dato();
+	 * if ($ady) echo "NodoElectrico adyacente: ".$ady->dato();
 	 * ```
 	 *
 	 * @note Devuelve `null` si no hay nodo en el enlace.
 	 * @param int|string $enlace El identificador del enlace a consultar
-	 * @return Nodo|null Nodo adyacente si existe, `null` en caso contrario
+	 * @return NodoElectrico|null NodoElectrico adyacente si existe, `null` en caso contrario
 	 */
 	/*
-	 * public function incidente($enlace): ?Nodo{
-	 * 	if (!Nodo::validar_nombre_enlace($enlace)) {// esto se deja porque si intento acceder al array con algo q no sea un entero o un string en php salta un warning
+	 * public function incidente($enlace): ?NodoElectrico{
+	 * 	if (!NodoElectrico::validar_nombre_enlace($enlace)) {// esto se deja porque si intento acceder al array con algo q no sea un entero o un string en php salta un warning
 	 * 		self::_error("El enlace debe ser un string");
 	 * 		return null;
 	 * 	}
@@ -1976,23 +1976,23 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * Ejemplo de uso:
 	 * ```php
 	 * $nodo = NodoElectrico::crear();
-	 * $nodo->_incidente_en(Nodo::crear_con_dato_e_id("hola", "Id_hola"), "enlace hola");
-	 * $nodo->_incidente_en(Nodo::crear_con_dato_e_id("chau", "Id_chau"), "enlace chau");
+	 * $nodo->_incidente_en(NodoElectrico::crear_con_dato_e_id("hola", "Id_hola"), "enlace hola");
+	 * $nodo->_incidente_en(NodoElectrico::crear_con_dato_e_id("chau", "Id_chau"), "enlace chau");
 	 * $todos = $nodo->incidentes();
 	 * if ($todos !== null) {
 	 *     foreach ($todos as $enlace => $inc) {
-	 *         echo "Enlace: $enlace, Nodo ID: " . $inc->id() . ", Nodo Dato: ". $inc->dato() ."<br>";// imprimo
+	 *         echo "Enlace: $enlace, NodoElectrico ID: " . $inc->id() . ", NodoElectrico Dato: ". $inc->dato() ."<br>";// imprimo
 	 * 	       unset($todos[$enlace]); //no modifico los enlaces en el nodo original
 	 *     }
 	 * }
 	 * echo "compruebo eliminacion en resultado<br>";
 	 * foreach ($todos as $enlace => $inc) {
-	 *     echo "Enlace: $enlace, Nodo ID: " . $inc->id() . ", Nodo Dato: ". $inc->dato() ."<br>";// imprimo
+	 *     echo "Enlace: $enlace, NodoElectrico ID: " . $inc->id() . ", NodoElectrico Dato: ". $inc->dato() ."<br>";// imprimo
 	 * }
 	 * echo "comprobacion nuevo resultado<br>";
 	 * $todos2 = $nodo->incidentes();
 	 * foreach ($todos2 as $enlace => $inc) {
-	 *    echo "Enlace: $enlace, Nodo ID: " . $inc->id() . ", Nodo Dato: ". $inc->dato() ."<br>";// imprimo
+	 *    echo "Enlace: $enlace, NodoElectrico ID: " . $inc->id() . ", NodoElectrico Dato: ". $inc->dato() ."<br>";// imprimo
 	 * }
 	 * ```
 	 *
@@ -2908,7 +2908,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 *
 	 * **Ejemplo 5 – Enlace sin nodo previo**
 	 * ```php
-	 * // Si el enlace 'nuevo' apunta a un Nodo, _peso lo convierte en Enlace y asigna.
+	 * // Si el enlace 'nuevo' apunta a un NodoElectrico, _peso lo convierte en Enlace y asigna.
 	 * $nodo->_adyacente_en($otro, 'nuevo');
 	 * $nodo->_peso('nuevo', 42);                     // ahora 'nuevo' tiene peso 42
 	 * ```
@@ -3057,7 +3057,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
     /**
      * Devuelve una copia del mapa completo de pesos de un enlace.
      *
-     * Si el enlace no tiene pesos (es un Nodo directo), retorna un array vacío.
+     * Si el enlace no tiene pesos (es un NodoElectrico directo), retorna un array vacío.
      *
      * @param string $nombreEnlace Nombre del enlace.
      * @return array<string, mixed> Mapa de pesos (clave = dimensión, valor = peso). Copia independiente.
@@ -3137,7 +3137,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * **Ejemplo 3 – Iterar resultados**
 	 * ```php
 	 * foreach ($nodo->adyacentes_ordenados_por_peso('distancia') as $item) {
-	 *     echo "Enlace: {$item['nombre_enlace']}, Nodo: {$item['nodo']->id()}, Peso: {$item['peso']}\n";
+	 *     echo "Enlace: {$item['nombre_enlace']}, NodoElectrico: {$item['nodo']->id()}, Peso: {$item['peso']}\n";
 	 * }
 	 * ```
 	 *
@@ -3210,7 +3210,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * Combina {@link _adyacente()} y {@link _peso()}. El nombre del enlace se genera
 	 * automáticamente a partir del id del nodo destino.
 	 *
-	 * @param NodoElectrico $un_nodo   Nodo que se desea enlazar.
+	 * @param NodoElectrico $un_nodo   NodoElectrico que se desea enlazar.
 	 * @param mixed         $peso      Peso a asignar al nuevo enlace.
 	 * @param string|null   $dimension Dimensión del peso (null para la por defecto).
 	 *

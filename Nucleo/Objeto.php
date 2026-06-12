@@ -469,15 +469,18 @@ class Objeto implements Id, ErroresYAlertas
 	 */
 	private static function imprimir_errores_html(): void
 	{
+
+		$colores = Conf::ERRORES_COLORES;
+		$fondo = htmlspecialchars($colores['fondo']);
+		$texto = htmlspecialchars($colores['texto']);
+		$borde = htmlspecialchars($colores['borde']);
+
+		echo "<div style='background:{$fondo}; color:{$texto}; padding:1em; margin:1em 0; border:1px solid {$borde}; font-family:monospace; white-space:pre-wrap;'>";
+		echo "<h3>===== ERRORES =====</h3>";
 		if (empty(self::$errores)) {
-			echo "<p><i>No hay errores registrados.</i></p>";
+			echo "<p><i>No hay errores registrados.</i></p></div>";
 			return;
 		}
-
-		// Contenedor principal con estilo similar al de JS
-		echo '<div style="background:#fee; color:#900; padding:1em; margin:1em 0; border:1px solid #c00; font-family:monospace; white-space:pre-wrap;">';
-		echo "<h3>===== ERRORES =====</h3>";
-
 		foreach (self::$errores as $error) {
 			$pila = $error['pila'];
 			$cant = count($pila);
@@ -1184,10 +1187,7 @@ class Objeto implements Id, ErroresYAlertas
 	 */
 	private static function imprimir_alertas_html(): void
 	{
-		if (empty(self::$alertas)) {
-			echo "<p><i>No hay alertas registrados.</i></p>";
-			return;
-		}
+
 
 		$colores = Conf::ALERTAS_COLORES;
 		$fondo = htmlspecialchars($colores['fondo']);
@@ -1196,7 +1196,10 @@ class Objeto implements Id, ErroresYAlertas
 
 		echo "<div style='background:{$fondo}; color:{$texto}; padding:1em; margin:1em 0; border:1px solid {$borde}; font-family:monospace; white-space:pre-wrap;'>";
 		echo "<h3>===== ALERTAS =====</h3>";
-
+		if (empty(self::$alertas)) {
+			echo "<p><i>No hay alertas registrados.</i></p></div>";
+			return;
+		}
 		foreach (self::$alertas as $alerta) {
 			$pila = $alerta['pila'];
 			$cant = count($pila);

@@ -7,23 +7,26 @@ use Iteradores\Configuracion\Entorno;
 use Iteradores\Nucleo\Objeto;
 
 /**
- * Comando que imprime errores, alertas y la superestructura.
+ * Comando que limpia las pilas de errores y alertas acumuladas.
  *
- * Solo está disponible en entornos de desarrollo y pruebas.
- * No es reversible.
+ * Sin argumentos, limpia ambas pilas. Se puede limitar la limpieza
+ * a una de las dos mediante las banderas `--errores` o `--alertas`.
+ *
+ * **Entorno:** solo disponible en desarrollo y pruebas.
+ * **Reversible:** No.
  *
  * @package Iteradores\Comandos\Depuracion
  * @since 1.3.1
  * @version 1.3.2
  */
-class Imprimir implements Comando
+class Limpiar implements Comando
 {
-    public static function nombre(): string { return 'depuracion:imprimir'; }
+    public static function nombre(): string { return 'depuracion:limpiar'; }
     public static function solo_desarrollo(): bool { return true; }
 
     public static function descripcion(): string
     {
-        return 'Muestra los registros de errores, alertas y la superestructura. Sin argumentos, muestra todo.';
+        return 'Limpia las pilas de errores y alertas acumuladas. Sin argumentos, limpia ambas.';
     }
 
     public static function parametros(): array
@@ -34,21 +37,21 @@ class Imprimir implements Comando
                 'tipo'        => 'bandera',
                 'obligatorio' => false,
                 'defecto'     => false,
-                'descripcion' => 'Muestra solo los errores.',
+                'descripcion' => 'Limpia solo los errores.',
             ],
             [
                 'nombre'      => 'alertas',
                 'tipo'        => 'bandera',
                 'obligatorio' => false,
                 'defecto'     => false,
-                'descripcion' => 'Muestra solo las alertas.',
+                'descripcion' => 'Limpia solo las alertas.',
             ],
             [
-                'nombre'      => 'super',
+                'nombre'      => 'todo',
                 'tipo'        => 'bandera',
                 'obligatorio' => false,
                 'defecto'     => false,
-                'descripcion' => 'Muestra solo la superestructura.',
+                'descripcion' => 'Limpia ambas pilas (explícito, igual que sin argumentos).',
             ],
         ];
     }
@@ -56,31 +59,33 @@ class Imprimir implements Comando
     public static function ejemplos(): array
     {
         return [
-            'depuracion:imprimir',
-            'depuracion:imprimir --errores --alertas',
-            'depuracion:imprimir --super',
+            'depuracion:limpiar',
+            'depuracion:limpiar --errores',
+            'depuracion:limpiar --alertas',
+            'depuracion:limpiar --todo',
         ];
     }
 
     public function ejecutar(string $token, array $args): bool
     {
         if (!Entorno::permite_pruebas()) {
-            echo "Solo disponible en desarrollo/pruebas.\n";
+            echo "El comando 'depuracion:limpiar' solo está disponible en desarrollo o pruebas.\n";
             return false;
         }
 
         $banderas = $args['banderas'];
-        $mostrar_todo = !$banderas['errores'] && !$banderas['alertas'] && !$banderas['super'];
+        $limpiarErrores = $banderas['errores'] || $banderas['todo'] || (!$banderas['errores'] && !$banderas['alertas'] && !$banderas['todo']);
+        $limpiarAlertas = $banderas['alertas'] || $banderas['todo'] || (!$banderas['errores'] && !$banderas['alertas'] && !$banderas['todo']);
 
-        if ($mostrar_todo || $banderas['errores']) {
-            Objeto::imprimir_errores();   // ya imprime con estilo y título
+        if ($limpiarErrores) {
+            Objeto::limpiar_errores();
+            echo "Pila de errores limpiada.\n";
         }
-        if ($mostrar_todo || $banderas['alertas']) {
-            Objeto::imprimir_alertas();
+        if ($limpiarAlertas) {
+            Objeto::limpiar_alertas();
+            echo "Pila de alertas limpiada.\n";
         }
-        if ($mostrar_todo || $banderas['super']) {
-            Controlador::imprimir_superestructura();
-        }
+
         return true;
     }
 
@@ -88,6 +93,6 @@ class Imprimir implements Comando
 }
 
 // ═══════════════════════════════════════════════════════════
-// AUTOENCOLACIÓN: No debe faltar esta línea
+// AUTOENCOLACIÓN
 // ═══════════════════════════════════════════════════════════
-Controlador::encolar_comando(Imprimir::class);
+Controlador::encolar_comando(Limpiar::class);

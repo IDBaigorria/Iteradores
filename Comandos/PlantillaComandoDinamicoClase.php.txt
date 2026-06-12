@@ -1,6 +1,6 @@
 <?php
 // ═══════════════════════════════════════════════════════════
-// PLANTILLA DE COMANDO DINÁMICO (CLASE ANÓNIMA)
+// PLANTILLA DE COMANDO DINÁMICO (CLASE ANÓNIMA) — v1.3.2
 // ═══════════════════════════════════════════════════════════
 // Úsela cuando necesite crear un comando en tiempo de ejecución
 // sin definir una clase en un archivo aparte.
@@ -21,25 +21,39 @@ $comando = new class implements Comando {
         return false; // true si solo debe existir en desarrollo
     }
 
-    public function ejecutar(string $token, ...$args)
+    public static function descripcion(): string
     {
-        // Lógica del comando aquí
+        return 'Descripción breve del comando dinámico.';
+    }
+
+    public static function parametros(): array
+    {
+        return [
+            // Definir aquí los parámetros igual que en una clase estática
+        ];
+    }
+
+    public static function ejemplos(): array
+    {
+        return [
+            'dinamico:accion --bandera1',
+        ];
+    }
+
+    public function ejecutar(string $token, array $args): mixed
+    {
+        // Acceder a los argumentos ya parseados
+        // $banderas = $args['banderas'];
+        // $opciones = $args['opciones'];
+        // $posicionales = $args['posicionales'];
+
         echo "Ejecutando comando dinámico\n";
         return true;
     }
 
     public function reversa(): ?callable
     {
-        // Si no es reversible:
-        return null;
-
-        // Si es reversible, ejemplo:
-        /*
-        return function(string $token, ...$args) {
-            // deshacer cambios
-            return true;
-        };
-        */
+        return null; // o devolver un callable
     }
 };
 
@@ -50,4 +64,4 @@ Controlador::registrar_comando_desde_instancia($comando);
 // Controlador::encolar_comando($comando);
 
 // Ahora puede ejecutarse
-// Controlador::ejecutar_comando('dinamico:accion', 'arg1');
+// Controlador::ejecutar_comando('dinamico:accion', '--bandera1');

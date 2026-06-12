@@ -12,12 +12,16 @@
  *
  * @package Iteradores\Comandos
  * @since 1.3.1
+ * @version 1.3.2
  */
 
 // Comandos de depuración
-require_once __DIR__.'/Depuracion/Imprimir.php';
+require_once __DIR__.'/Depuracion/imprimir.php';
+require_once __DIR__.'/Depuracion/limpiar.php';
+require_once __DIR__.'/Depuracion/recoleccion.php';
 // require_once __DIR__ . '/Depuracion/Limpiar.php';   // futuro
-
+// Comanados de prueba
+require_once __DIR__.'/Prueba/CrearNodo.php';
 // Comandos de nodos
 // require_once __DIR__ . '/Nodos/Contar.php';
 

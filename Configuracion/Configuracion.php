@@ -250,6 +250,14 @@ class Conf {
         'ansi_texto' => '34',
     ];
 
+    /**
+     * Palabras reservadas que no pueden usarse como nombres de parámetros
+     * en los comandos. Se utilizan para solicitar la ayuda del comando.
+     *
+     * @var string[]
+     * @since 1.3.2
+     */
+    public const PALABRAS_RESERVADAS_COMANDOS = ['man', 'help', 'h', 'manual', 'ayuda', 'ay'];
 }
 
 ?>
