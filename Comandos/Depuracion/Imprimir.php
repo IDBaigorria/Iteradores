@@ -14,7 +14,7 @@ use Iteradores\Nucleo\Objeto;
  *
  * @package Iteradores\Comandos\Depuracion
  * @since 1.3.1
- * @version 1.3.2
+ * @version 1.3.3
  */
 class Imprimir implements Comando
 {
@@ -65,7 +65,7 @@ class Imprimir implements Comando
     public function ejecutar(string $token, array $args): bool
     {
         if (!Entorno::permite_pruebas()) {
-            echo "Solo disponible en desarrollo/pruebas.\n";
+            Controlador::escribir_salida("Solo disponible en desarrollo/pruebas.");
             return false;
         }
 
@@ -73,7 +73,7 @@ class Imprimir implements Comando
         $mostrar_todo = !$banderas['errores'] && !$banderas['alertas'] && !$banderas['super'];
 
         if ($mostrar_todo || $banderas['errores']) {
-            Objeto::imprimir_errores();   // ya imprime con estilo y título
+            Objeto::imprimir_errores();
         }
         if ($mostrar_todo || $banderas['alertas']) {
             Objeto::imprimir_alertas();

@@ -17,7 +17,7 @@ use Iteradores\Nucleo\Objeto;
  *
  * @package Iteradores\Comandos\Depuracion
  * @since 1.3.1
- * @version 1.3.2
+ * @version 1.3.3
  */
 class Limpiar implements Comando
 {
@@ -69,21 +69,21 @@ class Limpiar implements Comando
     public function ejecutar(string $token, array $args): bool
     {
         if (!Entorno::permite_pruebas()) {
-            echo "El comando 'depuracion:limpiar' solo está disponible en desarrollo o pruebas.\n";
+            Controlador::escribir_salida("El comando 'depuracion:limpiar' solo está disponible en desarrollo o pruebas.");
             return false;
         }
 
         $banderas = $args['banderas'];
-        $limpiarErrores = $banderas['errores'] || $banderas['todo'] || (!$banderas['errores'] && !$banderas['alertas'] && !$banderas['todo']);
-        $limpiarAlertas = $banderas['alertas'] || $banderas['todo'] || (!$banderas['errores'] && !$banderas['alertas'] && !$banderas['todo']);
+        $limpiar_errores = $banderas['errores'] || $banderas['todo'] || (!$banderas['errores'] && !$banderas['alertas'] && !$banderas['todo']);
+        $limpiar_alertas = $banderas['alertas'] || $banderas['todo'] || (!$banderas['errores'] && !$banderas['alertas'] && !$banderas['todo']);
 
-        if ($limpiarErrores) {
+        if ($limpiar_errores) {
             Objeto::limpiar_errores();
-            echo "Pila de errores limpiada.\n";
+            Controlador::escribir_salida("Pila de errores limpiada.");
         }
-        if ($limpiarAlertas) {
+        if ($limpiar_alertas) {
             Objeto::limpiar_alertas();
-            echo "Pila de alertas limpiada.\n";
+            Controlador::escribir_salida("Pila de alertas limpiada.");
         }
 
         return true;

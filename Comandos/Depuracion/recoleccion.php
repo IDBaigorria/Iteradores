@@ -18,7 +18,7 @@ use Iteradores\Nucleo\Objeto;
  *
  * @package Iteradores\Comandos\Depuracion
  * @since 1.3.1
- * @version 1.3.2
+ * @version 1.3.3
  */
 class Recoleccion implements Comando
 {
@@ -70,36 +70,36 @@ class Recoleccion implements Comando
     public function ejecutar(string $token, array $args): bool
     {
         if (!Entorno::permite_pruebas()) {
-            echo "El comando 'depuracion:recoleccion' solo está disponible en desarrollo o pruebas.\n";
+            Controlador::escribir_salida("El comando 'depuracion:recoleccion' solo está disponible en desarrollo o pruebas.");
             return false;
         }
 
         $posicionales = $args['posicionales'];
         $banderas = $args['banderas'];
         $accion = $posicionales[0] ?? null;
-        $afectarErrores = $banderas['errores'] || (!$banderas['errores'] && !$banderas['alertas']);
-        $afectarAlertas = $banderas['alertas'] || (!$banderas['errores'] && !$banderas['alertas']);
+        $afectar_errores = $banderas['errores'] || (!$banderas['errores'] && !$banderas['alertas']);
+        $afectar_alertas = $banderas['alertas'] || (!$banderas['errores'] && !$banderas['alertas']);
 
         if ($accion === 'activar') {
-            if ($afectarErrores) {
+            if ($afectar_errores) {
                 Objeto::activar_errores();
-                echo "Recolección de errores activada.\n";
+                Controlador::escribir_salida("Recolección de errores activada.");
             }
-            if ($afectarAlertas) {
+            if ($afectar_alertas) {
                 Objeto::activar_alertas();
-                echo "Recolección de alertas activada.\n";
+                Controlador::escribir_salida("Recolección de alertas activada.");
             }
         } elseif ($accion === 'desactivar') {
-            if ($afectarErrores) {
+            if ($afectar_errores) {
                 Objeto::desactivar_errores();
-                echo "Recolección de errores desactivada.\n";
+                Controlador::escribir_salida("Recolección de errores desactivada.");
             }
-            if ($afectarAlertas) {
+            if ($afectar_alertas) {
                 Objeto::desactivar_alertas();
-                echo "Recolección de alertas desactivada.\n";
+                Controlador::escribir_salida("Recolección de alertas desactivada.");
             }
         } else {
-            echo "Acción no reconocida: '$accion'. Use 'activar' o 'desactivar'.\n";
+            Controlador::escribir_salida("Acción no reconocida: '$accion'. Use 'activar' o 'desactivar'.");
             return false;
         }
 

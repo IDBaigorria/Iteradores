@@ -285,6 +285,7 @@ Controlador::ejecutar_prueba(function($token) {
     echo "✅ Pruebas de los tres comandos de depuración completadas<br>";
 });*/
 // ─── 9. Pruebas de comando reversible con argumentos ───
+/*
 echo "\n🔹 Comando reversible con argumentos<br>";
 
 Controlador::ejecutar_prueba(function($token) {
@@ -315,5 +316,71 @@ Controlador::ejecutar_prueba(function($token) {
    // NodoElectrico::imprimir_alertas();
     Controlador::ejecutar_comando('depuracion:imprimir');
     echo "✅ Pruebas de comando reversible completadas<br>";
+});*/
+// ──────────────────────────────────────────────────────────
+// 10. PRUEBAS DE LA VERSIÓN 1.3.3 (COMUNICADORES)
+// ──────────────────────────────────────────────────────────
+echo "\n🔹 Comunicadores y comandos de comunicación v1.3.3<br>";
+
+Controlador::ejecutar_prueba(function($token) {
+    echo "▶ 10.0 var_dump salida_depuracion_consola<br>";
+    var_dump(Controlador::comunicador('salida_depuracion_consola'));
+    // ─── 10.1 Escribir en salida estándar ────────────────────
+    echo "<br>▶ 10.1 Escribir en salida estándar mediante Controlador::escribir_salida()<br>";
+    Controlador::escribir_salida("   Mensaje de prueba desde escribir_salida (debe verse en el formato adecuado)");
+
+    // Prueba 10.2 (salida estándar, sin destino)
+      echo "<br>▶ 10.2 Comunicación:escribir en salida consola<br>";
+    Controlador::ejecutar_comando('comunicacion:escribir', 'salida_depuracion_html', 'Hola desde prueba');
+
+    // Prueba 10.3 (archivo, con destino)
+    echo "<br>▶ 10.3 Leer y escribir archivo<br>";
+    $ruta = __DIR__ . '/test_comunicacion.txt';
+    Controlador::ejecutar_comando('comunicacion:escribir', 'archivo', 'Contenido de prueba', $ruta);
+    $leido = Controlador::ejecutar_comando('comunicacion:leer', 'archivo', $ruta);
+    echo "   Leído: " . var_export($leido, true) . " (debe ser 'Contenido de prueba')<br>";
+
+    // ─── 10.4 Listar directorio ─────────────────────────────
+    echo "▶ 10.4 Listar directorio actual<br>";
+    $listado = Controlador::ejecutar_comando('comunicacion:listar', 'archivo', __DIR__);
+    echo "   Archivos: " . count($listado) . " elementos<br>";
+
+    // ─── 10.5 Eliminar archivo ──────────────────────────────
+    echo "▶ 10.5 Eliminar archivo de prueba<br>";
+    Controlador::ejecutar_comando('comunicacion:eliminar', 'archivo', $ruta);
+    echo "   ¿Existe aún?: " . (file_exists($ruta) ? 'sí (error)' : 'no (correcto)') . "<br>";
+
+    // ─── 10.6 Alias de archivo ──────────────────────────────
+    echo "▶ 10.6 Usar alias 'archivo:leer' y 'archivo:escribir'<br>";
+    // Corregido: pasar argumentos posicionales, no flags
+    Controlador::ejecutar_comando('archivo:escribir', 'Contenido desde alias', $ruta);
+    $leidoAlias = Controlador::ejecutar_comando('archivo:leer', $ruta);
+    echo "   Leído con alias: " . var_export($leidoAlias, true) . "<br>";
+   Controlador::ejecutar_comando('archivo:eliminar', $ruta);
+
+    // ─── 10.7 Ayuda de comandos de comunicación ─────────────
+    echo "▶ 10.7 Ayuda de comunicación:leer<br>";
+    Controlador::ejecutar_comando('comunicacion:leer', '--help');
+
+    // ─── 10.8 Verificar comandos de depuración actualizados ──
+    echo "▶ 10.8 Comandos de depuración con nueva salida<br>";
+   // NodoElectrico::limpiar_errores();
+    //NodoElectrico::limpiar_alertas();
+    NodoElectrico::_error("Error de prueba v1.3.3");
+    NodoElectrico::_alerta("Alerta de prueba v1.3.3");
+
+    echo "   Ejecutando depuracion:imprimir (debe verse el error y la alerta):<br>";
+    Controlador::ejecutar_comando('depuracion:imprimir');
+
+    echo "   Ejecutando depuracion:limpiar --errores:<br>";
+    Controlador::ejecutar_comando('depuracion:limpiar', '--errores');
+    echo "   Verificación (errores deberían estar vacíos):<br>";
+    Controlador::ejecutar_comando('depuracion:imprimir', '--errores');
+
+    echo "   Ejecutando depuracion:limpiar (limpiar todo):<br>";
+    Controlador::ejecutar_comando('depuracion:limpiar');
+    Controlador::ejecutar_comando('depuracion:imprimir');
+
+    echo "✅ Pruebas de la versión 1.3.3 completadas<br>";
 });
 ?>

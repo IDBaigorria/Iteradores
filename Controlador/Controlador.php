@@ -12,6 +12,8 @@ use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraString
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL;
 use Iteradores\Controlador\interfaces\Comandos;
 use Iteradores\Comandos\Comando;
+use Iteradores\Controlador\interfaces\Comunicadores;
+use Iteradores\Comunicadores\Comunicador;
 require_once(".\configuracion\Configuracion.php");
 include_once(".\Nucleo\Objeto.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructura.php");
@@ -21,6 +23,8 @@ require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringJSON.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringXML.php");
 require_once("interfaces\Comandos.php");
 require_once(".\Comandos\Comando.php");
+require_once("interfaces\Comunicadores.php");
+require_once(".\Comunicadores\Comunicador.php");
 require_once(".\Nodos\NodoElectrico.php");
 /**
  * Clase Controlador
@@ -36,7 +40,7 @@ require_once(".\Nodos\NodoElectrico.php");
  * @implements Comandos
  * @since V3.4.0
  */
-class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
+class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores {
 
     /** 
      * @var string Método de persistencia activo por defecto 
@@ -229,54 +233,6 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
 
         return true;
     }
-    /**
-     * Indica si el controlador ya ha sido inicializado.
-     *
-     * Esta bandera interna evita que el proceso de inicialización se
-     * ejecute más de una vez. Si es `true`, significa que las clases
-     * principales (como `Nodo` y las implementaciones de
-     * `PerdurarSuperestructura`) ya fueron registradas correctamente.
-     *
-     * @var bool
-     * @since V3.3.0
-     */
-    private static $inicializo=false;
-     /**
-     * Inicializa el controlador principal del sistema.
-     *
-     * Este método registra las clases necesarias para coordinar la
-     * comunicación entre los distintos componentes:
-     * 
-     * - Asocia la clase `Nodo` con el `Controlador`.
-     * - Registra las implementaciones concretas de la interfaz
-     *   `PerdurarSuperestructura` (por ejemplo, `SQL`, `JSON`, etc.).
-     *
-     * La inicialización solo se ejecuta una vez gracias al uso de la
-     * variable interna `$inicializo`. En llamadas posteriores, el método
-     * no realiza ninguna acción.
-     *
-     * @return void
-     * @since V3.3.0
-     */
-    public static function inicializar(){
-        if (!static::$inicializo){
-           echo "MAMAI!";
-            Nodo::registrar_controlador("Iteradores\Controlador\Controlador");
-            Controlador::registrar_implementacion("SQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL");
-            Controlador::registrar_implementacion("JSON", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringJSON");
-            Controlador::registrar_implementacion("XML", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringXML");
-            Controlador::registrar_implementacion("ESQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL");
-            Controlador::establecer_metodo("ESQL");
-            NodoElectrico::_fase(self::$token, "a");
-            // ──────────────────────────────────────────────
-            // Carga y registro de comandos (siempre)
-            // ──────────────────────────────────────────────
-            require_once (__DIR__."/../Comandos/index.php");
-            self::cargar_comandos_pendientes();
-
-            static::$inicializo = true;
-        }
-    }
 
     // ──────────────────────────────────────────────────────────
     // MÉTODO PARA PRUEBAS: ejecutarPrueba
@@ -405,6 +361,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
         self::$comandos[$nombre] = [
             'manejador' => $manejador,
             'reversa'   => $reversa,
+            'clase'     => null,
         ];
         return true;
     }
@@ -679,7 +636,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
         $registro = self::$comandos[$nombre];
         $clase = $registro['clase'] ?? null;
         $manejador = $registro['manejador'];
-
+       // echo "ee".$registro['clase'];
         // Detectar solicitud de ayuda (palabras reservadas)
         $ayuda_flags = Conf::PALABRAS_RESERVADAS_COMANDOS;
         foreach ($args as $arg) {
@@ -920,6 +877,476 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos {
 
         $reversa = array_pop(self::$historial);
         return $reversa();
+    }
+
+    // ══════════════════════════════════════════════════════
+    // INTERFAZ COMUNICADORES
+    // ══════════════════════════════════════════════════════
+
+    /**
+     * Mapa de comunicadores registrados.
+     *
+     * Estructura:
+     * [
+     *     'nombre_comunicador' => [
+     *         'instancia' => Comunicador,   // Instancia única del comunicador
+     *         'clase'     => string,        // Nombre cualificado de la clase
+     *     ],
+     *     ...
+     * ]
+     *
+     * @var array<string, array{instancia: Comunicador, clase: string}>
+     */
+    private static array $comunicadores = [];
+
+    /**
+     * Lista de comunicadores pendientes de registro.
+     *
+     * Se pobla mediante {@link encolar_comunicador()} durante la carga
+     * de archivos. Al finalizar la inicialización, {@link cargar_comunicadores_pendientes()}
+     * los procesa y registra.
+     *
+     * @var array<int, array{clase?: string, instancia?: Comunicador}>
+     */
+    private static array $registro_comunicadores_pendiente = [];
+
+    /**
+     * Registra un nuevo comunicador a partir de una clase que implementa
+     * la interfaz {@link \Iteradores\Comunicadores\Comunicador}.
+     *
+     * Instancia la clase, verifica que no exista ya otro comunicador con el
+     * mismo nombre y, si todo es correcto, lo almacena en el mapa interno.
+     * Solo se permite un comunicador por nombre.
+     *
+     * @param string $clase Nombre cualificado de la clase del comunicador.
+     *
+     * @return bool `true` si se registró correctamente,
+     *              `false` si la clase no es válida o ya existe un comunicador con ese nombre.
+     *
+     * @example
+     * Controlador::registrar_comunicador_desde_clase(ComunicadorHTTP::class);
+     *
+     * @since 1.3.3
+     */
+    public static function registrar_comunicador_desde_clase(string $clase): bool
+    {
+        if (!is_subclass_of($clase, Comunicador::class)) {
+            self::_error("La clase '$clase' no implementa la interfaz Comunicador.");
+            return false;
+        }
+
+        $instancia = new $clase();
+        return self::registrar_comunicador_desde_instancia($instancia);
+    }
+
+    /**
+     * Registra un nuevo comunicador a partir de una instancia que implementa
+     * la interfaz {@link \Iteradores\Comunicadores\Comunicador}.
+     *
+     * Si ya existe un comunicador con el mismo nombre, emite una alerta y
+     * sobrescribe la entrada anterior.
+     *
+     * @param Comunicador $comunicador Instancia del comunicador.
+     *
+     * @return bool `true` si se registró correctamente.
+     *
+     * @example
+     * Controlador::registrar_comunicador_desde_instancia(new ComunicadorHTTP());
+     *
+     * @since 1.3.3
+     */
+    public static function registrar_comunicador_desde_instancia(Comunicador $comunicador): bool
+    {
+        $nombre = $comunicador::nombre();
+        $clase = get_class($comunicador);
+
+        if (isset(self::$comunicadores[$nombre])) {
+            self::_alerta("El comunicador '$nombre' ya está registrado y será sobrescrito.");
+        }
+
+        self::$comunicadores[$nombre] = [
+            'instancia' => $comunicador,
+            'clase'     => $clase,
+        ];
+
+        return true;
+    }
+
+    /**
+     * Encola un comunicador para registro diferido o inmediato.
+     *
+     * Este método es invocado automáticamente por la línea de autoencolación
+     * al final de cada archivo de comunicador. Acepta tanto un string (nombre
+     * de clase) como una instancia de {@link \Iteradores\Comunicadores\Comunicador}.
+     *
+     * **Comportamiento según el estado del Controlador:**
+     * - Si el Controlador **ya está inicializado**, el comunicador se registra
+     *   de inmediato (útil para registro en caliente).
+     * - Si el Controlador **no está inicializado**, el comunicador se guarda en
+     *   una lista temporal y será registrado al llamar a
+     *   {@link cargar_comunicadores_pendientes()}.
+     *
+     * @param string|Comunicador $comunicador Clase o instancia.
+     *
+     * @return void
+     *
+     * @example
+     * // En el archivo del comunicador:
+     * Controlador::encolar_comunicador(ComunicadorHTTP::class);
+     *
+     * @since 1.3.3
+     */
+    public static function encolar_comunicador(string|Comunicador $comunicador): void
+    {
+        if (self::$inicializo) {
+            // Registro inmediato
+            if ($comunicador instanceof Comunicador) {
+                self::registrar_comunicador_desde_instancia($comunicador);
+            } else {
+                self::registrar_comunicador_desde_clase($comunicador);
+            }
+            return;
+        }
+
+        // Registro diferido
+        if ($comunicador instanceof Comunicador) {
+            self::$registro_comunicadores_pendiente[] = ['instancia' => $comunicador];
+        } else {
+            self::$registro_comunicadores_pendiente[] = ['clase' => $comunicador];
+        }
+    }
+
+    /**
+     * Procesa la lista de comunicadores autoencolados y los registra.
+     *
+     * Recorre la lista temporal de comunicadores pendientes y los registra
+     * uno por uno. Finalmente, vacía la lista.
+     *
+     * Este método es invocado al final de {@link inicializar()}, después de
+     * que todos los archivos de comunicadores han sido incluidos.
+     *
+     * @return int Número de comunicadores registrados exitosamente en esta llamada.
+     *
+     * @since 1.3.3
+     */
+    public static function cargar_comunicadores_pendientes(): int
+    {
+        $contador = 0;
+
+        foreach (self::$registro_comunicadores_pendiente as $entrada) {
+            $exito = false;
+
+            if (isset($entrada['instancia'])) {
+                $exito = self::registrar_comunicador_desde_instancia($entrada['instancia']);
+            } elseif (isset($entrada['clase'])) {
+                $exito = self::registrar_comunicador_desde_clase($entrada['clase']);
+            }
+
+            if ($exito) {
+                $contador++;
+            }
+        }
+
+        self::$registro_comunicadores_pendiente = [];
+        return $contador;
+    }
+
+    /**
+     * Obtiene la instancia única de un comunicador por su nombre.
+     *
+     * Si se invoca sin argumentos (o con el valor especial `'predeterminado'`),
+     * devuelve automáticamente el comunicador de salida estándar correspondiente
+     * al entorno actual:
+     * - En **consola** → {@link SalidaDepuracionConsola} (`salida_depuracion_consola`).
+     * - En **navegador** → {@link SalidaDepuracionHTML} (`salida_depuracion_html`).
+     *
+     * En cualquier otro caso, busca el comunicador en el mapa interno y verifica
+     * que el usuario actual tenga permiso para utilizarlo mediante
+     * {@link tiene_permiso_comunicador()}.
+     *
+     * Si el comunicador no existe o el usuario no tiene permiso, retorna `null`
+     * y registra un error.
+     *
+     * @param string $nombre Nombre del comunicador (ej. `'archivo'`, `'http'`).
+     *                       Si se omite o es `'predeterminado'`, se usa la salida
+     *                       estándar según el entorno.
+     *
+     * @return Comunicador|null La instancia del comunicador,
+     *                                                     o `null` si no está disponible.
+     *
+     * @example
+     * // Obtener la salida estándar (consola o HTML según Entorno)
+     * $salida = Controlador::comunicador();
+     * $salida->enviar('', 'Hola mundo');
+     *
+     * // Obtener un comunicador específico
+     * $http = Controlador::comunicador('http');
+     * if ($http) {
+     *     $http->enviar('https://api.example.com', $datos);
+     * }
+     *
+     * @see SalidaDepuracionHTML
+     * @see SalidaDepuracionConsola
+     * @since 1.3.3
+     */
+    public static function comunicador(string $nombre = 'predeterminado'): ?Comunicador
+    {
+        // Resolver nombre del comunicador de salida según entorno
+        if ($nombre === 'predeterminado') {
+            $nombre = Entorno::es_consola()
+                ? 'salida_depuracion_consola'
+                : 'salida_depuracion_html';
+        }
+
+        if (!isset(self::$comunicadores[$nombre])) {
+            self::_error("Comunicador desconocido: '$nombre'.");
+            return null;
+        }
+
+        if (!self::tiene_permiso_comunicador($nombre)) {
+            self::_error("Permiso denegado para el comunicador '$nombre'.");
+            return null;
+        }
+
+        return self::$comunicadores[$nombre]['instancia'];
+    }
+
+    /**
+     * Verifica si el usuario actual tiene permiso para usar el comunicador.
+     *
+     * **Placeholder:** actualmente retorna `true` para cualquier comunicador.
+     * En el futuro se integrará con un sistema de roles/permisos.
+     *
+     * @param string $nombre Nombre del comunicador.
+     *
+     * @return bool `true` si el usuario tiene permiso, `false` en caso contrario.
+     *
+     * @see comunicador()
+     * @since 1.3.3
+     */
+    public static function tiene_permiso_comunicador(string $nombre): bool
+    {
+        // TODO: implementar verificación real de permisos
+        return true;
+    }
+
+    /**
+     * Registra los comandos genéricos de comunicación.
+     *
+     * Se invoca durante {@link inicializar()} para que estén disponibles
+     * tanto para programadores como para el futuro sistema de aprendizaje.
+     *
+     * @return void
+     * @since 1.3.3
+     */
+    private static function registrar_comandos_comunicacion(): void
+    {
+        // ─── comunicación:leer ───────────────────────────────
+        self::registrar_comando('comunicacion:leer', function(string $token, array $args) {
+            $medio   = $args[0] ?? null;
+            $destino = $args[1] ?? '';
+            if (!$medio) {
+                self::_error("Falta el parámetro 'medio' para 'comunicacion:leer'.");
+                return null;
+            }
+            $comunicador = self::comunicador($medio);
+            if (!$comunicador) return null;
+            return $comunicador->solicitar($destino, null, ['accion' => 'leer']);
+        }, null, false);
+
+        // ─── comunicación:escribir ────────────────────────────
+        /**
+         * Comando: comunicacion:escribir
+         *
+         * Envía un mensaje a través del comunicador indicado.
+         *
+         * @param string $medio   Nombre del comunicador (ej. 'salida_depuracion_consola', 'archivo').
+         * @param string $mensaje Contenido a escribir.
+         * @param string $destino (Opcional) Destino del mensaje (ruta de archivo, URL, etc.).
+         *                        Por defecto es cadena vacía (salida estándar).
+         * @return bool `true` si se escribió correctamente.
+         */
+        self::registrar_comando('comunicacion:escribir', function(string $token, array $args) {
+            $medio   = $args[0] ?? null;
+            $mensaje = $args[1] ?? '';
+            $destino = $args[2] ?? '';   // predeterminado: cadena vacía
+            if (!$medio) {
+                self::_error("Falta el parámetro 'medio' para 'comunicacion:escribir'.");
+                return false;
+            }
+            $comunicador = self::comunicador($medio);
+            if (!$comunicador) return false;
+            $comunicador->enviar($destino, $mensaje);
+            return true;
+        }, null, false);
+
+        // ─── comunicación:preguntar ───────────────────────────
+        self::registrar_comando('comunicacion:preguntar', function(string $token, array $args) {
+            $medio   = $args[0] ?? 'salida_depuracion_consola';
+            $mensaje = $args[1] ?? '';
+            $comunicador = self::comunicador($medio);
+            if (!$comunicador) return null;
+            if ($medio === 'salida_depuracion_consola') {
+                echo $mensaje . ' ';
+                return trim(fgets(STDIN));
+            }
+            return $comunicador->solicitar('', $mensaje);
+        }, null, false);
+
+        // ─── comunicación:eliminar ────────────────────────────
+        self::registrar_comando('comunicacion:eliminar', function(string $token, array $args) {
+            $medio   = $args[0] ?? null;
+            $destino = $args[1] ?? '';
+            if (!$medio) {
+                self::_error("Falta el parámetro 'medio' para 'comunicacion:eliminar'.");
+                return false;
+            }
+            $comunicador = self::comunicador($medio);
+            if (!$comunicador) return false;
+            $comunicador->enviar($destino, null, ['accion' => 'eliminar']);
+            return true;
+        }, null, false);
+
+        // ─── comunicación:listar ──────────────────────────────
+        self::registrar_comando('comunicacion:listar', function(string $token, array $args) {
+            $medio   = $args[0] ?? null;
+            $destino = $args[1] ?? '.';
+            if (!$medio) {
+                self::_error("Falta el parámetro 'medio' para 'comunicacion:listar'.");
+                return null;
+            }
+            $comunicador = self::comunicador($medio);
+            if (!$comunicador) return null;
+            return $comunicador->solicitar($destino, null, ['accion' => 'listar']);
+        }, null, false);
+
+        // ─── comunicación:escuchar ─────────────────────────────
+        self::registrar_comando('comunicacion:escuchar', function(string $token, array $args) {
+            $medio = $args[0] ?? null;
+            if (!$medio) {
+                self::_error("Falta el parámetro 'medio' para 'comunicacion:escuchar'.");
+                return false;
+            }
+            $comunicador = self::comunicador($medio);
+            if (!$comunicador) return false;
+            $comunicador->escuchar(function($mensaje) use ($medio) {
+                $salida = self::comunicador();
+                $salida?->enviar('', "[$medio] Recibido: " . json_encode($mensaje));
+            });
+            return true;
+        }, null, false);
+
+        // Alias archivo:leer
+        self::registrar_comando('archivo:leer', function(string $token, array $args) {
+            $destino = $args[0] ?? '';
+            return self::ejecutar_comando('comunicacion:leer', 'archivo', $destino);
+        }, null, false);
+
+        // Alias archivo:escribir
+        self::registrar_comando('archivo:escribir', function(string $token, array $args) {
+            $destino = $args[0] ?? '';
+            $mensaje = $args[1] ?? '';
+            return self::ejecutar_comando('comunicacion:escribir', 'archivo', $destino, $mensaje);
+        }, null, false);
+
+        // Alias archivo:eliminar
+        self::registrar_comando('archivo:eliminar', function(string $token, array $args) {
+            $destino = $args[0] ?? '';
+            return self::ejecutar_comando('comunicacion:eliminar', 'archivo', $destino);
+        }, null, false);
+
+        // Alias archivo:listar
+        self::registrar_comando('archivo:listar', function(string $token, array $args) {
+            $destino = $args[0] ?? '.';
+            return self::ejecutar_comando('comunicacion:listar', 'archivo', $destino);
+        }, null, false);
+    }
+    /**
+     * Escribe un mensaje en la salida estándar configurada según el entorno.
+     *
+     * Obtiene el comunicador predeterminado ({@link SalidaDepuracionHTML}
+     * o {@link SalidaConsola}) y envía el mensaje a través de él.
+     *
+     * Es el equivalente a `echo` o `console.log`, pero adaptado al
+     * tipo de salida definido en {@link \Iteradores\Configuracion\Entorno}.
+     *
+     * @param string $mensaje Texto a escribir en la salida estándar.
+     *
+     * @return void
+     *
+     * @example
+     * Controlador::escribir_salida("Operación completada.");
+     *
+     * @since 1.3.3
+     */
+    public static function escribir_salida(string $mensaje): void
+    {
+        $salida = self::comunicador();   // devuelve el predeterminado
+        if ($salida !== null) {
+            $salida->enviar('', $mensaje);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // INICIALIZACION
+    // ══════════════════════════════════════════════════════
+    /**
+     * Indica si el controlador ya ha sido inicializado.
+     *
+     * Esta bandera interna evita que el proceso de inicialización se
+     * ejecute más de una vez. Si es `true`, significa que las clases
+     * principales (como `Nodo` y las implementaciones de
+     * `PerdurarSuperestructura`) ya fueron registradas correctamente.
+     *
+     * @var bool
+     * @since V3.3.0
+     */
+    private static $inicializo=false;
+     /**
+     * Inicializa el controlador principal del sistema.
+     *
+     * Este método registra las clases necesarias para coordinar la
+     * comunicación entre los distintos componentes:
+     * 
+     * - Asocia la clase `Nodo` con el `Controlador`.
+     * - Registra las implementaciones concretas de la interfaz
+     *   `PerdurarSuperestructura` (por ejemplo, `SQL`, `JSON`, etc.).
+     *
+     * La inicialización solo se ejecuta una vez gracias al uso de la
+     * variable interna `$inicializo`. En llamadas posteriores, el método
+     * no realiza ninguna acción.
+     *
+     * @return void
+     * @since V3.3.0
+     */
+    public static function inicializar(){
+        if (!static::$inicializo){
+           echo "MAMAI!";
+            Nodo::registrar_controlador("Iteradores\Controlador\Controlador");
+            Controlador::registrar_implementacion("SQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL");
+            Controlador::registrar_implementacion("JSON", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringJSON");
+            Controlador::registrar_implementacion("XML", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringXML");
+            Controlador::registrar_implementacion("ESQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL");
+            Controlador::establecer_metodo("ESQL");
+            NodoElectrico::_fase(self::$token, "a");
+            
+            // Cargar todos los archivos de comunicadores (ejecuta sus encolamientos)
+            require_once __DIR__ . '/../Comunicadores/index.php';
+
+            // Procesar y registrar los comunicadores autoencolados
+            self::cargar_comunicadores_pendientes();
+            
+            self::registrar_comandos_comunicacion();
+
+            // ──────────────────────────────────────────────
+            // Carga y registro de comandos (siempre)
+            // ──────────────────────────────────────────────
+            require_once (__DIR__."/../Comandos/index.php");
+            self::cargar_comandos_pendientes();
+
+
+            static::$inicializo = true;
+        }
     }
 
 }
