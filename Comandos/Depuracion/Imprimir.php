@@ -2,10 +2,13 @@
 namespace Iteradores\Comandos\Depuracion;
 
 use Iteradores\Comandos\Comando;
-use Iteradores\Controlador\Controlador;
+use Iteradores\Controlador\RegistroGlobal;
 use Iteradores\Configuracion\Entorno;
 use Iteradores\Nucleo\Objeto;
+//require_once(__DIR__."\..\Comando.php");
+//require_once(__DIR__."\..\..\Controlador\RegistroGlobal.php");
 
+echo "mmmmmmmmmmmm";
 /**
  * Comando que imprime errores, alertas y la superestructura.
  *
@@ -14,7 +17,7 @@ use Iteradores\Nucleo\Objeto;
  *
  * @package Iteradores\Comandos\Depuracion
  * @since 1.3.1
- * @version 1.3.3
+ * @version 1.3.4
  */
 class Imprimir implements Comando
 {
@@ -65,7 +68,10 @@ class Imprimir implements Comando
     public function ejecutar(string $token, array $args): bool
     {
         if (!Entorno::permite_pruebas()) {
-            Controlador::escribir_salida("Solo disponible en desarrollo/pruebas.");
+            $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("Solo disponible en desarrollo/pruebas.");
+            }
             return false;
         }
 
@@ -79,7 +85,10 @@ class Imprimir implements Comando
             Objeto::imprimir_alertas();
         }
         if ($mostrar_todo || $banderas['super']) {
-            Controlador::imprimir_superestructura();
+            $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::imprimir_superestructura();
+            }
         }
         return true;
     }
@@ -90,4 +99,4 @@ class Imprimir implements Comando
 // ═══════════════════════════════════════════════════════════
 // AUTOENCOLACIÓN: No debe faltar esta línea
 // ═══════════════════════════════════════════════════════════
-Controlador::encolar_comando(Imprimir::class);
+RegistroGlobal::encolar_comando(Imprimir::class);

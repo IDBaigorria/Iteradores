@@ -12,10 +12,10 @@
  *
  * @package Iteradores\Comunicadores
  * @since 1.3.3
- * @version 1.3.3
+ * @version 1.3.4
  */
 
-
+require_once __DIR__.'/Comunicador.php';
 require_once __DIR__.'/Archivo.php';
 require_once __DIR__.'/SalidaDepuracionHTML.php';
 require_once __DIR__.'/SalidaDepuracionConsola.php';

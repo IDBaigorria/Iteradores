@@ -2,9 +2,12 @@
 namespace Iteradores\Comandos\Depuracion;
 
 use Iteradores\Comandos\Comando;
-use Iteradores\Controlador\Controlador;
+use Iteradores\Controlador\RegistroGlobal;
 use Iteradores\Configuracion\Entorno;
 use Iteradores\Nucleo\Objeto;
+//require_once(__DIR__."\..\Comando.php");
+//require_once(__DIR__."\..\..\Controlador\RegistroGlobal.php");
+
 
 /**
  * Comando que activa o desactiva la recolección de errores y alertas.
@@ -18,7 +21,7 @@ use Iteradores\Nucleo\Objeto;
  *
  * @package Iteradores\Comandos\Depuracion
  * @since 1.3.1
- * @version 1.3.3
+ * @version 1.3.4
  */
 class Recoleccion implements Comando
 {
@@ -70,7 +73,10 @@ class Recoleccion implements Comando
     public function ejecutar(string $token, array $args): bool
     {
         if (!Entorno::permite_pruebas()) {
-            Controlador::escribir_salida("El comando 'depuracion:recoleccion' solo está disponible en desarrollo o pruebas.");
+            $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("El comando 'depuracion:recoleccion' solo está disponible en desarrollo o pruebas.");
+                }
             return false;
         }
 
@@ -83,23 +89,38 @@ class Recoleccion implements Comando
         if ($accion === 'activar') {
             if ($afectar_errores) {
                 Objeto::activar_errores();
-                Controlador::escribir_salida("Recolección de errores activada.");
+                $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("Recolección de errores activada.");
+                }
             }
             if ($afectar_alertas) {
                 Objeto::activar_alertas();
-                Controlador::escribir_salida("Recolección de alertas activada.");
+                $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("Recolección de alertas activada.");
+                }
             }
         } elseif ($accion === 'desactivar') {
             if ($afectar_errores) {
                 Objeto::desactivar_errores();
-                Controlador::escribir_salida("Recolección de errores desactivada.");
+                $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("Recolección de errores desactivada.");
+                }
             }
             if ($afectar_alertas) {
                 Objeto::desactivar_alertas();
-                Controlador::escribir_salida("Recolección de alertas desactivada.");
+                $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("Recolección de alertas desactivada.");
+                }
             }
         } else {
-            Controlador::escribir_salida("Acción no reconocida: '$accion'. Use 'activar' o 'desactivar'.");
+            $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("Acción no reconocida: '$accion'. Use 'activar' o 'desactivar'.");
+                }
             return false;
         }
 
@@ -112,4 +133,4 @@ class Recoleccion implements Comando
 // ═══════════════════════════════════════════════════════════
 // AUTOENCOLACIÓN
 // ═══════════════════════════════════════════════════════════
-Controlador::encolar_comando(Recoleccion::class);
+RegistroGlobal::encolar_comando(Recoleccion::class);

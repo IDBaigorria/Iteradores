@@ -32,22 +32,6 @@ interface Comunicadores
      */
     public static function registrar_comunicador_desde_instancia(Comunicador $comunicador): bool;
 
-    /**
-     * Encola un comunicador para registro diferido o inmediato.
-     *
-     * Acepta tanto un string (nombre de clase) como una instancia de {@link Comunicador}.
-     *
-     * @param string|Comunicador $comunicador Clase o instancia.
-     * @return void
-     */
-    public static function encolar_comunicador(string|Comunicador $comunicador): void;
-
-    /**
-     * Procesa la lista de comunicadores pendientes y los registra.
-     *
-     * @return int Número de comunicadores registrados exitosamente.
-     */
-    public static function cargar_comunicadores_pendientes(): int;
 
     /**
      * Obtiene la instancia única de un comunicador por su nombre.

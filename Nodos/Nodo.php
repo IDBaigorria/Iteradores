@@ -14,15 +14,15 @@ use Iteradores\Nodos\Interfaces\Adyacentes;
 use Iteradores\Nodos\Interfaces\Incidentes;
 //include_once("Objeto V1.3.180822.php");
 //namespace MyApp;
-include_once(".\Nucleo\Objeto.php");
-//include_once(".\Nodos\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL.php");
+/*include_once(".\Nucleo\Objeto.php");
+//include_once(".\Nodos\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL.php");*/
 include_once(".\Nodos\Interfaces\FabricaDeNodos.php");
 include_once(".\Nodos\Interfaces\Datos.php");
 include_once(".\Nodos\Interfaces\Adyacentes.php");
 include_once(".\Nodos\Interfaces\Incidentes.php");
 include_once(".\Nodos\Interfaces\AccesoASuperestructura.php");
 include_once(".\Nodos\Interfaces\AccesoAEspeciales.php");
-include_once(".\miscelaneas\generarUUID.php");
+//include_once(".\miscelaneas\generarUUID.php");*/
 /**
  * Clase: Nodo
  *

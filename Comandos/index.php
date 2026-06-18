@@ -12,9 +12,10 @@
  *
  * @package Iteradores\Comandos
  * @since 1.3.1
- * @version 1.3.2
+ * @version 1.3.4
  */
-
+//interfaz
+require_once __DIR__.'/Comando.php';
 // Comandos de depuración
 require_once __DIR__.'/Depuracion/imprimir.php';
 require_once __DIR__.'/Depuracion/limpiar.php';

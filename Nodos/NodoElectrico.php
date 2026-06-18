@@ -13,7 +13,7 @@ use Iteradores\Nodos\Interfaces\Peso;
 use Iteradores\Nodos\Interfaces\AdyacenteConPeso;
 use Iteradores\Nodos\Nodo;
 
-include_once ('Nodo.php');
+/*include_once ('Nodo.php');*/
 include_once ('Interfaces/IncidentesDobleVia.php');
 include_once ('Interfaces/FabricaDeNodosElectricos.php');
 include_once ('Interfaces/Energia.php');

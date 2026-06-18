@@ -7,12 +7,12 @@
 // ⏳ = pendiente / incompleto
 // ❌ = no implementado
 // ============================================================
-require_once "Nodos/NodoElectrico.php";
+/*require_once "Nodos/NodoElectrico.php";
 require_once "Nodos/Nodo.php";
 require_once "Controlador/Controlador.php";
 require_once "Configuracion/Entorno.php";
 require_once "Configuracion/Configuracion.php";
-require_once "Comandos/Comando.php";
+require_once "Comandos/Comando.php";*/
 
 use Iteradores\Nodos\NodoElectrico;
 use Iteradores\Nodos\Nodo;
@@ -325,6 +325,8 @@ echo "\n🔹 Comunicadores y comandos de comunicación v1.3.3<br>";
 Controlador::ejecutar_prueba(function($token) {
     echo "▶ 10.0 var_dump salida_depuracion_consola<br>";
     var_dump(Controlador::comunicador('salida_depuracion_consola'));
+    NodoElectrico::imprimir_alertas();
+    Nodo::imprimir_errores();
     // ─── 10.1 Escribir en salida estándar ────────────────────
     echo "<br>▶ 10.1 Escribir en salida estándar mediante Controlador::escribir_salida()<br>";
     Controlador::escribir_salida("   Mensaje de prueba desde escribir_salida (debe verse en el formato adecuado)");

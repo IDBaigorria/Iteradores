@@ -1,8 +1,15 @@
 <?php
+// ═══════════════════════════════════════════════════════════
+// PLANTILLA DE COMANDO ESTÁTICO — v1.3.4
+// ═══════════════════════════════════════════════════════════
+// Úsela como base para crear un nuevo comando que residirá en
+// su propio archivo dentro de una categoría (p. ej. Depuracion,
+// Prueba, etc.). La clase debe implementar la interfaz Comando
+// y finalizar con la autoencolación en RegistroGlobal.
 namespace Iteradores\Comandos\[Categoria];
 
 use Iteradores\Comandos\Comando;
-use Iteradores\Controlador\Controlador;
+use Iteradores\Controlador\RegistroGlobal;   
 use Iteradores\Configuracion\Entorno;
 use Iteradores\Configuracion\Conf;
 use Iteradores\Nucleo\Objeto;
@@ -155,12 +162,19 @@ class [Nombre] implements Comando
 
         // ─── Ejemplo de guarda de entorno ──────────────────────
         if (!Entorno::permite_pruebas()) {
-            echo "El comando '" . static::nombre() . "' solo está disponible en desarrollo o pruebas.\n";
+            $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("El comando '" . static::nombre() . "' solo está disponible en desarrollo o pruebas.");
+            }
             return false;
         }
 
-        // ─── Ejemplo de uso de token para operaciones protegidas ─
-        // Controlador::imprimir_superestructura($token);
+        // ─── Acceso a servicios del Controlador a través de RegistroGlobal ─
+        // $controlador = RegistroGlobal::controlador();
+        // if ($controlador) {
+        //     $controlador::imprimir_superestructura();
+        //     $controlador::escribir_salida("Mensaje de salida");
+        // }
 
         // ─── Ejemplo de uso de Objeto para diagnóstico ─────────
         // Objeto::imprimir_errores();
@@ -193,6 +207,19 @@ class [Nombre] implements Comando
 }
 
 // ═══════════════════════════════════════════════════════════
-// AUTOENCOLACIÓN: No debe faltar esta línea
+// OBSERVACIONES FINALES
 // ═══════════════════════════════════════════════════════════
-\Iteradores\Controlador\Controlador::encolar_comando([Nombre]::class);
+// 1. Registre este archivo en el índice de comandos para que
+//    la autoencolación se ejecute. En Comandos/index.php añada:
+//    include_once("Depuracion/NombreDelComando.php");
+// 2. Si el comando necesita usar servicios del Controlador
+//    (escribir_salida, imprimir_superestructura, etc.), hágalo
+//    a través de RegistroGlobal:
+//    $controlador = RegistroGlobal::controlador();
+//    if ($controlador) {
+//        $controlador::escribir_salida("mensaje");
+//    }
+// 3. La autoencolación de abajo garantiza que el comando esté
+//    disponible incluso si el Controlador se inicializa después.
+// ═══════════════════════════════════════════════════════════
+RegistroGlobal::encolar_comando([Nombre]::class);

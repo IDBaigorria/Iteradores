@@ -3,7 +3,7 @@ namespace Iteradores\Configuracion;
 
 use Iteradores\Nucleo\Objeto;
 
-include_once(".\Nucleo\Objeto.php");
+//include_once(".\Nucleo\Objeto.php");
 
 /**
  * Gestión del entorno de ejecución.
@@ -17,11 +17,11 @@ include_once(".\Nucleo\Objeto.php");
  * que necesiten adaptar su comportamiento al entorno actual.
  *
  * @author Ignacio David Baigorria
- * @version 1.0.1
+ * @version 1.2.6
  * @since 1.2.6
  * @package Iteradores\Configuracion
  */
-class Entorno
+class Entorno extends Objeto
 {
     // ──────────────────────────────────────────────
     // Constantes de modo de ejecución

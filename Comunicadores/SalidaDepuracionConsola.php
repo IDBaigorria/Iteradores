@@ -3,6 +3,7 @@ namespace Iteradores\Comunicadores;
 
 use Iteradores\Comandos\Comando;
 use Iteradores\Controlador\Controlador;
+use Iteradores\Controlador\RegistroGlobal;
 use Iteradores\Configuracion\Entorno;
 use Iteradores\Nucleo\Objeto;
 
@@ -107,4 +108,4 @@ class SalidaDepuracionConsola implements Comunicador
 // ═══════════════════════════════════════════════════════════
 // AUTOENCOLACIÓN
 // ═══════════════════════════════════════════════════════════
-Controlador::encolar_comunicador(SalidaDepuracionConsola::class);
+RegistroGlobal::encolar_comunicador(SalidaDepuracionConsola::class);

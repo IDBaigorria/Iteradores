@@ -1,14 +1,15 @@
 <?php
 // ═══════════════════════════════════════════════════════════
-// PLANTILLA DE COMANDO DINÁMICO (CLASE ANÓNIMA) — v1.3.2
+// PLANTILLA DE COMANDO DINÁMICO (CLASE ANÓNIMA) — v1.3.4
 // ═══════════════════════════════════════════════════════════
 // Úsela cuando necesite crear un comando en tiempo de ejecución
 // sin definir una clase en un archivo aparte.
 // La clase anónima implementa la interfaz Comando y se registra
-// inmediatamente (o se encola si el Controlador aún no está inicializado).
+// a través de RegistroGlobal, que decidirá si puede registrarlo
+// de inmediato o debe encolarlo para el próximo procesamiento.
 
 use Iteradores\Comandos\Comando;
-use Iteradores\Controlador\Controlador;
+use Iteradores\Controlador\RegistroGlobal;
 
 $comando = new class implements Comando {
     public static function nombre(): string
@@ -47,7 +48,10 @@ $comando = new class implements Comando {
         // $opciones = $args['opciones'];
         // $posicionales = $args['posicionales'];
 
-        echo "Ejecutando comando dinámico\n";
+        $controlador = RegistroGlobal::controlador();
+        if ($controlador) {
+            $controlador::escribir_salida("Ejecutando comando dinámico\n");
+        }
         return true;
     }
 
@@ -57,11 +61,24 @@ $comando = new class implements Comando {
     }
 };
 
-// Opción A: registro inmediato (si el Controlador ya está inicializado)
-Controlador::registrar_comando_desde_instancia($comando);
+// ─── REGISTRO AUTOMÁTICO ─────────────────────────────────
+// RegistroGlobal decidirá la vía adecuada:
+// - Si el Controlador ya está inicializado, lo registra inmediatamente.
+// - Si no, lo encola para que se registre cuando el Controlador se inicie.
+$controlador = RegistroGlobal::controlador();
+if ($controlador) {
+    // El Controlador ya existe: registrar directamente
+    $controlador::registrar_comando_desde_instancia($comando);
+} else {
+    // El Controlador aún no está listo: encolar para registro diferido
+    RegistroGlobal::encolar_comando($comando);
+}
 
-// Opción B: registro diferido/inmediato automático (recomendado)
-// Controlador::encolar_comando($comando);
+// Alternativa: siempre encolar (útil si se prefiere un único mecanismo)
+// RegistroGlobal::encolar_comando($comando);
 
-// Ahora puede ejecutarse
-// Controlador::ejecutar_comando('dinamico:accion', '--bandera1');
+// Ahora puede ejecutarse (si el Controlador está inicializado)
+// $controlador = RegistroGlobal::controlador();
+// if ($controlador) {
+//     $controlador::ejecutar_comando('dinamico:accion', '--bandera1');
+// }

@@ -1,6 +1,11 @@
 <?php
 namespace Iteradores\Comunicadores;
 
+use Iteradores\Comandos\Comando;
+use Iteradores\Controlador\RegistroGlobal;
+//require_once(".\Controlador\RegistroGlobal.php");
+//require_once(".\Comunicador.php");
+
 /**
  * Comunicador para el sistema de archivos local.
  *
@@ -9,7 +14,7 @@ namespace Iteradores\Comunicadores;
  * específicos de archivos que también pueden invocarse mediante comandos.
  *
  * @package Iteradores\Comunicadores
- * @since 1.3.3
+ * @since 1.3.4
  */
 class Archivo implements Comunicador
 {
@@ -91,4 +96,4 @@ class Archivo implements Comunicador
 // ═══════════════════════════════════════════════════════════
 // AUTOENCOLACIÓN
 // ═══════════════════════════════════════════════════════════
-\Iteradores\Controlador\Controlador::encolar_comunicador(Archivo::class);
+RegistroGlobal::encolar_comunicador(Archivo::class);

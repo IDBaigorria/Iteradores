@@ -1,27 +1,35 @@
 <?php
 // ═══════════════════════════════════════════════════════════
-// PLANTILLA DE COMANDO DINÁMICO (INSTANCIA EXISTENTE) — v1.3.2
+// PLANTILLA DE COMANDO DINÁMICO (INSTANCIA EXISTENTE) — v1.3.4
 // ═══════════════════════════════════════════════════════════
 // Úsela cuando reciba una instancia que ya implementa la interfaz
 // Comando (por ejemplo, generada desde un nodo o recuperada de
 // un almacenamiento) y desee registrarla en el sistema.
 
 use Iteradores\Comandos\Comando;
-use Iteradores\Controlador\Controlador;
+use Iteradores\Controlador\RegistroGlobal;
 
 /** @var Comando $comandoExistente */
 $comandoExistente = obtenerComandoDeAlgunaFuente(); // ejemplo
 
 if ($comandoExistente instanceof Comando) {
-    // Opción A: registro inmediato
-    Controlador::registrar_comando_desde_instancia($comandoExistente);
+    // ─── Obtener el Controlador desde RegistroGlobal ─────────
+    $controlador = RegistroGlobal::controlador();
 
-    // Opción B: encolar (recomendado si hay posibilidad de que
-    // el Controlador aún no esté inicializado)
-    // Controlador::encolar_comando($comandoExistente);
+    if ($controlador) {
+        // Opción A: registro inmediato (recomendada si el Controlador ya está inicializado)
+        $controlador::registrar_comando_desde_instancia($comandoExistente);
 
-    // Ejecutar (los argumentos se parsean automáticamente)
-    // Controlador::ejecutar_comando($comandoExistente::nombre(), '--bandera1');
+        // Ejecutar (los argumentos se parsean automáticamente)
+        // $controlador::ejecutar_comando($comandoExistente::nombre(), '--bandera1');
+    } else {
+        // Opción B: el Controlador aún no está listo.
+        // Puede encolar la clase (no la instancia) para registro diferido,
+        // pero perderá el estado particular de esta instancia.
+        // Solo recomendado si el comando no depende de propiedades de la instancia.
+        RegistroGlobal::encolar_comando($comandoExistente);
+        echo "Controlador no inicializado. Se ha encolado la clase del comando (sin estado).\n";
+    }
 } else {
     echo "La instancia no implementa la interfaz Comando.\n";
 }

@@ -2,10 +2,11 @@
 namespace Iteradores\Comandos\Depuracion;
 
 use Iteradores\Comandos\Comando;
-use Iteradores\Controlador\Controlador;
+use Iteradores\Controlador\RegistroGlobal;
 use Iteradores\Configuracion\Entorno;
 use Iteradores\Nucleo\Objeto;
-
+//require_once(__DIR__."\..\Comando.php");
+//require_once(__DIR__."\..\..\Controlador\RegistroGlobal.php");
 /**
  * Comando que limpia las pilas de errores y alertas acumuladas.
  *
@@ -17,7 +18,7 @@ use Iteradores\Nucleo\Objeto;
  *
  * @package Iteradores\Comandos\Depuracion
  * @since 1.3.1
- * @version 1.3.3
+ * @version 1.3.4
  */
 class Limpiar implements Comando
 {
@@ -69,7 +70,10 @@ class Limpiar implements Comando
     public function ejecutar(string $token, array $args): bool
     {
         if (!Entorno::permite_pruebas()) {
-            Controlador::escribir_salida("El comando 'depuracion:limpiar' solo está disponible en desarrollo o pruebas.");
+            $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("El comando 'depuracion:limpiar' solo está disponible en desarrollo o pruebas.");
+                }
             return false;
         }
 
@@ -79,11 +83,17 @@ class Limpiar implements Comando
 
         if ($limpiar_errores) {
             Objeto::limpiar_errores();
-            Controlador::escribir_salida("Pila de errores limpiada.");
+            $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("Pila de errores limpiada.");
+            }
         }
         if ($limpiar_alertas) {
             Objeto::limpiar_alertas();
-            Controlador::escribir_salida("Pila de alertas limpiada.");
+            $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("Pila de alertas limpiada.");
+            }
         }
 
         return true;
@@ -95,4 +105,4 @@ class Limpiar implements Comando
 // ═══════════════════════════════════════════════════════════
 // AUTOENCOLACIÓN
 // ═══════════════════════════════════════════════════════════
-Controlador::encolar_comando(Limpiar::class);
+RegistroGlobal::encolar_comando(Limpiar::class);

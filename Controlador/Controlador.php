@@ -14,18 +14,22 @@ use Iteradores\Controlador\interfaces\Comandos;
 use Iteradores\Comandos\Comando;
 use Iteradores\Controlador\interfaces\Comunicadores;
 use Iteradores\Comunicadores\Comunicador;
-require_once(".\configuracion\Configuracion.php");
-include_once(".\Nucleo\Objeto.php");
+use Iteradores\Controlador\RegistroGlobal;
+/*require_once(".\configuracion\Configuracion.php");
+include_once(".\Nucleo\Objeto.php");*/
 require_once("PerdurarSuperestructura\PerdurarSuperestructura.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringSQL.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringJSON.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringXML.php");
+/*
+require_once(".\Comandos\Comando.php");*/
 require_once("interfaces\Comandos.php");
-require_once(".\Comandos\Comando.php");
 require_once("interfaces\Comunicadores.php");
-require_once(".\Comunicadores\Comunicador.php");
+/*require_once(".\Comunicadores\Comunicador.php");
 require_once(".\Nodos\NodoElectrico.php");
+require_once("RegistroGlobal.php");*/
+
 /**
  * Clase Controlador
  * 
@@ -38,6 +42,7 @@ require_once(".\Nodos\NodoElectrico.php");
  *
  * @implements PerdurarSuperestructura
  * @implements Comandos
+ * @implements Comunicadores
  * @since V3.4.0
  */
 class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores {
@@ -72,12 +77,10 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      * @return void
      */
     public static function registrar_implementacion(string $nombre, string $clase): void {
-       // echo "coasee ".$clase;
         echo "IIII".static::$token;
         static::$implementaciones[strtoupper($nombre)] = $clase;
         // Si ya existe el token, lo transmite a la clase registrada
         if (static::$token && class_exists($clase) && method_exists($clase, 'recibir_token')) {
-          // echo "AAAAAAAAAAAAAAAA ";
             $clase::recibir_token(static::$token, "por_cada_nodo_ejecutar");
         }
     }
@@ -127,7 +130,6 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
 			static::_error("el nombre no es un string");
 			return null;
 		}
-       // echo "claseActual".static::$claseActual;
         $clase = static::$claseActual;
         if (!static::$claseActual){
             static::_alerta("salio por aca.");
@@ -150,7 +152,6 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
 
     /** @return bool */
     public static function guardar($nombre): bool {
-       // echo "nombre: ".$nombre;
         return (bool) static::delegar('guardar', $nombre);
     }
 
@@ -250,43 +251,14 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      * o NodoElectrico::por_cada_nodo_ejecutar().
      *
      * ⚠️ **ADVERTENCIA**: Este método no debe estar disponible en producción.
-     * Se recomienda envolver su definición condicionalmente:
-     * ```php
-     * if (defined('ENV') && ENV === 'development') {
-     *     public static function ejecutarPrueba(callable $callback) { ... }
-     * }
-     * ```
-     *
-     * 🔗 Métodos relacionados que requieren token:
-     * - {@link Iteradores\Nodos\NodoElectrico::_fase()}
-     * - {@link Iteradores\Nodos\NodoElectrico::por_cada_nodo_ejecutar()}
-     * - {@link Iteradores\Nodos\NodoElectrico::por_cada_fase_ejecutar()}
-     *
-     * ---
-     * @example
-     * ```php
-     * // Ejemplo de uso en test.php
-     * Controlador::ejecutarPrueba(function($token) {
-     *     NodoElectrico::_fase($token, 'fase_test');
-     *     NodoElectrico::por_cada_fase_ejecutar($token, function($fase) {
-     *         echo "Fase: $fase\n";
-     *     });
-     * });
-     * ```
      *
      * @param callable $callback Función que recibirá el token como único parámetro.
-     *                           La función debe respetar la firma: `function(string $token): void`.
      * @return void
-     * 
-     * @note Este método solo debe ser usado en entornos de prueba/desarrollo.
-     *       En producción, se recomienda eliminarlo o deshabilitarlo.
      * @since 0.0.1
-     * @access public
      * @static
      */
     public static function ejecutar_prueba(callable $callback)
     {
-        // En entorno de desarrollo, se ejecuta; en producción, se podría lanzar una excepción
         if (!Entorno::permite_pruebas()) {
             self::_error('ejecutar_prueba() no está disponible en entorno de producción');
             return;
@@ -312,33 +284,14 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     /** @var array<callable> Pila de reversiones para deshacer. */
     private static array $historial = [];
 
-    /** @var array<string, array{clase?: string, instancia?: Comando}> Lista de comandos pendientes de registro. */
-    private static array $registro_pendiente = [];
-
     /**
      * Registra un nuevo comando en el sistema.
      *
-     * El registro se permite en todos los entornos de forma predeterminada.
-     * Si se establece `$solo_desarrollo = true`, el comando solo se registrará
-     * en modo desarrollo, evitando exponer herramientas de depuración en producción.
-     *
-     * Si el comando ya existía, se sobrescribe y se emite una alerta.
-     *
-     * @param string        $nombre          Nombre único del comando (ej. 'depuracion:imprimir').
+     * @param string        $nombre          Nombre único del comando.
      * @param callable      $manejador       Función que ejecuta el comando.
      * @param callable|null $reversa         Función opcional para deshacer el comando.
      * @param bool          $solo_desarrollo Si `true`, el comando no se registra en producción.
-     *
      * @return bool `true` si se registró correctamente, `false` si fue bloqueado por el entorno.
-     *
-     * @example
-     * Controlador::registrar_comando('depuracion:imprimir', function($token) {
-     *     if (!Entorno::permite_pruebas()) { ... }
-     *     Objeto::imprimir_errores();
-     * }, null, true);
-     *
-     * @see ejecutar_comando()
-     * @see deshacer_ultimo()
      * @since 1.3.1
      */
     public static function registrar_comando(
@@ -369,30 +322,16 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     /**
      * Registra un comando a partir de una instancia que implementa {@link Comando}.
      *
-     * Extrae los metadatos (nombre, reversa, desarrollo) de la instancia,
-     * construye los callables necesarios y los registra internamente.
-     *
-     * Además, valida que los nombres de los parámetros definidos por el comando
-     * no colisionen con las {@link \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS
-     * palabras reservadas}. Si se detecta una colisión, el registro se rechaza
-     * y se emite un error.
-     *
      * @param Comando $comando Instancia del comando.
      * @return bool
-     *
      * @since 1.3.1
-     * @version 1.3.2
+     * @version 1.3.4
      */
     public static function registrar_comando_desde_instancia(Comando $comando): bool
     {
         $nombre = $comando::nombre();
         $solo_desarrollo = $comando::solo_desarrollo();
         $clase = get_class($comando);
-
-        // Verificar palabras reservadas
-        if (!self::validar_parametros_reservados($clase)) {
-            return false;
-        }
 
         $manejador = function(string $token, $args) use ($comando) {
             return $comando->ejecutar($token, $args);
@@ -406,7 +345,6 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             };
         }
 
-        // Guardar también la clase para el parseo
         self::$comandos[$nombre] = [
             'manejador' => $manejador,
             'reversa'   => $reversa,
@@ -419,18 +357,10 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     /**
      * Registra un comando a partir de una clase que implementa {@link Comando}.
      *
-     * Instancia la clase y delega en {@link registrar_comando_desde_instancia()}.
-     * 
-     * Además, valida que los nombres de los parámetros definidos por el comando
-     * no colisionen con las {@link \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS
-     * palabras reservadas}. Si se detecta una colisión, el registro se rechaza
-     * y se emite un error.
-     *
      * @param string $clase Nombre cualificado de la clase.
      * @return bool
-     *
      * @since 1.3.1
-     * @version 1.3.2
+     * @version 1.3.4
      */
     public static function registrar_comando_desde_clase(string $clase): bool
     {
@@ -439,93 +369,8 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             return false;
         }
 
-        // Verificar palabras reservadas
-        if (!self::validar_parametros_reservados($clase)) {
-            return false;
-        }
-
         $instancia = new $clase();
         return self::registrar_comando_desde_instancia($instancia);
-    }
-
-    /**
-     * Verifica que los parámetros del comando no usen palabras reservadas.
-     *
-     * @param string $clase Nombre de la clase comando.
-     * @return bool
-     */
-    private static function validar_parametros_reservados(string $clase): bool
-    {
-        if (!method_exists($clase, 'parametros')) {
-            return true;
-        }
-
-        $reservadas = Conf::PALABRAS_RESERVADAS_COMANDOS;
-        $parametros = $clase::parametros();
-        foreach ($parametros as $param) {
-            if (in_array($param['nombre'], $reservadas, true)) {
-                self::_error(
-                    "El comando '{$clase::nombre()}' usa una palabra reservada como parámetro: '{$param['nombre']}'."
-                );
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Encola un comando para registro diferido o inmediato.
-     *
-     * Acepta tanto un string (nombre de clase) como una instancia de {@link Comando}.
-     * Si el Controlador ya está inicializado, el comando se registra de inmediato;
-     * en caso contrario, se almacena en la lista de registro pendiente.
-     *
-     * @param string|Comando $comando Clase o instancia.
-     * @return void
-     *
-     * @since 1.3.1
-     */
-    public static function encolar_comando(string|Comando $comando): void
-    {
-        if (self::$inicializo) {
-            if ($comando instanceof Comando) {
-                self::registrar_comando_desde_instancia($comando);
-            } else {
-                self::registrar_comando_desde_clase($comando);
-            }
-            return;
-        }
-
-        if ($comando instanceof Comando) {
-            self::$registro_pendiente[] = ['instancia' => $comando];
-        } else {
-            self::$registro_pendiente[] = ['clase' => $comando];
-        }
-    }
-
-    /**
-     * Procesa la lista de comandos autoencolados y los registra.
-     *
-     * @return int Número de comandos registrados exitosamente.
-     *
-     * @since 1.3.1
-     */
-    public static function cargar_comandos_pendientes(): int
-    {
-        $contador = 0;
-        foreach (self::$registro_pendiente as $entrada) {
-            if (isset($entrada['instancia'])) {
-                if (self::registrar_comando_desde_instancia($entrada['instancia'])) {
-                    $contador++;
-                }
-            } elseif (isset($entrada['clase'])) {
-                if (self::registrar_comando_desde_clase($entrada['clase'])) {
-                    $contador++;
-                }
-            }
-        }
-        self::$registro_pendiente = [];
-        return $contador;
     }
 
     /**
@@ -533,8 +378,8 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      *
      * Este método es el punto central de ejecución del sistema de comandos.
      * Se encarga de localizar el manejador asociado al comando, verificar
-     * permisos, parsear y validar argumentos, mostrar ayuda cuando se solicita
-     * y, finalmente, invocar la lógica del comando.
+     * permisos, parsear los argumentos cuando es posible y, finalmente,
+     * invocar la lógica del comando.
      *
      * **Flujo de ejecución detallado:**
      *
@@ -547,60 +392,28 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      *    registra un error y retorna `null`. Por ahora, {@link tiene_permiso()}
      *    es un placeholder que retorna `true`.
      *
-     * 3. **Detección de solicitud de ayuda:** Examina cada argumento en
-     *    busca de las palabras reservadas definidas en
-     *    {@link \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS}
-     *    (`man`, `help`, `h`). Si encuentra alguna, invoca
-     *    {@link mostrar_ayuda()} con la clase del comando y retorna `true`
-     *    sin ejecutar el comando.
-     *
-     * 4. **Parseo y validación de argumentos:** Si el comando tiene una clase
+     * 3. **Parseo de argumentos (opcional):** Si el comando tiene una clase
      *    asociada y ésta implementa el método {@link Comando::parametros()},
      *    se obtiene la definición de parámetros y se invoca
      *    {@link parsear_y_validar_args()} para convertir los argumentos
-     *    crudos en una estructura normalizada. Si hay errores de validación
-     *    (flags/opciones desconocidas, parámetros obligatorios faltantes),
-     *    se registran con {@link _error()}, se muestra la ayuda y se retorna
-     *    `null`.
+     *    crudos en una estructura normalizada.
+     *    Si no hay definición de parámetros, los argumentos se pasan
+     *    directamente al manejador como un array crudo.
      *
-     * 5. **Ejecución del manejador:** Invoca el manejador del comando con el
-     *    token de seguridad interno y los argumentos parseados (o crudos, si
-     *    no hay definición de parámetros).
+     * 4. **Ejecución del manejador:** Invoca el manejador del comando con el
+     *    token de seguridad interno y los argumentos (parseados o crudos).
      *
-     * 6. **Registro de reversa:** Si el comando tiene definida una función de
+     * 5. **Registro de reversa:** Si el comando tiene definida una función de
      *    reversa (proporcionada durante el registro), la almacena en la pila
      *    de historial para que pueda ser deshecha posteriormente con
      *    {@link deshacer_ultimo()}.
      *
-     * **Solicitudes de ayuda:**
-     * Las palabras reservadas (`--man`, `--help`, `-h`) están centralizadas
-     * en {@link \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS}.
-     * Al detectar cualquiera de ellas, el sistema muestra automáticamente
-     * la ayuda generada a partir de {@link Comando::descripcion()},
-     * {@link Comando::parametros()} y {@link Comando::ejemplos()}, adaptando
-     * el formato al entorno (consola o HTML). La ejecución del comando **no**
-     * se realiza.
-     *
-     * **Validación de argumentos:**
-     * Si el comando define parámetros, el método {@link parsear_y_validar_args()}
-     * compara cada argumento recibido contra la definición. Los argumentos
-     * que no coinciden con ningún parámetro declarado se registran como error
-     * y provocan la visualización de la ayuda.
-     *
-     * ⚠️ **Importante para desarrolladores de comandos:**
-     * No utilice ninguna de las palabras reservadas como nombre de un
-     * parámetro en {@link Comando::parametros()}. El sistema rechazará el
-     * registro de comandos que infrinjan esta regla mediante
-     * {@link registrar_comando_desde_instancia()} o
-     * {@link registrar_comando_desde_clase()}.
-     *
      * @param string $nombre Nombre del comando (ej. 'depuracion:imprimir').
-     * @param mixed  ...$args Argumentos para el manejador (crudos, serán parseados).
+     * @param mixed  ...$args Argumentos para el manejador (crudos, serán parseados si hay definición).
      *
      * @return mixed El resultado devuelto por el manejador del comando, o
      *               `null` si el comando no existe, no hay permiso o los
-     *               argumentos son inválidos. Retorna `true` si se mostró
-     *               la ayuda.
+     *               argumentos son inválidos.
      *
      * @example
      * // Ejecución básica
@@ -608,18 +421,13 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      *
      * // Con argumentos
      * Controlador::ejecutar_comando('depuracion:imprimir', '--errores');
-     *
-     * // Solicitar ayuda
-     * Controlador::ejecutar_comando('depuracion:imprimir', '--man');
+     * Controlador::ejecutar_comando('comunicacion:escribir', 'archivo', '/ruta', 'contenido');
      *
      * @see registrar_comando()
      * @see tiene_permiso()
      * @see deshacer_ultimo()
-     * @see mostrar_ayuda()
-     * @see parsear_y_validar_args()
-     * @see \Iteradores\Configuracion\Conf::PALABRAS_RESERVADAS_COMANDOS
      * @since 1.3.1
-     * @version 1.3.2
+     * @version 1.3.4
      */
     public static function ejecutar_comando(string $nombre, ...$args)
     {
@@ -636,31 +444,15 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
         $registro = self::$comandos[$nombre];
         $clase = $registro['clase'] ?? null;
         $manejador = $registro['manejador'];
-       // echo "ee".$registro['clase'];
-        // Detectar solicitud de ayuda (palabras reservadas)
-        $ayuda_flags = Conf::PALABRAS_RESERVADAS_COMANDOS;
-        foreach ($args as $arg) {
-            $sin_guiones = ltrim((string)$arg, '-');
-            if (in_array($sin_guiones, $ayuda_flags, true)) {
-                if ($clase !== null) {
-                    self::mostrar_ayuda($clase);
-                } else {
-                    echo "Comando '$nombre' (sin ayuda disponible).\n";
-                }
-                return true;
-            }
-        }
 
-        // Parsear y validar argumentos solo si el comando tiene definición
+        // Parsear argumentos solo si el comando tiene definición
         if ($clase && method_exists($clase, 'parametros')) {
             $definicion = $clase::parametros();
             $args_parseados = self::parsear_y_validar_args($definicion, $args, $clase);
             if ($args_parseados === null) {
-                // Los errores ya se registraron y la ayuda se mostró
                 return null;
             }
         } else {
-            // Sin definición de parámetros: pasar los argumentos tal cual
             $args_parseados = $args;
         }
 
@@ -677,20 +469,21 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
 
         return $resultado;
     }
+
     /**
      * Valida los argumentos crudos contra la definición de parámetros del comando.
      *
-     * Si se encuentran errores de validación, los registra con {@link _error()}
-     * y muestra la ayuda del comando.
+     * Si se encuentran errores de validación, los registra con {@link _error()}.
      *
      * @param array  $definicion Definición de parámetros del comando.
      * @param array  $args       Argumentos crudos.
-     * @param string $clase      Nombre de la clase del comando (para mostrar ayuda).
+     * @param string $clase      Nombre de la clase del comando.
      *
      * @return array|null Estructura con 'posicionales', 'banderas' y 'opciones',
      *                    o `null` si hay errores.
      *
      * @since 1.3.2
+     * @version 1.3.4 (eliminada la llamada a mostrar_ayuda)
      */
     private static function parsear_y_validar_args(array $definicion, array $args, string $clase): ?array
     {
@@ -747,7 +540,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
         }
 
         // Validar parámetros según la definición
-        $pos_def = 0; // índice para los posicionales en la definición
+        $pos_def = 0;
         foreach ($definicion as $param) {
             $nombre = $param['nombre'];
             $tipo = $param['tipo'];
@@ -755,18 +548,15 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             $valores_permitidos = $param['valores'] ?? null;
 
             if ($tipo === 'posicional') {
-                // ¿Está presente?
                 if ($obligatorio && !isset($posicionales[$pos_def])) {
                     $errores[] = "Falta el argumento posicional '{$nombre}' (obligatorio). Valores permitidos: ". implode(', ', $valores_permitidos) . ".";
                 } elseif (isset($posicionales[$pos_def]) && $valores_permitidos !== null) {
-                    // Validar valor permitido
                     if (!in_array($posicionales[$pos_def], $valores_permitidos, true)) {
                         $errores[] = "Valor inválido para '{$nombre}': '{$posicionales[$pos_def]}'. Valores permitidos: " . implode(', ', $valores_permitidos) . ".";
                     }
                 }
                 $pos_def++;
             } elseif ($tipo === 'opcion' && $valores_permitidos !== null && isset($opciones[$nombre])) {
-                // Validar valor de opción
                 if (!in_array($opciones[$nombre], $valores_permitidos, true)) {
                     $errores[] = "Valor inválido para '--{$nombre}': '{$opciones[$nombre]}'. Valores permitidos: " . implode(', ', $valores_permitidos) . ".";
                 }
@@ -777,7 +567,6 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             foreach ($errores as $error) {
                 self::_error($error);
             }
-            self::mostrar_ayuda($clase);
             return null;
         }
 
@@ -786,61 +575,6 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             'banderas'     => $banderas,
             'opciones'     => $opciones,
         ];
-    }
-
-    /**
-     * Muestra la ayuda de un comando en el formato adecuado según el entorno.
-     *
-     * La ayuda se genera dinámicamente consultando los métodos
-     * {@link Comando::descripcion()}, {@link Comando::parametros()} y
-     * {@link Comando::ejemplos()} de la clase del comando. Si alguno de estos
-     * métodos no está definido, se omite la sección correspondiente.
-     *
-     * @param string $clase Nombre cualificado de la clase comando.
-     *
-     * @return void
-     *
-     * @since 1.3.2
-     */
-    private static function mostrar_ayuda(string $clase): void
-    {
-        $nombre = $clase::nombre();
-        $ayuda = "Comando: $nombre\n";
-
-        // Descripción (opcional)
-        if (method_exists($clase, 'descripcion')) {
-            $ayuda .= $clase::descripcion() . "\n";
-        }
-
-        // Parámetros (opcionales)
-        if (method_exists($clase, 'parametros')) {
-            $parametros = $clase::parametros();
-            if (!empty($parametros)) {
-                $ayuda .= "\nParámetros:\n";
-                foreach ($parametros as $p) {
-                    $obligatorio = !empty($p['obligatorio']) ? ' (obligatorio)' : '';
-                    $ayuda .= "  --{$p['nombre']} [{$p['tipo']}]$obligatorio: {$p['descripcion']}\n";
-                }
-            }
-        }
-
-        // Ejemplos (opcionales)
-        if (method_exists($clase, 'ejemplos')) {
-            $ejemplos = $clase::ejemplos();
-            if (!empty($ejemplos)) {
-                $ayuda .= "\nEjemplos:\n";
-                foreach ($ejemplos as $ej) {
-                    $ayuda .= "  $ej\n";
-                }
-            }
-        }
-
-        // Salida según entorno
-        if (Entorno::es_consola()) {
-            echo $ayuda;
-        } else {
-            echo '<pre>' . htmlspecialchars($ayuda) . '</pre>';
-        }
     }
 
     /**
@@ -886,46 +620,15 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     /**
      * Mapa de comunicadores registrados.
      *
-     * Estructura:
-     * [
-     *     'nombre_comunicador' => [
-     *         'instancia' => Comunicador,   // Instancia única del comunicador
-     *         'clase'     => string,        // Nombre cualificado de la clase
-     *     ],
-     *     ...
-     * ]
-     *
      * @var array<string, array{instancia: Comunicador, clase: string}>
      */
     private static array $comunicadores = [];
 
     /**
-     * Lista de comunicadores pendientes de registro.
-     *
-     * Se pobla mediante {@link encolar_comunicador()} durante la carga
-     * de archivos. Al finalizar la inicialización, {@link cargar_comunicadores_pendientes()}
-     * los procesa y registra.
-     *
-     * @var array<int, array{clase?: string, instancia?: Comunicador}>
-     */
-    private static array $registro_comunicadores_pendiente = [];
-
-    /**
-     * Registra un nuevo comunicador a partir de una clase que implementa
-     * la interfaz {@link \Iteradores\Comunicadores\Comunicador}.
-     *
-     * Instancia la clase, verifica que no exista ya otro comunicador con el
-     * mismo nombre y, si todo es correcto, lo almacena en el mapa interno.
-     * Solo se permite un comunicador por nombre.
+     * Registra un nuevo comunicador a partir de una clase que implementa la interfaz Comunicador.
      *
      * @param string $clase Nombre cualificado de la clase del comunicador.
-     *
-     * @return bool `true` si se registró correctamente,
-     *              `false` si la clase no es válida o ya existe un comunicador con ese nombre.
-     *
-     * @example
-     * Controlador::registrar_comunicador_desde_clase(ComunicadorHTTP::class);
-     *
+     * @return bool `true` si se registró correctamente.
      * @since 1.3.3
      */
     public static function registrar_comunicador_desde_clase(string $clase): bool
@@ -940,19 +643,10 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     }
 
     /**
-     * Registra un nuevo comunicador a partir de una instancia que implementa
-     * la interfaz {@link \Iteradores\Comunicadores\Comunicador}.
-     *
-     * Si ya existe un comunicador con el mismo nombre, emite una alerta y
-     * sobrescribe la entrada anterior.
+     * Registra un nuevo comunicador a partir de una instancia.
      *
      * @param Comunicador $comunicador Instancia del comunicador.
-     *
      * @return bool `true` si se registró correctamente.
-     *
-     * @example
-     * Controlador::registrar_comunicador_desde_instancia(new ComunicadorHTTP());
-     *
      * @since 1.3.3
      */
     public static function registrar_comunicador_desde_instancia(Comunicador $comunicador): bool
@@ -973,125 +667,20 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     }
 
     /**
-     * Encola un comunicador para registro diferido o inmediato.
-     *
-     * Este método es invocado automáticamente por la línea de autoencolación
-     * al final de cada archivo de comunicador. Acepta tanto un string (nombre
-     * de clase) como una instancia de {@link \Iteradores\Comunicadores\Comunicador}.
-     *
-     * **Comportamiento según el estado del Controlador:**
-     * - Si el Controlador **ya está inicializado**, el comunicador se registra
-     *   de inmediato (útil para registro en caliente).
-     * - Si el Controlador **no está inicializado**, el comunicador se guarda en
-     *   una lista temporal y será registrado al llamar a
-     *   {@link cargar_comunicadores_pendientes()}.
-     *
-     * @param string|Comunicador $comunicador Clase o instancia.
-     *
-     * @return void
-     *
-     * @example
-     * // En el archivo del comunicador:
-     * Controlador::encolar_comunicador(ComunicadorHTTP::class);
-     *
-     * @since 1.3.3
-     */
-    public static function encolar_comunicador(string|Comunicador $comunicador): void
-    {
-        if (self::$inicializo) {
-            // Registro inmediato
-            if ($comunicador instanceof Comunicador) {
-                self::registrar_comunicador_desde_instancia($comunicador);
-            } else {
-                self::registrar_comunicador_desde_clase($comunicador);
-            }
-            return;
-        }
-
-        // Registro diferido
-        if ($comunicador instanceof Comunicador) {
-            self::$registro_comunicadores_pendiente[] = ['instancia' => $comunicador];
-        } else {
-            self::$registro_comunicadores_pendiente[] = ['clase' => $comunicador];
-        }
-    }
-
-    /**
-     * Procesa la lista de comunicadores autoencolados y los registra.
-     *
-     * Recorre la lista temporal de comunicadores pendientes y los registra
-     * uno por uno. Finalmente, vacía la lista.
-     *
-     * Este método es invocado al final de {@link inicializar()}, después de
-     * que todos los archivos de comunicadores han sido incluidos.
-     *
-     * @return int Número de comunicadores registrados exitosamente en esta llamada.
-     *
-     * @since 1.3.3
-     */
-    public static function cargar_comunicadores_pendientes(): int
-    {
-        $contador = 0;
-
-        foreach (self::$registro_comunicadores_pendiente as $entrada) {
-            $exito = false;
-
-            if (isset($entrada['instancia'])) {
-                $exito = self::registrar_comunicador_desde_instancia($entrada['instancia']);
-            } elseif (isset($entrada['clase'])) {
-                $exito = self::registrar_comunicador_desde_clase($entrada['clase']);
-            }
-
-            if ($exito) {
-                $contador++;
-            }
-        }
-
-        self::$registro_comunicadores_pendiente = [];
-        return $contador;
-    }
-
-    /**
      * Obtiene la instancia única de un comunicador por su nombre.
      *
      * Si se invoca sin argumentos (o con el valor especial `'predeterminado'`),
      * devuelve automáticamente el comunicador de salida estándar correspondiente
      * al entorno actual:
-     * - En **consola** → {@link SalidaDepuracionConsola} (`salida_depuracion_consola`).
-     * - En **navegador** → {@link SalidaDepuracionHTML} (`salida_depuracion_html`).
+     * - En **consola** → `salida_depuracion_consola`
+     * - En **navegador** → `salida_depuracion_html`
      *
-     * En cualquier otro caso, busca el comunicador en el mapa interno y verifica
-     * que el usuario actual tenga permiso para utilizarlo mediante
-     * {@link tiene_permiso_comunicador()}.
-     *
-     * Si el comunicador no existe o el usuario no tiene permiso, retorna `null`
-     * y registra un error.
-     *
-     * @param string $nombre Nombre del comunicador (ej. `'archivo'`, `'http'`).
-     *                       Si se omite o es `'predeterminado'`, se usa la salida
-     *                       estándar según el entorno.
-     *
-     * @return Comunicador|null La instancia del comunicador,
-     *                                                     o `null` si no está disponible.
-     *
-     * @example
-     * // Obtener la salida estándar (consola o HTML según Entorno)
-     * $salida = Controlador::comunicador();
-     * $salida->enviar('', 'Hola mundo');
-     *
-     * // Obtener un comunicador específico
-     * $http = Controlador::comunicador('http');
-     * if ($http) {
-     *     $http->enviar('https://api.example.com', $datos);
-     * }
-     *
-     * @see SalidaDepuracionHTML
-     * @see SalidaDepuracionConsola
+     * @param string $nombre Nombre del comunicador.
+     * @return Comunicador|null La instancia del comunicador, o `null` si no está disponible.
      * @since 1.3.3
      */
     public static function comunicador(string $nombre = 'predeterminado'): ?Comunicador
     {
-        // Resolver nombre del comunicador de salida según entorno
         if ($nombre === 'predeterminado') {
             $nombre = Entorno::es_consola()
                 ? 'salida_depuracion_consola'
@@ -1114,30 +703,21 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     /**
      * Verifica si el usuario actual tiene permiso para usar el comunicador.
      *
-     * **Placeholder:** actualmente retorna `true` para cualquier comunicador.
-     * En el futuro se integrará con un sistema de roles/permisos.
-     *
      * @param string $nombre Nombre del comunicador.
-     *
-     * @return bool `true` si el usuario tiene permiso, `false` en caso contrario.
-     *
-     * @see comunicador()
+     * @return bool
      * @since 1.3.3
      */
     public static function tiene_permiso_comunicador(string $nombre): bool
     {
-        // TODO: implementar verificación real de permisos
         return true;
     }
 
     /**
      * Registra los comandos genéricos de comunicación.
      *
-     * Se invoca durante {@link inicializar()} para que estén disponibles
-     * tanto para programadores como para el futuro sistema de aprendizaje.
-     *
      * @return void
      * @since 1.3.3
+     * @version 1.3.4 (eliminados alias de archivo)
      */
     private static function registrar_comandos_comunicacion(): void
     {
@@ -1160,16 +740,16 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
          *
          * Envía un mensaje a través del comunicador indicado.
          *
-         * @param string $medio   Nombre del comunicador (ej. 'salida_depuracion_consola', 'archivo').
+         * @param string $medio   Nombre del comunicador.
          * @param string $mensaje Contenido a escribir.
-         * @param string $destino (Opcional) Destino del mensaje (ruta de archivo, URL, etc.).
+         * @param string $destino (Opcional) Destino del mensaje.
          *                        Por defecto es cadena vacía (salida estándar).
          * @return bool `true` si se escribió correctamente.
          */
         self::registrar_comando('comunicacion:escribir', function(string $token, array $args) {
             $medio   = $args[0] ?? null;
             $mensaje = $args[1] ?? '';
-            $destino = $args[2] ?? '';   // predeterminado: cadena vacía
+            $destino = $args[2] ?? '';
             if (!$medio) {
                 self::_error("Falta el parámetro 'medio' para 'comunicacion:escribir'.");
                 return false;
@@ -1235,53 +815,20 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             });
             return true;
         }, null, false);
-
-        // Alias archivo:leer
-        self::registrar_comando('archivo:leer', function(string $token, array $args) {
-            $destino = $args[0] ?? '';
-            return self::ejecutar_comando('comunicacion:leer', 'archivo', $destino);
-        }, null, false);
-
-        // Alias archivo:escribir
-        self::registrar_comando('archivo:escribir', function(string $token, array $args) {
-            $destino = $args[0] ?? '';
-            $mensaje = $args[1] ?? '';
-            return self::ejecutar_comando('comunicacion:escribir', 'archivo', $destino, $mensaje);
-        }, null, false);
-
-        // Alias archivo:eliminar
-        self::registrar_comando('archivo:eliminar', function(string $token, array $args) {
-            $destino = $args[0] ?? '';
-            return self::ejecutar_comando('comunicacion:eliminar', 'archivo', $destino);
-        }, null, false);
-
-        // Alias archivo:listar
-        self::registrar_comando('archivo:listar', function(string $token, array $args) {
-            $destino = $args[0] ?? '.';
-            return self::ejecutar_comando('comunicacion:listar', 'archivo', $destino);
-        }, null, false);
     }
+
     /**
      * Escribe un mensaje en la salida estándar configurada según el entorno.
      *
-     * Obtiene el comunicador predeterminado ({@link SalidaDepuracionHTML}
-     * o {@link SalidaConsola}) y envía el mensaje a través de él.
-     *
-     * Es el equivalente a `echo` o `console.log`, pero adaptado al
-     * tipo de salida definido en {@link \Iteradores\Configuracion\Entorno}.
+     * Obtiene el comunicador predeterminado y envía el mensaje a través de él.
      *
      * @param string $mensaje Texto a escribir en la salida estándar.
-     *
      * @return void
-     *
-     * @example
-     * Controlador::escribir_salida("Operación completada.");
-     *
      * @since 1.3.3
      */
     public static function escribir_salida(string $mensaje): void
     {
-        $salida = self::comunicador();   // devuelve el predeterminado
+        $salida = self::comunicador();
         if ($salida !== null) {
             $salida->enviar('', $mensaje);
         }
@@ -1290,65 +837,59 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     // ══════════════════════════════════════════════════════
     // INICIALIZACION
     // ══════════════════════════════════════════════════════
+
+    /** @var bool Indica si el controlador ya ha sido inicializado. */
+    private static $inicializo = false;
+
     /**
-     * Indica si el controlador ya ha sido inicializado.
-     *
-     * Esta bandera interna evita que el proceso de inicialización se
-     * ejecute más de una vez. Si es `true`, significa que las clases
-     * principales (como `Nodo` y las implementaciones de
-     * `PerdurarSuperestructura`) ya fueron registradas correctamente.
-     *
-     * @var bool
-     * @since V3.3.0
-     */
-    private static $inicializo=false;
-     /**
      * Inicializa el controlador principal del sistema.
      *
-     * Este método registra las clases necesarias para coordinar la
-     * comunicación entre los distintos componentes:
-     * 
-     * - Asocia la clase `Nodo` con el `Controlador`.
-     * - Registra las implementaciones concretas de la interfaz
-     *   `PerdurarSuperestructura` (por ejemplo, `SQL`, `JSON`, etc.).
-     *
-     * La inicialización solo se ejecuta una vez gracias al uso de la
-     * variable interna `$inicializo`. En llamadas posteriores, el método
-     * no realiza ninguna acción.
+     * Procesa los comandos y comunicadores pendientes desde {@link RegistroGlobal}
+     * y registra los comandos de comunicación.
      *
      * @return void
      * @since V3.3.0
+     * @version 1.3.4 (migrado a RegistroGlobal)
      */
-    public static function inicializar(){
-        if (!static::$inicializo){
-           echo "MAMAI!";
+    public static function inicializar(): void
+    {
+        if (!static::$inicializo) {
+            // ─── Registro del controlador ante Nodo ────────────
             Nodo::registrar_controlador("Iteradores\Controlador\Controlador");
+
+            // ─── Implementaciones de persistencia ──────────────
             Controlador::registrar_implementacion("SQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL");
             Controlador::registrar_implementacion("JSON", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringJSON");
             Controlador::registrar_implementacion("XML", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringXML");
             Controlador::registrar_implementacion("ESQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL");
             Controlador::establecer_metodo("ESQL");
+
             NodoElectrico::_fase(self::$token, "a");
-            
-            // Cargar todos los archivos de comunicadores (ejecuta sus encolamientos)
-            require_once __DIR__ . '/../Comunicadores/index.php';
 
-            // Procesar y registrar los comunicadores autoencolados
-            self::cargar_comunicadores_pendientes();
-            
+            // ─── Procesar comandos pendientes ──────────────────
+            foreach (RegistroGlobal::$comandos_pendientes as $entrada) {
+                if (isset($entrada['clase'])) {
+                    self::registrar_comando_desde_clase($entrada['clase']);
+                } elseif (isset($entrada['nombre'])) {
+                    self::registrar_comando($entrada['nombre'], $entrada['manejador']);
+                }
+            }
+
+            // ─── Procesar comunicadores pendientes ─────────────
+            foreach (RegistroGlobal::$comunicadores_pendientes as $entrada) {
+                self::registrar_comunicador_desde_clase($entrada['clase']);
+            }
+
+            // ─── Limpiar pendientes e inyectar Controlador ─────
+            RegistroGlobal::limpiar();
+            RegistroGlobal::_controlador(self::class);
+
+            // ─── Comandos genéricos de comunicación ────────────
             self::registrar_comandos_comunicacion();
-
-            // ──────────────────────────────────────────────
-            // Carga y registro de comandos (siempre)
-            // ──────────────────────────────────────────────
-            require_once (__DIR__."/../Comandos/index.php");
-            self::cargar_comandos_pendientes();
-
 
             static::$inicializo = true;
         }
     }
-
 }
 
 Controlador::inicializar();

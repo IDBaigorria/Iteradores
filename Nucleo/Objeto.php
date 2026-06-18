@@ -4,10 +4,9 @@ use Iteradores\Configuracion\Conf;
 use Iteradores\Configuracion\Entorno;
 use Iteradores\Nucleo\Interfaces\Id;
 use Iteradores\Nucleo\Interfaces\ErroresYAlertas;
-session_start();
-header("Cache-control: no-cache, must-revalidate");
-require_once(".\configuracion\Configuracion.php");
-require_once(".\configuracion\Entorno.php");
+
+/*require_once(".\configuracion\Configuracion.php");
+require_once(".\configuracion\Entorno.php");*/
 require_once(".\Nucleo\Interfaces\Id.php");
 require_once(".\Nucleo\Interfaces\ErroresYAlertas.php");
 /**

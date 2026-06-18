@@ -1,10 +1,12 @@
 <?php
-namespace Iteradores\Comandos\Prueba;
+namespace Iteradores\Comandos\Depuracion;
 
 use Iteradores\Comandos\Comando;
 use Iteradores\Controlador\Controlador;
+use Iteradores\Controlador\RegistroGlobal;
+use Iteradores\Configuracion\Entorno;
+use Iteradores\Nucleo\Objeto;
 use Iteradores\Nodos\NodoElectrico;
-
 /**
  * Comando de prueba que crea un nodo eléctrico y permite deshacer la creación.
  *
@@ -18,7 +20,7 @@ use Iteradores\Nodos\NodoElectrico;
  */
 class CrearNodo implements Comando
 {
-    private int $nodo_creado_id = 0;   // ← inicialización por defecto
+    private string $nodo_creado_id = "";   // ← inicialización por defecto
 
     public static function nombre(): string { return 'prueba:crear_nodo'; }
     public static function solo_desarrollo(): bool { return false; }
@@ -88,4 +90,4 @@ class CrearNodo implements Comando
     }
 }
 
-Controlador::encolar_comando(CrearNodo::class);
+RegistroGlobal::encolar_comando(CrearNodo::class);

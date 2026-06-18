@@ -1,0 +1,165 @@
+<?php
+// ═══════════════════════════════════════════════════════════
+// PLANTILLA DE COMUNICADOR ESTÁTICO — v1.3.4
+// ═══════════════════════════════════════════════════════════
+// Úsela como base para crear un nuevo comunicador que residirá
+// en su propio archivo dentro de la carpeta Comunicadores.
+// La clase debe implementar la interfaz Comunicador y finalizar
+// con la autoencolación en RegistroGlobal.
+
+namespace Iteradores\Comunicadores;
+
+use Iteradores\Comunicadores\Comunicador;
+use Iteradores\Controlador\RegistroGlobal;
+
+/**
+ * [Descripción breve del comunicador].
+ *
+ * [Explicación detallada de su propósito, protocolo que utiliza,
+ * si necesita credenciales, etc.]
+ *
+ * **Entorno:** disponible en todos los entornos (o indicar solo desarrollo).
+ *
+ * @package Iteradores\Comunicadores
+ * @since [versión]
+ * @version [Versión]
+ */
+class [Nombre] implements Comunicador
+{
+    /**
+     * Nombre único del comunicador (ej. 'http', 'archivo', 'salida_estandar').
+     *
+     * @return string
+     */
+    public static function nombre(): string
+    {
+        return 'nombre_unico';
+    }
+
+    /**
+     * Indica si el comunicador solo debe estar disponible en desarrollo.
+     *
+     * @return bool
+     */
+    public static function solo_desarrollo(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Breve descripción del comunicador (para ayuda o documentación).
+     *
+     * @return string
+     */
+    public static function descripcion(): string
+    {
+        return 'Descripción corta del comunicador.';
+    }
+
+    /**
+     * Envía datos al destino especificado.
+     *
+     * @param string $destino   Destino del mensaje (URL, ruta, canal…).
+     * @param mixed  $mensaje   Datos a enviar.
+     * @param array  $opciones  Opciones adicionales (headers, timeout…).
+     * @return void
+     */
+    public function enviar(string $destino, mixed $mensaje = null, array $opciones = []): void
+    {
+        // TODO: Implementar el envío
+        // Ejemplo:
+        // file_put_contents($destino, (string)$mensaje);
+    }
+
+    /**
+     * Envía datos y espera una respuesta.
+     *
+     * @param string $destino   Destino del mensaje.
+     * @param mixed  $mensaje   Datos a enviar.
+     * @param array  $opciones  Opciones adicionales.
+     * @return mixed            Respuesta recibida.
+     */
+    public function solicitar(string $destino, mixed $mensaje = null, array $opciones = []): mixed
+    {
+        // TODO: Implementar la solicitud y devolver la respuesta
+        // Ejemplo:
+        // if (!file_exists($destino)) return null;
+        // return file_get_contents($destino);
+        return null;
+    }
+
+    /**
+     * Escucha eventos o mensajes entrantes (modo suscripción).
+     *
+     * @param callable $callback Función que se ejecutará al recibir un mensaje.
+     * @return void
+     */
+    public function escuchar(callable $callback): void
+    {
+        // Si no aplica, dejar vacío (o lanzar una excepción controlada)
+    }
+
+    /**
+     * Cierra los recursos del comunicador (conexiones, sockets…).
+     *
+     * @return void
+     */
+    public function cerrar(): void
+    {
+        // Liberar recursos si es necesario
+    }
+
+    /**
+     * Devuelve el estado actual del comunicador.
+     *
+     * @return string (ej. 'conectado', 'cerrado', 'activo')
+     */
+    public function estado(): string
+    {
+        // TODO: Devolver el estado real
+        return 'activo';
+    }
+
+    /**
+     * Configura la autenticación del comunicador.
+     *
+     * Se invoca automáticamente antes de cada envío o solicitud.
+     * Modifica el array de opciones por referencia.
+     *
+     * @param array &$opciones
+     * @return void
+     */
+    public function autenticar(array &$opciones): void
+    {
+        // Si no requiere autenticación, dejar vacío
+        // Ejemplo: añadir un header de autorización
+        // $opciones['headers']['Authorization'] = 'Bearer ' . $this->token;
+    }
+
+    /**
+     * Establece credenciales u otros parámetros de autenticación.
+     *
+     * @param array $credenciales Datos necesarios para autenticarse.
+     * @return void
+     */
+    public function establecer_credenciales(array $credenciales): void
+    {
+        // Almacenar credenciales para usar en autenticar()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// OBSERVACIONES FINALES
+// ═══════════════════════════════════════════════════════════
+// 1. Registre este archivo en el índice de comunicadores para
+//    que la autoencolación se ejecute. En Comunicadores/index.php
+//    añada:
+//    include_once("NombreDelComunicador.php");
+// 2. Los comunicadores no deberían necesitar acceder al
+//    Controlador, pero si es imprescindible, puede obtenerlo
+//    mediante RegistroGlobal::controlador().
+// 3. La autoencolación de abajo garantiza que el comunicador
+//    esté disponible incluso si el Controlador se inicializa
+//    después.
+// ═══════════════════════════════════════════════════════════
+RegistroGlobal::encolar_comunicador([Nombre]::class);
