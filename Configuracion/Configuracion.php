@@ -249,7 +249,93 @@ class Conf {
         'ansi_fondo' => '44',   // azul
         'ansi_texto' => '34',
     ];
+    // ═══════════════════════════════════════════════════════════
+    // RELOJ ASTRONÓMICO
+    // ═══════════════════════════════════════════════════════════
 
+    /**
+     * Peso del vector solar en la combinación final del Reloj Astronómico.
+     *
+     * Determina la influencia relativa del Sol frente a la Luna en el vector
+     * gravitacional resultante. Un valor mayor da más peso al ciclo día/noche.
+     *
+     * @var float
+     * @see \Iteradores\Tiempo\RelojAstronomico
+     * @since 1.3.5
+     */
+    public const RELOJ_ALFA_SOL = 0.7;
+
+    /**
+     * Peso del vector lunar en la combinación final del Reloj Astronómico.
+     *
+     * @var float
+     * @since 1.3.5
+     */
+    public const RELOJ_BETA_LUNA = 0.3;
+
+    /**
+     * Inclinación de la eclíptica respecto al ecuador celeste, en grados.
+     *
+     * @var float
+     * @since 1.3.5
+     */
+    public const RELOJ_INCLINACION_ECLIPTICA = 23.5;
+
+    /**
+     * Inclinación de la órbita lunar respecto a la eclíptica, en grados.
+     *
+     * @var float
+     * @since 1.3.5
+     */
+    public const RELOJ_INCLINACION_LUNAR = 5.15;
+
+    /**
+     * Período de precesión del nodo ascendente lunar, en años.
+     *
+     * @var float
+     * @since 1.3.5
+     */
+    public const RELOJ_PERIODO_PRECESION_NODAL = 18.6;
+
+    /**
+     * Radio medio de la Tierra en metros (reservado para uso futuro).
+     *
+     * @var float
+     * @since 1.3.5
+     */
+    public const RELOJ_RADIO_TIERRA = 6371000.0;
+
+    /**
+     * Duración de un día solar medio, en segundos.
+     *
+     * @var float
+     * @since 1.3.5
+     */
+    public const RELOJ_SEGUNDOS_POR_DIA = 86400.0;
+
+    /**
+     * Duración de un año juliano (365.25 días), en segundos.
+     *
+     * @var float
+     * @since 1.3.5
+     */
+    public const RELOJ_SEGUNDOS_POR_ANIO = 31557600.0;
+
+    /**
+     * Duración de un mes sinódico lunar (~29.53 días), en segundos.
+     *
+     * @var float
+     * @since 1.3.5
+     */
+    public const RELOJ_SEGUNDOS_POR_MES_SINODICO = 2551442.8;
+
+    /**
+     * Duración de un día sidéreo (23h 56m 4s), en segundos.
+     *
+     * @var float
+     * @since 1.3.5
+     */
+    public const RELOJ_SEGUNDOS_POR_DIA_SIDEREO = 86164.0905;
 
 }
 

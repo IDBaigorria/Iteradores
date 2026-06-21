@@ -62,6 +62,8 @@ include_once("Configuracion/Entorno.php");// debe ir despues de Objeto.php
 //  nodos
 include_once("Nodos/Nodo.php");
 include_once("Nodos/NodoElectrico.php");
+// tiempo
+include_once("Tiempo/RelojAstronomico.php");
 
 // ─── Comandos y Comunicadores (autoencolación) ─────────
 include_once("Controlador/RegistroGlobal.php");
@@ -72,4 +74,4 @@ include_once("Comunicadores/index.php");
 include_once("Controlador/Controlador.php");
 
 // ─── Pruebas (solo desarrollo) ─────────────────────────
-include_once("pruebas/PComando.php");
+include_once("pruebas/PruebaRelojAstronomico.php");
