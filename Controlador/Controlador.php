@@ -2,6 +2,7 @@
 namespace Iteradores\Controlador;
 use Iteradores\Configuracion\Conf;
 use Iteradores\Configuracion\Entorno;
+use Iteradores\Controlador\interfaces\VectorGravitacional;
 use Iteradores\Nodos\NodoElectrico;
 use Iteradores\Nucleo\Objeto;
 use Iteradores\Nodos\Nodo;
@@ -15,6 +16,7 @@ use Iteradores\Comandos\Comando;
 use Iteradores\Controlador\interfaces\Comunicadores;
 use Iteradores\Comunicadores\Comunicador;
 use Iteradores\Controlador\RegistroGlobal;
+use Iteradores\Tiempo\RelojAstronomico;
 /*require_once(".\configuracion\Configuracion.php");
 include_once(".\Nucleo\Objeto.php");*/
 require_once("PerdurarSuperestructura\PerdurarSuperestructura.php");
@@ -26,6 +28,7 @@ require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringXML.php");
 require_once(".\Comandos\Comando.php");*/
 require_once("interfaces\Comandos.php");
 require_once("interfaces\Comunicadores.php");
+require_once("interfaces\VectorGravitacional.php");
 /*require_once(".\Comunicadores\Comunicador.php");
 require_once(".\Nodos\NodoElectrico.php");
 require_once("RegistroGlobal.php");*/
@@ -43,9 +46,10 @@ require_once("RegistroGlobal.php");*/
  * @implements PerdurarSuperestructura
  * @implements Comandos
  * @implements Comunicadores
- * @since V3.4.0
+ * @implements VectorGravitacional
+ * @since V1.2.0
  */
-class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores {
+class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional {
 
     /** 
      * @var string Método de persistencia activo por defecto 
@@ -834,6 +838,53 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // RELOJ ASTRONÓMICO Y UBICACIÓN (v1.3.6)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Instancia del reloj astronómico asociada al controlador.
+     *
+     * Se inicializa en {@link inicializar} con las coordenadas obtenidas
+     * de {@link \Iteradores\Configuracion\Entorno::obtener_coordenadas}.
+     *
+     * @var RelojAstronomico|null
+     * @since 1.3.6
+     */
+    private static ?RelojAstronomico $_reloj = null;
+
+    /**
+     * Devuelve el vector gravitacional correspondiente al instante actual
+     * (o al timestamp proporcionado) según la ubicación del controlador.
+     *
+     * @param int|null $timestamp Timestamp Unix. Si es null, se usa el instante actual.
+     * @return array{x: float, y: float, z: float}|null Vector unitario, o null si el reloj no está inicializado.
+     * @since 1.3.6
+     */
+    public static function vector_gravitacional_actual(?int $timestamp = null): ?array
+    {
+        if (self::$_reloj === null) {
+            self::_alerta('Reloj astronómico no inicializado.');
+            return null;
+        }
+        return self::$_reloj->vector($timestamp);
+    }
+
+    /**
+     * Actualiza manualmente la ubicación del controlador y del reloj astronómico.
+     *
+     * @param float $latitud  Nueva latitud.
+     * @param float $longitud Nueva longitud.
+     * @return void
+     * @since 1.3.6
+     */
+    public static function _actualizar_ubicacion(float $latitud, float $longitud): void
+    {
+        if (self::$_reloj !== null) {
+            self::$_reloj->_ubicacion($latitud, $longitud);
+        }
+    }
+
     // ══════════════════════════════════════════════════════
     // INICIALIZACION
     // ══════════════════════════════════════════════════════
@@ -883,6 +934,13 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             // ─── Limpiar pendientes e inyectar Controlador ─────
             RegistroGlobal::limpiar();
             RegistroGlobal::_controlador(self::class);
+
+            // ─── Inicializar reloj astronómico con ubicación ───────
+            $coordenadas = Entorno::coordenadas();
+            self::$_reloj = new RelojAstronomico($coordenadas['latitud'], $coordenadas['longitud']);
+
+            // En PHP no podemos escuchar cambios en tiempo real.
+            // La ubicación se determina una vez por petición.
 
             // ─── Comandos genéricos de comunicación ────────────
             self::registrar_comandos_comunicacion();

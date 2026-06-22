@@ -6,18 +6,24 @@ use Iteradores\Nucleo\Objeto;
 //include_once(".\Nucleo\Objeto.php");
 
 /**
- * Gestión del entorno de ejecución.
+ * Gestión del entorno de ejecución y conciencia geográfica.
  *
- * Centraliza la configuración del contexto en el que corre la aplicación,
- * incluyendo el modo de ejecución (desarrollo, pruebas, producción),
- * el tipo de salida esperado (consola o HTML) y el método de persistencia
- * activo para la superestructura (sql, json, xml, etc.).
+ * Centraliza la configuración del contexto en el que corre la aplicación:
+ * modo de ejecución (desarrollo, pruebas, producción), tipo de salida
+ * (consola o HTML), método de persistencia activo para la superestructura
+ * (SQL, JSON, XML) y la ubicación geográfica del servidor o cliente.
+ *
+ * La ubicación se obtiene de forma automática utilizando la mejor fuente
+ * disponible (detección por IP del cliente o coordenadas predefinidas).
+ * En PHP no es posible detectar cambios de ubicación en tiempo real, por lo
+ * que el método {@link escuchar_cambios} es un placeholder preparado para
+ * una futura implementación mediante sondeo.
  *
  * Esta clase actúa como fuente única de verdad para todos los componentes
  * que necesiten adaptar su comportamiento al entorno actual.
  *
  * @author Ignacio David Baigorria
- * @version 1.2.6
+ * @version 1.3.6
  * @since 1.2.6
  * @package Iteradores\Configuracion
  */
@@ -276,5 +282,104 @@ class Entorno extends Objeto
     public static function es_persistencia_xml(): bool
     {
         return self::$persistencia === self::PERSISTENCIA_XML;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // UBICACIÓN GEOGRÁFICA (v1.3.6)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Caché estático de coordenadas para evitar múltiples consultas externas
+     * durante la misma ejecución.
+     *
+     * @var array{latitud: float, longitud: float}|null
+     * @since 1.3.6
+     */
+    private static ?array $_coordenadas_cacheadas = null;
+
+    /**
+     * Obtiene las coordenadas geográficas actuales utilizando la mejor
+     * fuente disponible.
+     *
+     * Orden de prioridad:
+     * 1. Coordenadas ya almacenadas en sesión (si existe y está activa).
+     * 2. Detección por IP del cliente mediante servicio externo configurable.
+     * 3. Coordenadas predefinidas en {@link \Iteradores\Configuracion\Conf::LATITUD_PREDETERMINADA}.
+     *
+     * El resultado se cachea en la propiedad {@link $_coordenadas_cacheadas}
+     * para evitar múltiples consultas externas durante la misma ejecución.
+     *
+     * @return array{latitud: float, longitud: float}
+     * @since 1.3.6
+     */
+    public static function coordenadas(): array
+    {
+        // Si ya las tenemos cacheadas en esta ejecución, las devolvemos
+        if (self::$_coordenadas_cacheadas !== null) {
+            return self::$_coordenadas_cacheadas;
+        }
+
+        $clave_sesion = Conf::PREFIJO_SESSION . 'coordenadas';
+
+        // Intento 1: Recuperar de sesión (si existe)
+        if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION[$clave_sesion])) {
+            self::$_coordenadas_cacheadas = $_SESSION[$clave_sesion];
+            return self::$_coordenadas_cacheadas;
+        }
+
+        // Intento 2: Detección por IP mediante servicio externo configurable
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        // Evitar consultar IPs privadas
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            $ip = '';
+        }
+        if ($ip) {
+            $url = Conf::GEOLOCALIZACION_URL . $ip;
+            $context = stream_context_create(['http' => ['timeout' => 3]]);
+            $response = @file_get_contents($url, false, $context);
+            if ($response) {
+                $data = json_decode($response, true);
+                if (isset($data['lat']) && isset($data['lon'])) {
+                    $coords = [
+                        'latitud'  => (float) $data['lat'],
+                        'longitud' => (float) $data['lon'],
+                    ];
+                    // Guardar en sesión para futuras peticiones
+                    if (session_status() === PHP_SESSION_ACTIVE) {
+                        $_SESSION[$clave_sesion] = $coords;
+                    }
+                    self::$_coordenadas_cacheadas = $coords;
+                    return $coords;
+                }
+            }
+        }
+
+        // Intento 3: Coordenadas predefinidas en Conf
+        $coords = [
+            'latitud'  => Conf::LATITUD_PREDETERMINADA,
+            'longitud' => Conf::LONGITUD_PREDETERMINADA,
+        ];
+        self::$_coordenadas_cacheadas = $coords;
+        return $coords;
+    }
+    /**
+     * Registra un callback para ser notificado cuando cambie la ubicación.
+     *
+     * **Importante:** En PHP no existe un mecanismo nativo para detectar
+     * cambios de ubicación en tiempo real. La ubicación se determina una
+     * vez por cada petición HTTP. Este método existe por coherencia con la
+     * interfaz de JavaScript y queda como un placeholder preparado para una
+     * futura implementación (por ejemplo, mediante sondeo periódico en
+     * aplicaciones de larga duración).
+     *
+     * @param callable $callback Función que recibiría (float $latitud, float $longitud).
+     * @return void
+     * @since 1.3.6
+     */
+    public static function escuchar_cambios(callable $callback): void
+    {
+        // En PHP la ubicación se determina por petición HTTP.
+        // No podemos escuchar cambios en tiempo real.
+        // Este método es un placeholder por coherencia con la API de JS.
     }
 }

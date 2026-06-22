@@ -336,7 +336,42 @@ class Conf {
      * @since 1.3.5
      */
     public const RELOJ_SEGUNDOS_POR_DIA_SIDEREO = 86164.0905;
+    
+    // ═══════════════════════════════════════════════════════════
+    // UBICACIÓN GEOGRÁFICA
+    // ═══════════════════════════════════════════════════════════
 
+    /**
+     * Latitud predeterminada cuando no se puede detectar la ubicación real.
+     *
+     * Utilizada por {@link \Iteradores\Configuracion\Entorno::obtener_coordenadas()}
+     * como último recurso (fallback).
+     *
+     * @var float
+     * @since 1.3.6
+     */
+    public const LATITUD_PREDETERMINADA = -34.0;   //Tres Arroyos, Argentina
+
+    /**
+     * Longitud predeterminada cuando no se puede detectar la ubicación real.
+     *
+     * @var float
+     * @since 1.3.6
+     */
+    public const LONGITUD_PREDETERMINADA = -64.0;
+
+    /**
+     * URL del servicio de geolocalización por IP.
+     *
+     * Se utiliza en {@link \Iteradores\Configuracion\Entorno::obtener_coordenadas()}
+     * cuando no hay coordenadas en sesión. El servicio debe devolver un JSON
+     * con las claves "lat" y "lon".
+     *
+     * Valor por defecto: freegeoip.app (uso comercial permitido, sin API key).
+     * @var string
+     * @since 1.3.6
+     */
+    public const GEOLOCALIZACION_URL = 'https://freegeoip.app/json/';
 }
 
 ?>
