@@ -3,6 +3,7 @@ namespace Iteradores\Controlador;
 use Iteradores\Configuracion\Conf;
 use Iteradores\Configuracion\Entorno;
 use Iteradores\Controlador\interfaces\VectorGravitacional;
+use Iteradores\Controlador\interfaces\Motor;
 use Iteradores\Nodos\NodoElectrico;
 use Iteradores\Nucleo\Objeto;
 use Iteradores\Nodos\Nodo;
@@ -29,6 +30,7 @@ require_once(".\Comandos\Comando.php");*/
 require_once("interfaces\Comandos.php");
 require_once("interfaces\Comunicadores.php");
 require_once("interfaces\VectorGravitacional.php");
+require_once("interfaces\Motor.php");
 /*require_once(".\Comunicadores\Comunicador.php");
 require_once(".\Nodos\NodoElectrico.php");
 require_once("RegistroGlobal.php");*/
@@ -49,7 +51,7 @@ require_once("RegistroGlobal.php");*/
  * @implements VectorGravitacional
  * @since V1.2.0
  */
-class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional {
+class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor {
 
     /** 
      * @var string Método de persistencia activo por defecto 
@@ -883,6 +885,251 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
         if (self::$_reloj !== null) {
             self::$_reloj->_ubicacion($latitud, $longitud);
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // MOTOR DE EJECUCIÓN (v1.3.7)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Estados posibles del motor.
+     *
+     * @var string
+     * @since 1.3.7
+     */
+    public const MOTOR_DETENIDO = 'detenido';
+    public const MOTOR_ACTIVO = 'activo';
+    public const MOTOR_PAUSADO = 'pausado';
+    public const MOTOR_PAUSA_URGENTE = 'pausa_urgente';
+
+    /**
+     * Estado actual del motor.
+     *
+     * @var string
+     * @since 1.3.7
+     */
+    private static string $estado_motor = self::MOTOR_DETENIDO;
+
+    /**
+     * Índice de la fase que será atendida en el próximo ciclo.
+     *
+     * @var int
+     * @since 1.3.7
+     */
+    private static int $indice_fase_actual = 0;
+
+    /**
+     * Razón de la última pausa urgente.
+     *
+     * @var string
+     * @since 1.3.7
+     */
+    private static string $razon_pausa_urgente = '';
+
+    /**
+     * Marca de tiempo (Unix) en la que se inició la pausa urgente.
+     *
+     * @var int|null
+     * @since 1.3.7
+     */
+    private static ?int $pausa_urgente_inicio = null;
+
+    /**
+     * Inicia el motor de ejecución.
+     *
+     * Si ya está activo o pausado, no hace nada.
+     * Arranca el bucle principal que se ejecutará periódicamente
+     * según {@link \Iteradores\Configuracion\Conf::MOTOR_INTERVALO_MS}.
+     *
+     * @return void
+     * @since 1.3.7
+     */
+    public static function iniciar_motor(): void
+    {
+        if (in_array(self::$estado_motor, [self::MOTOR_ACTIVO, self::MOTOR_PAUSADO], true)) {
+            return;
+        }
+
+        self::$estado_motor = self::MOTOR_ACTIVO;
+        self::$indice_fase_actual = 0;
+
+        $ciclos = 0;
+        $max_ciclos = Conf::MOTOR_MAX_CICLOS;
+
+        while (self::$estado_motor === self::MOTOR_ACTIVO) {
+            self::bucle_motor();
+            usleep(Conf::MOTOR_INTERVALO_MS * 1000);
+            $ciclos++;
+            if ($max_ciclos > 0 && $ciclos >= $max_ciclos) {
+                self::$estado_motor = self::MOTOR_DETENIDO;
+                break;
+            }
+        }
+    }
+
+
+    /**
+     * Pausa el motor por solicitud explícita.
+     *
+     * El estado se conserva para poder reanudar después.
+     * Se debería persistir la superestructura aquí para evitar pérdidas
+     * en caso de que el proceso sea destruido.
+     *
+     * @return void
+     * @since 1.3.7
+     */
+    public static function pausar_motor(): void
+    {
+        if (self::$estado_motor !== self::MOTOR_ACTIVO) {
+            return;
+        }
+
+        self::$estado_motor = self::MOTOR_PAUSADO;
+        // TODO: persistir superestructura cuando esté operativo
+        // PerdurarSuperestructura::guardar('motor');
+    }
+
+    /**
+     * Reanuda el motor tras una pausa explícita.
+     *
+     * @return void
+     * @since 1.3.7
+     */
+    public static function reanudar_motor(): void
+    {
+        if (self::$estado_motor !== self::MOTOR_PAUSADO) {
+            return;
+        }
+
+        // TODO: cargar superestructura para restaurar estado
+        // PerdurarSuperestructura::cargar('motor');
+
+        self::$estado_motor = self::MOTOR_ACTIVO;
+    }
+
+    /**
+     * Detiene el motor completamente.
+     *
+     * Limpia el estado interno. Para volver a usar el motor,
+     * es necesario llamar a {@link iniciar_motor}.
+     *
+     * @return void
+     * @since 1.3.7
+     */
+    public static function detener_motor(): void
+    {
+        // TODO: persistir superestructura antes de detener
+        self::$estado_motor = self::MOTOR_DETENIDO;
+        self::$indice_fase_actual = 0;
+    }
+
+    /**
+     * Pausa el motor de forma urgente, generalmente porque un comando
+     * requiere intervención del usuario o una respuesta externa.
+     *
+     * Se programa una reanudación automática tras
+     * {@link \Iteradores\Configuracion\Conf::MOTOR_PAUSA_URGENTE_TIMEOUT_S}
+     * segundos si la pausa no se levanta antes.
+     *
+     * @param string $razon Motivo de la pausa (para depuración).
+     * @return void
+     * @since 1.3.7
+     */
+    public static function pausar_urgente(string $razon = ''): void
+    {
+        if (self::$estado_motor !== self::MOTOR_ACTIVO) {
+            return;
+        }
+
+        self::$estado_motor = self::MOTOR_PAUSA_URGENTE;
+        self::$razon_pausa_urgente = $razon;
+        self::$pausa_urgente_inicio = time();
+
+        // TODO: persistir superestructura para evitar pérdida de estado
+    }
+
+    /**
+     * Ejecuta una rodaja de trabajo del motor.
+     *
+     * Atiende a la fase actual (según el péndulo) y ejecuta
+     * hasta {@link \Iteradores\Configuracion\Conf::MOTOR_QUANTUM} comandos.
+     * Si la fase se queda sin comandos, el péndulo avanza inmediatamente.
+     *
+     * @return void
+     * @since 1.3.7
+     */
+    private static function bucle_motor(): void
+    {
+        // Verificar timeout de pausa urgente
+        if (self::$estado_motor === self::MOTOR_PAUSA_URGENTE) {
+            $transcurrido = time() - (self::$pausa_urgente_inicio ?? time());
+            if ($transcurrido >= Conf::MOTOR_PAUSA_URGENTE_TIMEOUT_S) {
+                self::_alerta("Timeout de pausa urgente alcanzado ({$transcurrido}s). Reanudando.");
+                self::$estado_motor = self::MOTOR_ACTIVO;
+                self::$razon_pausa_urgente = '';
+                self::$pausa_urgente_inicio = null;
+            } else {
+                return; // seguimos esperando
+            }
+        }
+
+        if (self::$estado_motor !== self::MOTOR_ACTIVO) {
+            return;
+        }
+
+        $fase = self::$indice_fase_actual;
+        $quantum = Conf::MOTOR_QUANTUM;
+
+        for ($i = 0; $i < $quantum; $i++) {
+            $comando = self::siguiente_comando_en_fase($fase);
+            if ($comando === null) {
+                break; // no hay más comandos en esta fase
+            }
+            $resultado = $comando();
+            if ($resultado === 'PAUSAR_URGENTE') {
+                self::pausar_urgente('Comando solicitó pausa urgente');
+                return;
+            }
+        }
+
+        // Avanzar el péndulo para el próximo ciclo
+        self::$indice_fase_actual = self::pendulo($fase);
+    }
+
+    /**
+     * Devuelve la siguiente fase que debe ser atendida (péndulo).
+     *
+     * Actualmente es un round-robin simple:
+     * (fase_actual + 1) % número_total_de_fases.
+     *
+     * En el futuro podrá incorporar pesos y prioridades.
+     *
+     * @param int $fase_actual Fase que acaba de ser atendida.
+     * @return int Siguiente fase.
+     * @since 1.3.7
+     */
+    private static function pendulo(int $fase_actual): int
+    {
+        // Número de fases disponibles (0 a N-1)
+        // Por ahora usamos un valor fijo; en el futuro se obtendrá dinámicamente.
+        $total_fases = 3; // TODO: detectar automáticamente el número de fases activas
+        return ($fase_actual + 1) % $total_fases;
+    }
+
+    /**
+     * Obtiene el siguiente comando pendiente en una fase dada.
+     *
+     * Placeholder: actualmente no hay colas de comandos por fase.
+     * En versiones futuras, los comandos se encolarán en la fase que corresponda.
+     *
+     * @param int $fase Número de fase.
+     * @return callable|null El comando a ejecutar, o null si no hay.
+     * @since 1.3.7
+     */
+    private static function siguiente_comando_en_fase(int $fase): ?callable
+    {
+        // TODO: implementar colas de comandos por fase
+        return null;
     }
 
     // ══════════════════════════════════════════════════════
