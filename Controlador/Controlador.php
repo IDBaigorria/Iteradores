@@ -911,12 +911,13 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     private static string $estado_motor = self::MOTOR_DETENIDO;
 
     /**
-     * Índice de la fase que será atendida en el próximo ciclo.
+     * Identificador de la fase que será atendida en el próximo ciclo.
      *
-     * @var int
+     * @var string|null
      * @since 1.3.7
+     * @version 1.3.8 (cambiado a string)
      */
-    private static int $indice_fase_actual = 0;
+    private static ?string $indice_fase_actual = null;
 
     /**
      * Razón de la última pausa urgente.
@@ -1057,10 +1058,11 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      *
      * @return void
      * @since 1.3.7
+     * @version 1.3.8
      */
     private static function bucle_motor(): void
     {
-        // Verificar timeout de pausa urgente
+        // Verificar timeout de pausa urgente (sin cambios)
         if (self::$estado_motor === self::MOTOR_PAUSA_URGENTE) {
             $transcurrido = time() - (self::$pausa_urgente_inicio ?? time());
             if ($transcurrido >= Conf::MOTOR_PAUSA_URGENTE_TIMEOUT_S) {
@@ -1069,7 +1071,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
                 self::$razon_pausa_urgente = '';
                 self::$pausa_urgente_inicio = null;
             } else {
-                return; // seguimos esperando
+                return;
             }
         }
 
@@ -1077,13 +1079,21 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             return;
         }
 
-        $fase = self::$indice_fase_actual;
+        // Obtener la fase actual del péndulo (puede ser null si no hay colas)
+        $fase = self::$indice_fase_actual; // ahora es string|null
+        if ($fase === null) {
+            $fase = self::pendulo(null);
+            if ($fase === null) {
+                return; // no hay fases activas
+            }
+        }
+
         $quantum = Conf::MOTOR_QUANTUM;
 
         for ($i = 0; $i < $quantum; $i++) {
             $comando = self::siguiente_comando_en_fase($fase);
             if ($comando === null) {
-                break; // no hay más comandos en esta fase
+                break;
             }
             $resultado = $comando();
             if ($resultado === 'PAUSAR_URGENTE') {
@@ -1092,44 +1102,128 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             }
         }
 
-        // Avanzar el péndulo para el próximo ciclo
+        // Avanzar el péndulo
         self::$indice_fase_actual = self::pendulo($fase);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // COLAS DE COMANDOS POR FASE (v1.3.8)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Colas de comandos pendientes, indexadas por identificador de fase.
+     *
+     * Cada clave es un string que identifica la fase (ej. "0", "html:0").
+     * Cada valor es un array indexado de callables.
+     *
+     * Las fases se crean bajo demanda al encolar el primer comando.
+     *
+     * @var array<string, callable[]>
+     * @since 1.3.8
+     */
+    private static array $colas_comandos = [];
+
+    /**
+     * Añade un comando a la cola de una fase.
+     *
+     * Si la fase no existe, se crea automáticamente.
+     *
+     * @param string   $fase    Identificador de la fase (ej. "0", "html:entrada:0").
+     * @param callable $comando Función a ejecutar.
+     * @return void
+     * @since 1.3.8
+     */
+    public static function encolar_comando_en_fase(string $fase, callable $comando): void
+    {
+        if (!isset(self::$colas_comandos[$fase])) {
+            self::$colas_comandos[$fase] = [];
+        }
+        self::$colas_comandos[$fase][] = $comando;
+    }
+
+    /**
+     * Obtiene el siguiente comando pendiente en una fase (y lo retira de la cola).
+     *
+     * @param string $fase Identificador de la fase.
+     * @return callable|null El comando, o null si la cola está vacía o no existe.
+     * @since 1.3.8
+     */
+    private static function siguiente_comando_en_fase(string $fase): ?callable
+    {
+        if (empty(self::$colas_comandos[$fase])) {
+            // Si la cola está vacía, eliminamos la entrada para no sobrecargar
+            // el array de fases y para que el péndulo no la tenga en cuenta.
+            unset(self::$colas_comandos[$fase]);
+            return null;
+        }
+        return array_shift(self::$colas_comandos[$fase]);
     }
 
     /**
      * Devuelve la siguiente fase que debe ser atendida (péndulo).
      *
-     * Actualmente es un round-robin simple:
-     * (fase_actual + 1) % número_total_de_fases.
+     * Ahora itera sobre las fases activas (las que tienen cola no vacía).
+     * Si no hay ninguna, retorna null.
      *
-     * En el futuro podrá incorporar pesos y prioridades.
-     *
-     * @param int $fase_actual Fase que acaba de ser atendida.
-     * @return int Siguiente fase.
+     * @param string|null $fase_actual Fase que acaba de ser atendida, o null.
+     * @return string|null Siguiente fase, o null si no hay.
      * @since 1.3.7
+     * @version 1.3.8 (adaptado a colas dinámicas)
      */
-    private static function pendulo(int $fase_actual): int
+    private static function pendulo(?string $fase_actual): ?string
     {
-        // Número de fases disponibles (0 a N-1)
-        // Por ahora usamos un valor fijo; en el futuro se obtendrá dinámicamente.
-        $total_fases = 3; // TODO: detectar automáticamente el número de fases activas
-        return ($fase_actual + 1) % $total_fases;
+        // Filtrar solo fases con comandos pendientes
+        $fases = [];
+        foreach (self::$colas_comandos as $fase => $cola) {
+            if (!empty($cola)) {
+                $fases[] = $fase;
+            }
+        }
+
+        if (empty($fases)) {
+            return null;
+        }
+
+        // Orden predecible
+        sort($fases, SORT_STRING);
+
+        // Si no hay fase actual o ya no existe, empezar desde la primera
+        $indice = array_search($fase_actual, $fases, true);
+        if ($indice === false) {
+            return $fases[0];
+        }
+
+        // Siguiente en round-robin
+        return $fases[($indice + 1) % count($fases)];
     }
 
-    /**
-     * Obtiene el siguiente comando pendiente en una fase dada.
+     /**
+     * Registra los comandos genéricos de de dominio.
      *
-     * Placeholder: actualmente no hay colas de comandos por fase.
-     * En versiones futuras, los comandos se encolarán en la fase que corresponda.
-     *
-     * @param int $fase Número de fase.
-     * @return callable|null El comando a ejecutar, o null si no hay.
-     * @since 1.3.7
+     * @return void
+     * @since 1.3.3
+     * @version 1.3.4 (eliminados alias de archivo)
      */
-    private static function siguiente_comando_en_fase(int $fase): ?callable
+    private static function registrar_comandos_dominio(): void
     {
-        // TODO: implementar colas de comandos por fase
-        return null;
+        // En registrar_comandos_comunicacion() o un nuevo método:
+        self::registrar_comando('dominio:leer_byte', function(string $token, array $args) {
+            // TODO: implementar cuando exista la compuerta
+            $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("[placeholder] dominio:leer_byte ejecutado.");
+            }
+            return true;
+        }, null, true); // solo_desarrollo = true
+
+        self::registrar_comando('dominio:escribir_byte', function(string $token, array $args) {
+            // TODO: implementar cuando exista la compuerta
+            $controlador = RegistroGlobal::controlador();
+            if ($controlador) {
+                $controlador::escribir_salida("[placeholder] dominio:escribir_byte ejecutado.");
+            }
+            return true;
+        }, null, true);
     }
 
     // ══════════════════════════════════════════════════════
@@ -1190,8 +1284,9 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             // La ubicación se determina una vez por petición.
 
             // ─── Comandos genéricos de comunicación ────────────
-            self::registrar_comandos_comunicacion();
-
+            self::registrar_comandos_dominio();
+            // ─── Comandos genéricos de comunicación ────────────
+            self::registrar_comandos_dominio();
             static::$inicializo = true;
         }
     }

@@ -18,6 +18,7 @@ namespace Iteradores\Controlador\interfaces;
  *
  * @package Iteradores\Controlador\interfaces
  * @since 1.3.7
+ * @version 1.3.8
  */
 interface Motor
 {
@@ -69,4 +70,17 @@ interface Motor
      * @return void
      */
     public static function pausar_urgente(string $razon = ''): void;
-}
+
+    /**
+     * Añade un comando a la cola de una fase.
+     *
+     * Si la fase no existe, se crea automáticamente.
+     *
+     * @param string   $fase    Identificador de la fase (ej. "0", "html:entrada:0").
+     * @param callable $comando Función a ejecutar.
+     * @return void
+     * @since 1.3.8
+     */
+    public static function encolar_comando_en_fase(string $fase, callable $comando): void;
+    }
+    
