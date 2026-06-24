@@ -7,7 +7,8 @@ namespace Iteradores\Controlador\interfaces;
  * El motor es el componente encargado de planificar y ejecutar
  * periódicamente los comandos pendientes en cada fase del sistema.
  * Funciona con un ritmo configurable (ciclos por minuto), un
- * planificador round‑robin (péndulo) y soporte para pausas urgentes.
+ * planificador round‑robin (péndulo), soporte para pausas urgentes,
+ * y reversa.
  *
  * ## Propósito de la interfaz
  *
@@ -18,7 +19,7 @@ namespace Iteradores\Controlador\interfaces;
  *
  * @package Iteradores\Controlador\interfaces
  * @since 1.3.7
- * @version 1.3.8
+ * @version 1.3.9
  */
 interface Motor
 {
@@ -76,11 +77,23 @@ interface Motor
      *
      * Si la fase no existe, se crea automáticamente.
      *
-     * @param string   $fase    Identificador de la fase (ej. "0", "html:entrada:0").
-     * @param callable $comando Función a ejecutar.
+     * @param string $fase           Identificador de la fase (ej. "0", "html:entrada:0").
+     * @param string $nombre_comando Nombre del comando registrado.
+     * @param mixed  ...$args        Argumentos para el comando.
      * @return void
      * @since 1.3.8
+     * @version 1.3.9 (cambiada la firma)
      */
-    public static function encolar_comando_en_fase(string $fase, callable $comando): void;
-    }
-    
+    public static function encolar_comando_en_fase(string $fase, string $nombre_comando, ...$args): void;
+
+    /**
+     * Deshace el último comando ejecutado por el motor.
+     *
+     * Solo puede ejecutarse cuando el motor está en estado DETENIDO.
+     * Delega en {@link \Iteradores\Controlador\Controlador::deshacer_ultimo()}.
+     *
+     * @return mixed Resultado de la reversa, o null si no se puede deshacer.
+     * @since 1.3.9
+     */
+    public static function deshacer_motor(): mixed;
+}

@@ -2,6 +2,7 @@
 namespace Iteradores\Controlador;
 use Iteradores\Configuracion\Conf;
 use Iteradores\Configuracion\Entorno;
+use Iteradores\Controlador\interfaces\Dominios;
 use Iteradores\Controlador\interfaces\VectorGravitacional;
 use Iteradores\Controlador\interfaces\Motor;
 use Iteradores\Nodos\NodoElectrico;
@@ -31,6 +32,7 @@ require_once("interfaces\Comandos.php");
 require_once("interfaces\Comunicadores.php");
 require_once("interfaces\VectorGravitacional.php");
 require_once("interfaces\Motor.php");
+require_once("interfaces\Dominios.php");
 /*require_once(".\Comunicadores\Comunicador.php");
 require_once(".\Nodos\NodoElectrico.php");
 require_once("RegistroGlobal.php");*/
@@ -49,9 +51,10 @@ require_once("RegistroGlobal.php");*/
  * @implements Comandos
  * @implements Comunicadores
  * @implements VectorGravitacional
+ * @implements Dominios
  * @since V1.2.0
  */
-class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor {
+class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor, Dominios {
 
     /** 
      * @var string Método de persistencia activo por defecto 
@@ -1058,11 +1061,11 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      *
      * @return void
      * @since 1.3.7
-     * @version 1.3.8
+     * @version 1.3.9
      */
     private static function bucle_motor(): void
     {
-        // Verificar timeout de pausa urgente (sin cambios)
+        // Verificar timeout de pausa urgente
         if (self::$estado_motor === self::MOTOR_PAUSA_URGENTE) {
             $transcurrido = time() - (self::$pausa_urgente_inicio ?? time());
             if ($transcurrido >= Conf::MOTOR_PAUSA_URGENTE_TIMEOUT_S) {
@@ -1079,33 +1082,70 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             return;
         }
 
-        // Obtener la fase actual del péndulo (puede ser null si no hay colas)
-        $fase = self::$indice_fase_actual; // ahora es string|null
+        // Obtener la fase actual del péndulo
+        $fase = self::$indice_fase_actual;
         if ($fase === null) {
             $fase = self::pendulo(null);
             if ($fase === null) {
-                return; // no hay fases activas
+                // No hay fases activas: detener el motor automáticamente
+                self::$estado_motor = self::MOTOR_DETENIDO;
+                return;
             }
         }
 
         $quantum = Conf::MOTOR_QUANTUM;
 
         for ($i = 0; $i < $quantum; $i++) {
-            $comando = self::siguiente_comando_en_fase($fase);
-            if ($comando === null) {
+            $entrada = self::siguiente_comando_en_fase($fase);
+            if ($entrada === null) {
                 break;
             }
-            $resultado = $comando();
-            if ($resultado === 'PAUSAR_URGENTE') {
-                self::pausar_urgente('Comando solicitó pausa urgente');
-                return;
+            [$nombre_comando, $args] = $entrada;
+            self::ejecutar_comando($nombre_comando, ...$args);
+        }
+
+        // Si la fase se vació, determinar la siguiente acción
+        if (self::siguiente_comando_en_fase($fase) === null) {
+            // Si estábamos en modo dominio, buscar otro dominio o volver a global
+            if (self::$dominio_actual !== null) {
+                $siguiente = self::siguiente_dominio(self::$dominio_actual);
+                if ($siguiente !== null) {
+                    self::activar_dominio($siguiente);
+                    $fase = self::pendulo(null);
+                } else {
+                    self::desactivar_dominio();
+                    $fase = self::pendulo(null);
+                }
             }
         }
 
-        // Avanzar el péndulo
-        self::$indice_fase_actual = self::pendulo($fase);
+        // Avanzar el péndulo para el próximo ciclo (si aún hay fases)
+        if (!empty(self::$colas_comandos)) {
+            self::$indice_fase_actual = self::pendulo($fase);
+        } else {
+            self::$indice_fase_actual = null;
+            // Si no hay más fases, detener el motor
+            self::$estado_motor = self::MOTOR_DETENIDO;
+        }
     }
 
+    /**
+     * Deshace el último comando ejecutado por el motor.
+     *
+     * Solo puede ejecutarse cuando el motor está en estado DETENIDO.
+     * Delega en {@link \Iteradores\Controlador\Controlador::deshacer_ultimo()}.
+     *
+     * @return mixed Resultado de la reversa, o null si no se puede deshacer.
+     * @since 1.3.9
+     */
+    public static function deshacer_motor(): mixed
+    {
+        if (self::$estado_motor !== self::MOTOR_DETENIDO) {
+            self::_alerta('El motor debe estar DETENIDO para deshacer.');
+            return null;
+        }
+        return self::deshacer_ultimo();
+    }
     // ═══════════════════════════════════════════════════════════
     // COLAS DE COMANDOS POR FASE (v1.3.8)
     // ═══════════════════════════════════════════════════════════
@@ -1114,12 +1154,13 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      * Colas de comandos pendientes, indexadas por identificador de fase.
      *
      * Cada clave es un string que identifica la fase (ej. "0", "html:0").
-     * Cada valor es un array indexado de callables.
+     * Cada valor es un array indexado de arrays [nombre_comando, args].
      *
      * Las fases se crean bajo demanda al encolar el primer comando.
      *
-     * @var array<string, callable[]>
+     * @var array<string, array<int, array{string, array}>>
      * @since 1.3.8
+     * @version 1.3.9 (cambiada la estructura interna)
      */
     private static array $colas_comandos = [];
 
@@ -1128,37 +1169,71 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      *
      * Si la fase no existe, se crea automáticamente.
      *
-     * @param string   $fase    Identificador de la fase (ej. "0", "html:entrada:0").
-     * @param callable $comando Función a ejecutar.
+     * @param string $fase           Identificador de la fase (ej. "0", "html:entrada:0").
+     * @param string $nombre_comando Nombre del comando registrado.
+     * @param mixed  ...$args        Argumentos para el comando.
      * @return void
+     * 
      * @since 1.3.8
+     * @version 1.3.8
      */
-    public static function encolar_comando_en_fase(string $fase, callable $comando): void
+    public static function encolar_comando_en_fase(string $fase, string $nombre_comando, ...$args): void
     {
         if (!isset(self::$colas_comandos[$fase])) {
             self::$colas_comandos[$fase] = [];
         }
-        self::$colas_comandos[$fase][] = $comando;
+        self::$colas_comandos[$fase][] = [$nombre_comando, $args];
     }
 
     /**
      * Obtiene el siguiente comando pendiente en una fase (y lo retira de la cola).
      *
      * @param string $fase Identificador de la fase.
-     * @return callable|null El comando, o null si la cola está vacía o no existe.
+     * @return array{string, array}|null Tupla [nombre_comando, args] o null.
      * @since 1.3.8
+     * @version 1.3.9 (devuelve array en lugar de callable)
      */
-    private static function siguiente_comando_en_fase(string $fase): ?callable
+    private static function siguiente_comando_en_fase(string $fase): ?array
     {
         if (empty(self::$colas_comandos[$fase])) {
-            // Si la cola está vacía, eliminamos la entrada para no sobrecargar
-            // el array de fases y para que el péndulo no la tenga en cuenta.
             unset(self::$colas_comandos[$fase]);
             return null;
         }
         return array_shift(self::$colas_comandos[$fase]);
     }
 
+    /**
+     * Devuelve el siguiente dominio con comandos pendientes (excluyendo el tálamo).
+     *
+     * @param string|null $dominio_actual Dominio actual.
+     * @return string|null Siguiente dominio, o null si no hay.
+     * @since 1.3.9
+     */
+    private static function siguiente_dominio(?string $dominio_actual): ?string
+    {
+        $dominios = [];
+        foreach (self::$colas_comandos as $fase => $cola) {
+            if (empty($cola)) continue;
+            $partes = explode(':', $fase, 2);
+            $dom = count($partes) > 1 ? $partes[0] : 'talamo';
+            if ($dom !== 'talamo' && !in_array($dom, $dominios, true)) {
+                $dominios[] = $dom;
+            }
+        }
+
+        if (empty($dominios)) {
+            return null;
+        }
+
+        sort($dominios, SORT_STRING);
+
+        if ($dominio_actual === null || !in_array($dominio_actual, $dominios, true)) {
+            return $dominios[0];
+        }
+
+        $indice = array_search($dominio_actual, $dominios, true);
+        return $dominios[($indice + 1) % count($dominios)];
+    }
     /**
      * Devuelve la siguiente fase que debe ser atendida (péndulo).
      *
@@ -1168,35 +1243,34 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      * @param string|null $fase_actual Fase que acaba de ser atendida, o null.
      * @return string|null Siguiente fase, o null si no hay.
      * @since 1.3.7
-     * @version 1.3.8 (adaptado a colas dinámicas)
+     * @version 1.3.9
      */
     private static function pendulo(?string $fase_actual): ?string
     {
-        // Filtrar solo fases con comandos pendientes
+        // Obtener fases con comandos pendientes, aplicando filtro de dominio si es necesario
         $fases = [];
         foreach (self::$colas_comandos as $fase => $cola) {
-            if (!empty($cola)) {
-                $fases[] = $fase;
+            if (empty($cola)) continue;
+            // Si hay un dominio activo, solo incluir fases que empiecen por ese prefijo
+            if (self::$dominio_actual !== null && !str_starts_with($fase, self::$dominio_actual . ':')) {
+                continue;
             }
+            $fases[] = $fase;
         }
 
         if (empty($fases)) {
             return null;
         }
 
-        // Orden predecible
         sort($fases, SORT_STRING);
 
-        // Si no hay fase actual o ya no existe, empezar desde la primera
-        $indice = array_search($fase_actual, $fases, true);
-        if ($indice === false) {
+        if ($fase_actual === null || !in_array($fase_actual, $fases, true)) {
             return $fases[0];
         }
 
-        // Siguiente en round-robin
+        $indice = array_search($fase_actual, $fases, true);
         return $fases[($indice + 1) % count($fases)];
     }
-
      /**
      * Registra los comandos genéricos de de dominio.
      *
@@ -1226,6 +1300,47 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
         }, null, true);
     }
 
+    // ══════════════════════════════════════════════════════
+    // INTERFAZ DOMINIOS
+    // ══════════════════════════════════════════════════════
+    
+    /**
+     * Dominio actualmente activo (null = modo global).
+     *
+     * @var string|null
+     * @since 1.3.9
+     */
+    private static ?string $dominio_actual = null;
+
+    /**
+     * Activa el modo exclusivo para un dominio.
+     *
+     * Mientras un dominio está activo, el péndulo solo itera sobre fases
+     * cuyo nombre comience por el prefijo del dominio (ej. 'html:').
+     *
+     * @param string $dominio Nombre del dominio (sin ':').
+     * @return void
+     * @since 1.3.9
+     */
+    public static function activar_dominio(string $dominio): void
+    {
+        self::$dominio_actual = $dominio;
+        self::$indice_fase_actual = null;
+    }
+
+    /**
+     * Desactiva el modo exclusivo de dominio.
+     *
+     * El péndulo vuelve a considerar todas las fases activas.
+     *
+     * @return void
+     * @since 1.3.9
+     */
+    public static function desactivar_dominio(): void
+    {
+        self::$dominio_actual = null;
+        self::$indice_fase_actual = null;
+    }
     // ══════════════════════════════════════════════════════
     // INICIALIZACION
     // ══════════════════════════════════════════════════════
