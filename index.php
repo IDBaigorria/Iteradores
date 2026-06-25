@@ -62,6 +62,7 @@ include_once("Configuracion/Entorno.php");// debe ir despues de Objeto.php
 //  nodos
 include_once("Nodos/Nodo.php");
 include_once("Nodos/NodoElectrico.php");
+include_once("Nodos/Matriz2x2.php");
 // tiempo
 include_once("Tiempo/RelojAstronomico.php");
 
@@ -74,4 +75,4 @@ include_once("Comunicadores/index.php");
 include_once("Controlador/Controlador.php");
 
 // ─── Pruebas (solo desarrollo) ─────────────────────────
-include_once("pruebas/PruebaMotorDominios139.php");
+include_once("pruebas/PruebaMatriz2x2.php");
