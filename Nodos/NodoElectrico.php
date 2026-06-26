@@ -11,6 +11,7 @@ use Iteradores\Nodos\Interfaces\Incidentes;
 use Iteradores\Nodos\Interfaces\IncidentesDobleVia;
 use Iteradores\Nodos\Interfaces\Peso;
 use Iteradores\Nodos\Interfaces\AdyacenteConPeso;
+use Iteradores\Nodos\Interfaces\DatosElectrico;
 use Iteradores\Nodos\Nodo;
 
 /*include_once ('Nodo.php');*/
@@ -20,6 +21,7 @@ include_once ('Interfaces/Energia.php');
 include_once ('Interfaces/Fase.php');
 include_once ('Interfaces/Peso.php');
 include_once ('Interfaces/AdyacenteConPeso.php');
+include_once ('Interfaces/DatosElectrico.php');
 
 
 /**
@@ -33,9 +35,9 @@ include_once ('Interfaces/AdyacenteConPeso.php');
  * - Si solo hay un peso (sin dimensión explícita) se guarda como escalar.
  * - Si se añade una segunda dimensión, se migra a un array asociativo (clave '' para el default).
  *
+ * 
  * @class
  * @package Iteradores\Nodos
- * @version 0.0.0
  * @since 1.2.9
  */
 class Enlace
@@ -105,6 +107,23 @@ class Enlace
  * ##INTERFAZ ADYACENTES e INCIDENTES
  * hay que reescribir cada funcion de la interfaz "adyacentes" para que cumplan con el nuevo estandar
  *
+ * ##INTERFAZ DATO
+ * 
+ * A partir de la versión **1.4.1**, el almacenamiento de datos se vuelve **multifase**
+ * y **multidimensional**.
+ *
+ * - **Multifase**: el mismo nodo puede contener diferentes datos en cada fase de trabajo
+ *   (definida por {@link NodoElectrico::fase()}).
+ * - **Multidimensional**: dentro de cada fase, los datos se organizan en *dimensiones*
+ *   con nombre (por ejemplo `'abajo'`, `'arriba'`, `'compuesta'`, etc.), además de una
+ *   dimensión por defecto (clave vacía).
+ *
+ * Esto permite representar conceptos como “matriz compuesta en esta fase” o
+ * “referencia al nodo ascendido” sin perder la identidad del nodo.
+ *
+ * La implementación **reutiliza la propiedad `$dato` heredada de {@link Nodo}**,
+ * cuyo tipo ahora es un array asociativo `[fase => [dimension => valor]]`.
+ * 
  * ##HISTORIA
  * **V0.0.1:**
  * **V0.0.2.251110:** terminada la interfaz Adyacentes y Incidentes vamos a completar toda la clase
@@ -129,12 +148,12 @@ class Enlace
  *
  * **V0.0.4.260529:**	Retomo otra vez
  * **V0.1.0.260605:**	Finalizadas y probadas Interfaces FabricaDeNodosElectricos, Fase, Adyacentes e Incidentes y a punto de comenzar con la interfaz Peso
- *
+ * **V1.4.1.260625:**	El historial se lleva en los commit y en el archivo Historial.txt
  *
  * @class
  * @author Ignacio David Baigorria
  * @package Iteradores\Nodos
- * @version 0.1.0
+ * @version 1.4.1
  * @since 1.2
  * @extends Nodo
  * @implements Interfaces\IncidentesDobleVia
@@ -144,7 +163,7 @@ class Enlace
  * @implements Interfaces\Peso
  * @implements Interfaces\AdyacenteConPeso
  */
-class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosElectricos, Energia, Fase, Peso, AdyacenteConPeso
+class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosElectricos, Energia, Fase, Peso, AdyacenteConPeso, DatosElectrico
 {
 	/**
 	 * Manejador de Incidentes
@@ -303,9 +322,9 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 ******************************************************************************************/
 
 	/**
-	 * Constructor de la clase Nodo
+	 * Constructor de la clase NodoElectrico
 	 *
-	 * Construcción y destrucción (FabricaDeNodos)
+	 * Construcción y destrucción (FabricaDeNodosElectricos)
 	 * Caso de uso: Crea internamente un nodo
 	 *
 	 * @private
@@ -313,11 +332,14 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * @note Incluye un mecanismo para contar la cantidad de nodos existentes con la variable estática $cant
 	 *
 	 * @return NodoElectrico
+	 * @since 1.2
+	 * @version 1.4.1
 	 */
-	protected function __construct()
-	{
-		self::$cant++;
-	}
+    protected function __construct()
+    {
+        $this->dato = [];
+        self::$cant++;
+    }
 
 	/**
 	 * Destructor de la clase NodoElectrico
@@ -334,7 +356,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	function __destruct()
 	{
 		//self::$cant--;
-		echo '</br>destruccion!</br>';
+		//echo '</br>destruccion!</br>';
 	}
 
 
@@ -388,10 +410,10 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 */
 	public static function crear(int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, float $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico
 	{
-		$nodo = parent::crear();
-		$nodo->fuga = $fuga;
-		$nodo->capacidad = $capacidad;
-		return $nodo;
+        $nodo = parent::crear();    // parent::crear() no asigna dato, solo id y contadores
+        $nodo->fuga = $fuga;
+        $nodo->capacidad = $capacidad;
+        return $nodo;
 	}
 
 	/**
@@ -443,12 +465,16 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO}.
 	 * @return NodoElectrico Una nueva instancia de la clase {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico}.
+	 * @since 1.2
+	 * @version 1.4.1
 	 */
 	public static function crear_con_dato($dato, $todos = false, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico
 	{
-		$nodo = parent::crear_con_dato($dato, $todos);
-		$nodo->capacidad = $capacidad;
+		$nodo = parent::crear();          // id, superestructura, etc.
 		$nodo->fuga = $fuga;
+		$nodo->capacidad = $capacidad;
+		// Asignación directa al array multifase (sin llamada a _dato)
+		$nodo->dato[self::$fase][''] = $dato;
 		return $nodo;
 	}
 
@@ -504,15 +530,16 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * @param int $fuga Opcional. Fuga de energia por ciclo. El valor por defecto se configura desde:
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO}.
 	 * @return NodoElectrico|null Instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico} con el identificador *especial* en caso de exito, null en caso contrario.
+	 * @since 1.2
 	 */
 	public static function crear_con_id($id, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null
 	{
-		$nodo = parent::crear_con_id($id);
-		if ($nodo !== null) {
-			$nodo->capacidad = $capacidad;
-			$nodo->fuga = $fuga;
-		}
-		return $nodo;
+        $nodo = parent::crear_con_id($id);
+        if ($nodo !== null) {
+            $nodo->capacidad = $capacidad;
+            $nodo->fuga = $fuga;
+        }
+        return $nodo;
 	}
 
 	/**
@@ -568,13 +595,14 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO}.
 	 * @return NodoElectrico|null Instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico} con dato
 	 * e identificador *especial* en caso de exito, null en caso contrario.
+     * @since 1.2
+     * @version 1.4.1
 	 */
 	public static function crear_con_dato_e_id($dato, $id, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico|null
 	{
-		$nodo = parent::crear_con_dato_e_id($dato, $id);
+		$nodo = static::crear_con_id($id, $capacidad, $fuga);
 		if ($nodo !== null) {
-			$nodo->capacidad = $capacidad;
-			$nodo->fuga = $fuga;
+			$nodo->dato[self::$fase][''] = $dato;
 		}
 		return $nodo;
 	}
@@ -673,7 +701,8 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * {@link ./classes/Iteradores-Configuracion-Conf.html#constant_FUGA_NODO_ELECTRICO Conf::FUGA_NODO_ELECTRICO}.
 	 * @return NodoElectrico Instancia de {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico}
 	 *
-	 * @since V2.9.3
+     * @since 1.2
+     * @version 1.4.1
 	 */
 	public static function nodo($elemento = null, &$es_nodo = null, $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO, $fuga = Conf::FUGA_NODO_ELECTRICO): NodoElectrico
 	{
@@ -681,6 +710,14 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		if ($nodo !== null && !$es_nodo) {
 			$nodo->capacidad = $capacidad;
 			$nodo->fuga = $fuga;
+			// parent::nodo() puede haber asignado $this->dato = $elemento (string)
+			// Aseguramos que dato sea un array multifase
+			if (!is_array($nodo->dato)) {
+				$nodo->dato = [];
+			}
+			if ($elemento !== null) {
+				$nodo->dato[self::$fase][''] = $elemento;
+			}
 		}
 		return $nodo;
 	}
@@ -856,6 +893,88 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		// No cumple condiciones para eliminar
 		return false;
 	}
+
+	/* *********************************************************************
+     * PROPIEDAD `dato` MULTIFASE (reutilizada de Nodo)
+     ***********************************************************************/
+
+    /**
+     * Datos multifase y multidimensionales.
+     *
+     * **Estructura:**
+     * ```
+     * [
+     *   'fase_a' => ['' => 'valor por defecto', 'abajo' => ..., 'arriba' => ...],
+     *   'fase_b' => [...]
+     * ]
+     * ```
+     *
+     * Se hereda de {@link Nodo} y se reescribe su contenido para albergar
+     * la nueva organización.
+     *
+     * @var array<string, array<string, mixed>>
+     * @since 1.4.1
+     */
+    protected $dato;
+
+
+    /* *********************************************************************
+     * INTERFAZ DATO - dato() Y _dato() MULTIFASE
+     ***********************************************************************/
+
+    /**
+     * Asigna un dato en la **fase actual** y **dimensión** especificada.
+     *
+     * Este método **reemplaza** al heredado de {@link Nodo} para adaptarlo al
+     * sistema multifase/multidimensional.
+     *
+     * @param mixed       $valor     Valor a almacenar.
+     * @param string|null $dimension Nombre de la dimensión.
+     *                               Si es `null` se usa la dimensión por defecto (clave `''`).
+     * @return void
+     *
+     * @example
+     * // Asignar en la fase activa, dimensión por defecto
+     * $nodo->_dato("Hola");
+     *
+     * // Asignar en dimensiones concretas
+     * $nodo->_dato($matriz, 'abajo');
+     * $nodo->_dato($otroNodo, 'arriba');
+     *
+     * @since 1.4.1
+     */
+    public function _dato($valor, ?string $dimension = null): void
+    {
+        $fase = self::$fase;
+        $dim = $dimension ?? '';
+        if (!isset($this->dato[$fase])) {
+            $this->dato[$fase] = [];
+        }
+        $this->dato[$fase][$dim] = $valor;
+    }
+
+    /**
+     * Recupera el dato de la **fase actual** y **dimensión** indicada.
+     *
+     * Este método **reemplaza** al heredado de {@link Nodo}.
+     *
+     * @param string|null $dimension Nombre de la dimensión.
+     *                               Si es `null` se devuelve el dato de la dimensión por defecto.
+     * @return mixed El valor almacenado, o `null` si no existe.
+     *
+     * @example
+     * $valor = $nodo->dato();           // dimensión por defecto
+     * $matriz = $nodo->dato('abajo');   // dimensión 'abajo'
+     *
+     * @since 1.4.1
+     */
+    public function dato(?string $dimension = null)
+    {
+        $fase = self::$fase;
+        $dim = $dimension ?? '';
+        return $this->dato[$fase][$dim] ?? null;
+    }
+
 
 	/***************************************************************************************
 	 * INTERFAZ ADYACENTES (INSTANCIA)
@@ -1284,7 +1403,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 			$cont++;
 		}
 		// asigno adyacente
-		echo ' <br/>J' . $fase . $enlace . ' <br/>';
+		//echo ' <br/>J' . $fase . $enlace . ' <br/>';
 		$this->adyacentes[$fase][$enlace] = $un_nodo;
 
 		$un_nodo->_incidente_en($this, $enlace);
@@ -2121,7 +2240,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 			static::_alerta('No se puede agregar el enlace de vuelta antes que el de ida');
 			return false;
 		}
-		echo '<br/>_inidente_en' . $enlace . '<br/>';
+		//echo '<br/>_inidente_en' . $enlace . '<br/>';
 		// inicializacion perezosa
 		if ($this->incidentes === null) {
 			$this->incidentes = [];
@@ -2136,7 +2255,7 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		if (!isset($fases[$fase])) {
 			$this->incidentes[$idstring][$fase] = [];
 		}
-		echo '<br/>_inidente_333en' . $idstring . $fase . $enlace . '<br/>';
+	//	echo '<br/>_inidente_333en' . $idstring . $fase . $enlace . '<br/>';
 		$this->incidentes[$idstring][$fase][$enlace] = $un_nodo;
 		return true;
 	}
@@ -3311,15 +3430,16 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 *
 	 * Muestra todos los datos relevantes del nodo **en la fase actual**:
 	 * id, dato, referencias, capacidad, fuga, energía, adyacentes (con pesos),
-	 * e incidentes.
+	 *, incidentes y dato multidimensional.
 	 *
 	 * Los códigos ANSI utilizados en la terminal se toman de `ansi_fondo` y
 	 * `ansi_texto` de {@link Configuracion.Conf::NODOS_COLORES}. Modifique esas
 	 * constantes si desea otra combinación cromática.
-	 * 
+	 *
 	 * @return void
 	 * @private
 	 * @since 1.3.0
+	 * @version 1.4.1 – Soporte para dato multifase
 	 */
 	private function imprimir_consola(): void
 	{
@@ -3338,22 +3458,34 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		if ($this->es_especial()) {
 			echo ' (ESP)';
 		}
-		echo ' - Dato: ';
-		$dato = $this->dato();
-		if (is_string($dato) || is_numeric($dato)) {
-			echo $dato;
-		} elseif ($dato === null) {
-			echo 'null';
+		echo ' - Datos (fase ' . $fase . '):';
+		$datos_fase = $this->dato[self::$fase] ?? [];
+		if (empty($datos_fase)) {
+			echo " null\n";
 		} else {
-			echo 'este dato no es un string';
+			echo "\n";
+			foreach ($datos_fase as $dim => $valor) {
+				$etiqueta = ($dim === '') ? '(defecto)' : $dim;
+				if (is_string($valor) || is_numeric($valor)) {
+					echo "  [$etiqueta] => $valor\n";
+				} elseif ($valor === null) {
+					echo "  [$etiqueta] => null\n";
+				} elseif (is_object($valor)) {
+					echo "  [$etiqueta] => objeto(" . get_class($valor) . ")\n";
+				} elseif (is_array($valor)) {
+					echo "  [$etiqueta] => array(" . count($valor) . " elementos)\n";
+				} else {
+					echo "  [$etiqueta] => " . gettype($valor) . "\n";
+				}
+			}
 		}
 
-		echo "\nReferencias: " . $this->referencias;
-		echo "\nCapacidad: " . $this->capacidad;
-		echo "\nFuga: " . $this->fuga;
-		echo "\nEnergía: " . $this->energia();
+		echo "Referencias: " . $this->referencias . "\n";
+		echo "Capacidad: " . $this->capacidad . "\n";
+		echo "Fuga: " . $this->fuga . "\n";
+		echo "Energía: " . $this->energia() . "\n";
 
-		echo "\nAdyacentes (fase: $fase):\n";
+		echo "Adyacentes (fase: $fase):\n";
 		if (isset($this->adyacentes[$fase]) && !empty($this->adyacentes[$fase])) {
 			foreach ($this->adyacentes[$fase] as $enlace => $valor) {
 				$nodo = ($valor instanceof Enlace) ? $valor->nodo : $valor;
@@ -3393,15 +3525,16 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 	 * Imprime el nodo en formato HTML.
 	 *
 	 * Genera un bloque HTML con todos los datos del nodo **en la fase activa**,
-	 * incluyendo enlaces navegables entre nodos y la visualización de pesos.
+	 * incluyendo enlaces navegables entre nodos, la visualización de pesos y
+	 * la visualización del dato multidimensional.
 	 *
 	 * El bloque HTML emplea los valores de fondo, texto y borde definidos en
 	 * {@link Configuracion.Conf::NODOS_COLORES}. Para personalizar la apariencia,
 	 * cambie esas constantes.
-	 * 
 	 * @return void
 	 * @private
 	 * @since 1.3.0
+	 * @version 1.4.1 – Soporte para dato multifase
 	 */
 	private function imprimir_html(): void
 	{
@@ -3415,12 +3548,27 @@ class NodoElectrico extends Nodo implements IncidentesDobleVia, FabricaDeNodosEl
 		echo "<div style='background:{$fondo}; color:{$texto}; padding:1em; margin:1em 0; border:1px solid {$borde}; font-family:monospace; white-space:pre-wrap;'>";
 		echo '<strong>NODOELECTRICO ' . $this->id();
 		if ($this->es_especial()) echo ' (ESP)';
-		echo ' - Dato: ';
-		$dato = $this->dato();
-		if (is_string($dato)) echo htmlspecialchars($dato);
-		elseif ($dato === null) echo 'null';
-		else echo 'este dato no es un string';
-		echo '</strong><br>';
+		echo ' - Datos (fase ' . $fase . '):</strong><br>';
+
+		$datos_fase = $this->dato[self::$fase] ?? [];
+		if (empty($datos_fase)) {
+			echo 'null<br>';
+		} else {
+			foreach ($datos_fase as $dim => $valor) {
+				$etiqueta = ($dim === '') ? '(defecto)' : htmlspecialchars($dim);
+				if (is_string($valor)) {
+					echo "[$etiqueta] => " . htmlspecialchars($valor) . "<br>";
+				} elseif ($valor === null) {
+					echo "[$etiqueta] => null<br>";
+				} elseif (is_object($valor)) {
+					echo "[$etiqueta] => objeto(" . get_class($valor) . ")<br>";
+				} elseif (is_array($valor)) {
+					echo "[$etiqueta] => array(" . count($valor) . " elementos)<br>";
+				} else {
+					echo "[$etiqueta] => " . gettype($valor) . "<br>";
+				}
+			}
+		}
 
 		echo 'Referencias: ' . $this->referencias . '<br>';
 		echo 'Capacidad: ' . $this->capacidad . '<br>';
