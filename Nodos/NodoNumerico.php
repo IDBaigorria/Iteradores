@@ -1,10 +1,13 @@
 <?php
 
 namespace Iteradores\Nodos;
-
+use Iteradores\Configuracion\Conf;
+use Iteradores\Configuracion\Entorno;
 use Iteradores\Nodos\Matriz2x2;
 use Iteradores\Nodos\NodoElectrico;
-use Iteradores\Configuracion\Conf;
+use Iteradores\Nodos\Interfaces\FabricaDeNodosNumericos;
+
+include_once('Interfaces/FabricaDeNodosNumericos.php');
 
 /**
  * NodoNumerico – Nodo eléctrico con identidad matricial 2×2.
@@ -129,12 +132,13 @@ use Iteradores\Configuracion\Conf;
  * - El NodoNumerico guarda una referencia al NodoPrimo en `dato('arriba')`.
  *
  * @package Iteradores\Nodos
+ * @implements FabricaDeNodosNumericos
  * @version 1.4.2
  * @since 1.4.2
  * @author Ignacio David Baigorria
  * @extends NodoElectrico
  */
-class NodoNumerico extends NodoElectrico
+class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos
 {
     /**
      * Indica si el nodo representa una secuencia ordenada (true)
@@ -142,7 +146,7 @@ class NodoNumerico extends NodoElectrico
      *
      * @var bool
      */
-    private bool $ordenado;
+    protected bool $ordenado;
 
     /**
      * Identidad matricial del nodo.
@@ -184,72 +188,195 @@ class NodoNumerico extends NodoElectrico
     private static array $siguiente_primo_a_crear = [];
 
     // -----------------------------------------------------------------
-    // Factories estáticos
+    // INTERFAZ FABRICADENODOSNUMERICOS
     // -----------------------------------------------------------------
 
     /**
-     * Crea un NodoNumerico que representa una secuencia ordenada de p factores.
+     * Cache de la matriz de marca para conjuntos.
+     * Se inicializa una sola vez.
      *
-     * La cantidad de factores debe ser un número primo pequeño (2, 3, 5, 7...).
-     *
-     * @param NodoNumerico[] $factores Array de p nodos (p primo)
-     * @return NodoNumerico
-     * @throws \InvalidArgumentException si el número de factores no es primo
+     * @var Matriz2x2|null
      */
-    public static function crear_secuencia(array $factores): NodoNumerico
+    private static ?Matriz2x2 $matriz_marca_conjunto = null;
+
+    /**
+     * Devuelve la matriz de marca de conjunto (cacheada).
+     *
+     * @return Matriz2x2
+     */
+    private static function obtener_matriz_marca(): Matriz2x2
     {
-        // TODO 1.4.2: Validar que count($factores) sea primo,
-        // multiplicar M1 × M2 × ... × MP,
-        // registrar en índice, enlazar factores.
+        if (self::$matriz_marca_conjunto === null) {
+            $m = Conf::MATRIZ_MARCA_CONJUNTO;
+            self::$matriz_marca_conjunto = new Matriz2x2($m[0][0], $m[0][1], $m[1][0], $m[1][1]);
+        }
+        return self::$matriz_marca_conjunto;
+    }
+
+     /**
+     * Constructor protegido. Inicializa identidad neutra por defecto.
+     */
+    protected function __construct()
+    {
+        parent::__construct();
+        $this->identidad = Matriz2x2::neutra();
     }
 
     /**
-     * Crea un NodoNumerico que representa un conjunto desordenado de p componentes.
+     * Devuelve la matriz identidad del nodo.
      *
-     * @param NodoNumerico[] $componentes Array de p nodos (p primo)
-     * @return NodoNumerico
+     * @return Matriz2x2
      */
-    public static function crear_conjunto(array $componentes): NodoNumerico
+    public function identidad(): Matriz2x2
     {
-        // TODO 1.4.2: Validar primo, ordenar canónicamente,
-        // multiplicar M_marca × M(ord1) × M(ord2) × ... × M(ordP),
-        // registrar en índice, enlazar componentes.
+        return $this->identidad;
     }
 
     /**
-     * Devuelve el nodo con la identidad matricial dada.
-     * Si no existe, lo crea determinando si es primo o compuesto.
+     * Indica si el nodo es una secuencia ordenada.
+     *
+     * @return bool
+     */
+    public function ordenado(): bool
+    {
+        return $this->ordenado;
+    }
+
+    /**
+     * Setter controlado para pruebas.
      *
      * @param Matriz2x2 $identidad
-     * @param string|null $fase
-     * @return NodoNumerico
-     */
-    public static function nodo_por_identidad(Matriz2x2 $identidad, ?string $fase = null): NodoNumerico
-    {
-        // TODO 1.4.2
-    }
-
-    /**
-     * Devuelve el primer NodoPrimo libre en la fase indicada.
-     * Si no hay, crea uno nuevo (si no se alcanzó el límite).
-     *
-     * @param string|null $fase
-     * @return NodoPrimo|null
-     */
-    public static function siguiente_primo_libre(?string $fase = null): ?NodoPrimo
-    {
-        // TODO 1.4.2
-    }
-
-    /**
-     * Inicializa la reserva de primos para una fase.
-     *
-     * @param string $fase
-     * @param int $limite
      * @return void
      */
-    public static function inicializar_fase(string $fase, int $limite): void
+    public function _identidad(Matriz2x2 $identidad): void
     {
-        // TODO 1.4.2
+        if (!Entorno::permite_pruebas()) {
+            self::_alerta('_identidad() solo disponible en entorno de pruebas.');
+            return;
+        }
+        $this->identidad = $identidad;
+    }
+
+    /**
+     * Verifica si un número es primo.
+     *
+     * @param int $n
+     * @return bool
+     */
+    protected static function es_primo(int $n): bool
+    {
+        if ($n < 2) return false;
+        if ($n === 2) return true;
+        if ($n % 2 === 0) return false;
+        for ($i = 3; $i * $i <= $n; $i += 2) {
+            if ($n % $i === 0) return false;
+        }
+        return true;
+    }
+
+    // ═════════════════════════════════════════════
+    // FÁBRICAS PÚBLICAS
+    // ═════════════════════════════════════════════
+
+    /**
+     * Crea un nodo numérico con una identidad no prima.
+     *
+     * @param Matriz2x2 $identidad Identidad matricial (determinante no primo).
+     * @param int $capacidad Capacidad máxima de energía.
+     * @param float $fuga Fuga de energía por ciclo.
+     * @return NodoNumerico|null
+     */
+    public static function crear_numerico(
+        Matriz2x2 $identidad,
+        int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
+        float $fuga = Conf::FUGA_NODO_ELECTRICO
+    ): ?NodoNumerico {
+        $det = $identidad->determinante();
+        if (self::es_primo($det)) {
+            self::_error('La identidad proporcionada corresponde a un número primo.');
+            return null;
+        }
+
+        $clave = (string) $identidad;
+        if (isset(self::$indice_identidad[$clave])) {
+            return self::$indice_identidad[$clave];
+        }
+
+        $nodo = parent::crear($capacidad, $fuga);
+        $nodo->identidad = $identidad;
+        $nodo->ordenado = true;
+        self::$indice_identidad[$clave] = $nodo;
+        return $nodo;
+    }
+
+    /**
+     * Crea (o recupera) un nodo primo con el número primo indicado.
+     *
+     * @param int $primo Número primo (ej. 2, 3, 5...).
+     * @param int $capacidad
+     * @param float $fuga
+     * @return NodoPrimo|null
+     */
+    public static function crear_primo(
+        int $primo,
+        int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
+        float $fuga = Conf::FUGA_NODO_ELECTRICO
+    ): ?NodoPrimo {
+        if (!self::es_primo($primo)) {
+            self::_error("El número {$primo} no es primo.");
+            return null;
+        }
+
+        $identidad = Matriz2x2::crear_prima($primo);
+        $clave = (string) $identidad;
+
+        if (isset(self::$indice_identidad[$clave])) {
+            return self::$indice_identidad[$clave];
+        }
+
+        $nodo = NodoPrimo::_crear_interno($primo, $capacidad, $fuga);
+        self::$indice_identidad[$clave] = $nodo;
+        return $nodo;
+    }
+
+    /**
+     * Crea un nodo de sincronización con los componentes dados.
+     *
+     * @param NodoNumerico[] $componentes Array de nodos (cantidad prima).
+     * @param int $capacidad
+     * @param float $fuga
+     * @return NodoParalelo|null
+     */
+    public static function crear_paralelo(
+        array $componentes,
+        int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
+        float $fuga = Conf::FUGA_NODO_ELECTRICO
+    ): ?NodoParalelo {
+        return NodoParalelo::_crear_interno($componentes, $capacidad, $fuga);
+    }
+
+    /**
+     * Crea un nuevo concepto semántico (sin nombre).
+     *
+     * @param int $capacidad
+     * @param float $fuga
+     * @return NodoConjunto
+     */
+    public static function crear_conjunto(
+        int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
+        float $fuga = Conf::FUGA_NODO_ELECTRICO
+    ): NodoConjunto {
+        return NodoConjunto::_crear_interno($capacidad, $fuga);
+    }
+
+    /**
+     * Recupera un nodo del índice global por su identidad.
+     *
+     * @param Matriz2x2 $identidad
+     * @return NodoNumerico|null
+     */
+    public static function nodo_por_identidad(Matriz2x2 $identidad): ?NodoNumerico
+    {
+        return self::$indice_identidad[(string) $identidad] ?? null;
     }
 }

@@ -75,4 +75,4 @@ include_once("Comunicadores/index.php");
 include_once("Controlador/Controlador.php");
 
 // ─── Pruebas (solo desarrollo) ─────────────────────────
-include_once("pruebas/PruebaNodoElectrico141.php");
+include_once("pruebas/PruebaNodoNumerico142.php");

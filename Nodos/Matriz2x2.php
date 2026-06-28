@@ -230,4 +230,9 @@ class Matriz2x2 extends Objeto
         }
         return true;
     }
+
+    public static function crear_negativa(int $n): Matriz2x2
+    {
+        return new self($n, 0, 1, 1);
+    }
 }

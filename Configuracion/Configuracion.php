@@ -442,30 +442,8 @@ class Conf {
      * @var array
      * @since 1.4.2
      */
-    const MATRIZ_MARCA_CONJUNTO = [[1, 1], [0, 1]];
+    public const MATRIZ_MARCA_CONJUNTO = [[1, 1], [0, 1]];
 
-    /**
-     * Almacena la instancia inmutable de la matriz de marca.
-     * @var Matriz2x2|null
-     */
-    private static ?Matriz2x2 $instancia_matriz_marca = null;
-
-    /**
-     * Devuelve la matriz de marca de conjunto como objeto Matriz2x2.
-     *
-     * La instancia se crea una sola vez y se reutiliza en todas las llamadas.
-     *
-     * @return Matriz2x2
-     * @since 1.4.2
-     */
-    public static function obtener_matriz_marca_conjunto(): Matriz2x2
-    {
-        if (self::$instancia_matriz_marca === null) {
-            $m = self::MATRIZ_MARCA_CONJUNTO;
-            self::$instancia_matriz_marca = new Matriz2x2($m[0][0], $m[0][1], $m[1][0], $m[1][1]);
-        }
-        return self::$instancia_matriz_marca;
-    }
 
 }
 
