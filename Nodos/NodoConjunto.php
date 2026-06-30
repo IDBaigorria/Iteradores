@@ -6,37 +6,37 @@ use Iteradores\Configuracion\Conf;
 use Iteradores\Nodos\Matriz2x2;
 
 /**
- * NodoConjunto – Concepto semántico con identidad negativa inmutable.
+ * NodoConjunto – Concepto semántico con identidad negativa y pintura contextual.
  *
- * Representa un **concepto abstracto** (color semántico) dentro del grafo
- * de aprendizaje. A diferencia de {@link NodoParalelo} que agrupa señales
- * simultáneas, un NodoConjunto define una categoría semántica cuyos
- * miembros pueden evolucionar con el tiempo sin alterar su identidad.
+ * Representa un **color semántico** (por ejemplo "vocales", "verbos",
+ * "dominio HTML"). Su identidad es una matriz negativa inmutable
+ * `[[-n, 1], [1, 1]]`.
  *
- * ## Identidad negativa
- * La identidad se genera con un contador global decreciente a partir de -1.
- * La forma canónica es `[[-n, 0], [1, 1]]`. Esto garantiza:
- * - **Unicidad**: cada concepto tiene una identidad irrepetible.
- * - **Inmutabilidad**: agregar o quitar miembros no cambia la matriz.
- * - **Separación espectral**: los positivos representan estructura;
- *   los negativos representan significado.
+ * ## Diccionario global
+ * Un índice estático asocia el nombre del concepto a su instancia,
+ * evitando duplicados. El método {@link _nombre()} registra el concepto
+ * tras ser etiquetado (normalmente por un humano).
  *
- * ## Nombre del concepto
- * El nombre se asigna mediante {@link _nombre()} después de la creación.
- * Una vez asignado, el concepto se registra en el **diccionario global**
- * de conceptos, permitiendo su recuperación por nombre.
+ * ## Pintura y entrelazamiento cuántico
+ * El NodoConjunto "pinta" a sus miembros multiplicando la entrada `b`
+ * de sus matrices identidad por un número primo único. Esto permite:
+ * - **Pertenencia O(1):** `miembro->identidad()->b % primo == 0`.
+ * - **Intersección O(1):** `b % (primo1 * primo2) == 0`.
+ * - **Propagación global:** el contexto viaja con la matriz al ascender.
  *
- * ## Gestión de miembros
- * Los miembros se agregan y quitan mediante enlaces adyacentes de doble vía
- * con pesos de pertenencia (dimensión `'pertenencia'`). Esto permite que
- * el conjunto evolucione sin perder su identidad ni su capacidad de
- * ascender entre fases.
+ * La pintura es reversible (despintar) y no altera las entradas `a`, `c`, `d`
+ * de la identidad nuclear del miembro. Los enlaces con pesos multidimensionales
+ * complementan la pertenencia binaria con el *grado* de asociación.
  *
- * @package Iteradores\Nodos
- * @version 1.4.2
- * @since 1.4.2
- * @author Ignacio David Baigorria
+ * ## Miembros dinámicos
+ * Los métodos {@link agregar_miembro} y {@link quitar_miembro} gestionan
+ * la membresía creando/eliminando enlaces de doble vía y aplicando la
+ * pintura/despintura sobre la matriz del miembro.
+ *
  * @extends NodoNumerico
+ * @implements IdentidadNumerica (heredado)
+ * @see Matriz2x2
+ * @see NodoNumerico
  */
 class NodoConjunto extends NodoNumerico
 {

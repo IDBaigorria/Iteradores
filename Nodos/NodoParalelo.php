@@ -6,28 +6,28 @@ use Iteradores\Configuracion\Conf;
 use Iteradores\Nodos\Matriz2x2;
 
 /**
- * NodoParalelo – Nodo numérico que agrupa componentes simultáneos.
+ * NodoParalelo – Sincronización de componentes simultáneos.
  *
- * Representa un **grupo de señales que ocurren al mismo tiempo**
- * (sincronización). Se utiliza para modelar, por ejemplo, la activación
- * simultánea de múltiples dominios en un mismo pulso del Tálamo.
- *
- * ## Identidad
- * La identidad matricial se calcula como:
- * `M_marca_sinc × M(c1) × M(c2) × ... × M(cp)`
+ * Agrupa señales que ocurren **al mismo tiempo** (por ejemplo, los
+ * dominios activos en un mismo pulso del Tálamo). Su identidad se
+ * calcula como:
+ * `M_marca × M(c1) × M(c2) × ... × M(cp)`
  * donde los componentes se ordenan canónicamente antes de multiplicar.
- * La marca de sincronización (`Conf::MATRIZ_MARCA_CONJUNTO`) diferencia
- * un NodoParalelo de una secuencia (producto simple).
+ *
+ * ## Marca de sincronización
+ * La marca `[[1, 1], [0, 1]]` diferencia a un NodoParalelo de una
+ * secuencia común. Su entrada `b=1` permite que el nodo sea pintado
+ * posteriormente por conjuntos.
  *
  * ## Cantidad prima
- * El número de componentes debe ser un número primo (2, 3, 5, 7...).
- * Esto limita el tamaño del grupo y mantiene la elegancia algebraica.
+ * El número de componentes debe ser un número primo. Esto limita el
+ * tamaño del grupo y mantiene la coherencia algebraica con el resto
+ * del sistema.
  *
- * @package Iteradores\Nodos
- * @version 1.4.2
- * @since 1.4.2
- * @author Ignacio David Baigorria
  * @extends NodoNumerico
+ * @implements IdentidadNumerica (heredado)
+ * @see Matriz2x2
+ * @see NodoConjunto
  */
 class NodoParalelo extends NodoNumerico
 {

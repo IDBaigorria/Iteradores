@@ -5,33 +5,31 @@ namespace Iteradores\Nodos;
 use Iteradores\Nodos\Matriz2x2;
 
 /**
- * NodoPrimo – Nodo numérico cuya identidad es una matriz prima.
+ * NodoPrimo – Identidad prima canónica e indivisible.
  *
- * Representa una unidad atómica e indivisible dentro de una fase.
- * Su identidad matricial tiene la forma canónica `[[p, 0], [1, 1]]`
- * donde **p** es un número primo. Esta matriz es **no conmutativa**
- * y permite que la multiplicación preserve el orden de los factores.
+ * Representa la unidad atómica del grafo de aprendizaje. Su identidad
+ * matricial es `[[p, 1], [1, 1]]` donde `p` es un número primo.
  *
- * Los NodoPrimo son los ladrillos fundamentales del grafo de aprendizaje:
- * - En fase 0 representan bytes individuales (0-255).
- * - En fases superiores representan conceptos que han ascendido
- *   desde fases inferiores.
+ * Los NodoPrimo forman el **alfabeto** de cada fase:
+ * - En fase 0 son bytes (0‑255).
+ * - En fases superiores son conceptos que han ascendido desde una fase
+ *   inferior y se representan con un nuevo número primo.
  *
  * ## Pool de primos libres
- * Cada NodoPrimo recién creado se agrega automáticamente al pool de
- * primos libres de su fase actual, quedando disponible para representar
- * composiciones ascendidas. Al asignársele un dato en la dimensión
- * `'abajo'` se considera ocupado y se retira del pool.
+ * Cada NodoPrimo se agrega automáticamente al pool de su fase al ser
+ * creado. El método {@link NodoNumerico::siguiente_primo_libre} los
+ * consume cuando un nodo compuesto necesita ascender.
  *
- * ## Factorización
- * Un NodoPrimo **no puede descomponerse** en factores dentro de su misma
- * fase. Cualquier intento de factorización devuelve una alerta.
+ * ## Inmutabilidad lógica
+ * Las entradas `a`, `c`, `d` son inmutables. La entrada `b` es un
+ * canvas de contexto mutable (ver {@link Matriz2x2}) que permite
+ * "pintar" el nodo con la pertenencia a conjuntos sin alterar su
+ * identidad prima nuclear.
  *
- * @package Iteradores\Nodos
- * @version 1.4.2
- * @since 1.4.2
- * @author Ignacio David Baigorria
  * @extends NodoNumerico
+ * @implements IdentidadNumerica (heredado)
+ * @see Matriz2x2
+ * @see NodoConjunto
  */
 class NodoPrimo extends NodoNumerico
 {

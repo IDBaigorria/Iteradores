@@ -35,7 +35,7 @@ use Iteradores\Nucleo\Objeto;
  *
  * @package Iteradores\Nodos
  * @version 1.4.0
- * @since 1.4.0
+ * @since 1.4.2
  * @author Ignacio David Baigorria
  * @extends Objeto
  * @see NodoNumerico
@@ -47,7 +47,7 @@ class Matriz2x2 extends Objeto
     public readonly int $a;
 
     /** @var int Entrada superior derecha */
-    public readonly int $b;
+    public  int $b;  // ← ahora mutable
 
     /** @var int Entrada inferior izquierda */
     public readonly int $c;
@@ -73,11 +73,19 @@ class Matriz2x2 extends Objeto
      */
     public function __construct(int $a, int $b, int $c, int $d)
     {
-        $this->a = $a;
+       $this->a = $a;
         $this->b = $b;
         $this->c = $c;
         $this->d = $d;
-        $this->determinante = $this->a * $this->d - $this->b * $this->c;
+        $this->recalcular();
+    }
+
+   /**
+     * Recalcula la representación en cadena cacheada tras un cambio en b.
+     * @return void
+     */
+    private function recalcular(): void
+    {
         $this->cadena = "[[{$this->a},{$this->b}],[{$this->c},{$this->d}]]";
     }
 
@@ -92,19 +100,27 @@ class Matriz2x2 extends Objeto
     {
         return new self(1, 0, 0, 1);
     }
-
+    /**
+     * Crea la matriz canónica para un concepto (espectro negativo).
+     * Forma: `[[-n, 1], [1, 1]]`
+     *
+     * @param int $n Entero negativo
+     * @return Matriz2x2
+     */
+    public static function crear_negativa(int $n): Matriz2x2
+    {
+        return new self($n, 1, 1, 1);
+    }
     /**
      * Crea la matriz canónica para un número primo.
+     * Forma: `[[p, 1], [1, 1]]`
      *
-     * Forma: `[[p, 0], [1, 1]]`
-     *
-     * @param int $p Número primo (no se verifica aquí)
+     * @param int $p Número primo
      * @return Matriz2x2
-     * @see NodoPrimo
      */
     public static function crear_prima(int $p): Matriz2x2
     {
-        return new self($p, 0, 1, 1);
+        return new self($p, 1, 1, 1);
     }
 
     /**
@@ -230,9 +246,37 @@ class Matriz2x2 extends Objeto
         }
         return true;
     }
-
-    public static function crear_negativa(int $n): Matriz2x2
+    /**
+     * "Pinta" la matriz añadiendo un factor primo a la entrada `b`.
+     *
+     * Esta operación es el núcleo del entrelazamiento contextual:
+     * codifica la pertenencia del nodo a un conjunto o contexto.
+     *
+     * @param int $primo Factor a multiplicar en `b`.
+     * @return void
+     * @see despintar()
+     */
+    public function pintar(int $primo): void
     {
-        return new self($n, 0, 1, 1);
+        $this->b *= $primo;
+        $this->recalcular();
+    }
+
+    /**
+     * "Despinta" la matriz dividiendo la entrada `b` por el primo indicado.
+     *
+     * Revierte la operación de {@link pintar()}.
+     *
+     * @param int $primo Factor a eliminar de `b`.
+     * @return void
+     * @throws \InvalidArgumentException si el primo no divide a `b`.
+     */
+    public function despintar(int $primo): void
+    {
+        if ($this->b % $primo !== 0) {
+            throw new \InvalidArgumentException("El primo {$primo} no está presente en b.");
+        }
+        $this->b /= $primo;
+        $this->recalcular();
     }
 }

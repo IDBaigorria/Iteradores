@@ -3,6 +3,7 @@
 namespace Iteradores\Nodos;
 use Iteradores\Configuracion\Conf;
 use Iteradores\Configuracion\Entorno;
+use Iteradores\Nodos\Interfaces\IdentidadNumerica;
 use Iteradores\Nodos\Matriz2x2;
 use Iteradores\Nodos\NodoElectrico;
 use Iteradores\Nodos\Interfaces\FabricaDeNodosNumericos;
@@ -114,10 +115,10 @@ include_once('Interfaces/FabricaDeNodosNumericos.php');
  *
  * ## Mecanismo de identidad
  *
- * | `ordenado` | Operación interna | Resultado |
- * |------------|-------------------|-----------|
- * | `true`     | `M(factor1) × M(factor2) × ... × M(factorP)` | Producto no conmutativo que preserva el orden |
- * | `false`    | `M_marca × M(comp1) × M(comp2) × ... × M(compP)` (orden canónico) | Producto con prefijo de tipo, conmutativo respecto a los componentes |
+ * | `ordenado` | Operación interna                                                 | Resultado                                                             |
+ * |------------|-------------------------------------------------------------------|-----------------------------------------------------------------------|
+ * | `true`     | `M(factor1) × M(factor2) × ... × M(factorP)`                      | Producto no conmutativo que preserva el orden                         |
+ * | `false`    | `M_marca × M(comp1) × M(comp2) × ... × M(compP)` (orden canónico) | Producto con prefijo de tipo, conmutativo respecto a los componentes  |
  *
  * La **marca de conjunto** (`Conf::MATRIZ_MARCA_CONJUNTO`) es una matriz
  * constante `[[1, 1], [0, 1]]` que actúa como firma algebraica de "conjunto".
@@ -133,12 +134,13 @@ include_once('Interfaces/FabricaDeNodosNumericos.php');
  *
  * @package Iteradores\Nodos
  * @implements FabricaDeNodosNumericos
+ * @implements IdentidadNumerica
  * @version 1.4.2
  * @since 1.4.2
  * @author Ignacio David Baigorria
  * @extends NodoElectrico
  */
-class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos
+class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, IdentidadNumerica
 {
     /**
      * Indica si el nodo representa una secuencia ordenada (true)
@@ -161,7 +163,7 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos
      *
      * @var array
      */
-    private static array $indice_identidad = [];
+    protected static array $indice_identidad = [];
 
     /**
      * Pool de primos libres por fase.
