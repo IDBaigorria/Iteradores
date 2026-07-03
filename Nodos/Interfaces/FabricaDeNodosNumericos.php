@@ -33,11 +33,11 @@ interface FabricaDeNodosNumericos extends FabricaDeNodosElectricos
      * @param float $fuga Fuga de energía por ciclo.
      * @return NodoNumerico|null
      */
-    public static function crear_numerico(
+  /*  public static function crear_numerico(
         Matriz2x2 $identidad,
         int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
         float $fuga = Conf::FUGA_NODO_ELECTRICO
-    ): ?NodoNumerico;
+    ): ?NodoNumerico;*/
 
     /**
      * Crea (o recupera) un nodo primo con el número primo indicado.
@@ -47,11 +47,11 @@ interface FabricaDeNodosNumericos extends FabricaDeNodosElectricos
      * @param float $fuga
      * @return NodoPrimo|null
      */
-    public static function crear_primo(
+   /* public static function crear_primo(
         int $primo,
         int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
         float $fuga = Conf::FUGA_NODO_ELECTRICO
-    ): ?NodoPrimo;
+    ): ?NodoPrimo;*/
 
     /**
      * Crea un nodo de sincronización con los componentes dados.
@@ -61,11 +61,11 @@ interface FabricaDeNodosNumericos extends FabricaDeNodosElectricos
      * @param float $fuga
      * @return NodoParalelo|null
      */
-    public static function crear_paralelo(
+  /* public static function crear_paralelo(
         array $componentes,
         int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
         float $fuga = Conf::FUGA_NODO_ELECTRICO
-    ): ?NodoParalelo;
+    ): ?NodoParalelo;*/
 
     /**
      * Crea un nuevo concepto semántico (sin nombre).
@@ -74,16 +74,16 @@ interface FabricaDeNodosNumericos extends FabricaDeNodosElectricos
      * @param float $fuga
      * @return NodoConjunto
      */
-    public static function crear_conjunto(
+    /*public static function crear_conjunto(
         int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
         float $fuga = Conf::FUGA_NODO_ELECTRICO
     ): NodoConjunto;
-
+*/
     /**
      * Recupera un nodo del índice global por su identidad.
      *
      * @param Matriz2x2 $identidad
      * @return NodoNumerico|null
      */
-    public static function nodo_por_identidad(Matriz2x2 $identidad): ?NodoNumerico;
+ //   public static function nodo_por_identidad(Matriz2x2 $identidad): ?NodoNumerico;
 }
