@@ -46,7 +46,7 @@ header("Cache-control: no-cache, must-revalidate");
  *
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.3.4
+ * @version   1.4.4
  */
 
 // ─── Nodos y utilidades base ───────────────────────────
@@ -64,7 +64,7 @@ include_once("Nodos/Nodo.php");
 include_once("Nodos/NodoElectrico.php");
 include_once("Nodos/Matriz2x2.php");
 include_once("Nodos/NodoNumerico.php");
-include_once("Nodos/NodoConjunto.php");
+
 // tiempo
 include_once("Tiempo/RelojAstronomico.php");
 
@@ -77,4 +77,4 @@ include_once("Comunicadores/index.php");
 include_once("Controlador/Controlador.php");
 
 // ─── Pruebas (solo desarrollo) ─────────────────────────
-include_once("pruebas/Prueba143.php");
+include_once("pruebas/Prueba144.php");

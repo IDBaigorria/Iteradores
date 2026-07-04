@@ -10,19 +10,32 @@ use Iteradores\Nodos\Matriz2x2;
  *
  * Representa la **unidad atómica** del grafo de aprendizaje. Cada NodoPrimo
  * encapsula un número primo y lo expresa matricialmente mediante la forma
- * canónica `[[p, 1], [1, 1]]` (ver {@link Matriz2x2::crear_prima()}).
+ * canónica inmutable `[[p, 0], [1, 1]]` (ver {@link Matriz2x2::crear_prima()}).
  *
  * Estos nodos constituyen el **alfabeto** de cada fase:
- * - En la fase 0 son los bytes (valores 0‑255).
- * - En fases superiores son conceptos que han ascendido desde una fase
- *   inferior y se representan con un nuevo número primo.
+ * - En la fase 0 son los bytes (valores 0‑255) o comandos atómicos.
+ * - En fases superiores son secuencias que han ascendido y se representan
+ *   con un nuevo número primo (positivo para hacer, negativo para deshacer).
+ *
+ * ## P‑grama de un primo
+ *
+ * A diferencia de los nodos compuestos, un NodoPrimo tiene un p‑grama
+ * formado exclusivamente por su propio número primo:
+ *
+ * ```
+ * p‑grama = [p]   (sin marca 1)
+ * ```
+ *
+ * Esto permite que los métodos de ascenso/descenso de {@link NodoNumerico}
+ * traten a los primos de manera uniforme: el p‑grama es la única fuente de
+ * verdad sobre la identidad, también para los nodos atómicos.
  *
  * ## Responsabilidades principales
  *
- * 1. **Identidad prima inmutable (salvo canvas `b`)**
- *    Las entradas `a`, `c` y `d` de su {@link Matriz2x2} son fijas. Solo la
- *    entrada `b` (canvas de pertenencia) puede modificarse para reflejar
- *    la pertenencia a conjuntos, sin alterar la identidad nuclear del nodo.
+ * 1. **Identidad prima inmutable**
+ *    Las cuatro entradas de su {@link Matriz2x2} son fijas una vez construido
+ *    el nodo. La matriz actúa como un identificador compacto y no conmutativo,
+ *    sin almacenar información contextual.
  *
  * 2. **Pool de primos libres por fase**
  *    Para optimizar el ascenso de nodos compuestos, la clase mantiene un
@@ -32,9 +45,9 @@ use Iteradores\Nodos\Matriz2x2;
  *
  * 3. **Factorización bloqueada en su propia fase**
  *    Un NodoPrimo no puede descomponerse dentro de la misma fase. El método
- *    {@link factorizar()} lanza una excepción. La factorización solo tiene
- *    sentido al descender de fase, donde se recupera la matriz compuesta
- *    original desde el dato `'abajo'`.
+ *    {@link factorizar()} lanza una excepción. La descomposición solo es
+ *    posible al descender de fase, utilizando el dato `'abajo'` almacenado
+ *    durante el ascenso.
  *
  * ## Herencia y polimorfismo
  *
@@ -42,25 +55,27 @@ use Iteradores\Nodos\Matriz2x2;
  * permite consultar la naturaleza atómica de cualquier nodo de la jerarquía
  * sin necesidad de verificar su clase concreta.
  *
- * ## Relación con el canvas de contexto
+ * ## Comandos destructivos (deshacer)
  *
- * El canvas `b` de su matriz identidad puede ser pintado por {@link NodoConjunto}
- * para indicar pertenencia. A su vez, el NodoPrimo puede pintar a los conjuntos
- * a los que pertenece, creando un **entrelazamiento de conjunto** verificable
- * en O(1) mediante el operador módulo.
+ * Un NodoPrimo puede representar tanto un comando constructivo (primo positivo)
+ * como su correspondiente deshacer (primo negativo). El signo del número primo
+ * determina el tipo de acción, y la matriz canónica `[[-p, 0], [1, 1]]` lo
+ * refleja en su entrada `a`. La gestión de ambos es simétrica y comparten el
+ * mismo pool de libres.
  *
  * @package Iteradores\Nodos
- * @version 1.4.3
+ * @version 1.4.4
  * @since 1.4.2
  * @author Ignacio David Baigorria
  * @extends NodoNumerico
  * @see Matriz2x2
- * @see NodoConjunto
  */
 class NodoPrimo extends NodoNumerico
 {
     /**
      * Número primo representado por este nodo.
+     *
+     * Puede ser positivo (comando constructivo) o negativo (comando destructivo).
      *
      * @var int
      */
@@ -90,18 +105,16 @@ class NodoPrimo extends NodoNumerico
      * Constructor protegido.
      *
      * Inicializa el nodo con el número primo indicado, asigna la matriz
-     * canónica correspondiente y marca el nodo como ordenado (aunque un
-     * primo no es una secuencia, internamente se trata como componente
-     * unitario ordenado).
+     * canónica correspondiente y establece el p‑grama como `[$numero_primo]`.
      *
-     * @param int $numero_primo Número primo a encapsular.
+     * @param int $numero_primo Número primo a encapsular (positivo o negativo).
      */
     protected function __construct(int $numero_primo)
     {
         parent::__construct();
         $this->numero_primo = $numero_primo;
-        $this->ordenado = true;
         $this->_identidad(Matriz2x2::crear_prima($numero_primo));
+        $this->_pgrama([$numero_primo]);   // p‑grama de un primo: solo él mismo
     }
 
     /**
@@ -113,7 +126,7 @@ class NodoPrimo extends NodoNumerico
      * reciclarlo más tarde, debe llamarse explícitamente a
      * {@link devolver_primo_libre()}.
      *
-     * @param int   $numero_primo Número primo validado.
+     * @param int   $numero_primo Número primo (positivo o negativo).
      * @param int   $capacidad    Capacidad máxima de energía.
      * @param float $fuga         Fuga de energía por ciclo.
      * @return NodoPrimo
@@ -153,7 +166,7 @@ class NodoPrimo extends NodoNumerico
      * Los NodoPrimo no pueden descomponerse dentro de su propia fase.
      * La factorización solo es posible al descender de fase, donde se
      * utiliza la información almacenada en el dato multidimensional
-     * (por ejemplo, `dato('matriz_compuesta', 'abajo')`).
+     * (dimensión `'abajo'`).
      *
      * @return void
      * @throws \BadMethodCallException Siempre lanza esta excepción.

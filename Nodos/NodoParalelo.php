@@ -8,35 +8,27 @@ use Iteradores\Nodos\Matriz2x2;
 /**
  * NodoParalelo – Sincronización de componentes simultáneos.
  *
- * Representa un **grupo de señales o comandos que ocurren en el mismo
- * instante lógico** (por ejemplo, todos los dominios activos en un único
- * pulso del Tálamo). A diferencia de una secuencia ordenada, los
- * componentes de un NodoParalelo no tienen un orden predefinido: el
- * sistema los trata como un conjunto simultáneo cuya identidad es
- * **conmutativa**.
+ * Representa un **grupo de comandos o señales que ocurren en el mismo
+ * instante lógico**. A diferencia de una secuencia ordenada, los componentes
+ * de un NodoParalelo no tienen un orden predefinido: el sistema los trata
+ * como un conjunto simultáneo cuya identidad es **conmutativa**.
  *
- * ## Identidad matricial
+ * ## Identidad y p‑grama
  *
- * La identidad de un NodoParalelo se construye como:
+ * La identidad de un NodoParalelo se construye a partir de su **p‑grama**,
+ * que siempre comienza con el marcador `1` seguido de los factores primos
+ * ordenados canónicamente:
+ *
  * ```
- * M_marca × M(c₁) × M(c₂) × … × M(cₚ)
+ * p‑grama = [1, p₁, p₂, …, pₚ]   (primos en orden canónico)
+ * matriz  = M(1) × M(p₁) × M(p₂) × … × M(pₚ)
  * ```
- * donde los componentes se ordenan **canónicamente** (según la
- * representación textual de sus matrices identidad) antes de la
- * multiplicación. Esto garantiza que el producto sea el mismo
- * independientemente del orden en que se pasen los componentes a la
- * fábrica.
  *
- * ## Marca de sincronización
- *
- * La matriz `[[1, 1], [0, 1]]` (definida en {@link Conf::MATRIZ_MARCA_CONJUNTO})
- * se antepone al producto de los componentes para **marcar algebraicamente**
- * que este nodo es una sincronización y no una secuencia común.
- *
- * - La entrada `b = 1` permite que el nodo sea pintado posteriormente por
- *   conjuntos sin alterar su estructura.
- * - La entrada `c = 0` distingue la marca de las matrices canónicas de los
- *   primos (que siempre tienen `c = 1`).
+ * donde `M(1)` es {@link Matriz2x2::inicial()} (`[[1,0],[1,1]]`). El `1`
+ * al inicio del p‑grama es el **marcador de sincronización**: no es un primo
+ * y nunca aparecerá como identificador de un comando atómico. Su presencia
+ * permite distinguir algebraicamente un paralelo de una secuencia sin
+ * necesidad de un flag separado.
  *
  * ## Cantidad prima de componentes
  *
@@ -45,7 +37,7 @@ use Iteradores\Nodos\Matriz2x2;
  *
  * - Mantiene la coherencia algebraica con el resto del sistema, que opera
  *   con p‑gramas primos.
- * - Evita la ambigüedad en la factorización: un grupo de 4 podría
+ * - Evita la ambigüedad en la descomposición: un grupo de 4 podría
  *   confundirse con dos grupos de 2, pero 3 o 5 no admiten esa ambigüedad.
  * - Facilita el ascenso de fase, ya que los primos son las unidades
  *   atómicas que ascienden.
@@ -54,32 +46,26 @@ use Iteradores\Nodos\Matriz2x2;
  *
  * - Hereda de {@link NodoNumerico} e implementa {@link IdentidadNumerica}
  *   (a través de la herencia).
- * - Su propiedad `ordenado` es `false`, lo que lo distingue de las
- *   secuencias creadas con {@link NodoNumerico::crear_numerico()}.
- * - Puede ser **pintado** por {@link NodoConjunto} a través del canvas `b`
- *   de su matriz identidad, igual que cualquier otro nodo.
+ * - Su p‑grama comienza con `1`, lo que lo distingue de las secuencias
+ *   creadas con {@link NodoNumerico::crear_numerico()}.
+ * - Puede ascender a una fase superior mediante {@link NodoNumerico::ascender()},
+ *   que guarda su p‑grama en un {@link NodoPrimo} de la fase destino.
  *
  * @package Iteradores\Nodos
- * @version 1.4.3
+ * @version 1.4.4
  * @since 1.4.2
  * @author Ignacio David Baigorria
  * @extends NodoNumerico
  * @see Matriz2x2
- * @see NodoConjunto
- * @see Conf::MATRIZ_MARCA_CONJUNTO
  */
 class NodoParalelo extends NodoNumerico
 {
     /**
      * Constructor protegido.
-     *
-     * Inicializa el nodo con `ordenado = false`, reflejando su naturaleza
-     * de conjunto simultáneo sin orden preestablecido.
      */
     protected function __construct()
     {
         parent::__construct();
-        $this->ordenado = false;
     }
 
     /**
@@ -91,13 +77,15 @@ class NodoParalelo extends NodoNumerico
      *    primo, se registra un error y se retorna `null`.
      * 2. **Ordenación canónica:** los componentes se ordenan según la
      *    representación textual de sus identidades matriciales. Esto asegura
-     *    que el producto sea conmutativo.
-     * 3. **Cálculo de la matriz identidad:** se multiplica la marca de
-     *    sincronización ({@link Conf::MATRIZ_MARCA_CONJUNTO}) por las
-     *    identidades de los componentes en orden canónico.
-     * 4. **Asignación al nodo:** se crea la instancia, se le asigna la
-     *    matriz resultante y se enlazan los componentes mediante adyacentes
-     *    con nombres `componente_1`, `componente_2`, …, `componente_p`.
+     *    que el p‑grama y la matriz sean conmutativos.
+     * 3. **Construcción del p‑grama:** se crea el array `[1, p₁, p₂, …, pₚ]`
+     *    donde `pᵢ` son los números primos de los componentes ya ordenados.
+     * 4. **Cálculo de la matriz identidad:** se multiplica {@link Matriz2x2::inicial()}
+     *    (que actúa como `M(1)`) por las identidades de los componentes en
+     *    orden canónico.
+     * 5. **Asignación al nodo:** se crea la instancia, se le asigna la
+     *    matriz, el p‑grama y la capacidad/fuga. **No se crean enlaces
+     *    internos**; esa es responsabilidad del iterador.
      *
      * @param NodoNumerico[] $componentes Componentes del grupo (cantidad prima).
      * @param int            $capacidad   Capacidad máxima de energía.
@@ -116,48 +104,32 @@ class NodoParalelo extends NodoNumerico
             return null;
         }
 
-        // Ordenar canónicamente.
+        // Ordenar canónicamente por representación textual de la identidad.
         usort($componentes, function (NodoNumerico $a, NodoNumerico $b) {
             return strcmp((string) $a->identidad(), (string) $b->identidad());
         });
 
-        // Calcular matriz con marca.
-        $marca = self::obtener_matriz_marca();
-        $matriz = $marca;
+        // Construir p‑grama: [1, p₁, p₂, …, pₚ]
+        $pgrama = [1];
+        foreach ($componentes as $comp) {
+            if ($comp instanceof NodoPrimo) {
+                $pgrama[] = $comp->numero_primo();
+            }
+        }
+
+        // Calcular matriz: M(1) × M(p₁) × M(p₂) × … × M(pₚ)
+        $matriz = Matriz2x2::inicial();  // M(1) = [[1,0],[1,1]]
         foreach ($componentes as $comp) {
             $matriz = $matriz->multiplicar($comp->identidad());
         }
 
-        // Crear nodo y asignar identidad en fase actual.
+        // Crear nodo y asignar identidad y p‑grama en fase actual.
         $nodo = new self();
         $nodo->capacidad = $capacidad;
         $nodo->fuga = $fuga;
         $nodo->_identidad($matriz);
-
-        // Enlazar componentes.
-        for ($i = 0; $i < $cantidad; $i++) {
-            $nodo->_adyacente_en($componentes[$i], 'componente_' . ($i + 1), true);
-        }
+        $nodo->_pgrama($pgrama);
 
         return $nodo;
-    }
-
-    /**
-     * Devuelve la marca de sincronización cacheada.
-     *
-     * La marca es la matriz `[[1, 1], [0, 1]]` definida en
-     * {@link Conf::MATRIZ_MARCA_CONJUNTO}. Se cachea estáticamente para
-     * evitar recrearla en cada llamada.
-     *
-     * @return Matriz2x2
-     */
-    private static function obtener_matriz_marca(): Matriz2x2
-    {
-        static $marca = null;
-        if ($marca === null) {
-            $m = Conf::MATRIZ_MARCA_CONJUNTO; // [[1,1],[0,1]]
-            $marca = new Matriz2x2($m[0][0], $m[0][1], $m[1][0], $m[1][1]);
-        }
-        return $marca;
     }
 }

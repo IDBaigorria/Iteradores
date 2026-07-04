@@ -15,66 +15,67 @@ include_once(__DIR__."/Interfaces/IdentidadNumerica.php");
 /**
  * NodoNumerico – Orquestador central de identidades numéricas.
  *
- * Clase abstracta que actúa como **punto de creación y reciclaje** de todos los nodos
- * con identidad matricial. Es la implementación base de la que heredan
- * {@link NodoPrimo}, {@link NodoParalelo} y {@link NodoConjunto}.
+ * Clase base de la que heredan {@link NodoPrimo} y {@link NodoParalelo}.
+ * Actúa como **punto de creación y reciclaje** de todos los nodos con
+ * identidad matricial, y gestiona el ascenso y descenso entre fases.
  *
  * ## Responsabilidades principales
  *
- * 1. **Identidad multifase**  
+ * 1. **Identidad multifase**
  *    Cada instancia mantiene un mapa `identidad_por_fase[fase]` que asocia una
- *    {@link Matriz2x2} distinta a cada fase de trabajo. Esto permite que un mismo
- *    nodo represente una secuencia en la fase `a`, un conjunto en la fase `b` y un
- *    primo en la fase `c`, sin que las mutaciones del canvas `b` en una fase
- *    interfieran en las demás.
+ *    {@link Matriz2x2} distinta a cada fase de trabajo.
  *
- * 2. **Caché global de primos**  
+ * 2. **P‑grama multifase**
+ *    El mapa `pgrama_por_fase[fase]` almacena la lista exacta de factores que
+ *    componen el nodo en cada fase. Es la **única fuente de verdad** sobre la
+ *    identidad compuesta. La matriz identidad se deriva completamente de este
+ *    p‑grama. Las marcas especiales al inicio del array indican el tipo:
+ *    - `1`: paralelo (sincronización de componentes simultáneos).
+ *    - `-1`: secuencia de deshacer (todos los factores son comandos destructivos).
+ *    - Sin marca: secuencia de hacer (comandos constructivos).
+ *
+ * 3. **Caché global de primos**
  *    La lista estática `$primos_conocidos` crece con cada nuevo primo descubierto,
  *    compartida por todas las fases. Métodos como {@link es_numero_primo()} y
  *    {@link siguiente_numero_primo()} la consultan y expanden, evitando recalcular
  *    primalidad para números ya conocidos.
  *
- * 3. **Contadores multifase de primos**  
- *    Dos mapas `$ultimo_primo_positivo_por_fase` y `$ultimo_primo_negativo_por_fase`
- *    guardan el último primo asignado en cada fase para los espectros positivo
- *    (nodos primos) y negativo (conjuntos). Así cada fase posee su propio espacio
- *    de identidades independiente, esencial para el ascenso/descenso jerárquico.
+ * 4. **Contador multifase de primos**
+ *    El mapa `$ultimo_primo_positivo_por_fase` guarda el último primo asignado en
+ *    cada fase para los comandos constructivos (positivos) y destructivos (negativos).
  *
- * 4. **Pool de nodos libres**  
+ * 5. **Pool de nodos libres**
  *    Para evitar la creación innecesaria de instancias, la clase mantiene un
  *    conjunto de nodos reutilizables por fase (`$nodos_libres_por_fase`).
  *    Las fábricas obtienen nodos mediante {@link tomar_nodo_libre()} y los
- *    devuelven con {@link devolver_nodo_libre()} una vez que dejan de usarse
- *    (por ejemplo, tras ascender a otra fase).
+ *    devuelven con {@link devolver_nodo_libre()} una vez que dejan de usarse.
  *
- * ## Entrelazamiento de conjunto (pintura)
+ * 6. **Ascenso y descenso entre fases**
+ *    El método {@link ascender()} promociona un nodo compuesto a la fase superior,
+ *    guardando su p‑grama y el nombre de la fase actual en un {@link NodoPrimo}
+ *    libre. No libera el nodo actual. El método estático {@link descender()}
+ *    reconstruye el nodo compuesto en la fase original a partir del p‑grama
+ *    guardado. Las marcas `1` y `-1` determinan el tipo de composición.
  *
- * La entrada `b` de la {@link Matriz2x2} actúa como **canvas de pertenencia**.
- * Cuando un {@link NodoConjunto} agrega un miembro, ambos se «pintan» mutuamente:
- * el miembro multiplica su `b` por el primo de contexto del conjunto, y el conjunto
- * multiplica su `b` por el número primo del miembro. La verificación de pertenencia
- * es O(1) mediante el operador módulo, sin necesidad de índices externos.
+ * ## Identidad matricial inmutable
+ *
+ * A partir de la versión 1.4.4, la {@link Matriz2x2} es completamente inmutable
+ * (`b = 0` fijo). La matriz actúa como un **identificador compacto y no conmutativo**
+ * de la secuencia de factores, sin almacenar información contextual.
  *
  * @package Iteradores\Nodos
- * @version 1.4.3
+ * @version 1.4.4
  * @since 1.4.2
  * @author Ignacio David Baigorria
  * @extends NodoElectrico
  * @implements FabricaDeNodosNumericos
  * @implements IdentidadNumerica
+ * @see Matriz2x2
+ * @see NodoPrimo
+ * @see NodoParalelo
  */
 class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, IdentidadNumerica
 {
-    /**
-     * Indica si el nodo representa una secuencia ordenada.
-     *
-     * - `true`  → secuencia (producto no conmutativo de factores).
-     * - `false` → conjunto o paralelo (producto conmutativo con marca).
-     *
-     * @var bool
-     */
-    protected bool $ordenado;
-
     /**
      * Identidad matricial del nodo, indexada por fase.
      *
@@ -92,6 +93,28 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      */
     private array $identidad_por_fase = [];
 
+    /**
+     * P‑grama de factores, indexado por fase.
+     *
+     * Almacena la secuencia exacta de identificadores que componen el nodo
+     * en cada fase. Es la **única fuente de verdad** para el ascenso/descenso.
+     *
+     * - **Secuencia:** `[p₁, p₂, …, pₚ]`
+     * - **Paralelo:** `[1, p₁, p₂, …, pₚ]` (primos en orden canónico)
+     *
+     * Estructura:
+     * ```
+     * [
+     *   'fase_a' => [2, 3, 5],
+     *   'fase_b' => [1, 7, 11],
+     *   ...
+     * ]
+     * ```
+     *
+     * @var array<string, int[]>
+     */
+    private array $pgrama_por_fase = [];
+
     // ═══════════════════════════════════════════
     // CACHÉ DE PRIMOS (GLOBAL)
     // ═══════════════════════════════════════════
@@ -106,23 +129,14 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
     private static array $primos_conocidos = [2, 3];
 
     /**
-     * Último número primo positivo asignado en cada fase.
+     * Último número primo asignado en cada fase.
      *
-     * Usado por {@link siguiente_primo_positivo()} para generar primos únicos.
+     * Usado por {@link siguiente_primo_positivo()} para generar primos únicos,
+     * tanto para comandos constructivos como destructivos.
      *
      * @var array<string, int>
      */
     protected static array $ultimo_primo_positivo_por_fase = [];
-
-    /**
-     * Último número primo (positivo) usado para crear identidades negativas
-     * de conjuntos en cada fase.
-     *
-     * Usado por {@link siguiente_primo_negativo()} para generar primos únicos.
-     *
-     * @var array<string, int>
-     */
-    protected static array $ultimo_primo_negativo_por_fase = [];
 
     // ═══════════════════════════════════════════
     // POOL DE NODOS LIBRES
@@ -159,7 +173,7 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      * Obtiene la identidad matricial del nodo en la fase indicada.
      *
      * Si no existe una matriz para la fase solicitada, devuelve
-     * {@link Matriz2x2::inicial()} (matriz semilla `[[1,1],[1,2]]`).
+     * {@link Matriz2x2::inicial()} (matriz semilla `[[1,0],[1,1]]`).
      *
      * @param string|null $fase Fase de trabajo (null = fase actual del sistema).
      * @return Matriz2x2
@@ -188,14 +202,33 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
         $matriz->_nodo($this);
     }
 
+    // ═══════════════════════════════════════════
+    // P-GRAMA MULTIFASE
+    // ═══════════════════════════════════════════
+
     /**
-     * Indica si el nodo representa una secuencia ordenada.
+     * Obtiene el p‑grama de factores del nodo en la fase indicada.
      *
-     * @return bool
+     * @param string|null $fase Fase de trabajo (null = fase actual del sistema).
+     * @return int[] Lista de identificadores, o array vacío si no hay p‑grama en esa fase.
      */
-    public function ordenado(): bool
+    public function pgrama(?string $fase = null): array
     {
-        return $this->ordenado;
+        $fase = $fase ?? self::$fase;
+        return $this->pgrama_por_fase[$fase] ?? [];
+    }
+
+    /**
+     * Asigna el p‑grama de factores en la fase indicada.
+     *
+     * @param int[] $pgrama Lista de identificadores.
+     * @param string|null $fase
+     * @return void
+     */
+    public function _pgrama(array $pgrama, ?string $fase = null): void
+    {
+        $fase = $fase ?? self::$fase;
+        $this->pgrama_por_fase[$fase] = $pgrama;
     }
 
     /**
@@ -301,9 +334,12 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
 
     /**
      * Devuelve el siguiente número primo disponible para **nodos primos**
-     * (espectro positivo) en la fase indicada.
+     * en la fase indicada.
      *
-     * Avanza el contador correspondiente y actualiza la caché.
+     * Avanza el contador correspondiente y actualiza la caché. El mismo
+     * contador se usa para comandos constructivos (positivos) y destructivos
+     * (negativos), ya que ambos comparten el mismo espacio de identidades
+     * primas; el signo lo determina el llamante al crear la matriz.
      *
      * @param string|null $fase Fase de trabajo (null = fase actual).
      * @return int Nuevo número primo.
@@ -318,23 +354,6 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
         return $nuevo;
     }
 
-    /**
-     * Devuelve el siguiente número primo (positivo) para crear identidades
-     * negativas de **conjuntos** en la fase indicada.
-     *
-     * @param string|null $fase
-     * @return int Nuevo número primo (positivo) para un conjunto negativo.
-     * @see NodoConjunto
-     */
-    public static function siguiente_primo_negativo(?string $fase = null): int
-    {
-        $fase = $fase ?? self::$fase;
-        $ultimo = self::$ultimo_primo_negativo_por_fase[$fase] ?? 2;
-        $nuevo = self::siguiente_numero_primo($ultimo);
-        self::$ultimo_primo_negativo_por_fase[$fase] = $nuevo;
-        return $nuevo;
-    }
-
     // ═══════════════════════════════════════════
     // POOL DE NODOS LIBRES
     // ═══════════════════════════════════════════
@@ -343,8 +362,8 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      * Toma un nodo libre del pool para la fase indicada.
      *
      * Si el pool está vacío, crea una nueva instancia llamando a
-     * {@link NodoElectrico::crear()}. Al tomar un nodo del pool, se limpia
-     * su identidad anterior en esa fase por seguridad.
+     * {@link NodoElectrico::crear()}. Al tomar un nodo del pool, se limpian
+     * su identidad y p‑grama anteriores en esa fase por seguridad.
      *
      * @param string|null $fase
      * @return NodoNumerico Nodo reutilizado o recién creado.
@@ -357,8 +376,9 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
         }
         if (!empty(self::$nodos_libres_por_fase[$fase])) {
             $nodo = array_shift(self::$nodos_libres_por_fase[$fase]);
-            // Limpiar identidad anterior (por seguridad).
+            // Limpiar propiedades multifase anteriores (por seguridad).
             unset($nodo->identidad_por_fase[$fase]);
+            unset($nodo->pgrama_por_fase[$fase]);
             return $nodo;
         }
         return parent::crear();
@@ -379,6 +399,117 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
         }
         self::$nodos_libres_por_fase[$fase][] = $nodo;
     }
+    
+    // ═══════════════════════════════════════════
+    // ASCENSO Y DESCENSO ENTRE FASES
+    // ═══════════════════════════════════════════
+
+    /**
+     * Asciende el nodo compuesto a la fase superior.
+     *
+     * El proceso de ascenso:
+     * 1. Recopila el p‑grama de la fase actual.
+     * 2. Obtiene un {@link NodoPrimo} libre en la fase de destino.
+     * 3. Guarda en el dato multidimensional del primo (dimensión `'abajo'`)
+     *    un paquete con el p‑grama de factores y el nombre de la fase actual.
+     * 4. No libera el nodo actual; esa responsabilidad es del iterador de aprendizaje.
+     *
+     * @param string $fase_destino Nombre de la fase superior a la que ascender.
+     * @return NodoPrimo El NodoPrimo que representa al nodo compuesto en la fase superior.
+     * @throws \RuntimeException Si el nodo no tiene p‑grama en la fase actual.
+     */
+    public function ascender(string $fase_destino): NodoPrimo
+    {
+        $fase_actual = self::$fase;
+
+        // Obtener el p‑grama de la fase actual.
+        $factores = $this->pgrama($fase_actual);
+        if (empty($factores)) {
+            self::_error('El nodo no tiene p‑grama en la fase actual para ascender.');
+            throw new \RuntimeException('El nodo no tiene p‑grama en la fase actual para ascender.');
+        }
+
+        // Obtener NodoPrimo libre en la fase destino.
+        self::$fase = $fase_destino;
+        $primo_superior = NodoPrimo::siguiente_primo_libre($fase_destino);
+        self::$fase = $fase_actual;
+
+        if ($primo_superior === null) {
+            self::_error('No hay NodoPrimo libre en la fase destino.');
+            throw new \RuntimeException('No hay NodoPrimo libre en la fase destino.');
+        }
+
+        // Guardar el p‑grama y el nombre de la fase actual en el primo superior.
+        $primo_superior->_dato([
+            'factores'    => $factores,
+            'fase_origen' => $fase_actual,
+        ], 'abajo');
+
+        // El nodo actual NO se devuelve al pool; permanece activo para el iterador.
+
+        return $primo_superior;
+    }
+
+    /**
+     * Desciende un nodo compuesto desde un NodoPrimo superior a la fase original.
+     *
+     * El proceso de descenso:
+     * 1. Lee el dato `'abajo'` del {@link NodoPrimo} superior, que contiene
+     *    el p‑grama de factores y el nombre de la fase origen (guardados por
+     *    {@link ascender}).
+     * 2. Determina el tipo de composición observando el primer elemento del
+     *    p‑grama:
+     *    - `1`: paralelo.
+     *    - `-1`: secuencia de deshacer.
+     *    - otro: secuencia de hacer.
+     * 3. Crea los {@link NodoPrimo} correspondientes a cada factor y construye
+     *    el nodo compuesto en la fase origen con la fábrica adecuada.
+     *
+     * @param NodoPrimo $primo_superior El NodoPrimo en la fase superior que
+     *                                  contiene el p‑grama y la fase origen.
+     * @return NodoNumerico El nodo compuesto reconstruido en la fase origen.
+     * @throws \RuntimeException Si el dato 'abajo' no existe, no contiene factores
+     *                          o no contiene el nombre de la fase origen.
+     */
+    public static function descender(NodoPrimo $primo_superior): NodoNumerico
+    {
+        $paquete = $primo_superior->dato('abajo');
+
+        if ($paquete === null || !isset($paquete['factores']) || !isset($paquete['fase_origen'])) {
+            self::_error('El NodoPrimo no contiene un paquete de descenso válido (factores y fase_origen).');
+            throw new \RuntimeException('El NodoPrimo no contiene un paquete de descenso válido.');
+        }
+
+        $factores = $paquete['factores'];
+        $fase_origen = $paquete['fase_origen'];
+
+        // Determinar el tipo de composición según la marca inicial.
+        $es_paralelo  = ($factores[0] === 1);
+        $es_deshacer  = ($factores[0] === -1);
+        if ($es_paralelo || $es_deshacer) {
+            array_shift($factores); // quitar la marca (1 o -1)
+        }
+
+        // Crear los componentes (NodoPrimo) a partir de los factores reales.
+        $componentes = [];
+        foreach ($factores as $primo) {
+            $componentes[] = self::crear_primo($primo);
+        }
+
+        // Cambiar a la fase origen para la creación.
+        $fase_actual = self::$fase;
+        self::$fase = $fase_origen;
+
+        // Crear el nodo compuesto con la fábrica adecuada.
+        if ($es_paralelo) {
+            $nodo = self::crear_paralelo($componentes);
+        } else {
+            $nodo = self::crear_numerico($componentes);
+        }
+
+        self::$fase = $fase_actual;
+        return $nodo;
+    }
 
     // ═══════════════════════════════════════════
     // FÁBRICAS
@@ -391,8 +522,12 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      * resultante es el **producto matricial no conmutativo** de las identidades
      * de los componentes en el orden proporcionado.
      *
-     * Se toma un nodo del pool (o se crea uno nuevo) y se le enlazan los
-     * componentes mediante adyacentes `factor_1`, `factor_2`, etc.
+     * Si todos los componentes son deshaceres (primos negativos), se antepone
+     * la marca `-1` al p‑grama.
+     *
+     * Se toma un nodo del pool (o se crea uno nuevo) y se le asignan la
+     * matriz, el p‑grama y la capacidad/fuga en la fase actual.
+     * **No se crean enlaces internos**; esa es responsabilidad del iterador.
      *
      * @param NodoNumerico[] $componentes Componentes de la secuencia (cantidad prima).
      * @param int            $capacidad   Capacidad máxima de energía.
@@ -413,20 +548,30 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
 
         // Calcular identidad como producto en orden.
         $matriz = $componentes[0]->identidad();
+        $factores = [];
+        $es_deshacer = true;
+        foreach ($componentes as $comp) {
+            if ($comp instanceof NodoPrimo) {
+                $factores[] = $comp->numero_primo();
+                if ($comp->numero_primo() > 0) {
+                    $es_deshacer = false;
+                }
+            }
+        }
         for ($i = 1; $i < $cantidad; $i++) {
             $matriz = $matriz->multiplicar($componentes[$i]->identidad());
         }
 
+        // Si todos los componentes son deshaceres, anteponer marca -1.
+        if ($es_deshacer && !empty($factores)) {
+            array_unshift($factores, -1);
+        }
+
         $nodo = self::tomar_nodo_libre();
         $nodo->_identidad($matriz);
-        $nodo->ordenado = true;
+        $nodo->_pgrama($factores);
         $nodo->capacidad = $capacidad;
         $nodo->fuga = $fuga;
-
-        // Enlazar componentes.
-        for ($i = 0; $i < $cantidad; $i++) {
-            $nodo->_adyacente_en($componentes[$i], 'factor_' . ($i + 1), true);
-        }
 
         return $nodo;
     }
@@ -434,10 +579,11 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
     /**
      * Crea un nodo primo con el número primo indicado.
      *
-     * @param int   $primo      Número primo.
+     * @param int   $primo      Número primo (positivo para comando constructivo,
+     *                          negativo para destructivo).
      * @param int   $capacidad  Capacidad máxima de energía.
      * @param float $fuga       Fuga de energía por ciclo.
-     * @return NodoPrimo|null  El NodoPrimo creado, o `null` si el número no es primo.
+     * @return NodoPrimo|null  El NodoPrimo creado, o `null` si el valor absoluto no es primo.
      * @see NodoPrimo
      */
     public static function crear_primo(
@@ -445,8 +591,8 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
         int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
         float $fuga = Conf::FUGA_NODO_ELECTRICO
     ): ?NodoPrimo {
-        if (!self::es_numero_primo($primo)) {
-            self::_error("El número {$primo} no es primo.");
+        if (!self::es_numero_primo(abs($primo))) {
+            self::_error("El valor absoluto de {$primo} no es primo.");
             return null;
         }
         return NodoPrimo::_crear_interno($primo, $capacidad, $fuga);
@@ -456,8 +602,10 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      * Crea un nodo de sincronización (paralelo) con los componentes dados.
      *
      * La cantidad de componentes debe ser un número primo. La identidad es
-     * el producto conmutativo (orden canónico) antecedido por la marca de
-     * sincronización {@link Conf::MATRIZ_MARCA_CONJUNTO}.
+     * el producto conmutativo (orden canónico) con la marca `1` antepuesta
+     * en el p‑grama.
+     *
+     * Delega completamente en {@link NodoParalelo::_crear_interno()}.
      *
      * @param NodoNumerico[] $componentes Componentes (cantidad prima).
      * @param int            $capacidad
@@ -471,23 +619,5 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
         float $fuga = Conf::FUGA_NODO_ELECTRICO
     ): ?NodoParalelo {
         return NodoParalelo::_crear_interno($componentes, $capacidad, $fuga);
-    }
-
-    /**
-     * Crea un nuevo concepto semántico (conjunto) vacío.
-     *
-     * El conjunto nace sin miembros; se irá poblando mediante pintura
-     * a través de {@link NodoConjunto::agregar_miembro()}.
-     *
-     * @param int   $capacidad Capacidad máxima de energía.
-     * @param float $fuga      Fuga de energía por ciclo.
-     * @return NodoConjunto
-     * @see NodoConjunto
-     */
-    public static function crear_conjunto(
-        int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
-        float $fuga = Conf::FUGA_NODO_ELECTRICO
-    ): NodoConjunto {
-        return NodoConjunto::_crear_interno($capacidad, $fuga);
     }
 }

@@ -48,5 +48,5 @@ interface IdentidadNumerica
      *
      * @return bool
      */
-    public function ordenado(): bool;
+    //public function ordenado(): bool;
 }
