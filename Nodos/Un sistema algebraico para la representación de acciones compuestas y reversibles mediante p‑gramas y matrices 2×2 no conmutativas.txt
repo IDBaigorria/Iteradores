@@ -1,0 +1,210 @@
+# Un sistema algebraico para la representación de acciones compuestas y reversibles mediante matrices 2×2 no conmutativas
+
+**Autor: Ignacio David Baigorria**  
+**Versión 1.4.4' – Julio 2026**
+
+---
+
+## 1. Introducción
+
+En todo sistema dinámico —ya sea un procesador de comandos, un motor de inferencia o un asistente inteligente— se necesitan dos propiedades fundamentales: **toda acción debe poder componerse con otras para formar secuencias complejas**, y **toda acción compuesta debe poder revertirse de manera exacta y auditable**. El presente trabajo describe una arquitectura algebraica que satisface ambas exigencias usando únicamente matrices enteras de 2×2 como identidades atómicas y compuestas, y una noción de niveles de abstracción denominados *fases*.
+
+El núcleo de la propuesta es que **la matriz 2×2 es la identidad fundamental de toda acción**. Cuatro enteros —siempre los mismos cuatro, sin importar cuán larga o compleja sea la secuencia que representan— bastan para identificar de manera única e inequívoca cualquier composición de comandos, preservando el orden exacto de los factores gracias a la no conmutatividad del producto matricial. Para p‑gramas de longitud 2 o 3, la matriz es eficiente; para p‑gramas de 5 o más factores, la matriz es **increíblemente compacta**: reduce una lista arbitrariamente larga de identificadores a exactamente cuatro enteros, sin pérdida de capacidad distintiva. Y para p‑gramas muy grandes —secuencias de 11, 13 o más comandos— la matriz es sencillamente insustituible: ninguna otra representación ofrece tanta densidad de información en tan poco espacio.
+
+El p‑grama (la lista ordenada de factores primos) se conserva como un **registro auxiliar** que viaja junto a la matriz durante los procesos de ascenso (generalización) y descenso (concreción) entre fases, garantizando la reversibilidad total del sistema sin necesidad de factorizar la matriz. Se introduce, además, un mecanismo de marcas numéricas especiales (`1` y `-1`) para diferenciar composiciones simultáneas (paralelas) y secuencias de comandos destructivos (deshaceres), manteniendo la coherencia algebraica en todos los niveles.
+
+A lo largo de este documento se presentan las definiciones formales, las propiedades algebraicas de las matrices, la interacción con el resto del framework (NodoElectrico, energía, enlaces y fases) y las conexiones con teorías matemáticas conocidas.
+
+---
+
+## 2. Contexto arquitectónico: el grafo de Nodos Eléctricos
+
+El sistema se inscribe dentro de un framework más amplio llamado *Iteradores*, cuyo elemento básico es el **NodoElectrico**. Un NodoElectrico es un vértice de un grafo dirigido con las siguientes características:
+
+- Posee un **identificador único** y puede almacenar datos multidimensionales organizados por *fase*.
+- Mantiene dos colecciones de aristas: **adyacentes** (salientes) e **incidentes** (entrantes). Cada arista es de doble vía: cuando el nodo A enlaza a B, B registra automáticamente a A como incidente.
+- Las aristas pueden tener **pesos** numéricos (simples o multidimensionales) que permiten graduar la fuerza de la relación.
+- Cada nodo tiene una **energía** escalar, una **capacidad** máxima y una **fuga** por ciclo de tiempo. La energía se puede inyectar o drenar, y los nodos pueden ejecutar acciones cuando se saturan (energía = capacidad) o se agotan (energía = 0).
+- Existe una noción global de **fase** (un string que identifica el nivel de abstracción actual). Todos los nodos operan en la fase activa y pueden cambiar de una fase a otra mediante un token de control.
+
+Sobre esta base, el subsistema de **NodoNumerico** extiende a NodoElectrico para incorporar una *identidad matricial* que permite representar comandos atómicos y compuestos, así como ascenderlos y descenderlos entre fases. Las subclases **NodoPrimo** (átomo) y **NodoParalelo** (sincronización) conforman la jerarquía numérica.
+
+---
+
+## 3. La identidad fundamental: matrices 2×2 como núcleo del sistema
+
+### 3.1. Comandos atómicos y la matriz canónica prima
+
+Cada comando atómico (la unidad mínima de acción) se representa mediante un **número primo** \( p \). La elección de los primos proporciona un espacio de identificadores denso, sin colisiones y con la factorización única como propiedad subyacente.
+
+Cada comando atómico se materializa en un **NodoPrimo**, cuya identidad es la **matriz canónica prima**:
+
+\[
+M(p) = \begin{pmatrix} p & 0 \\ 1 & 1 \end{pmatrix}, \qquad
+M(-p) = \begin{pmatrix} -p & 0 \\ 1 & 1 \end{pmatrix}
+\]
+
+Los primos **positivos** representan comandos constructivos ("hacer"); los **negativos**, comandos destructivos ("deshacer"). El signo de \( a \) es el distintivo natural del tipo de acción.
+
+Las entradas de la matriz tienen roles fijos e inmutables:
+
+- \( a = \pm p \): el valor propio del comando. Es el único componente que varía entre comandos distintos.
+- \( b = 0 \): fijo e inmutable. Garantiza que la matriz solo codifica la identidad estructural, sin mezclarla con información contextual (pertenencias, estados, etc.). En versiones anteriores se experimentó con un *canvas de contexto* (\( b \) mutable), pero fue descartado por problemas de identidad multifase.
+- \( c = 1 \): garantiza la **no conmutatividad** del producto, la propiedad clave que permite codificar el orden.
+- \( d = 1 \): completa la forma canónica y asegura que el determinante sea exactamente \( \pm p \).
+
+### 3.2. No conmutatividad: el orden está en la matriz
+
+El producto de dos matrices canónicas no es conmutativo:
+
+\[
+M(p)M(q) = \begin{pmatrix} pq & 0 \\ q+1 & 1 \end{pmatrix}, \quad
+M(q)M(p) = \begin{pmatrix} pq & 0 \\ p+1 & 1 \end{pmatrix}
+\]
+
+La diferencia está en la entrada \( c \): \( q+1 \) versus \( p+1 \). Esta propiedad es la que permite que la matriz resultante **identifique de manera única la secuencia ordenada** de factores. Dos permutaciones distintas de los mismos primos producen matrices diferentes, aunque sus determinantes coincidan (\( \det = pq \)).
+
+Para un p‑grama de longitud \( k \), la matriz compuesta es:
+
+\[
+M(p_1, p_2, \dots, p_k) = M(p_1) \times M(p_2) \times \cdots \times M(p_k)
+\]
+
+Esta matriz **es** la identidad del nodo compuesto. Siempre tiene exactamente 4 enteros, sin importar el valor de \( k \). Para \( k = 11 \), \( k = 13 \) o \( k = 101 \), la matriz sigue ocupando lo mismo: cuatro enteros. Esta compacidad es la gran fortaleza del sistema.
+
+### 3.3. La matriz como hash no conmutativo perfecto
+
+La matriz compuesta actúa como un **hash no conmutativo**: una función que toma una secuencia ordenada de factores y produce un identificador compacto y único. A diferencia de un hash criptográfico, es incremental: se puede calcular paso a paso a medida que se conocen los factores, sin necesidad de almacenar la secuencia completa.
+
+**Propiedades del hash matricial:**
+
+- **Unicidad:** dos secuencias diferentes (por composición u orden) producen matrices diferentes, con una probabilidad de colisión extremadamente baja. La no conmutatividad y la estructura del producto garantizan que las entradas \( a \) y \( c \) capturen tanto los valores como el orden.
+- **Compacidad extrema:** independientemente de la longitud de la secuencia, el identificador resultante ocupa siempre 4 enteros. Para p‑gramas de longitud 5 o más, esto es más compacto que la lista de factores misma. Para secuencias de 11, 13 o más comandos, la compresión es de un orden de magnitud.
+- **No reversibilidad:** la matriz no puede descomponerse en sus factores sin información adicional. Esto es una ventaja: la matriz puede usarse como identificador público sin revelar la estructura interna de la acción.
+- **Determinante informativo:** el determinante de la matriz compuesta es el producto de los determinantes de los factores, lo que proporciona una firma rápida de la "magnitud" de la acción (cantidad neta de hacer/deshacer) sin necesidad de inspeccionar la estructura.
+
+---
+
+## 4. El p‑grama: registro auxiliar para la reversibilidad
+
+Aunque la matriz es la identidad, el sistema necesita poder revertir las acciones compuestas. Como la factorización de la matriz no es viable en general, se mantiene el **p‑grama** —la lista ordenada de factores primos— como un **registro auxiliar** que acompaña a la matriz.
+
+### 4.1. Definición de p‑grama
+
+Un p‑grama es una secuencia finita de enteros (primos con signo) de longitud \( k \), donde \( k \) es un número primo. La restricción a longitudes primas mantiene la coherencia algebraica y evita ambigüedades en la descomposición jerárquica.
+
+La matriz y el p‑grama se almacenan juntos en cada nodo, indexados por fase. La matriz es la identidad; el p‑grama es la "receta" que permite reconstruir los factores si es necesario.
+
+### 4.2. Marcas especiales: paralelo y deshacer
+
+Para distinguir diferentes tipos de composición sin recurrir a flags externos, se emplean dos marcas numéricas especiales al inicio del p‑grama:
+
+- **Marca \( 1 \):** indica un **paralelo** (sincronización de comandos simultáneos). El 1 no es primo y nunca aparecerá como identificador atómico. En un paralelo, los factores que siguen están **ordenados canónicamente**, de modo que el p‑grama sea único independientemente del orden de entrada. La matriz del paralelo se construye como \( M(1) \times M(p_1) \times \cdots \times M(p_k) \), donde \( M(1) = \begin{pmatrix} 1 & 0 \\ 1 & 1 \end{pmatrix} \).
+- **Marca \( -1 \):** indica una **secuencia de deshacer** (todos los comandos siguientes son destructivos). Esto es necesario porque el producto de matrices negativas puede tener determinante positivo, lo que colisionaría algebraicamente con una secuencia constructiva. La marca \( -1 \) elimina la ambigüedad sin alterar la matriz (los factores ya llevan el signo negativo).
+
+Así, los tipos de p‑gramas son:
+
+| Tipo | P‑grama | Ejemplo |
+|------|---------|---------|
+| Secuencia de hacer | \( [p_1, p_2, \dots, p_k] \) | \( [2, 3] \) |
+| Secuencia de deshacer | \( [-1, p_1, p_2, \dots, p_k] \) | \( [-1, -2, -3] \) |
+| Paralelo de hacer | \( [1, p_1, p_2, \dots, p_k] \) (canónico) | \( [1, 2, 3] \) |
+
+---
+
+## 5. Multifase: la matriz como identidad dependiente del contexto
+
+Cada nodo numérico puede operar en múltiples fases, y su identidad matricial es dependiente de la fase. Para ello, se almacenan dos mapas por instancia:
+
+- **Identidad matricial por fase:** asocia a cada nombre de fase una matriz 2×2. Esta es la identidad del nodo en esa fase.
+- **P‑grama por fase:** asocia a cada fase el p‑grama correspondiente, como registro auxiliar para ascenso/descenso.
+
+Esto permite que un mismo nodo represente una secuencia en la fase `a`, un paralelo en la fase `b` y un primo en la fase `c`, sin interferencias. La fase activa del sistema determina cuál es la identidad vigente.
+
+---
+
+## 6. El pool de nodos libres: eficiencia y reciclaje
+
+Para evitar la creación y destrucción constante de objetos, el sistema mantiene un **pool de nodos libres** por fase. Cuando una fábrica necesita un nuevo nodo, primero intenta obtener uno del pool; si está vacío, crea una instancia nueva. Cuando un nodo deja de ser útil (por ejemplo, tras ascender), puede ser devuelto al pool, donde se limpian sus identidades y p‑gramas de la fase correspondiente, listo para ser reutilizado.
+
+---
+
+## 7. Ascenso y descenso entre fases
+
+El mecanismo de cambio de nivel de abstracción es fundamental para la generalización y la auditoría.
+
+### 7.1. Ascenso
+
+Cuando un nodo compuesto acumula suficiente energía o es seleccionado por un iterador, puede **ascender** a una fase superior. El proceso es:
+
+1. Se obtiene la matriz identidad y el p‑grama del nodo en la fase actual.
+2. Se obtiene un **NodoPrimo libre** en la fase destino.
+3. Se guarda en el dato multidimensional del primo (dimensión `'abajo'`) un paquete con:
+   - `factores`: el p‑grama completo (con sus marcas, si las tiene).
+   - `fase_origen`: el nombre de la fase desde la que se ascendió.
+4. El nodo original **no se destruye**; permanece en su fase.
+
+El NodoPrimo resultante en la fase superior es ahora una nueva acción atómica (con su propia matriz canónica prima), pero lleva consigo la información necesaria para revertir el proceso.
+
+### 7.2. Descenso
+
+Para recuperar la acción compuesta original:
+
+1. Se lee el paquete del dato `'abajo'` del NodoPrimo en la fase superior.
+2. Se examina el primer elemento del p‑grama para determinar el tipo (paralelo, deshacer o secuencia).
+3. Se crean los NodoPrimo correspondientes a cada factor.
+4. Se cambia a la fase origen y se construye un nuevo nodo compuesto con esos factores.
+
+El nodo resultante tiene exactamente la misma matriz identidad que el original. La reversibilidad es total, y la matriz nunca necesitó ser factorizada.
+
+---
+
+## 8. Propiedades matemáticas y conexiones
+
+### 8.1. Compacidad asintótica
+
+La propiedad más notable del sistema es su compacidad. Una secuencia de \( k \) comandos se representa mediante \( k \) enteros en el p‑grama, pero solo **4 enteros** en la matriz, para cualquier \( k \). Para \( k \geq 5 \), la matriz es más compacta que el p‑grama. Para \( k \to \infty \), la matriz sigue ocupando 4 enteros, mientras que el p‑grama crece linealmente. Esto convierte a la matriz en una representación ideal para la comunicación entre fases y dominios: una señal puede portar una matriz sin revelar su complejidad interna.
+
+### 8.2. No conmutatividad y codificación del orden
+
+La no conmutatividad del producto matricial es el mecanismo que permite que cuatro enteros capturen el orden de una secuencia arbitrariamente larga. En un sistema conmutativo (como la multiplicación de enteros), el orden se perdería. La entrada \( c \) actúa como un "acumulador de historia" que codifica la secuencia de factores de manera no lineal.
+
+### 8.3. Relación con cadenas de Markov
+
+En las cadenas de Markov, el producto de matrices de transición representa la evolución de un sistema estocástico. La no conmutatividad también está presente (el orden de las transiciones importa). Nuestra construcción es análoga, pero determinista, y el objetivo es la identificación, no la probabilidad.
+
+### 8.4. Factorización única y aritmética
+
+Aunque la matriz no se factoriza directamente, el determinante sí es factorizable (es el producto de los primos). Esto proporciona una verificación rápida de consistencia sin necesidad de acceder al p‑grama.
+
+### 8.5. Álgebras de Clifford y representaciones de grupos
+
+Las matrices de la forma \( \begin{pmatrix} a & 0 \\ 1 & 1 \end{pmatrix} \) generan un subgrupo del grupo afín en dimensión 1 (transformaciones \( x \mapsto ax + 1 \)). La composición de estas transformaciones corresponde a la multiplicación matricial. Este punto de vista conecta con las **representaciones de grupos**, donde cada elemento del grupo se asocia a una matriz que actúa sobre un espacio vectorial. En nuestro caso, el "grupo" es el conjunto de secuencias de comandos, y la matriz es su representación natural actuando sobre un espacio de estados. Esta conexión sugiere generalizaciones futuras: usar matrices más grandes (n×n) para representar comandos con múltiples parámetros, o explotar la estructura de grupo para optimizar las operaciones de composición.
+
+### 8.6. Reversibilidad y auditoría
+
+El diseño garantiza dos propiedades globales:
+
+- **Reversibilidad:** toda secuencia de hacer tiene una secuencia de deshacer correspondiente. La información para deshacer está siempre disponible en el p‑grama.
+- **Auditabilidad:** en cualquier momento se puede descender una acción compuesta y recuperar la secuencia exacta de comandos atómicos que la produjeron.
+
+---
+
+## 9. Implementación conceptual
+
+- **NodoNumerico:** clase base con identidad matricial multifase y p‑grama multifase. Fábricas para crear primos, secuencias y paralelos.
+- **NodoPrimo:** átomo del sistema. Su matriz es \( M(\pm p) \), su p‑grama es \( [\pm p] \). Gestiona el pool de primos libres por fase.
+- **NodoParalelo:** sincronización de comandos simultáneos. Su matriz se construye con \( M(1) \) como prefijo; su p‑grama comienza con la marca \( 1 \).
+- **Eliminación de NodoConjunto:** la pertenencia semántica se expresará mediante enlaces en el grafo, tarea de los iteradores.
+
+---
+
+## 10. Conclusión
+
+Se ha presentado un sistema algebraico donde la **matriz 2×2 es la identidad fundamental** de toda acción, atómica o compuesta. La matriz proporciona una representación compacta, no conmutativa y única para cualquier secuencia de comandos, con una eficiencia que crece con la longitud del p‑grama. El p‑grama se conserva como registro auxiliar para garantizar la reversibilidad sin factorización. Las marcas especiales `1` y `-1` permiten distinguir paralelos y deshaceres sin añadir metadatos externos.
+
+El sistema es completamente determinista, reversible y auditable, y sienta las bases para la comunicación entre dominios de fase mediante señales que portan matrices como identificadores opacos.
+
+---
+
+Este documento refleja el estado de la versión 1.4.4' del framework Iteradores, desarrollado por Ignacio David Baigorria.

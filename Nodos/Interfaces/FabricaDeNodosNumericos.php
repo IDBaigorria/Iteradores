@@ -1,89 +1,78 @@
 <?php
+
 namespace Iteradores\Nodos\Interfaces;
 
 use Iteradores\Nodos\Matriz2x2;
 use Iteradores\Nodos\NodoNumerico;
 use Iteradores\Nodos\NodoPrimo;
 use Iteradores\Nodos\NodoParalelo;
-use Iteradores\Nodos\NodoConjunto;
 use Iteradores\Configuracion\Conf;
 
 /**
- * Interfaz que define las fábricas centralizadas de nodos numéricos.
+ * Interfaz FabricaDeNodosNumericos – Contrato para la creación de nodos numéricos.
  *
- * Extiende {@link FabricaDeNodosElectricos} y es implementada por
- * {@link NodoNumerico}, que actúa como orquestador de sus tres subclases:
- * - {@link NodoPrimo}
- * - {@link NodoParalelo}
- * - {@link NodoConjunto}
+ * Centraliza las fábricas estáticas que permiten construir los distintos tipos
+ * de nodos con identidad matricial: primos, secuencias compuestas y paralelos.
  *
- * Todas las creaciones pasan por estos métodos para mantener la coherencia
- * del índice global de identidades y del diccionario de conceptos.
+ * Es implementada por {@link \Iteradores\Nodos\NodoNumerico}, que actúa como
+ * orquestador de todas las creaciones, garantizando la coherencia del pool de
+ * nodos libres y de los p‑gramas multifase.
+ *
+ * ## Responsabilidades
+ *
+ * - Crear nodos primos (comandos atómicos, positivos o negativos).
+ * - Crear nodos compuestos (secuencias ordenadas de p‑grama).
+ * - Crear nodos de sincronización (paralelos).
  *
  * @package Iteradores\Nodos\Interfaces
+ * @version 1.4.4
  * @since 1.4.2
+ * @see \Iteradores\Nodos\NodoNumerico
+ * @see \Iteradores\Nodos\NodoPrimo
+ * @see \Iteradores\Nodos\NodoParalelo
  */
-interface FabricaDeNodosNumericos extends FabricaDeNodosElectricos
+interface FabricaDeNodosNumericos
 {
     /**
-     * Crea un nodo numérico con una identidad no prima.
+     * Crea un nodo primo con el número primo indicado.
      *
-     * @param Matriz2x2 $identidad Identidad matricial (determinante no primo).
-     * @param int $capacidad Capacidad máxima de energía.
-     * @param float $fuga Fuga de energía por ciclo.
-     * @return NodoNumerico|null
+     * @param int   $primo      Número primo (positivo para comando constructivo,
+     *                          negativo para destructivo).
+     * @param int   $capacidad  Capacidad máxima de energía.
+     * @param float $fuga       Fuga de energía por ciclo.
+     * @return NodoPrimo|null   El NodoPrimo creado, o null si el valor absoluto no es primo.
      */
-  /*  public static function crear_numerico(
-        Matriz2x2 $identidad,
-        int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
-        float $fuga = Conf::FUGA_NODO_ELECTRICO
-    ): ?NodoNumerico;*/
-
-    /**
-     * Crea (o recupera) un nodo primo con el número primo indicado.
-     *
-     * @param int $primo Número primo (ej. 2, 3, 5...).
-     * @param int $capacidad
-     * @param float $fuga
-     * @return NodoPrimo|null
-     */
-   /* public static function crear_primo(
+    public static function crear_primo(
         int $primo,
         int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
         float $fuga = Conf::FUGA_NODO_ELECTRICO
-    ): ?NodoPrimo;*/
+    ): ?NodoPrimo;
 
     /**
-     * Crea un nodo de sincronización con los componentes dados.
+     * Crea un nodo numérico compuesto (secuencia ordenada de p‑grama).
      *
-     * @param NodoNumerico[] $componentes Array de nodos (cantidad prima).
-     * @param int $capacidad
-     * @param float $fuga
-     * @return NodoParalelo|null
+     * @param NodoNumerico[] $componentes Componentes de la secuencia (cantidad prima).
+     * @param int            $capacidad   Capacidad máxima de energía.
+     * @param float          $fuga        Fuga de energía por ciclo.
+     * @return NodoNumerico|null El nuevo nodo, o null si la cantidad no es prima.
      */
-  /* public static function crear_paralelo(
+    public static function crear_numerico(
         array $componentes,
         int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
         float $fuga = Conf::FUGA_NODO_ELECTRICO
-    ): ?NodoParalelo;*/
+    ): ?NodoNumerico;
 
     /**
-     * Crea un nuevo concepto semántico (sin nombre).
+     * Crea un nodo de sincronización (paralelo) con los componentes dados.
      *
-     * @param int $capacidad
-     * @param float $fuga
-     * @return NodoConjunto
+     * @param NodoNumerico[] $componentes Componentes (cantidad prima).
+     * @param int            $capacidad
+     * @param float          $fuga
+     * @return NodoParalelo|null
      */
-    /*public static function crear_conjunto(
+    public static function crear_paralelo(
+        array $componentes,
         int $capacidad = Conf::CAPACIDAD_NODO_ELECTRICO,
         float $fuga = Conf::FUGA_NODO_ELECTRICO
-    ): NodoConjunto;
-*/
-    /**
-     * Recupera un nodo del índice global por su identidad.
-     *
-     * @param Matriz2x2 $identidad
-     * @return NodoNumerico|null
-     */
- //   public static function nodo_por_identidad(Matriz2x2 $identidad): ?NodoNumerico;
+    ): ?NodoParalelo;
 }

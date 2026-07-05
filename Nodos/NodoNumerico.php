@@ -399,7 +399,7 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
         }
         self::$nodos_libres_por_fase[$fase][] = $nodo;
     }
-    
+
     // ═══════════════════════════════════════════
     // ASCENSO Y DESCENSO ENTRE FASES
     // ═══════════════════════════════════════════

@@ -5,6 +5,11 @@ namespace Iteradores\Nodos;
 use Iteradores\Configuracion\Conf;
 use Iteradores\Nodos\Matriz2x2;
 
+use Iteradores\Nodos\Interfaces\GestorPrimosLibres;
+
+include_once(__DIR__."/Interfaces/GestorPrimosLibres.php");
+
+
 /**
  * NodoPrimo – Identidad prima canónica e indivisible.
  *
@@ -70,7 +75,7 @@ use Iteradores\Nodos\Matriz2x2;
  * @extends NodoNumerico
  * @see Matriz2x2
  */
-class NodoPrimo extends NodoNumerico
+class NodoPrimo extends NodoNumerico implements GestorPrimosLibres
 {
     /**
      * Número primo representado por este nodo.
