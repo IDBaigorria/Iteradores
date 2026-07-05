@@ -14,18 +14,18 @@ use Iteradores\Nodos\Matriz2x2;
  *
  * ## Responsabilidades
  *
- * - Proveer una **matriz identidad** 2×2 asociada a cada fase de trabajo.
- * - Proveer el **p‑grama** (lista de factores primos) correspondiente a cada fase.
+ * - Proveer una **matriz identidad** 2×2 única e inmutable para el nodo.
+ * - Proveer el **p‑grama** (lista de factores primos) único del nodo.
  * - Permitir consultar si el nodo es atómico (primo) o compuesto.
  *
- * ## Identidad multifase
+ * ## Identidad única
  *
- * Tanto la matriz identidad como el p‑grama están indexados por fase. Un mismo
- * nodo puede tener distintas identidades en fases diferentes, reflejando
- * distintos niveles de abstracción o contextos de ejecución.
+ * A partir de la versión 1.4.5, la matriz identidad y el p‑grama son propiedades
+ * únicas del nodo, independientes de la fase. Esto simplifica el modelo y refleja
+ * que la identidad numérica es intrínseca, no contextual.
  *
  * @package Iteradores\Nodos\Interfaces
- * @version 1.4.4
+ * @version 1.4.5
  * @since 1.4.2
  * @see \Iteradores\Nodos\Matriz2x2
  * @see \Iteradores\Nodos\NodoNumerico
@@ -33,25 +33,20 @@ use Iteradores\Nodos\Matriz2x2;
 interface IdentidadNumerica
 {
     /**
-     * Obtiene la matriz identidad del nodo en la fase indicada.
+     * Obtiene la matriz identidad del nodo.
      *
-     * Si no existe una matriz para la fase solicitada, se debe devolver
-     * {@link \Iteradores\Nodos\Matriz2x2::inicial()}.
-     *
-     * @param string|null $fase Fase de trabajo (null = fase actual del sistema).
      * @return Matriz2x2
      */
-    public function identidad(?string $fase = null): Matriz2x2;
+    public function identidad(): Matriz2x2;
 
     /**
-     * Obtiene el p‑grama (lista de factores primos) del nodo en la fase indicada.
+     * Obtiene el p‑grama (lista de factores primos) del nodo.
      *
-     * Si no hay p‑grama en la fase solicitada, se debe devolver un array vacío.
+     * Si el nodo no tiene p‑grama, se debe devolver un array vacío.
      *
-     * @param string|null $fase Fase de trabajo (null = fase actual del sistema).
      * @return int[] Lista de identificadores, o array vacío.
      */
-    public function pgrama(?string $fase = null): array;
+    public function pgrama(): array;
 
     /**
      * Indica si el nodo es un NodoPrimo (identidad atómica).

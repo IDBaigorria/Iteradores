@@ -21,15 +21,14 @@ include_once(__DIR__."/Interfaces/IdentidadNumerica.php");
  *
  * ## Responsabilidades principales
  *
- * 1. **Identidad multifase**
- *    Cada instancia mantiene un mapa `identidad_por_fase[fase]` que asocia una
- *    {@link Matriz2x2} distinta a cada fase de trabajo.
+ * 1. **Identidad única e inmutable**
+ *    Cada instancia posee una {@link Matriz2x2} que la identifica de forma
+ *    unívoca. Esta matriz se asigna en la creación y **no depende de la fase**.
  *
- * 2. **P‑grama multifase**
- *    El mapa `pgrama_por_fase[fase]` almacena la lista exacta de factores que
- *    componen el nodo en cada fase. Es la **única fuente de verdad** sobre la
- *    identidad compuesta. La matriz identidad se deriva completamente de este
- *    p‑grama. Las marcas especiales al inicio del array indican el tipo:
+ * 2. **P‑grama único**
+ *    El array `$pgrama` almacena la lista exacta de factores que componen
+ *    el nodo. Es la **única fuente de verdad** sobre la identidad compuesta.
+ *    Las marcas especiales al inicio del array indican el tipo:
  *    - `1`: paralelo (sincronización de componentes simultáneos).
  *    - `-1`: secuencia de deshacer (todos los factores son comandos destructivos).
  *    - Sin marca: secuencia de hacer (comandos constructivos).
@@ -37,8 +36,7 @@ include_once(__DIR__."/Interfaces/IdentidadNumerica.php");
  * 3. **Caché global de primos**
  *    La lista estática `$primos_conocidos` crece con cada nuevo primo descubierto,
  *    compartida por todas las fases. Métodos como {@link es_numero_primo()} y
- *    {@link siguiente_numero_primo()} la consultan y expanden, evitando recalcular
- *    primalidad para números ya conocidos.
+ *    {@link siguiente_numero_primo()} la consultan y expanden.
  *
  * 4. **Contador multifase de primos**
  *    El mapa `$ultimo_primo_positivo_por_fase` guarda el último primo asignado en
@@ -48,7 +46,7 @@ include_once(__DIR__."/Interfaces/IdentidadNumerica.php");
  *    Para evitar la creación innecesaria de instancias, la clase mantiene un
  *    conjunto de nodos reutilizables por fase (`$nodos_libres_por_fase`).
  *    Las fábricas obtienen nodos mediante {@link tomar_nodo_libre()} y los
- *    devuelven con {@link devolver_nodo_libre()} una vez que dejan de usarse.
+ *    devuelven con {@link devolver_nodo_libre()}.
  *
  * 6. **Ascenso y descenso entre fases**
  *    El método {@link ascender()} promociona un nodo compuesto a la fase superior,
@@ -59,12 +57,12 @@ include_once(__DIR__."/Interfaces/IdentidadNumerica.php");
  *
  * ## Identidad matricial inmutable
  *
- * A partir de la versión 1.4.4, la {@link Matriz2x2} es completamente inmutable
- * (`b = 0` fijo). La matriz actúa como un **identificador compacto y no conmutativo**
- * de la secuencia de factores, sin almacenar información contextual.
+ * A partir de la versión 1.4.5, la {@link Matriz2x2} es completamente inmutable
+ * (`b = 0` fijo) y **única por nodo**. Ya no se mantienen identidades distintas
+ * por fase.
  *
  * @package Iteradores\Nodos
- * @version 1.4.4
+ * @version 1.4.5
  * @since 1.4.2
  * @author Ignacio David Baigorria
  * @extends NodoElectrico
@@ -77,43 +75,25 @@ include_once(__DIR__."/Interfaces/IdentidadNumerica.php");
 class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, IdentidadNumerica
 {
     /**
-     * Identidad matricial del nodo, indexada por fase.
+     * Identidad matricial del nodo (única).
      *
-     * Estructura:
-     * ```
-     * [
-     *   'fase_a' => Matriz2x2,
-     *   'fase_b' => Matriz2x2,
-     *   ...
-     * ]
-     * ```
-     *
-     * @var array<string, Matriz2x2>
+     * @var Matriz2x2
      * @see Matriz2x2
      */
-    private array $identidad_por_fase = [];
+    private Matriz2x2 $identidad;
 
     /**
-     * P‑grama de factores, indexado por fase.
+     * P‑grama de factores (único).
      *
-     * Almacena la secuencia exacta de identificadores que componen el nodo
-     * en cada fase. Es la **única fuente de verdad** para el ascenso/descenso.
+     * Almacena la secuencia exacta de identificadores que componen el nodo.
+     * Es la **única fuente de verdad** para el ascenso/descenso.
      *
      * - **Secuencia:** `[p₁, p₂, …, pₚ]`
      * - **Paralelo:** `[1, p₁, p₂, …, pₚ]` (primos en orden canónico)
      *
-     * Estructura:
-     * ```
-     * [
-     *   'fase_a' => [2, 3, 5],
-     *   'fase_b' => [1, 7, 11],
-     *   ...
-     * ]
-     * ```
-     *
-     * @var array<string, int[]>
+     * @var int[]
      */
-    private array $pgrama_por_fase = [];
+    private array $pgrama;
 
     // ═══════════════════════════════════════════
     // CACHÉ DE PRIMOS (GLOBAL)
@@ -155,80 +135,69 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
     /**
      * Constructor protegido.
      *
-     * Inicializa la identidad de la fase actual con {@link Matriz2x2::inicial()}
-     * y enlaza la matriz al nodo para sincronización directa.
+     * Inicializa la identidad con {@link Matriz2x2::inicial()} y el p‑grama
+     * como array vacío. Enlaza la matriz al nodo.
      */
     protected function __construct()
     {
         parent::__construct();
-        $this->identidad_por_fase[self::$fase] = Matriz2x2::inicial();
-        $this->identidad_por_fase[self::$fase]->_nodo($this);
+        $this->identidad = Matriz2x2::inicial();
+        $this->identidad->_nodo($this);
+        $this->pgrama = [];
     }
 
     // ═══════════════════════════════════════════
-    // IDENTIDAD MULTIFASE
+    // IDENTIDAD ÚNICA
     // ═══════════════════════════════════════════
 
     /**
-     * Obtiene la identidad matricial del nodo en la fase indicada.
+     * Obtiene la identidad matricial del nodo.
      *
-     * Si no existe una matriz para la fase solicitada, devuelve
-     * {@link Matriz2x2::inicial()} (matriz semilla `[[1,0],[1,1]]`).
-     *
-     * @param string|null $fase Fase de trabajo (null = fase actual del sistema).
      * @return Matriz2x2
      */
-    public function identidad(?string $fase = null): Matriz2x2
+    public function identidad(): Matriz2x2
     {
-        $fase = $fase ?? self::$fase;
-        return $this->identidad_por_fase[$fase] ?? Matriz2x2::inicial();
+        return $this->identidad;
     }
 
     /**
-     * Asigna la identidad matricial del nodo en la fase indicada.
+     * Asigna la identidad matricial del nodo.
      *
      * Solo se permite en entorno de pruebas (ver {@link Entorno::permite_pruebas()}).
-     * Además de almacenar la matriz, establece la referencia inversa con
-     * {@link Matriz2x2::_nodo()} para sincronización directa.
+     * Establece la referencia inversa con {@link Matriz2x2::_nodo()}.
      *
      * @param Matriz2x2 $matriz
-     * @param string|null $fase
      * @return void
      */
-    public function _identidad(Matriz2x2 $matriz, ?string $fase = null): void
+    public function _identidad(Matriz2x2 $matriz): void
     {
-        $fase = $fase ?? self::$fase;
-        $this->identidad_por_fase[$fase] = $matriz;
+        $this->identidad = $matriz;
         $matriz->_nodo($this);
     }
 
     // ═══════════════════════════════════════════
-    // P-GRAMA MULTIFASE
+    // P-GRAMA ÚNICO
     // ═══════════════════════════════════════════
 
     /**
-     * Obtiene el p‑grama de factores del nodo en la fase indicada.
+     * Obtiene el p‑grama de factores del nodo.
      *
-     * @param string|null $fase Fase de trabajo (null = fase actual del sistema).
-     * @return int[] Lista de identificadores, o array vacío si no hay p‑grama en esa fase.
+     * @return int[] Lista de identificadores, o array vacío si no tiene.
      */
-    public function pgrama(?string $fase = null): array
+    public function pgrama(): array
     {
-        $fase = $fase ?? self::$fase;
-        return $this->pgrama_por_fase[$fase] ?? [];
+        return $this->pgrama;
     }
 
     /**
-     * Asigna el p‑grama de factores en la fase indicada.
+     * Asigna el p‑grama de factores.
      *
      * @param int[] $pgrama Lista de identificadores.
-     * @param string|null $fase
      * @return void
      */
-    public function _pgrama(array $pgrama, ?string $fase = null): void
+    public function _pgrama(array $pgrama): void
     {
-        $fase = $fase ?? self::$fase;
-        $this->pgrama_por_fase[$fase] = $pgrama;
+        $this->pgrama = $pgrama;
     }
 
     /**
@@ -363,7 +332,7 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      *
      * Si el pool está vacío, crea una nueva instancia llamando a
      * {@link NodoElectrico::crear()}. Al tomar un nodo del pool, se limpian
-     * su identidad y p‑grama anteriores en esa fase por seguridad.
+     * su identidad y p‑grama anteriores por seguridad.
      *
      * @param string|null $fase
      * @return NodoNumerico Nodo reutilizado o recién creado.
@@ -376,9 +345,9 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
         }
         if (!empty(self::$nodos_libres_por_fase[$fase])) {
             $nodo = array_shift(self::$nodos_libres_por_fase[$fase]);
-            // Limpiar propiedades multifase anteriores (por seguridad).
-            unset($nodo->identidad_por_fase[$fase]);
-            unset($nodo->pgrama_por_fase[$fase]);
+            // Limpiar identidad y p‑grama anteriores (por seguridad).
+            $nodo->identidad = Matriz2x2::inicial();
+            $nodo->pgrama = [];
             return $nodo;
         }
         return parent::crear();
@@ -408,7 +377,7 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      * Asciende el nodo compuesto a la fase superior.
      *
      * El proceso de ascenso:
-     * 1. Recopila el p‑grama de la fase actual.
+     * 1. Recopila el p‑grama del nodo.
      * 2. Obtiene un {@link NodoPrimo} libre en la fase de destino.
      * 3. Guarda en el dato multidimensional del primo (dimensión `'abajo'`)
      *    un paquete con el p‑grama de factores y el nombre de la fase actual.
@@ -416,17 +385,17 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      *
      * @param string $fase_destino Nombre de la fase superior a la que ascender.
      * @return NodoPrimo El NodoPrimo que representa al nodo compuesto en la fase superior.
-     * @throws \RuntimeException Si el nodo no tiene p‑grama en la fase actual.
+     * @throws \RuntimeException Si el nodo no tiene p‑grama.
      */
     public function ascender(string $fase_destino): NodoPrimo
     {
         $fase_actual = self::$fase;
 
-        // Obtener el p‑grama de la fase actual.
-        $factores = $this->pgrama($fase_actual);
+        // Obtener el p‑grama del nodo.
+        $factores = $this->pgrama();
         if (empty($factores)) {
-            self::_error('El nodo no tiene p‑grama en la fase actual para ascender.');
-            throw new \RuntimeException('El nodo no tiene p‑grama en la fase actual para ascender.');
+            self::_error('El nodo no tiene p‑grama para ascender.');
+            throw new \RuntimeException('El nodo no tiene p‑grama para ascender.');
         }
 
         // Obtener NodoPrimo libre en la fase destino.
@@ -526,7 +495,7 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      * la marca `-1` al p‑grama.
      *
      * Se toma un nodo del pool (o se crea uno nuevo) y se le asignan la
-     * matriz, el p‑grama y la capacidad/fuga en la fase actual.
+     * matriz, el p‑grama y la capacidad/fuga.
      * **No se crean enlaces internos**; esa es responsabilidad del iterador.
      *
      * @param NodoNumerico[] $componentes Componentes de la secuencia (cantidad prima).
@@ -619,5 +588,35 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
         float $fuga = Conf::FUGA_NODO_ELECTRICO
     ): ?NodoParalelo {
         return NodoParalelo::_crear_interno($componentes, $capacidad, $fuga);
+    }
+
+    // ═══════════════════════════════════════════
+    // V 1.4.5
+    // ═══════════════════════════════════════════
+
+    /**
+     * Devuelve la secuencia de matrices de identidad correspondientes a los
+     * factores primos del p‑grama en el orden canónico, omitiendo las marcas
+     * de sincronización (1, -1).
+     *
+     * @return Matriz2x2[] Secuencia de matrices del nodo.
+     * @since 1.4.5
+     */
+    public function secuencia_de_matrices(): array
+    {
+        $matrices = [];
+
+        foreach ($this->pgrama as $p) {
+            if ($p === 1 || $p === -1) {
+                continue;
+            }
+            if ($p > 0) {
+                $matrices[] = Matriz2x2::crear_prima($p);
+            } else {
+                $matrices[] = Matriz2x2::crear_negativa_prima(-$p);
+            }
+        }
+
+        return $matrices;
     }
 }
