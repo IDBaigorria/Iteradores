@@ -4,6 +4,9 @@ namespace Iteradores\Controlador;
 use Iteradores\Nucleo\Objeto;
 use Iteradores\Nodos\Matriz2x2;
 use Iteradores\Nodos\NodoNumerico;
+use Iteradores\Controlador\MapeoBytesMatrices;   
+use Iteradores\Controlador\AplanadorSenal;       
+
 /**
  * Señal: estructura ligera de comunicación entre dominios.
  *
@@ -17,7 +20,7 @@ use Iteradores\Nodos\NodoNumerico;
  *
  * @package Iteradores
  * @since 1.4.5
- * @version 1.4.5
+ * @version 1.4.6
  */
 class Senal extends Objeto
 {
@@ -26,14 +29,14 @@ class Senal extends Objeto
      *
      * @var Matriz2x2[]
      */
-    private array $_matrices_crudas;
+    private array $matrices_crudas;
 
     /**
      * Cantidad de matrices crudas que ya han sido consumidas.
      *
      * @var int
      */
-    private int $_indice_consumido;
+    private int $indice_consumido;
 
     /**
      * Ítems ya procesados. Cada elemento puede ser:
@@ -42,7 +45,7 @@ class Senal extends Objeto
      *
      * @var array
      */
-    private array $_elementos_procesados;
+    private array $elementos_procesados;
 
     /**
      * Constructor.
@@ -51,9 +54,9 @@ class Senal extends Objeto
      */
     public function __construct(array $matrices = [])
     {
-        $this->_matrices_crudas = $matrices;
-        $this->_indice_consumido = 0;
-        $this->_elementos_procesados = [];
+        $this->matrices_crudas = $matrices;
+        $this->indice_consumido = 0;
+        $this->elementos_procesados = [];
     }
 
     /**
@@ -64,7 +67,7 @@ class Senal extends Objeto
      */
     public function _matriz(Matriz2x2 $matriz): void
     {
-        $this->_matrices_crudas[] = $matriz;
+        $this->matrices_crudas[] = $matriz;
     }
 
     /**
@@ -74,7 +77,7 @@ class Senal extends Objeto
      */
     public function longitud_cruda(): int
     {
-        return count($this->_matrices_crudas);
+        return count($this->matrices_crudas);
     }
 
     /**
@@ -84,7 +87,7 @@ class Senal extends Objeto
      */
     public function longitud_no_consumida(): int
     {
-        return count($this->_matrices_crudas) - $this->_indice_consumido;
+        return count($this->matrices_crudas) - $this->indice_consumido;
     }
 
     /**
@@ -95,8 +98,8 @@ class Senal extends Objeto
     public function no_consumidas(): array
     {
         return array_slice(
-            $this->_matrices_crudas,
-            $this->_indice_consumido
+            $this->matrices_crudas,
+            $this->indice_consumido
         );
     }
 
@@ -123,20 +126,20 @@ class Senal extends Objeto
 
         if ($patron !== null) {
             // Captura realizada por un patrón
-            $this->_elementos_procesados[] = $patron;
+            $this->elementos_procesados[] = $patron;
         } else {
             // Sin patrón, se agregan las matrices crudas una a una
             $porcion = array_slice(
-                $this->_matrices_crudas,
-                $this->_indice_consumido,
+                $this->matrices_crudas,
+                $this->indice_consumido,
                 $longitud
             );
             foreach ($porcion as $matriz) {
-                $this->_elementos_procesados[] = $matriz;
+                $this->elementos_procesados[] = $matriz;
             }
         }
 
-        $this->_indice_consumido += $longitud;
+        $this->indice_consumido += $longitud;
     }
 
     /**
@@ -146,7 +149,7 @@ class Senal extends Objeto
      */
     public function indice_consumido(): int
     {
-        return $this->_indice_consumido;
+        return $this->indice_consumido;
     }
 
     /**
@@ -154,9 +157,9 @@ class Senal extends Objeto
      *
      * @return array
      */
-    public function obtener_elementos_procesados(): array
+    public function elementos_procesados(): array
     {
-        return $this->_elementos_procesados;
+        return $this->elementos_procesados;
     }
 
     /**
@@ -166,9 +169,9 @@ class Senal extends Objeto
      *
      * @return Matriz2x2[]
      */
-    public function obtener_crudas(): array
+    public function crudas(): array
     {
-        return $this->_matrices_crudas;
+        return $this->matrices_crudas;
     }
 
     /**
@@ -183,12 +186,13 @@ class Senal extends Objeto
      * @param int $fase Fase en la que se obtienen las matrices de identidad de los patrones.
      * @return Senal
      * @since 1.4.5
+     * @version 1.4.6
      * @todo Implementar una vez que el enrutamiento entre dominios esté activo.
      */
-    public function generar_senal_de_salida(int $fase): Senal
+    public function senal_de_salida(int $fase): Senal
     {
         $matrices_salida = [];
-        foreach ($this->_elementos_procesados as $item) {
+        foreach ($this->elementos_procesados as $item) {
             if ($item instanceof NodoNumerico) {
                 // TODO: validar que el nodo tenga identidad en la fase dada
                 $matrices_salida[] = $item->identidad();
@@ -197,5 +201,59 @@ class Senal extends Objeto
             }
         }
         return new self($matrices_salida);
+    }
+
+    // ═══════════════════════════════════════════
+    // V 1.4.6 – CONVERSIÓN BYTES ↔ SEÑAL
+    // ═══════════════════════════════════════════
+
+    /**
+     * Construye una señal a partir de una cadena de bytes.
+     *
+     * Cada byte (0‑255) se traduce a su {@link Matriz2x2} prima canónica
+     * utilizando {@link \Iteradores\Compuertas\MapeoBytesMatrices::byte_a_matriz()}.
+     *
+     * @param string $bytes Cadena de bytes (p. ej. leída de un archivo).
+     * @return self Nueva señal con las matrices primas correspondientes.
+     * @since 1.4.6
+     * @see \Iteradores\Compuertas\MapeoBytesMatrices
+     */
+    public static function desde_bytes(string $bytes): self
+    {
+        $matrices = [];
+        $longitud = strlen($bytes);
+        for ($i = 0; $i < $longitud; $i++) {
+            $byte = ord($bytes[$i]);
+            $matriz = MapeoBytesMatrices::byte_a_matriz($byte);  // ahora sí está importada
+            if ($matriz !== null) {
+                $matrices[] = $matriz;
+            }
+        }
+        return new self($matrices);
+    }
+
+    /**
+     * Convierte una señal procesada de vuelta a una cadena de bytes.
+     *
+     * Aplana la señal con {@link AplanadorSenal::aplanar()} para obtener
+     * las matrices originales del tálamo y luego traduce cada una a su byte
+     * con {@link \Iteradores\Compuertas\MapeoBytesMatrices::matriz_a_byte()}.
+     *
+     * @param Senal $senal Señal ya procesada por un dominio.
+     * @return string Cadena de bytes lista para ser escrita o enviada.
+     * @since 1.4.6
+     * @see AplanadorSenal
+     * @see \Iteradores\Compuertas\MapeoBytesMatrices
+     */
+    public static function a_bytes(Senal $senal): string
+    {
+        $bytes = '';
+        foreach (AplanadorSenal::aplanar($senal) as $matriz) {
+            $byte = MapeoBytesMatrices::matriz_a_byte($matriz);
+            if ($byte !== null) {
+                $bytes .= chr($byte);
+            }
+        }
+        return $bytes;
     }
 }

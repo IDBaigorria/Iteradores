@@ -62,7 +62,7 @@ include_once(__DIR__."/Interfaces/IdentidadNumerica.php");
  * por fase.
  *
  * @package Iteradores\Nodos
- * @version 1.4.5
+ * @version 1.4.6
  * @since 1.4.2
  * @author Ignacio David Baigorria
  * @extends NodoElectrico
@@ -96,17 +96,24 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
     private array $pgrama;
 
     // ═══════════════════════════════════════════
-    // CACHÉ DE PRIMOS (GLOBAL)
+    // CACHÉ GLOBAL DE PRIMOS (instancias)
     // ═══════════════════════════════════════════
+
+    /** @var array<int, NodoPrimo> */
+    private static array $primos_cache = [];
 
     /**
      * Caché global de números primos conocidos.
      *
-     * Se inicializa con `[2, 3]` y crece bajo demanda. Compartida por todas las fases.
+     * Se inicializa con `[2, 3]` y crece bajo demanda. Compartida por
+     * todas las fases. A partir de la versión 1.4.6 es pública para
+     * que las compuertas puedan acceder directamente al mapeo byte↔primo.
      *
      * @var int[]
+     * @since 1.4.2
+     * @version 1.4.6
      */
-    private static array $primos_conocidos = [2, 3];
+    public static array $primos_conocidos = [2, 3];
 
     /**
      * Último número primo asignado en cada fase.
@@ -117,6 +124,34 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      * @var array<string, int>
      */
     protected static array $ultimo_primo_positivo_por_fase = [];
+
+    // ═══════════════════════════════════════════
+    // INICIALIZACIÓN DE CACHÉ
+    // ═══════════════════════════════════════════
+
+    /**
+     * Expande la caché global de primos hasta contener al menos los
+     * primeros 256 números primos.
+     *
+     * Este método está pensado para ser invocado durante la
+     * inicialización del sistema (por ejemplo, desde
+     * {@link \Iteradores\Controlador\Controlador::inicializar()}),
+     * garantizando que las compuertas dispongan de todos los primos
+     * necesarios para el mapeo byte↔primo sin tener que generarlos
+     * bajo demanda.
+     *
+     * @return void
+     * @since 1.4.6
+     * @see \Iteradores\Compuertas\CompuertaBase
+     */
+    public static function inicializar_cache_primos(): void
+    {
+        while (count(self::$primos_conocidos) < 256) {
+            $ultimo = end(self::$primos_conocidos);
+            $siguiente = self::calcular_siguiente_primo($ultimo);
+            self::$primos_conocidos[] = $siguiente;
+        }
+    }
 
     // ═══════════════════════════════════════════
     // POOL DE NODOS LIBRES
@@ -564,7 +599,14 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
             self::_error("El valor absoluto de {$primo} no es primo.");
             return null;
         }
-        return NodoPrimo::_crear_interno($primo, $capacidad, $fuga);
+
+        if (isset(self::$primos_cache[$primo])) {
+            return self::$primos_cache[$primo];
+        }
+
+        $nodo = NodoPrimo::_crear_interno($primo, $capacidad, $fuga);
+        self::$primos_cache[$primo] = $nodo;
+        return $nodo;
     }
 
     /**
@@ -618,5 +660,41 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
         }
 
         return $matrices;
+    }
+
+    // ═══════════════════════════════════════════
+    // V 1.4.6 – INICIALIZACIÓN DE CONTADOR POR FASE
+    // ═══════════════════════════════════════════
+
+    /**
+     * Indica si ya existe un contador de primos para la fase dada.
+     *
+     * @param string $fase Identificador de fase.
+     * @return bool
+     * @since 1.4.6
+     */
+    public static function contador_fase_existe(string $fase): bool
+    {
+        return isset(self::$ultimo_primo_positivo_por_fase[$fase]);
+    }
+
+    /**
+     * Inicializa el contador de primos de una fase en un valor arbitrario.
+     *
+     * Requiere token de seguridad válido.
+     *
+     * @param string $token Token de seguridad.
+     * @param string $fase  Identificador de fase.
+     * @param int    $valor Valor inicial (por defecto 256, reservando los primeros 256 primos).
+     * @return void
+     * @since 1.4.6
+     */
+    public static function inicializar_contador_fase(string $token, string $fase, int $valor = 256): void
+    {
+        if (!self::$token===$token) {
+            self::_error('Token inválido para inicializar contador de fase.');
+            return;
+        }
+        self::$ultimo_primo_positivo_por_fase[$fase] = $valor;
     }
 }

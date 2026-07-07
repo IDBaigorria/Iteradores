@@ -46,7 +46,7 @@ header("Cache-control: no-cache, must-revalidate");
  *
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.4.4
+ * @version   1.4.6
  */
 
 // ─── Nodos y utilidades base ───────────────────────────
@@ -64,8 +64,17 @@ include_once("Nodos/Nodo.php");
 include_once("Nodos/NodoElectrico.php");
 include_once("Nodos/Matriz2x2.php");
 include_once("Nodos/NodoNumerico.php");
+include_once("Nodos/NodoPrimo.php");
+include_once("Nodos/NodoParalelo.php");
 
-// tiempo
+// ─── V 1.4.5/1.4.6 – Señal y Procesador ──────────────
+include_once("Controlador/MapeoBytesMatrices.php");
+include_once("Controlador/Senal.php");
+include_once("Controlador/AplanadorSenal.php");
+include_once("Controlador/Antena.php");
+include_once("Controlador/ProcesadorDeDominio.php");
+
+// ─── Tiempo ───────────────────────────────────────────
 include_once("Tiempo/RelojAstronomico.php");
 
 // ─── Comandos y Comunicadores (autoencolación) ─────────
@@ -77,4 +86,4 @@ include_once("Comunicadores/index.php");
 include_once("Controlador/Controlador.php");
 
 // ─── Pruebas (solo desarrollo) ─────────────────────────
-include_once("pruebas/Prueba145.php");
+include_once("pruebas/Prueba146.php");

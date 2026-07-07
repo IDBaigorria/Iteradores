@@ -18,42 +18,42 @@ use Iteradores\Controlador\Senal;
  *
  * @package Iteradores\Controlador
  * @since 1.4.5
- * @version 1.4.5
+ * @version 1.4.6
  */
 class Antena extends Objeto
 {
     /**
-     * Fase a la que pertenece esta antena.
+     * Fase a la que pertenece esta antena (ahora puede ser un string con prefijo de dominio).
      *
-     * @var int
+     * @var string
      */
-    private int $_fase;
+    private string $fase;
 
     /**
      * Lista de patrones registrados en esta antena.
      *
      * @var NodoNumerico[]
      */
-    private array $_patrones;
+    private array $patrones;
 
     /**
      * Caché de las secuencias de matrices de cada patrón,
-     * en el mismo orden que _patrones.
+     * en el mismo orden que patrones.
      *
      * @var Matriz2x2[][]
      */
-    private array $_secuencias;
+    private array $secuencias;
 
     /**
      * Constructor.
      *
-     * @param int $fase Fase a la que pertenece la antena.
+     * @param string $fase Fase a la que pertenece la antena (puede ser un número o un string prefijado).
      */
-    public function __construct(int $fase)
+    public function __construct(string $fase)
     {
-        $this->_fase = $fase;
-        $this->_patrones = [];
-        $this->_secuencias = [];
+        $this->fase = $fase;
+        $this->patrones = [];
+        $this->secuencias = [];
     }
 
     /**
@@ -70,7 +70,7 @@ class Antena extends Objeto
         // Validar que el nodo posea identidad en la fase de esta antena.
         if ($nodo->identidad()->es_igual(Matriz2x2::inicial())) {
             self::_error(
-                "El nodo no tiene identidad en la fase {$this->_fase}."
+                "El nodo no tiene identidad en la fase {$this->fase}."
             );
             return;
         }
@@ -83,8 +83,8 @@ class Antena extends Objeto
             return;
         }
 
-        $this->_patrones[] = $nodo;
-        $this->_secuencias[] = $secuencia;
+        $this->patrones[] = $nodo;
+        $this->secuencias[] = $secuencia;
     }
 
     /**
@@ -108,13 +108,13 @@ class Antena extends Objeto
         }
 
         // Ordenar patrones por longitud de secuencia descendente.
-        $indices = array_keys($this->_patrones);
+        $indices = array_keys($this->patrones);
         usort($indices, function ($a, $b) {
-            return count($this->_secuencias[$b]) - count($this->_secuencias[$a]);
+            return count($this->secuencias[$b]) - count($this->secuencias[$a]);
         });
 
         foreach ($indices as $idx) {
-            $secuencia = $this->_secuencias[$idx];
+            $secuencia = $this->secuencias[$idx];
             $longitud = count($secuencia);
 
             if ($longitud > $total) {
@@ -131,7 +131,7 @@ class Antena extends Objeto
             }
 
             if ($coincide) {
-                $patron = $this->_patrones[$idx];
+                $patron = $this->patrones[$idx];
                 $senal->consumir($longitud, $patron);
                 return true;
             }
@@ -143,11 +143,11 @@ class Antena extends Objeto
     /**
      * Devuelve la fase de la antena.
      *
-     * @return int
+     * @return string
      */
-    public function fase(): int
+    public function fase(): string
     {
-        return $this->_fase;
+        return $this->fase;
     }
 
     /**
@@ -157,6 +157,6 @@ class Antena extends Objeto
      */
     public function patrones(): array
     {
-        return $this->_patrones;
+        return $this->patrones;
     }
 }

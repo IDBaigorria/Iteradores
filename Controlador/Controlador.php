@@ -13,29 +13,27 @@ use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraString
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringJSON;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringXML;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL;
+use iteradores\Nodos\NodoNumerico;
 use Iteradores\Controlador\interfaces\Comandos;
 use Iteradores\Comandos\Comando;
 use Iteradores\Controlador\interfaces\Comunicadores;
 use Iteradores\Comunicadores\Comunicador;
 use Iteradores\Controlador\RegistroGlobal;
 use Iteradores\Tiempo\RelojAstronomico;
-/*require_once(".\configuracion\Configuracion.php");
-include_once(".\Nucleo\Objeto.php");*/
+use Iteradores\Controlador\ProcesadorDeDominio;
+use Iteradores\Controlador\Senal;
+use Iteradores\Controlador\MapeoBytesMatrices;
+
 require_once("PerdurarSuperestructura\PerdurarSuperestructura.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringSQL.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringJSON.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringXML.php");
-/*
-require_once(".\Comandos\Comando.php");*/
 require_once("interfaces\Comandos.php");
 require_once("interfaces\Comunicadores.php");
 require_once("interfaces\VectorGravitacional.php");
 require_once("interfaces\Motor.php");
 require_once("interfaces\Dominios.php");
-/*require_once(".\Comunicadores\Comunicador.php");
-require_once(".\Nodos\NodoElectrico.php");
-require_once("RegistroGlobal.php");*/
 
 /**
  * Clase Controlador
@@ -77,6 +75,18 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      * @var string Token de seguridad recibido de la clase Nodo.
      */
     protected static string $token = '';
+
+    // ═══════════════════════════════════════════
+    // V 1.4.6 – PROCESADORES DE DOMINIO
+    // ═══════════════════════════════════════════
+
+    /**
+     * Procesadores de dominio (entrada/salida), indexados por prefijo.
+     *
+     * @var array<string, ProcesadorDeDominio>
+     * @since 1.4.6
+     */
+    private static array $procesadores = [];
 
     /**
      * Registra una clase de persistencia disponible para el sistema.
@@ -726,7 +736,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      *
      * @return void
      * @since 1.3.3
-     * @version 1.3.4 (eliminados alias de archivo)
+     * @version 1.4.6 (integrados Senal y ProcesadorDeDominio)
      */
     private static function registrar_comandos_comunicacion(): void
     {
@@ -740,24 +750,25 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             }
             $comunicador = self::comunicador($medio);
             if (!$comunicador) return null;
-            return $comunicador->solicitar($destino, null, ['accion' => 'leer']);
+
+            // 1. Leer bytes del medio.
+            $bytes = $comunicador->solicitar($destino, null, ['accion' => 'leer']);
+            if ($bytes === null) return null;
+
+            // 2. Convertir bytes → Senal.
+            $senal = Senal::desde_bytes($bytes);
+
+            // 3. Procesar con el tálamo (entrada).
+            $proc = self::procesador('Talamo', 'entrada');
+            $proc->procesar($senal);
+
+            return $senal;
         }, null, false);
 
         // ─── comunicación:escribir ────────────────────────────
-        /**
-         * Comando: comunicacion:escribir
-         *
-         * Envía un mensaje a través del comunicador indicado.
-         *
-         * @param string $medio   Nombre del comunicador.
-         * @param string $mensaje Contenido a escribir.
-         * @param string $destino (Opcional) Destino del mensaje.
-         *                        Por defecto es cadena vacía (salida estándar).
-         * @return bool `true` si se escribió correctamente.
-         */
         self::registrar_comando('comunicacion:escribir', function(string $token, array $args) {
             $medio   = $args[0] ?? null;
-            $mensaje = $args[1] ?? '';
+            $mensaje = $args[1] ?? '';      // Puede ser string (bytes) o Senal procesada
             $destino = $args[2] ?? '';
             if (!$medio) {
                 self::_error("Falta el parámetro 'medio' para 'comunicacion:escribir'.");
@@ -765,7 +776,11 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             }
             $comunicador = self::comunicador($medio);
             if (!$comunicador) return false;
-            $comunicador->enviar($destino, $mensaje);
+
+            // Si ya es una Senal, aplanarla a bytes; si es string, usarlo directamente.
+            $bytes = ($mensaje instanceof Senal) ? Senal::a_bytes($mensaje) : (string)$mensaje;
+
+            $comunicador->enviar($destino, $bytes);
             return true;
         }, null, false);
 
@@ -1276,26 +1291,46 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      *
      * @return void
      * @since 1.3.3
-     * @version 1.3.4 (eliminados alias de archivo)
+     * @version 1.4.6 (implementados con Senal y ProcesadorDeDominio)
      */
     private static function registrar_comandos_dominio(): void
     {
-        // En registrar_comandos_comunicacion() o un nuevo método:
+        // ─── dominio:leer_byte ──────────────────────────────
         self::registrar_comando('dominio:leer_byte', function(string $token, array $args) {
-            // TODO: implementar cuando exista la compuerta
-            $controlador = RegistroGlobal::controlador();
-            if ($controlador) {
-                $controlador::escribir_salida("[placeholder] dominio:leer_byte ejecutado.");
+            $medio   = $args[0] ?? null;
+            $destino = $args[1] ?? '';
+            if (!$medio) {
+                self::_error("Falta el parámetro 'medio' para 'dominio:leer_byte'.");
+                return null;
             }
-            return true;
-        }, null, true); // solo_desarrollo = true
+            $comunicador = self::comunicador($medio);
+            if (!$comunicador) return null;
 
+            $bytes = $comunicador->solicitar($destino, null, ['accion' => 'leer']);
+            if ($bytes === null || $bytes === '') return null;
+
+            // Convertir a Senal y procesar con el tálamo.
+            $senal = Senal::desde_bytes($bytes);
+            $proc = self::procesador('Talamo', 'entrada');
+            $proc->procesar($senal);
+
+            // Aplanar y devolver los bytes originales.
+            return Senal::a_bytes($senal);
+        }, null, true);
+
+        // ─── dominio:escribir_byte ───────────────────────────
         self::registrar_comando('dominio:escribir_byte', function(string $token, array $args) {
-            // TODO: implementar cuando exista la compuerta
-            $controlador = RegistroGlobal::controlador();
-            if ($controlador) {
-                $controlador::escribir_salida("[placeholder] dominio:escribir_byte ejecutado.");
+            $medio   = $args[0] ?? null;
+            $byte    = $args[1] ?? null;
+            $destino = $args[2] ?? '';
+            if (!$medio || $byte === null) {
+                self::_error("Faltan parámetros 'medio' o 'byte' para 'dominio:escribir_byte'.");
+                return false;
             }
+            $comunicador = self::comunicador($medio);
+            if (!$comunicador) return false;
+
+            $comunicador->enviar($destino, chr($byte));
             return true;
         }, null, true);
     }
@@ -1341,6 +1376,29 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
         self::$dominio_actual = null;
         self::$indice_fase_actual = null;
     }
+
+    // ═══════════════════════════════════════════
+    // V 1.4.6 – PROCESADORES DE DOMINIO
+    // ═══════════════════════════════════════════
+
+    /**
+     * Obtiene (o crea) el procesador para un medio y dirección.
+     *
+     * @param string $medio     Nombre del medio (ej. 'Archivo', 'Talamo').
+     * @param string $direccion 'entrada' o 'salida'.
+     * @return ProcesadorDeDominio
+     * @since 1.4.6
+     */
+    public static function procesador(string $medio, string $direccion): ProcesadorDeDominio
+    {
+        $clave = "{$medio}:{$direccion}";
+        if (!isset(self::$procesadores[$clave])) {
+            self::$procesadores[$clave] = new ProcesadorDeDominio($medio, $direccion);
+            self::$procesadores[$clave]::recibir_token(self::$token);
+        }
+        return self::$procesadores[$clave];
+    }
+
     // ══════════════════════════════════════════════════════
     // INICIALIZACION
     // ══════════════════════════════════════════════════════
@@ -1356,7 +1414,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      *
      * @return void
      * @since V3.3.0
-     * @version 1.3.4 (migrado a RegistroGlobal)
+     * @version 1.4.6 (inicialización del tálamo y procesadores)
      */
     public static function inicializar(): void
     {
@@ -1371,7 +1429,23 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             Controlador::registrar_implementacion("ESQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL");
             Controlador::establecer_metodo("ESQL");
 
-            NodoElectrico::_fase(self::$token, "a");
+            // ─── Inicializar cache de primos ─────────────────────
+            NodoNumerico::inicializar_cache_primos();
+
+            // ─── Inicializar mapeo byte ↔ matriz ─────────────────
+            MapeoBytesMatrices::inicializar();
+
+            // ─── Inicializar tálamo (fase 0 con 256 primos) ───
+            $proc_talamo_entrada = self::procesador('Talamo', 'entrada');
+            for ($byte = 0; $byte < 256; $byte++) {
+                $matriz = MapeoBytesMatrices::byte_a_matriz($byte);
+                if ($matriz !== null) {
+                    $nodo = NodoNumerico::crear_primo(
+                        NodoNumerico::$primos_conocidos[$byte]
+                    );
+                    $proc_talamo_entrada->_patron($nodo, 0);
+                }
+            }
 
             // ─── Procesar comandos pendientes ──────────────────
             foreach (RegistroGlobal::$comandos_pendientes as $entrada) {
@@ -1395,12 +1469,10 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             $coordenadas = Entorno::coordenadas();
             self::$_reloj = new RelojAstronomico($coordenadas['latitud'], $coordenadas['longitud']);
 
-            // En PHP no podemos escuchar cambios en tiempo real.
-            // La ubicación se determina una vez por petición.
-
             // ─── Comandos genéricos de comunicación ────────────
-            self::registrar_comandos_dominio();
-            // ─── Comandos genéricos de comunicación ────────────
+            self::registrar_comandos_comunicacion();
+            
+            // ─── Comandos genéricos de dominio ──────────────────
             self::registrar_comandos_dominio();
             static::$inicializo = true;
         }
