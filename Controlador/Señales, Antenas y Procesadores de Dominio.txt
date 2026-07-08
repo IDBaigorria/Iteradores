@@ -1,137 +1,191 @@
-# Señales, Antenas y Procesadores de Dominio:  
+# Señales, Antenas y Procesadores de Dominio:
 ## Un modelo de comunicación y aprendizaje para grafos de identidades matriciales
 
-**Autor: Ignacio David Baigorria**  
-**Versión 1.4.6 – Julio 2026**
+**Autor: Ignacio David Baigorria**
+**Versión 1.4.7 – Julio 2026**
 
 ---
 
 ## 1. Introducción
 
-El sistema algebraico presentado en el documento anterior demostró cómo cualquier secuencia de comandos o acciones puede representarse mediante una matriz 2×2 no conmutativa, compacta y reversible, utilizando números primos como identificadores atómicos. Sin embargo, quedaba pendiente la cuestión de cómo **conectar** estas estructuras con el mundo exterior, cómo **procesar** secuencias de símbolos arbitrarios y cómo **construir** nuevos patrones compuestos a partir de la experiencia.
+El sistema algebraico presentado en el documento anterior demostró cómo cualquier secuencia de comandos o acciones puede representarse mediante una matriz 2×2 no conmutativa, compacta y reversible, utilizando números primos como identificadores atómicos. Quedaba pendiente la cuestión de cómo **conectar** estas estructuras con el mundo exterior, cómo **procesar** secuencias de símbolos arbitrarios y cómo **construir** nuevos patrones compuestos a partir de la experiencia.
 
-La versión 1.4.6 del framework Iteradores introduce los conceptos de **Señal**, **Antena**, **Procesador de Dominio** y **Tálamo**, que en conjunto forman una arquitectura completa de comunicación y aprendizaje para el grafo de Nodos Numéricos. Este documento describe dicha arquitectura, su funcionamiento y su integración con el núcleo algebraico preexistente.
-
----
-
-## 2. Señales: el lenguaje común entre dominios
-
-Una **Señal** es una secuencia ordenada de matrices 2×2 que representa información cruda o procesada que fluye entre los distintos componentes del sistema (medios externos, tálamo, dominios específicos). Constituye el **lenguaje franco** que permite la comunicación sin exponer la estructura interna de las acciones compuestas.
-
-### 2.1. Estructura interna
-
-Cada señal está compuesta por tres elementos:
-
-- **Matrices crudas:** la lista original de matrices que componen la señal, tal como se recibió o construyó inicialmente. Es inmutable una vez creada la señal.
-- **Índice de consumo:** un marcador numérico que indica cuántas matrices de la señal ya han sido reconocidas y procesadas por las antenas. Avanza a medida que se producen capturas.
-- **Elementos procesados:** una lista que registra los resultados del procesamiento. Cada entrada puede ser una matriz original (si no fue reconocida por ningún patrón) o una referencia a un NodoNumérico (cuando un patrón ha capturado una subsecuencia). Esta lista es la base para la reconstrucción o el envío a otros dominios.
-
-Las señales son **mutables**: el procesamiento no crea nuevas instancias, sino que avanza el índice y agrega elementos a la lista de procesados, preservando siempre las matrices crudas originales para auditoría o reprocesamiento.
-
-### 2.2. Conversión desde el mundo exterior
-
-La clase `Senal` provee métodos estáticos para traducir entre bytes (datos crudos de un comunicador como Archivo, HTTP o Consola) y señales:
-
-- `Senal.desde_bytes(bytes)` convierte una cadena de bytes en una señal cruda. Cada byte (0‑255) se mapea a su matriz canónica prima correspondiente, utilizando los primeros 256 números primos como alfabeto universal. Este mapeo es determinista y reversible.
-- `Senal.a_bytes(senal)` realiza la operación inversa: aplana los patrones reconocidos en una señal hasta extraer las matrices originales del tálamo y luego las convierte de nuevo a bytes, listos para ser transmitidos o almacenados por un comunicador externo.
+La versión 1.4.7 del framework Iteradores consolida los conceptos de **Señal**, **Antena**, **Procesador de Dominio** y **Tálamo**, que en conjunto forman una arquitectura completa de comunicación y aprendizaje para el grafo de Nodos Numéricos. Este documento describe dicha arquitectura, su funcionamiento y su integración con el núcleo algebraico preexistente.
 
 ---
 
-## 3. Antenas: reconocimiento voraz de patrones
+## 2. Señales: portadoras mínimas de matrices
 
-Una **Antena** es el dispositivo de reconocimiento de patrones asociado a una fase específica dentro de un dominio. Su función es examinar la porción no consumida de una señal e identificar la subsecuencia más larga que coincida con alguno de sus patrones registrados.
+Una **Señal** es una secuencia ordenada e inmutable de matrices 2×2 que representa información en tránsito entre los distintos componentes del sistema. Su diseño ha sido reducido a la mínima expresión: una simple lista de matrices sin estado interno de consumo ni registro de procesamiento.
+
+### 2.1. Estructura
+
+Cada señal contiene exclusivamente:
+
+- **Matrices:** la lista de matrices 2×2 que componen la señal, en orden estricto.
+
+No hay índice de consumo, ni elementos procesados, ni marca de posición. La señal es una estructura pasiva que no sabe ni le importa cómo será interpretada. Esta minimalidad permite que cualquier dominio pueda recorrer sus matrices de la forma que considere adecuada (secuencial, en grilla, en árbol) sin acarrear metadatos innecesarios.
+
+### 2.2. Traducción desde y hacia bytes
+
+La conversión entre bytes (datos crudos de un comunicador como Archivo, HTTP o Consola) y matrices no es responsabilidad de la Señal, sino del **Tálamo** (ver sección 5). La Señal simplemente proporciona sus matrices cuando se le solicita, mediante `matrices()`.
+
+---
+
+## 3. Antenas: reconocimiento voraz sin modificación de la señal
+
+Una **Antena** es el dispositivo de reconocimiento de patrones asociado a una fase específica dentro de un dominio. Su función es examinar una señal a partir de un índice dado e identificar la subsecuencia más larga que coincida con alguno de sus patrones registrados.
+
+A diferencia de versiones anteriores, la antena **no modifica la señal**. Simplemente informa al ProcesadorDeDominio sobre la longitud capturada y el patrón que produjo la captura.
 
 ### 3.1. Registro de patrones
 
 Cada antena mantiene:
 
 - Una lista de **patrones** (Nodos Numéricos) que constituyen su vocabulario.
-- Una **caché de secuencias de matrices** precalculadas para cada patrón, obtenidas a partir de su p‑grama (omitiendo las marcas especiales `1` y `-1`).
-
-Para registrar un patrón, la antena verifica que el nodo posea una identidad real (matriz distinta de la inicial) y que su secuencia de matrices no esté vacía. Si ambas condiciones se cumplen, el nodo se añade al vocabulario y su secuencia se almacena en caché para acelerar las comparaciones futuras.
+- Una **caché de secuencias de matrices** precalculadas para cada patrón, obtenidas a partir de la secuencia de matrices de identidad del nodo.
+- Un **almacén de matrices originales**, indexado por la representación del p‑grama, que conserva las matrices del Tálamo asociadas a cada patrón atómico. Este almacén es la clave para la reversibilidad de las traducciones entre dominios.
 
 ### 3.2. Algoritmo de captura
 
-Ante una señal entrante, la antena aplica una estrategia **voraz**:
+Ante una señal y un índice inicial, la antena aplica una estrategia **voraz**:
 
-1. Ordena sus patrones por longitud de secuencia descendente (los más largos primero).
-2. Para cada patrón, compara su secuencia de matrices, elemento a elemento, con el prefijo de la porción no consumida de la señal.
-3. Si encuentra una coincidencia exacta, **consume** esa subsecuencia: avanza el índice de la señal en la longitud correspondiente y registra el patrón como un elemento procesado.
-4. Retorna `true` si hubo captura, `false` en caso contrario.
+1. Obtiene la porción de matrices de la señal desde el índice en adelante.
+2. Ordena sus patrones por longitud de secuencia descendente (los más largos primero), ignorando el último patrón registrado para evitar auto‑capturas durante el aprendizaje.
+3. Para cada patrón, compara su secuencia de matrices, elemento a elemento, con el prefijo de la porción extraída.
+4. Si encuentra una coincidencia exacta, retorna `[longitud, patrón]`.
+5. Si ningún patrón coincide, retorna `[0, null]`.
 
 Este mecanismo garantiza que los bocados reconocidos sean siempre lo más grandes posible, maximizando la compresión semántica de la señal.
 
+### 3.3. Emisión de señales
+
+La antena también es responsable del proceso inverso: **emitir** una nueva señal a partir de una lista de p‑gramas capturados. Para cada p‑grama, busca en su vocabulario el patrón correspondiente y recupera la **matriz original del Tálamo** almacenada durante el aprendizaje trivial. Si por alguna razón esa matriz no estuviera disponible, la antena reconstruye la matriz prima a partir del número primo del p‑grama. El resultado es una nueva Señal en el alfabeto del Tálamo, lista para ser traducida a bytes.
+
 ---
 
-## 4. Procesador de Dominio: orquestación jerárquica
+## 4. Procesador de Dominio: orquestación jerárquica con índice local
 
-Un **Procesador de Dominio** agrupa múltiples antenas, una por cada nivel de abstracción (fase), y coordina el reconocimiento mediante un bucle voraz jerárquico.
+Un **Procesador de Dominio** agrupa múltiples antenas, una por cada nivel de abstracción (fase), y coordina el reconocimiento mediante un bucle voraz jerárquico. El procesador mantiene internamente el índice de avance y la lista de p‑gramas capturados, liberando a la Señal de cualquier responsabilidad de estado.
 
 ### 4.1. Asociación a medio y dirección
 
-Cada procesador está asociado a un **medio** (por ejemplo, `'texto'`, `'Talamo'`, `'http'`) y a una **dirección** (`'entrada'` o `'salida'`). Las fases se prefijan internamente con esta información (`"texto:entrada:0"`, `"texto:entrada:1"`, etc.) para evitar colisiones entre diferentes dominios y subdominios, y para que el motor de ejecución pueda encolar comandos en la fase correcta.
+Cada procesador está asociado a un **medio** (por ejemplo, `'texto'`, `'Talamo'`, `'html'`) y a una **dirección** (`'entrada'` o `'salida'`). Las fases se prefijan internamente con esta información (`"texto:entrada:0"`, `"texto:entrada:1"`, etc.) para evitar colisiones entre diferentes dominios y para que el motor de ejecución pueda encolar comandos en la fase correcta.
+
+Adicionalmente, el procesador puede establecer una **fase máxima** que limita el ascenso del bucle voraz. Esto es utilizado por el Tálamo para restringirse a la fase 0.
 
 ### 4.2. Bucle voraz jerárquico
 
 El procesamiento de una señal sigue este algoritmo:
 
-1. Se ordenan las fases existentes de mayor a menor (las fases más altas contienen patrones más abstractos y complejos).
-2. Se itera sobre las fases, invocando `intentar_capturar` en la antena correspondiente.
-3. Si una antena logra una captura, **se reinicia el ciclo desde la fase más alta**, porque la nueva señal reducida podría ser ahora reconocible por un patrón aún más abstracto.
-4. El proceso se repite hasta que ninguna fase de todo el procesador logra capturar nada.
-
-Este comportamiento emula el procesamiento cognitivo: primero se intenta reconocer estructuras complejas y, si no es posible, se desciende a niveles más básicos.
+1. Se obtienen todas las matrices de la señal (`$senal->matrices()`).
+2. Se inicializa un índice local `$i = 0`.
+3. Mientras `$i` sea menor que la cantidad de matrices:
+   - Se ordenan las fases existentes de mayor a menor (respetando la fase máxima, si existe).
+   - Para cada fase, se invoca `$antena->intentar_capturar($senal, $i)`.
+   - Si una antena logra una captura (retorna `[$longitud, $patron]` con `$longitud > 0`):
+     - Se registra el p‑grama del patrón en la lista interna `$elementos_procesados`.
+     - Se avanza `$i` en `$longitud`.
+     - Se reinicia el ciclo desde la fase más alta.
+   - Si ninguna antena capturó:
+     - Se activa el **aprendizaje trivial** (ver 4.3).
+     - Se avanza `$i` en 1.
+4. Al finalizar, el procesador tiene en `$elementos_procesados` una secuencia de p‑gramas que representa la señal en el alfabeto del dominio.
 
 ### 4.3. Aprendizaje trivial
 
-Cuando el bucle voraz termina y aún quedan matrices sin consumir en la señal, se activa el mecanismo de **aprendizaje trivial**:
+Cuando el bucle voraz no puede capturar una matriz, el sistema crea un nuevo símbolo atómico en la fase 0 del dominio:
 
-1. Se cambia la fase activa a la fase 0 del dominio (la fase de átomos).
-2. Para cada matriz restante:
-   - Se obtiene un nuevo número primo virgen para esa fase (el contador de primos de la fase se inicializa en 256, reservando los primeros 256 para el tálamo, aunque esta reserva es solo una convención, no una restricción técnica).
-   - Se crea un NodoPrimo con ese número, que encapsula la matriz original del tálamo en su dato multidimensional `'abajo'` (clave `'matriz_original'`).
-   - El nuevo primo se registra como patrón en la antena de fase 0.
-   - La matriz correspondiente se consume de la señal.
-3. Se restaura la fase activa original.
+1. Se cambia temporalmente la fase activa a la fase 0 del dominio (ej. `"texto:entrada:0"`).
+2. Se obtiene un nuevo número primo mediante el contador de primos de esa fase.
+3. Se crea un NodoPrimo con ese número.
+4. Se guarda la **matriz original de la señal** (que es una matriz en el alfabeto del dominio de origen, típicamente el Tálamo) en un almacén interno de la antena, indexado por el p‑grama del nuevo primo.
+5. El nuevo primo se registra como patrón en la antena de fase 0.
+6. Se restaura la fase activa original.
 
-Este mecanismo garantiza que **ninguna matriz quede huérfana** y que el sistema comience a construir su vocabulario básico desde los átomos sin intervención externa. Es el primer paso hacia el aprendizaje autónomo que los futuros iteradores de dominio desarrollarán plenamente.
+Este mecanismo garantiza que **ninguna matriz quede huérfana** y que cada dominio construya su propio vocabulario desde cero, con sus propios primos pequeños. La matriz original del Tálamo se preserva en el almacén de la antena, permitiendo la traducción inversa durante la emisión.
 
----
+### 4.4. Emisión de señales desde el procesador
 
-## 5. El Tálamo: núcleo de relevo central
-
-El **Tálamo** es un dominio especial que actúa como **núcleo de relevo central** del sistema. Su nombre proviene de la analogía con el tálamo biológico, que retransmite y modula las señales sensoriales hacia las áreas corticales especializadas.
-
-### 5.1. Función
-
-El Tálamo es la puerta de entrada de toda información proveniente del mundo exterior. Su fase 0 contiene como patrones todos los NodosPrimos correspondientes a los 256 bytes posibles (los primeros 256 números primos). Esto le permite:
-
-- **Capturar cualquier señal de entrada**, por más simple que sea, traduciéndola inmediatamente al lenguaje común de matrices del sistema.
-- **Preprocesar** señales antes de enrutarlas a dominios específicos, reconociendo patrones frecuentes que haya aprendido.
-- **Servir como alfabeto universal** compartido por todos los dominios: cualquier byte tiene la misma representación matricial en cualquier contexto.
-
-### 5.2. Relación con los Procesadores de Dominio
-
-El Tálamo es, técnicamente, una instancia más de `ProcesadorDeDominio` con medio `'Talamo'` y dirección `'entrada'`. La diferencia radica en su inicialización: durante el arranque del sistema, se registran automáticamente los 256 patrones de fase 0. No hay nada en la arquitectura que impida que otros dominios tengan también estos patrones, pero la convención es que el Tálamo centraliza esta función.
+El procesador puede generar una nueva señal a partir de los p‑gramas capturados invocando `emitir_senal()`. Este método delega en la antena de fase 0, que recorre los p‑gramas y recupera las matrices originales del Tálamo desde su almacén interno. El resultado es una Señal en el alfabeto del Tálamo que puede ser entregada a un comunicador o a otro dominio.
 
 ---
 
-## 6. Flujo completo de entrada a salida
+## 5. El Tálamo: núcleo de relevo central y traductor universal
 
-El recorrido de un dato desde el mundo exterior hasta su salida procesada es el siguiente:
+El **Tálamo** es un ProcesadorDeDominio especializado que actúa como **puerta de entrada y salida** del sistema. Su nombre proviene de la analogía con el tálamo biológico, que retransmite y modula las señales sensoriales hacia las áreas corticales especializadas.
 
-1. **Lectura externa:** Un comunicador (Archivo, HTTP, Consola) lee una cadena de bytes desde su medio nativo.
-2. **Conversión a señal:** `Senal.desde_bytes()` traduce los bytes a una señal cruda compuesta por matrices primas (una por byte).
-3. **Procesamiento en el Tálamo:** La señal se pasa al `ProcesadorDeDominio('Talamo', 'entrada')`. La fase 0 del tálamo captura cada byte, reconociéndolo como un primo conocido. Si el tálamo ha aprendido patrones más complejos (palabras, comandos frecuentes), sus antenas de fases superiores los capturarán, reduciendo la señal.
-4. **Ruteo a un dominio específico:** La señal procesada se envía al dominio correspondiente (por ejemplo, `'texto:entrada'`), donde su propio procesador intentará reconocer patrones de más alto nivel. Si el dominio no tiene antenas aún, el aprendizaje trivial creará los primos necesarios en su fase 0.
-5. **Aprendizaje:** Los dominios aprenden patrones compuestos a medida que procesan señales (en esta versión, solo el aprendizaje trivial está implementado; los futuros iteradores añadirán ascenso de patrones compuestos).
-6. **Preparación de salida:** Cuando se desea emitir una respuesta, se toma una señal procesada (que contiene elementos procesados: matrices sueltas y patrones compuestos). Esta señal se **aplana** con el `AplanadorSenal`:
-   - Para matrices sueltas, se devuelven tal cual.
-   - Para patrones compuestos (Nodos Numéricos), se recorre su p‑grama y se desciende recursivamente. En cada NodoPrimo atómico se busca el dato `'abajo'`, que contiene la matriz original del tálamo guardada durante el aprendizaje o el ascenso. Si no existe, se usa la propia identidad del primo.
-7. **Conversión a bytes:** Las matrices aplanadas se convierten a bytes mediante el mapeo inverso (primo → byte).
-8. **Escritura externa:** Los bytes resultantes se entregan al comunicador de salida para su envío, almacenamiento o presentación.
+### 5.1. Características distintivas
 
-Este flujo es **simétrico y reversible**: toda entrada puede reconstruirse a la salida, incluso después de haber sido capturada por patrones compuestos. La información necesaria para la reversibilidad está siempre disponible en los datos `'abajo'` de los primos.
+- Es un singleton que extiende `ProcesadorDeDominio` con medio `'Talamo'` y dirección `'entrada'`.
+- Tiene su fase máxima fijada en 0, lo que le impide ascender o aprender patrones compuestos.
+- Su vocabulario es cerrado: exactamente 256 patrones, uno por cada byte posible (0‑255).
+
+### 5.2. Inicialización
+
+Durante el arranque del sistema, el Tálamo precarga sus 256 patrones. Para cada byte (0 a 255):
+
+1. Se obtiene el número primo correspondiente de la caché global (`NodoNumerico::$primos_conocidos`).
+2. Se crea la matriz prima canónica mediante `Matriz2x2::crear_prima()`.
+3. Se crea un NodoPrimo con ese número primo.
+4. Se guarda la matriz prima en el almacén de la antena de fase 0, indexada por el p‑grama `[primo]`.
+5. Se registra el nodo como patrón en la antena.
+
+De este modo, el Tálamo conoce todos los bytes sin necesidad de aprendizaje trivial.
+
+### 5.3. Traducción de entrada
+
+Cuando un comunicador externo proporciona una cadena de bytes, el Tálamo los convierte en una Señal:
+
+1. Cada byte se mapea a su matriz prima correspondiente (usando la caché de primos global).
+2. Se construye una Señal con esas matrices.
+3. Opcionalmente, se procesa la señal con `procesar()`, aunque como el Tálamo solo tiene fase 0 y ya conoce todos los bytes, simplemente capturará cada matriz individualmente y registrará los p‑gramas `[primo]`.
+
+### 5.4. Traducción de salida
+
+Cuando un dominio especializado ha procesado una señal y desea emitir una respuesta, el Tálamo recibe la Señal en su alfabeto:
+
+1. Procesa la señal con `procesar()`. Sus antenas de fase 0 capturan cada matriz, reconociéndola como un byte.
+2. Obtiene los p‑gramas capturados (cada uno de la forma `[primo]`).
+3. Para cada p‑grama, busca el byte correspondiente en la caché de primos global (invirtiendo el mapeo primo → byte).
+4. Concatena los bytes y retorna la cadena resultante, lista para ser enviada al comunicador de salida.
+
+### 5.5. Separación de alfabetos
+
+Es crucial entender que el Tálamo y los dominios especializados operan con **alfabetos diferentes**:
+
+- El **Tálamo** trabaja con los 256 primos globales (2, 3, 5, …, 1619), donde cada primo representa exactamente un byte.
+- Los **dominios** (texto, imagen, etc.) construyen su propio alfabeto mediante aprendizaje trivial, usando primos pequeños (2, 3, 5, 7, 11, …) que representan **matrices del Tálamo**, no bytes directamente.
+
+Esta separación permite que cada dominio desarrolle su propio vocabulario optimizado sin interferir con los demás. La traducción entre alfabetos está garantizada por el almacén de matrices originales que cada antena mantiene.
+
+---
+
+## 6. Flujo completo de comunicación
+
+A continuación se describe el recorrido de un dato desde el mundo exterior hasta su salida procesada, pasando por el Tálamo y un dominio especializado (por ejemplo, texto).
+
+### 6.1. Entrada
+
+1. **Comunicador externo:** Un comunicador (Archivo, HTTP, Consola) lee una cadena de bytes desde su medio nativo.
+2. **Traducción Tálamo → Señal:** El Tálamo convierte los bytes en una Señal compuesta por matrices primas (una por byte). Esta Señal está en el alfabeto del Tálamo.
+3. **Enrutamiento:** El Controlador entrega la Señal al ProcesadorDeDominio correspondiente (por ejemplo, `'texto:entrada'`).
+
+### 6.2. Procesamiento en el dominio
+
+4. **Bucle voraz:** El dominio recorre las matrices de la Señal e intenta capturarlas con sus antenas.
+5. **Aprendizaje trivial:** Para cada matriz no reconocida, el dominio crea un nuevo NodoPrimo (con un primo pequeño de su propio alfabeto) y guarda la matriz original del Tálamo en el almacén de su antena de fase 0.
+6. **Resultado:** El dominio obtiene una lista de p‑gramas (en su propio alfabeto) que representan la señal.
+
+### 6.3. Salida
+
+7. **Emisión:** El dominio invoca `emitir_senal()`, que recorre los p‑gramas capturados y recupera del almacén de la antena las matrices originales del Tálamo. El resultado es una nueva Señal en el alfabeto del Tálamo.
+8. **Traducción Señal → bytes:** El Tálamo recibe esta Señal, la procesa (capturando cada matriz como un byte) y genera la cadena de bytes correspondiente.
+9. **Comunicador externo:** Los bytes se entregan al comunicador de salida para su envío, almacenamiento o presentación.
+
+### 6.4. Simetría y reversibilidad
+
+Este flujo es completamente **simétrico y reversible**: cualquier secuencia de bytes puede convertirse en una Señal del Tálamo, procesarse en un dominio especializado (incluso transformándose mediante inversión, filtrado u otras operaciones), y luego reconstruirse como bytes de vuelta. La información necesaria para la reversibilidad está siempre disponible en los almacenes de las antenas, sin depender de la fase activa ni de la persistencia interna de los nodos.
 
 ---
 
@@ -146,20 +200,22 @@ Un Iterador Multifase será una evolución del Procesador de Dominio que, ademá
 - **Ascenderá patrones compuestos** a fases superiores cuando su energía o frecuencia supere un umbral, creando nuevas antenas en niveles más abstractos.
 - **Emitirá comandos al motor de ejecución** para todas estas operaciones, integrándose con el sistema de colas por fase ya existente.
 
-La arquitectura actual —señales, antenas, procesadores con aprendizaje trivial y tálamo— proporciona los cimientos sólidos sobre los que se construirá ese aprendizaje autónomo.
+La arquitectura actual —señales mínimas, antenas con almacenes locales de matrices originales, procesadores con índice propio y aprendizaje trivial, y un Tálamo central como traductor universal— proporciona los cimientos sólidos sobre los que se construirá ese aprendizaje autónomo.
 
 ---
 
 ## 8. Conclusión
 
-La versión 1.4.6 completa el circuito de comunicación del framework Iteradores. Las señales matriciales proveen un lenguaje común y compacto entre dominios; las antenas implementan un reconocimiento voraz que prioriza los patrones más largos; los procesadores de dominio organizan las antenas jerárquicamente y garantizan que ningún dato quede sin interpretar mediante el aprendizaje trivial. El tálamo centraliza la traducción desde el mundo exterior y establece el alfabeto universal de 256 primos.
+La versión 1.4.7 completa y consolida el circuito de comunicación del framework Iteradores. Las señales matriciales proveen un lenguaje común, compacto y sin estado entre dominios; las antenas implementan un reconocimiento voraz que prioriza los patrones más largos sin modificar la señal; los procesadores de dominio organizan las antenas jerárquicamente, mantienen el índice de avance y garantizan que ningún dato quede sin interpretar mediante el aprendizaje trivial, que construye el vocabulario del dominio preservando siempre la referencia a las matrices originales del Tálamo. El Tálamo centraliza la traducción desde y hacia el mundo exterior y establece el alfabeto universal de 256 primos.
+
+La separación de alfabetos entre el Tálamo (bytes) y los dominios especializados (primos) permite que cada dominio desarrolle su propio vocabulario optimizado sin interferencias, mientras que los almacenes locales de matrices originales en las antenas garantizan la traducción inversa en cualquier momento, independientemente de la fase activa.
 
 Todo ello mantiene las propiedades algebraicas fundamentales del sistema: compacidad extrema de la representación matricial, no conmutatividad que preserva el orden, reversibilidad total gracias al p‑grama y auditabilidad completa a través del descenso entre fases.
 
 ---
 
-**Referencia:** *"Un sistema algebraico para la representación de acciones compuestas y reversibles mediante matrices 2×2 no conmutativas"*, v1.4.4', Ignacio David Baigorria.
+**Referencia:** *"Un sistema algebraico para la representación de acciones compuestas y reversibles mediante matrices 2×2 no conmutativas"*, v1.4.4, Ignacio David Baigorria.
 
 ---
 
-Este documento refleja el estado de la versión 1.4.6 del framework, en desarrollo por Ignacio David Baigorria.
+Este documento refleja el estado de la versión 1.4.7 del framework, en desarrollo por Ignacio David Baigorria.

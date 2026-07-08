@@ -1,6 +1,6 @@
 <?php
 // ═══════════════════════════════════════════════════════════
-// PLANTILLA DE COMUNICADOR ESTÁTICO — v1.3.4
+// PLANTILLA DE COMUNICADOR — v1.4.7
 // ═══════════════════════════════════════════════════════════
 // Úsela como base para crear un nuevo comunicador que residirá
 // en su propio archivo dentro de la carpeta Comunicadores.
@@ -10,6 +10,7 @@
 namespace Iteradores\Comunicadores;
 
 use Iteradores\Comunicadores\Comunicador;
+use Iteradores\Controlador\Senal;
 use Iteradores\Controlador\RegistroGlobal;
 
 /**
@@ -18,18 +19,24 @@ use Iteradores\Controlador\RegistroGlobal;
  * [Explicación detallada de su propósito, protocolo que utiliza,
  * si necesita credenciales, etc.]
  *
+ * A partir de la versión 1.4.7, los métodos de entrada/salida trabajan
+ * directamente con {@link Senal}. La traducción entre bytes y señales
+ * se realiza externamente, normalmente por el {@link \Iteradores\Controlador\Talamo}
+ * a través de los comandos de comunicación del {@link \Iteradores\Controlador\Controlador}.
+ *
  * **Entorno:** disponible en todos los entornos (o indicar solo desarrollo).
  *
  * @package Iteradores\Comunicadores
  * @since [versión]
- * @version [Versión]
+ * @version 1.4.7
  */
 class [Nombre] implements Comunicador
 {
     /**
-     * Nombre único del comunicador (ej. 'http', 'archivo', 'salida_estandar').
+     * Nombre único del comunicador (ej. 'http', 'archivo', 'consola').
      *
      * @return string
+     * @since [versión]
      */
     public static function nombre(): string
     {
@@ -40,6 +47,7 @@ class [Nombre] implements Comunicador
      * Indica si el comunicador solo debe estar disponible en desarrollo.
      *
      * @return bool
+     * @since [versión]
      */
     public static function solo_desarrollo(): bool
     {
@@ -50,6 +58,7 @@ class [Nombre] implements Comunicador
      * Breve descripción del comunicador (para ayuda o documentación).
      *
      * @return string
+     * @since [versión]
      */
     public static function descripcion(): string
     {
@@ -57,35 +66,36 @@ class [Nombre] implements Comunicador
     }
 
     /**
-     * Envía datos al destino especificado.
+     * Envía una señal al destino especificado.
      *
-     * @param string $destino   Destino del mensaje (URL, ruta, canal…).
-     * @param mixed  $mensaje   Datos a enviar.
-     * @param array  $opciones  Opciones adicionales (headers, timeout…).
+     * @param string $destino Identificador del destino (ruta, URL, etc.).
+     * @param Senal  $senal   Señal a transmitir.
      * @return void
+     * @since [versión]
+     * @version 1.4.7
      */
-    public function enviar(string $destino, mixed $mensaje = null, array $opciones = []): void
+    public function enviar(string $destino, Senal $senal): void
     {
-        // TODO: Implementar el envío
-        // Ejemplo:
-        // file_put_contents($destino, (string)$mensaje);
+        // TODO: Implementar el envío.
+        // Si necesita convertir la señal a bytes, use el Tálamo:
+        // $bytes = \Iteradores\Controlador\Talamo::obtener()->traducir_salida($senal);
+        // Luego envíe $bytes por el medio nativo.
     }
 
     /**
-     * Envía datos y espera una respuesta.
+     * Solicita datos desde una fuente y los devuelve como señal.
      *
-     * @param string $destino   Destino del mensaje.
-     * @param mixed  $mensaje   Datos a enviar.
-     * @param array  $opciones  Opciones adicionales.
-     * @return mixed            Respuesta recibida.
+     * @param string $fuente Identificador de la fuente (ruta, URL, etc.).
+     * @return Senal Señal que contiene los datos obtenidos.
+     * @since [versión]
+     * @version 1.4.7
      */
-    public function solicitar(string $destino, mixed $mensaje = null, array $opciones = []): mixed
+    public function solicitar(string $fuente): Senal
     {
-        // TODO: Implementar la solicitud y devolver la respuesta
-        // Ejemplo:
-        // if (!file_exists($destino)) return null;
-        // return file_get_contents($destino);
-        return null;
+        // TODO: Obtener los datos crudos (bytes) del medio nativo.
+        // Luego convertirlos a Senal usando el Tálamo:
+        // return \Iteradores\Controlador\Talamo::obtener()->traducir_entrada($bytes);
+        return new Senal([]); // Placeholder
     }
 
     /**
@@ -93,30 +103,32 @@ class [Nombre] implements Comunicador
      *
      * @param callable $callback Función que se ejecutará al recibir un mensaje.
      * @return void
+     * @since [versión]
      */
     public function escuchar(callable $callback): void
     {
-        // Si no aplica, dejar vacío (o lanzar una excepción controlada)
+        // Si no aplica, dejar vacío.
     }
 
     /**
      * Cierra los recursos del comunicador (conexiones, sockets…).
      *
      * @return void
+     * @since [versión]
      */
     public function cerrar(): void
     {
-        // Liberar recursos si es necesario
+        // Liberar recursos si es necesario.
     }
 
     /**
      * Devuelve el estado actual del comunicador.
      *
      * @return string (ej. 'conectado', 'cerrado', 'activo')
+     * @since [versión]
      */
     public function estado(): string
     {
-        // TODO: Devolver el estado real
         return 'activo';
     }
 
@@ -126,14 +138,13 @@ class [Nombre] implements Comunicador
      * Se invoca automáticamente antes de cada envío o solicitud.
      * Modifica el array de opciones por referencia.
      *
-     * @param array &$opciones
+     * @param array &$opciones Opciones que se pasarán a enviar/solicitar.
      * @return void
+     * @since [versión]
      */
     public function autenticar(array &$opciones): void
     {
-        // Si no requiere autenticación, dejar vacío
-        // Ejemplo: añadir un header de autorización
-        // $opciones['headers']['Authorization'] = 'Bearer ' . $this->token;
+        // Si no requiere autenticación, dejar vacío.
     }
 
     /**
@@ -141,15 +152,16 @@ class [Nombre] implements Comunicador
      *
      * @param array $credenciales Datos necesarios para autenticarse.
      * @return void
+     * @since [versión]
      */
     public function establecer_credenciales(array $credenciales): void
     {
-        // Almacenar credenciales para usar en autenticar()
+        // Almacenar credenciales para usar en autenticar().
     }
 }
 
 // ═══════════════════════════════════════════════════════════
-// OBSERVACIONES FINALES
+// AUTOENCOLACIÓN
 // ═══════════════════════════════════════════════════════════
 // 1. Registre este archivo en el índice de comunicadores para
 //    que la autoencolación se ejecute. En Comunicadores/index.php
