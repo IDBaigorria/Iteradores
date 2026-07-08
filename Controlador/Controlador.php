@@ -22,7 +22,7 @@ use Iteradores\Controlador\RegistroGlobal;
 use Iteradores\Tiempo\RelojAstronomico;
 use Iteradores\Controlador\ProcesadorDeDominio;
 use Iteradores\Controlador\Senal;
-use Iteradores\Controlador\MapeoBytesMatrices;
+use Iteradores\Controlador\Talamo;
 
 require_once("PerdurarSuperestructura\PerdurarSuperestructura.php");
 require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringSQL.php");
@@ -691,19 +691,18 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      * Si se invoca sin argumentos (o con el valor especial `'predeterminado'`),
      * devuelve automáticamente el comunicador de salida estándar correspondiente
      * al entorno actual:
-     * - En **consola** → `salida_depuracion_consola`
-     * - En **navegador** → `salida_depuracion_html`
+     * - En **consola** → `consola`
+     * - En **navegador** → `html`
      *
      * @param string $nombre Nombre del comunicador.
      * @return Comunicador|null La instancia del comunicador, o `null` si no está disponible.
      * @since 1.3.3
+     * @version 1.4.7 (nombres actualizados a 'consola' y 'html')
      */
     public static function comunicador(string $nombre = 'predeterminado'): ?Comunicador
     {
         if ($nombre === 'predeterminado') {
-            $nombre = Entorno::es_consola()
-                ? 'salida_depuracion_consola'
-                : 'salida_depuracion_html';
+            $nombre = Entorno::es_consola() ? 'consola' : 'html';
         }
 
         if (!isset(self::$comunicadores[$nombre])) {
@@ -736,51 +735,41 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      *
      * @return void
      * @since 1.3.3
-     * @version 1.4.6 (integrados Senal y ProcesadorDeDominio)
+     * @version 1.4.7 (traducción delegada al Tálamo, eliminación usa método propio)
      */
     private static function registrar_comandos_comunicacion(): void
     {
         // ─── comunicación:leer ───────────────────────────────
         self::registrar_comando('comunicacion:leer', function(string $token, array $args) {
             $medio   = $args[0] ?? null;
-            $destino = $args[1] ?? '';
+            $fuente  = $args[1] ?? '';
             if (!$medio) {
-                self::_error("Falta el parámetro 'medio' para 'comunicacion:leer'.");
+                self::_error("Falta el medio para 'comunicacion:leer'.");
                 return null;
             }
             $comunicador = self::comunicador($medio);
             if (!$comunicador) return null;
 
-            // 1. Leer bytes del medio.
-            $bytes = $comunicador->solicitar($destino, null, ['accion' => 'leer']);
-            if ($bytes === null) return null;
-
-            // 2. Convertir bytes → Senal.
-            $senal = Senal::desde_bytes($bytes);
-
-            // 3. Procesar con el tálamo (entrada).
-            $proc = self::procesador('Talamo', 'entrada');
-            $proc->procesar($senal);
-
-            return $senal;
+            return $comunicador->solicitar($fuente);
         }, null, false);
 
         // ─── comunicación:escribir ────────────────────────────
         self::registrar_comando('comunicacion:escribir', function(string $token, array $args) {
             $medio   = $args[0] ?? null;
-            $mensaje = $args[1] ?? '';      // Puede ser string (bytes) o Senal procesada
+            $senal   = $args[1] ?? null;   // Debe ser una Senal
             $destino = $args[2] ?? '';
-            if (!$medio) {
-                self::_error("Falta el parámetro 'medio' para 'comunicacion:escribir'.");
+            if (!$medio || !$senal) {
+                self::_error("Faltan medio o señal para 'comunicacion:escribir'.");
+                return false;
+            }
+            if (!($senal instanceof Senal)) {
+                self::_error("El parámetro debe ser una Senal.");
                 return false;
             }
             $comunicador = self::comunicador($medio);
             if (!$comunicador) return false;
 
-            // Si ya es una Senal, aplanarla a bytes; si es string, usarlo directamente.
-            $bytes = ($mensaje instanceof Senal) ? Senal::a_bytes($mensaje) : (string)$mensaje;
-
-            $comunicador->enviar($destino, $bytes);
+            $comunicador->enviar($destino, $senal);
             return true;
         }, null, false);
 
@@ -792,9 +781,10 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             if (!$comunicador) return null;
             if ($medio === 'salida_depuracion_consola') {
                 echo $mensaje . ' ';
-                return trim(fgets(STDIN));
+                $respuesta = trim(fgets(STDIN));
+                return Talamo::obtener()->traducir_entrada($respuesta);
             }
-            return $comunicador->solicitar('', $mensaje);
+            return $comunicador->solicitar($mensaje);
         }, null, false);
 
         // ─── comunicación:eliminar ────────────────────────────
@@ -802,40 +792,57 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             $medio   = $args[0] ?? null;
             $destino = $args[1] ?? '';
             if (!$medio) {
-                self::_error("Falta el parámetro 'medio' para 'comunicacion:eliminar'.");
+                self::_error("Falta el medio para 'comunicacion:eliminar'.");
                 return false;
             }
             $comunicador = self::comunicador($medio);
             if (!$comunicador) return false;
-            $comunicador->enviar($destino, null, ['accion' => 'eliminar']);
-            return true;
+
+            // Si el comunicador tiene un método 'eliminar', lo usamos
+            if (method_exists($comunicador, 'eliminar')) {
+                $comunicador->eliminar($destino);
+                return true;
+            }
+
+            self::_error("El comunicador '$medio' no soporta eliminación.");
+            return false;
         }, null, false);
 
         // ─── comunicación:listar ──────────────────────────────
         self::registrar_comando('comunicacion:listar', function(string $token, array $args) {
-            $medio   = $args[0] ?? null;
-            $destino = $args[1] ?? '.';
+            $medio      = $args[0] ?? null;
+            $directorio = $args[1] ?? '.';
             if (!$medio) {
-                self::_error("Falta el parámetro 'medio' para 'comunicacion:listar'.");
+                self::_error("Falta el medio para 'comunicacion:listar'.");
                 return null;
             }
             $comunicador = self::comunicador($medio);
             if (!$comunicador) return null;
-            return $comunicador->solicitar($destino, null, ['accion' => 'listar']);
+
+            // Si tiene método 'listar' propio, lo usamos
+            if (method_exists($comunicador, 'listar')) {
+                return $comunicador->listar($directorio);
+            }
+
+            self::_error("El comunicador '$medio' no soporta listado.");
+            return null;
         }, null, false);
 
         // ─── comunicación:escuchar ─────────────────────────────
         self::registrar_comando('comunicacion:escuchar', function(string $token, array $args) {
             $medio = $args[0] ?? null;
             if (!$medio) {
-                self::_error("Falta el parámetro 'medio' para 'comunicacion:escuchar'.");
+                self::_error("Falta el medio para 'comunicacion:escuchar'.");
                 return false;
             }
             $comunicador = self::comunicador($medio);
             if (!$comunicador) return false;
-            $comunicador->escuchar(function($mensaje) use ($medio) {
+
+            $comunicador->escuchar(function($senal) use ($medio) {
                 $salida = self::comunicador();
-                $salida?->enviar('', "[$medio] Recibido: " . json_encode($mensaje));
+                if ($salida) {
+                    $salida->enviar('', $senal);
+                }
             });
             return true;
         }, null, false);
@@ -844,20 +851,22 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     /**
      * Escribe un mensaje en la salida estándar configurada según el entorno.
      *
-     * Obtiene el comunicador predeterminado y envía el mensaje a través de él.
+     * Convierte el texto a {@link Senal} mediante el {@link Talamo} y lo envía
+     * a través del comunicador predeterminado.
      *
      * @param string $mensaje Texto a escribir en la salida estándar.
      * @return void
      * @since 1.3.3
+     * @version 1.4.7 (usa Talamo para convertir el string)
      */
     public static function escribir_salida(string $mensaje): void
     {
         $salida = self::comunicador();
         if ($salida !== null) {
-            $salida->enviar('', $mensaje);
+            $senal = Talamo::obtener()->traducir_entrada($mensaje);
+            $salida->enviar('', $senal);
         }
     }
-
     // ═══════════════════════════════════════════════════════════
     // RELOJ ASTRONÓMICO Y UBICACIÓN (v1.3.6)
     // ═══════════════════════════════════════════════════════════
@@ -1286,19 +1295,20 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
         $indice = array_search($fase_actual, $fases, true);
         return $fases[($indice + 1) % count($fases)];
     }
-     /**
-     * Registra los comandos genéricos de de dominio.
+
+    /**
+     * Registra los comandos genéricos de dominio.
      *
      * @return void
      * @since 1.3.3
-     * @version 1.4.6 (implementados con Senal y ProcesadorDeDominio)
+     * @version 1.4.7 (adaptados a Senal y Talamo)
      */
     private static function registrar_comandos_dominio(): void
     {
         // ─── dominio:leer_byte ──────────────────────────────
         self::registrar_comando('dominio:leer_byte', function(string $token, array $args) {
             $medio   = $args[0] ?? null;
-            $destino = $args[1] ?? '';
+            $fuente  = $args[1] ?? '';
             if (!$medio) {
                 self::_error("Falta el parámetro 'medio' para 'dominio:leer_byte'.");
                 return null;
@@ -1306,16 +1316,8 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             $comunicador = self::comunicador($medio);
             if (!$comunicador) return null;
 
-            $bytes = $comunicador->solicitar($destino, null, ['accion' => 'leer']);
-            if ($bytes === null || $bytes === '') return null;
-
-            // Convertir a Senal y procesar con el tálamo.
-            $senal = Senal::desde_bytes($bytes);
-            $proc = self::procesador('Talamo', 'entrada');
-            $proc->procesar($senal);
-
-            // Aplanar y devolver los bytes originales.
-            return Senal::a_bytes($senal);
+            // El comunicador devuelve una Senal (posiblemente con un solo byte)
+            return $comunicador->solicitar($fuente);
         }, null, true);
 
         // ─── dominio:escribir_byte ───────────────────────────
@@ -1330,7 +1332,9 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             $comunicador = self::comunicador($medio);
             if (!$comunicador) return false;
 
-            $comunicador->enviar($destino, chr($byte));
+            // Convertir el byte en una Senal de una sola matriz
+            $senal = Talamo::obtener()->traducir_entrada(chr($byte));
+            $comunicador->enviar($destino, $senal);
             return true;
         }, null, true);
     }
@@ -1432,20 +1436,11 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             // ─── Inicializar cache de primos ─────────────────────
             NodoNumerico::inicializar_cache_primos();
 
-            // ─── Inicializar mapeo byte ↔ matriz ─────────────────
-            MapeoBytesMatrices::inicializar();
-
-            // ─── Inicializar tálamo (fase 0 con 256 primos) ───
-            $proc_talamo_entrada = self::procesador('Talamo', 'entrada');
-            for ($byte = 0; $byte < 256; $byte++) {
-                $matriz = MapeoBytesMatrices::byte_a_matriz($byte);
-                if ($matriz !== null) {
-                    $nodo = NodoNumerico::crear_primo(
-                        NodoNumerico::$primos_conocidos[$byte]
-                    );
-                    $proc_talamo_entrada->_patron($nodo, 0);
-                }
-            }
+            // ─── Inicializar Tálamo (singleton) y precargar los 256 bytes ──
+            $talamo = Talamo::obtener();
+            $talamo::recibir_token(self::$token);
+            $talamo->precargar();
+            self::$procesadores['Talamo:entrada'] = $talamo;
 
             // ─── Procesar comandos pendientes ──────────────────
             foreach (RegistroGlobal::$comandos_pendientes as $entrada) {

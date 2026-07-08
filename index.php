@@ -73,6 +73,7 @@ include_once("Controlador/Senal.php");
 include_once("Controlador/AplanadorSenal.php");
 include_once("Controlador/Antena.php");
 include_once("Controlador/ProcesadorDeDominio.php");
+include_once("Controlador/Talamo.php");
 
 // ─── Tiempo ───────────────────────────────────────────
 include_once("Tiempo/RelojAstronomico.php");
@@ -86,4 +87,4 @@ include_once("Comunicadores/index.php");
 include_once("Controlador/Controlador.php");
 
 // ─── Pruebas (solo desarrollo) ─────────────────────────
-include_once("pruebas/Prueba146.php");
+include_once("pruebas/Prueba147_intermedia.php");

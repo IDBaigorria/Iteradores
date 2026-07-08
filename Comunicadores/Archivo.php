@@ -1,10 +1,9 @@
 <?php
 namespace Iteradores\Comunicadores;
 
-use Iteradores\Comandos\Comando;
 use Iteradores\Controlador\RegistroGlobal;
-//require_once(".\Controlador\RegistroGlobal.php");
-//require_once(".\Comunicador.php");
+use Iteradores\Controlador\Senal;
+use Iteradores\Controlador\Talamo;
 
 /**
  * Comunicador para el sistema de archivos local.
@@ -13,84 +12,140 @@ use Iteradores\Controlador\RegistroGlobal;
  * Implementa la interfaz {@link Comunicador} y expone métodos adicionales
  * específicos de archivos que también pueden invocarse mediante comandos.
  *
+ * A partir de la versión 1.4.7, la conversión entre bytes y {@link Senal}
+ * se delega en el {@link Talamo}.
+ *
  * @package Iteradores\Comunicadores
  * @since 1.3.4
+ * @version 1.4.7
  */
 class Archivo implements Comunicador
 {
-    /** @return string */
+    /** @return string
+     *  @since 1.3.4 */
     public static function nombre(): string
     {
         return 'archivo';
     }
 
-    /** @return bool */
+    /** @return bool
+     *  @since 1.3.4 */
     public static function solo_desarrollo(): bool
     {
         return false;
     }
 
-    /** @return string */
+    /** @return string
+     *  @since 1.3.4 */
     public static function descripcion(): string
     {
         return 'Comunicador para leer, escribir y gestionar archivos locales.';
     }
 
-    /** @inheritdoc */
-    public function enviar(string $destino = '', mixed $mensaje = null, array $opciones = []): void
+    /**
+     * Escribe una señal en un archivo.
+     *
+     * @param string $destino Ruta del archivo a escribir.
+     * @param Senal  $senal   Señal cuyos bytes se guardarán.
+     * @return void
+     * @throws \RuntimeException Si no se puede escribir.
+     * @since 1.3.4
+     * @version 1.4.7
+     */
+    public function enviar(string $destino, Senal $senal): void
     {
-        $accion = $opciones['accion'] ?? 'escribir';
-        if ($accion === 'escribir') {
-            file_put_contents($destino, (string)$mensaje);
-        } elseif ($accion === 'eliminar') {
-            if (file_exists($destino)) {
-                unlink($destino);
-            }
-        } elseif ($accion === 'crear_directorio') {
-            if (!is_dir($destino)) {
-                mkdir($destino, 0777, true);
-            }
+        $bytes = Talamo::obtener()->traducir_salida($senal);
+        file_put_contents($destino, $bytes);
+    }
+
+    /**
+     * Lee un archivo y lo devuelve como una señal.
+     *
+     * @param string $fuente Ruta del archivo a leer.
+     * @return Senal Señal que contiene los bytes del archivo.
+     * @throws \RuntimeException Si el archivo no existe o no se puede leer.
+     * @since 1.3.4
+     * @version 1.4.7
+     */
+    public function solicitar(string $fuente): Senal
+    {
+        if (!file_exists($fuente)) {
+            throw new \RuntimeException("El archivo '$fuente' no existe.");
+        }
+        $contenido = file_get_contents($fuente);
+        if ($contenido === false) {
+            throw new \RuntimeException("No se pudo leer el archivo '$fuente'.");
+        }
+        return Talamo::obtener()->traducir_entrada($contenido);
+    }
+
+    /**
+     * Lista el contenido de un directorio.
+     *
+     * @param string $directorio Ruta del directorio.
+     * @return array Nombres de archivos y directorios.
+     * @since 1.4.7
+     */
+    public function listar(string $directorio): array
+    {
+        if (!is_dir($directorio)) {
+            return [];
+        }
+        return scandir($directorio);
+    }
+
+    /**
+     * Elimina un archivo.
+     *
+     * @param string $ruta Ruta del archivo a eliminar.
+     * @return void
+     * @since 1.4.7
+     */
+    public function eliminar(string $ruta): void
+    {
+        if (file_exists($ruta)) {
+            unlink($ruta);
         }
     }
 
-    /** @inheritdoc */
-    public function solicitar(string $destino, mixed $mensaje = null, array $opciones = []): mixed
+    /**
+     * Crea un directorio recursivamente.
+     *
+     * @param string $ruta Ruta del nuevo directorio.
+     * @return void
+     * @since 1.4.7
+     */
+    public function crear_directorio(string $ruta): void
     {
-        $accion = $opciones['accion'] ?? 'leer';
-        if ($accion === 'leer') {
-            if (!file_exists($destino)) {
-                return null;
-            }
-            return file_get_contents($destino);
+        if (!is_dir($ruta)) {
+            mkdir($ruta, 0777, true);
         }
-        if ($accion === 'listar') {
-            if (!is_dir($destino)) {
-                return [];
-            }
-            return scandir($destino);
-        }
-        return null;
     }
 
-    /** @inheritdoc */
+    /** @inheritdoc
+     *  @since 1.3.4 */
     public function escuchar(callable $callback): void
     {
         // No implementado para archivos locales
     }
 
-    /** @inheritdoc */
+    /** @inheritdoc
+     *  @since 1.3.4 */
     public function cerrar(): void {}
 
-    /** @inheritdoc */
+    /** @inheritdoc
+     *  @since 1.3.4 */
     public function estado(): string
     {
         return 'activo';
     }
 
-    /** @inheritdoc */
+    /** @inheritdoc
+     *  @since 1.3.4 */
     public function autenticar(array &$opciones): void {}
 
-    /** @inheritdoc */
+    /** @inheritdoc
+     *  @since 1.3.4 */
     public function establecer_credenciales(array $credenciales): void {}
 }
 // ═══════════════════════════════════════════════════════════

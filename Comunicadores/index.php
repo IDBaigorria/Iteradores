@@ -17,8 +17,8 @@
 
 require_once __DIR__.'/Comunicador.php';
 require_once __DIR__.'/Archivo.php';
-require_once __DIR__.'/SalidaDepuracionHTML.php';
-require_once __DIR__.'/SalidaDepuracionConsola.php';
+require_once __DIR__.'/HTML.php';
+require_once __DIR__.'/Consola.php';
 
 //require_once __DIR__.'/Depuracion/limpiar.php';
 //require_once __DIR__.'/Depuracion/recoleccion.php';

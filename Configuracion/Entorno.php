@@ -64,7 +64,7 @@ class Entorno extends Objeto
     private static string $modo = self::MODO_DESARROLLO;
 
     /** @var string Tipo de salida actual. */
-    private static string $salida = self::SALIDA_HTML;
+    private static string $salida = self::SALIDA_CONSOLA;
 
     /** @var string Método de persistencia activo. */
     private static string $persistencia = self::PERSISTENCIA_SQL;

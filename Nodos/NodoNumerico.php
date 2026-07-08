@@ -142,14 +142,18 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      *
      * @return void
      * @since 1.4.6
+     * @version 1.4.7 (inicialización explícita desde 2)
      * @see \Iteradores\Compuertas\CompuertaBase
      */
     public static function inicializar_cache_primos(): void
     {
+        self::$primos_conocidos = [];          // partir siempre de cero
+        $candidato = 2;
         while (count(self::$primos_conocidos) < 256) {
-            $ultimo = end(self::$primos_conocidos);
-            $siguiente = self::calcular_siguiente_primo($ultimo);
-            self::$primos_conocidos[] = $siguiente;
+            if (self::es_primo_simple($candidato)) {
+                self::$primos_conocidos[] = $candidato;
+            }
+            $candidato++;
         }
     }
 
