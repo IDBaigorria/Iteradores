@@ -1437,10 +1437,10 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             NodoNumerico::inicializar_cache_primos();
 
             // ─── Inicializar Tálamo (singleton) y precargar los 256 bytes ──
-            $talamo = Talamo::obtener();
+           /* $talamo = Talamo::obtener();
             $talamo::recibir_token(self::$token);
             $talamo->precargar();
-            self::$procesadores['Talamo:entrada'] = $talamo;
+            self::$procesadores['Talamo:entrada'] = $talamo;*/
 
             // ─── Procesar comandos pendientes ──────────────────
             foreach (RegistroGlobal::$comandos_pendientes as $entrada) {

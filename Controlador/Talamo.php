@@ -34,6 +34,7 @@ class Talamo extends ProcesadorDeDominio
      * Obtiene la instancia única del Tálamo, inicializándola si es necesario.
      *
      * @return self
+     * //DS: yo la llamaria talamo() //
      */
     public static function obtener(): self
     {
@@ -51,6 +52,9 @@ class Talamo extends ProcesadorDeDominio
      * cada byte dispara el aprendizaje trivial y registra su patrón.
      *
      * @return void
+     * //DS: calcular todos esos esos nodos primos de entrada puede hacer a un retrazo 
+     * // notable, creo que es mucho mas rapido colocar directamente un array con los primos 300
+     * // numeros primos conocidos, y si son mas de 256 porque planeo usar
      */
     public function precargar(): void
     {

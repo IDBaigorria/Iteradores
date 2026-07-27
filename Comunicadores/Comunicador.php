@@ -10,7 +10,7 @@ use Iteradores\Controlador\Senal;
  * directamente con {@link Senal}. La traducción entre bytes y señales
  * se realiza externamente, normalmente por el {@link \Iteradores\Controlador\Talamo}
  * a través de los comandos de comunicación del {@link \Iteradores\Controlador\Controlador}.
- *
+ *  //DS: corrije ese comentario, la traduccion la hara el Controlador y le pasara al Talamo una "Senal"
  * @package Iteradores\Comunicadores
  * @since 1.3.3
  * @version 1.4.7

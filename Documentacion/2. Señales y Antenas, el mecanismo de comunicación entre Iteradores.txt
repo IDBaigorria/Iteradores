@@ -1,0 +1,88 @@
+# Señales y Antenas: el mecanismo de comunicación entre Iteradores
+
+**Autor: Ignacio David Baigorria**  
+**Versión 1.4.8 – Julio 2026**
+
+---
+
+## 1. Introducción
+
+En el núcleo del framework *Iteradores*, el conocimiento se construye y se refina a través de un proceso de aprendizaje continuo. Distintos componentes —los *Iteradores*— deben colaborar, compartir patrones y transferir información entre diferentes niveles de abstracción, llamados *fases*. Para que esta colaboración sea posible, se necesita un mecanismo de comunicación universal que sea a la vez lo suficientemente simple para ser comprendido por cualquier componente y lo suficientemente expresivo para transmitir la complejidad inherente a las secuencias de acciones.
+
+Este documento describe las dos piezas fundamentales que conforman este mecanismo: la **Señal**, como soporte de información, y las **Antenas**, como los puntos de envío y recepción. Juntas, definen el lenguaje común con el que los Iteradores intercambiarán patrones, aprenderán de lo desconocido y, eventualmente, construirán comprensión. Se introduce también el rol del **Controlador** como la única capa externa al sistema, cuya comunicación con los Iteradores se canaliza exclusivamente a través de un tipo especial de antena.
+
+---
+
+## 2. El medio de transporte: la Señal
+
+La **Señal** es la unidad mínima de transporte de información entre dos componentes del sistema. Es un objeto pasivo, sin comportamiento ni estado mutable, que actúa como un sobre que contiene tres datos fundamentales:
+
+- **Matrices**: una secuencia ordenada de una o más matrices de 2×2. Estas matrices son, como se ha descrito en trabajos anteriores, las identidades compactas y no conmutativas de las acciones, capaces de representar desde un comando atómico hasta una secuencia arbitrariamente larga en tan solo cuatro enteros.
+- **Fase de Origen**: la fase completa desde la que se emite la señal, expresada en el formato `dominio:numero_fase`. Este dato es esencial para que el receptor sepa a qué fase del emisor debe dirigir su respuesta.
+- **Marcado**: un simple valor booleano que indica la naturaleza de la antena emisora. Si es `falso`, la señal fue creada por una Antena Común; si es `verdadero`, por una Antena de Marcado. Este campo permite que las antenas receptoras filtren de inmediato las señales que no les corresponden.
+
+La Señal no sabe ni le importa quién la creó o quién la recibirá. Es un mensaje en una botella, arrojado a un mar de fases, cuyo único propósito es ser portado y, eventualmente, interpretado.
+
+---
+
+## 3. Los tres tipos de Antena
+
+Si la Señal es el mensaje, las **Antenas** son los puertos de comunicación. Son los únicos componentes del sistema con la capacidad de crear y recibir señales. Ningún otro elemento —ni los Nodos, ni los propios Iteradores— puede generar una Señal por sí mismo; deben hacerlo a través de una antena. Esto centraliza y estandariza toda la comunicación, garantizando que cada intercambio siga las mismas reglas.
+
+Cada antena pertenece a una fase específica y funciona como el "oído" y la "voz" de un Iterador en esa fase. Sin embargo, la fase no es una propiedad interna e inmutable de la antena, sino que depende de la fase global activa en el sistema. Esto convierte a las antenas en dispositivos inherentemente **multifase**: una misma antena puede operar en cualquier fase sin necesidad de ser reconfigurada, simplemente leyendo el contexto global.
+
+Existen tres tipos de antenas, cada una con un rol bien definido en el ecosistema de la comunicación.
+
+### 3.1. Antena Común
+
+La **Antena Común** es la unidad elemental de comunicación. Su función es construir y mantener un vocabulario de patrones atómicos. Trabaja exclusivamente con **señales de una única matriz**.
+
+Cuando una Antena Común recibe una señal, intenta hacer coincidir su única matriz con uno de los patrones que ya conoce. Si la encuentra, devuelve el Nodo que representa ese patrón, haciendo así de traductor entre una secuencia de matrices externa y un símbolo interno del sistema. Si no la encuentra, la antena no falla ni devuelve un error: simplemente activa un proceso de **aprendizaje trivial**, creando un nuevo Nodo (un NodoPrimo) que a partir de ese momento representará esa matriz. La señal que portaba la matriz se almacena dentro del nuevo Nodo, convirtiéndolo en el significado interno de ese fragmento de realidad externa.
+
+En el sentido inverso, cuando un Iterador desea emitir un patrón que ha aprendido, la Antena Común recupera la señal original almacenada en el Nodo y la reenvía, o bien, si el Nodo es un compuesto (una secuencia de patrones), emite una nueva señal con su matriz de identidad. En ambos casos, la señal de salida llevará la marca `falso`, indicando su origen común.
+
+### 3.2. Antena de Marcado
+
+Si la Antena Común es un traductor de palabras sueltas, la **Antena de Marcado** es un empaquetador de frases completas. Su propósito es agrupar una secuencia arbitraria de matrices dentro de un único NodoPrimo, que actúa como un "marcador" o "contenedor" de toda esa información. Es la herramienta para encapsular mensajes complejos (como un comando, un medio y un destino) en un solo símbolo que puede viajar por el sistema como una unidad indivisible.
+
+Cada par de comunicación (un origen y un destino) tiene asignado un único NodoPrimo marcador. Cuando la antena recibe una señal de marcado, busca el marcador correspondiente a ese origen y guarda dentro de él la **señal completa** (no solo sus matrices). Si el marcador no existe, lo crea. Si ya existía, simplemente actualiza su contenido, sobrescribiendo el mensaje anterior. El NodoPrimo se convierte así en un buzón que siempre contiene el último mensaje recibido desde un origen concreto.
+
+Para emitir, el proceso es el inverso: se recupera la señal completa almacenada en el marcador y se envía tal cual. La señal emitida llevará la marca `verdadero`, indicando que fue generada por una Antena de Marcado. Esta antena es fundamental para la construcción de mensajes estructurados, como los que el futuro Iterador del Tálamo utilizará para dirigir la atención del sistema.
+
+### 3.3. Antena de Traducción
+
+La **Antena de Traducción** es un tipo especial de antena que no pertenece al mundo interno de los Iteradores, sino al **Controlador**, la capa más externa del sistema. Su misión es bidireccional: convertir las cadenas de bytes del mundo exterior en señales matriciales comprensibles para los Iteradores, y viceversa.
+
+A diferencia de las otras antenas, la Antena de Traducción no es multifase ni singleton. Se instancia una por cada dirección de comunicación externa que necesite el Controlador, y su funcionamiento es determinista y fijo: posee un mapeo predefinido que asocia cada byte (0-255) con un NodoPrimo específico, construido a partir de una tabla de números primos precargados. Este mapeo es inmutable y conocido por todas las antenas de traducción, lo que garantiza una traducción perfecta y sin aprendizaje.
+
+Cuando el mundo exterior envía una cadena de bytes (por ejemplo, el texto "leer"), la Antena de Traducción la transforma en una señal de tipo **marcado** que contiene una matriz por cada byte. Esta señal es luego inyectada en el sistema, donde una Antena de Marcado la empaquetará. A la inversa, cuando una señal marcada llega desde el interior, la Antena de Traducción extrae el número primo de cada matriz, busca su byte correspondiente en el mapeo, y reconstruye la cadena de bytes original, que es devuelta al mundo exterior.
+
+---
+
+## 4. Flujo de aprendizaje: el Aprendizaje Trivial
+
+Una de las propiedades más poderosas de este mecanismo de comunicación es que el aprendizaje básico no requiere intervención externa. Tanto la Antena Común como la Antena de Marcado incorporan lo que llamamos **aprendizaje trivial bidireccional**:
+
+- **En recepción**: si una antena recibe una señal que no puede interpretar (una matriz desconocida para la Antena Común, o un nuevo origen para la Antena de Marcado), no devuelve un error ni delega la responsabilidad a un módulo superior. Ella misma crea un nuevo NodoPrimo en su fase actual, lo asocia al patrón o al origen, y almacena la señal. El sistema ha "aprendido" un nuevo símbolo.
+
+- **En emisión**: si se solicita a una antena emitir un Nodo que no está registrado en el par de destino, la antena crea automáticamente la asociación necesaria y emite una señal construida a partir de la información del Nodo.
+
+Este comportamiento significa que las antenas son capaces de construir y expandir un vocabulario de forma completamente autónoma, sin necesidad de un "maestro" que les indique cómo. Son, en esencia, los bloques de construcción del conocimiento procedimental del sistema.
+
+---
+
+## 5. La capa externa: Controlador
+
+El **Controlador** es la frontera entre el mundo determinista de los Iteradores y el mundo caótico del exterior (archivos, redes, usuarios). Su única vía de comunicación con el sistema interno es a través de las **Antenas de Traducción**. No puede hablar directamente con los Iteradores, ni ellos con él.
+
+Esta restricción es fundamental para mantener la integridad del sistema. Los Iteradores construyen su comprensión basándose exclusivamente en patrones que han aprendido a través de sus antenas. Si el Controlador pudiera manipular directamente los símbolos internos, se rompería la cadena de aprendizaje y se introducirían atajos que harían al sistema frágil y opaco. En cambio, al forzar toda comunicación externa a pasar por el mapeo fijo de las Antenas de Traducción, se garantiza que cada dato que entra o sale del sistema es inmediatamente traducible y auditable.
+
+El Controlador, por tanto, no es un Iterador. Es un orquestador que maneja el flujo de bytes, inyecta comandos y recoge resultados, pero siempre usando el lenguaje de señales y matrices que el sistema interno entiende.
+
+---
+
+## 6. Conclusión
+
+La Señal y las Antenas forman un sistema de comunicación elegante y minimalista. La Señal es un contenedor pasivo y universal. Las Antenas son los únicos puntos capaces de crearlas e interpretarlas, y lo hacen con la notable capacidad de aprender de forma autónoma aquello que aún no conocen. Los tres tipos de antenas —Común, de Marcado y de Traducción— cubren todas las necesidades de comunicación del framework: el reconocimiento de patrones atómicos, el empaquetado de mensajes complejos y la traducción desde y hacia el mundo exterior.
+
+Sobre esta base, los Iteradores podrán especializarse, ascender y descender entre fases, y componer patrones cada vez más sofisticados. Las antenas son el sustrato que hace posible el diálogo entre los distintos niveles de abstracción, y la Señal es la moneda de cambio universal con la que se comerciará el conocimiento.

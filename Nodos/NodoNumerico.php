@@ -62,7 +62,7 @@ include_once(__DIR__."/Interfaces/IdentidadNumerica.php");
  * por fase.
  *
  * @package Iteradores\Nodos
- * @version 1.4.6
+ * @version 1.4.8
  * @since 1.4.2
  * @author Ignacio David Baigorria
  * @extends NodoElectrico
@@ -133,27 +133,48 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
      * Expande la caché global de primos hasta contener al menos los
      * primeros 256 números primos.
      *
-     * Este método está pensado para ser invocado durante la
-     * inicialización del sistema (por ejemplo, desde
-     * {@link \Iteradores\Controlador\Controlador::inicializar()}),
-     * garantizando que las compuertas dispongan de todos los primos
-     * necesarios para el mapeo byte↔primo sin tener que generarlos
-     * bajo demanda.
+     * Primero recorre {@link \Iteradores\Configuracion\Conf::PRIMOS_PRECARGADOS}
+     * comprobando que cada entrada sea realmente un número primo.
+     * Si todos son válidos, los copia en {@link $primos_conocidos}.
+     * Si hay algún valor no primo (o el array está vacío), emite una alerta
+     * y genera manualmente los primeros 256 primos como fallback.
      *
      * @return void
      * @since 1.4.6
-     * @version 1.4.7 (inicialización explícita desde 2)
-     * @see \Iteradores\Compuertas\CompuertaBase
+     * @version 1.4.8 (recorrido completo de PRIMOS_PRECARGADOS con alerta)
      */
     public static function inicializar_cache_primos(): void
     {
-        self::$primos_conocidos = [];          // partir siempre de cero
-        $candidato = 2;
-        while (count(self::$primos_conocidos) < 256) {
-            if (self::es_primo_simple($candidato)) {
-                self::$primos_conocidos[] = $candidato;
+        $precargados = \Iteradores\Configuracion\Conf::PRIMOS_PRECARGADOS;
+        $valido = true;
+
+        if (empty($precargados)) {
+            $valido = false;
+        } else {
+            foreach ($precargados as $indice => $numero) {
+                if (!self::es_primo_simple($numero)) {
+                    self::_alerta(
+                        "PRIMOS_PRECARGADOS: el valor en la posición {$indice} ({$numero}) no es primo. Se usarán 256 primos generados manualmente."
+                    );
+                    $valido = false;
+                    break;
+                }
             }
-            $candidato++;
+        }
+
+        if ($valido) {
+            // Copiar todos los primos precargados (pueden ser más de 256)
+            self::$primos_conocidos = $precargados;
+        } else {
+            // Fallback: generar los primeros 256 primos manualmente
+            self::$primos_conocidos = [];
+            $candidato = 2;
+            while (count(self::$primos_conocidos) < 256) {
+                if (self::es_primo_simple($candidato)) {
+                    self::$primos_conocidos[] = $candidato;
+                }
+                $candidato++;
+            }
         }
     }
 
@@ -585,7 +606,7 @@ class NodoNumerico extends NodoElectrico implements FabricaDeNodosNumericos, Ide
     }
 
     /**
-     * Crea un nodo primo con el número primo indicado.
+     * Devuelve (crea si es neceario) un nodo primo con el número primo indicado.
      *
      * @param int   $primo      Número primo (positivo para comando constructivo,
      *                          negativo para destructivo).

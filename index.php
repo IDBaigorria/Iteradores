@@ -10,6 +10,14 @@ header("Cache-control: no-cache, must-revalidate");
  * {@link \Iteradores\Controlador\RegistroGlobal} antes de que el
  * {@link \Iteradores\Controlador\Controlador} sea inicializado.
  *
+ * ## Cambios en v1.4.8
+ * - Se añaden las nuevas clases de antenas (`AntenaComun`, `AntenaDeMarcado`,
+ *   `AntenaTraduccion`) y la `Senal` actualizada.
+ * - Se eliminan `MapeoBytesMatrices` y `AplanadorSenal` (absorbidos por las
+ *   antenas de traducción).
+ * - `Talamo` y `ProcesadorDeDominio` se mantienen temporalmente hasta su
+ *   refactorización completa.
+ *
  * ## Orden de carga y justificación
  *
  * 1. **Nodos y utilidades base**
@@ -17,7 +25,11 @@ header("Cache-control: no-cache, must-revalidate");
  *    proporcionan las clases fundamentales sin depender de comandos
  *    ni del controlador.
  *
- * 2. **Comandos y Comunicadores**
+ * 2. **Comunicación (Señal y Antenas)**
+ *    Las nuevas clases de comunicación se cargan después de los nodos
+ *    porque dependen de `Matriz2x2`, `NodoNumerico`, etc.
+ *
+ * 3. **Comandos y Comunicadores**
  *    `Comandos/index.php` y `Comunicadores/index.php` incluyen todas
  *    las definiciones de comandos y comunicadores. Cada archivo
  *    individual ejecuta al final `RegistroGlobal::encolar_comando()`
@@ -25,14 +37,14 @@ header("Cache-control: no-cache, must-revalidate");
  *    Como no importan directamente al Controlador, no disparan su
  *    inicialización prematura.
  *
- * 3. **Controlador**
+ * 4. **Controlador**
  *    `Controlador/Controlador.php` define la clase Controlador y,
  *    al ser incluido, ejecuta `Controlador::inicializar()`. En ese
  *    momento los pendientes ya están encolados y se procesan
  *    correctamente.
  *
- * 4. **Pruebas (solo desarrollo)**
- *    `pruebas/PComando.php` se incluye al final para disponer de
+ * 5. **Pruebas (solo desarrollo)**
+ *    `pruebas/Prueba148.php` se incluye al final para disponer de
  *    herramientas de prueba que pueden interactuar con el sistema
  *    ya inicializado.
  *
@@ -46,20 +58,23 @@ header("Cache-control: no-cache, must-revalidate");
  *
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.4.6
+ * @version   1.4.8
  */
 
-// ─── Nodos y utilidades base ───────────────────────────
-//  miselaneas
+// --- Utilidades base ----------------------------------
 include_once("miscelaneas/benchmark.php");
 include_once("miscelaneas/generarUUID.php");
-//  configuracion
+
+// --- Configuración ------------------------------------
 include_once("configuracion/Configuracion.php");
-//  nucleo
+
+// --- Núcleo -------------------------------------------
 include_once("Nucleo/Objeto.php");
-//  entorno
-include_once("Configuracion/Entorno.php");// debe ir despues de Objeto.php
-//  nodos
+
+// --- Entorno (debe ir después de Objeto.php) ----------
+include_once("Configuracion/Entorno.php");
+
+// --- Nodos --------------------------------------------
 include_once("Nodos/Nodo.php");
 include_once("Nodos/NodoElectrico.php");
 include_once("Nodos/Matriz2x2.php");
@@ -67,24 +82,26 @@ include_once("Nodos/NodoNumerico.php");
 include_once("Nodos/NodoPrimo.php");
 include_once("Nodos/NodoParalelo.php");
 
-// ─── V 1.4.5/1.4.6 – Señal y Procesador ──────────────
-include_once("Controlador/MapeoBytesMatrices.php");
-include_once("Controlador/Senal.php");
-include_once("Controlador/AplanadorSenal.php");
-include_once("Controlador/Antena.php");
+// --- V 1.4.8 – Comunicación: Señal y Antenas ---------
+include_once("Iteradores/Senal.php");
+include_once("Iteradores/AntenaComun.php");
+include_once("Iteradores/AntenaDeMarcado.php");
+include_once("Controlador/AntenaTraduccion.php");   // en namespace Controlador
+
+// --- Iteradores ---------------------------------------
 include_once("Controlador/ProcesadorDeDominio.php");
 include_once("Controlador/Talamo.php");
 
-// ─── Tiempo ───────────────────────────────────────────
+// --- Tiempo -------------------------------------------
 include_once("Tiempo/RelojAstronomico.php");
 
-// ─── Comandos y Comunicadores (autoencolación) ─────────
+// --- Comandos y Comunicadores (autoencolación) ---------
 include_once("Controlador/RegistroGlobal.php");
 include_once("Comandos/index.php");
 include_once("Comunicadores/index.php");
 
-// ─── Controlador (inicialización) ──────────────────────
+// --- Controlador (inicialización) ----------------------
 include_once("Controlador/Controlador.php");
 
-// ─── Pruebas (solo desarrollo) ─────────────────────────
-include_once("pruebas/Prueba147_intermedia.php");
+// --- Pruebas (solo desarrollo) -------------------------
+include_once("pruebas/Prueba148.php");

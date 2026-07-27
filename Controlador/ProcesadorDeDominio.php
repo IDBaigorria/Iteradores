@@ -2,38 +2,38 @@
 namespace Iteradores\Controlador;
 
 use Iteradores\Nucleo\Objeto;
+use Iteradores\Nodos\Matriz2x2;
 use Iteradores\Nodos\NodoNumerico;
 use Iteradores\Nodos\NodoElectrico;
-use Iteradores\Controlador\Antena;
+use Iteradores\Iteradores\AntenaComun;
 use Iteradores\Controlador\Senal;
+use Iteradores\Configuracion\Conf;
 
 /**
- * Procesador de Dominio: coordina las antenas de un dominio y ejecuta
- * el bucle de captura jerárquico para reducir una señal.
+ * Procesador de Dominio: coordina la antena de fase 0 de un dominio.
  *
- * Gestiona múltiples antenas (una por fase) y aplica un algoritmo voraz
- * que comienza por las fases más altas. Cuando una antena captura una
- * porción de la señal, se reinicia el recorrido desde la fase máxima,
- * garantizando así que los bocados sean siempre lo más grandes posible.
+ * A partir de la versión 1.4.8, **solo se utiliza la antena de fase 0**.
+ * El bucle voraz entre fases ha sido eliminado; las señales recibidas ya
+ * vienen preempaquetadas en forma de NodoPrimo por el Controlador, y la
+ * antena de fase 0 las captura directamente. El ascenso a fases superiores
+ * será reintroducido más adelante por el futuro Iterador.
  *
- * A partir de la versión 1.4.7, el procesador mantiene internamente
- * el índice de consumo y la lista de p‑gramas capturados. La señal ya
- * no es modificada; en su lugar, el procesador registra los elementos
- * procesados y permite emitir una nueva señal con
- * {@link emitir_senal()}.
+ * Incorpora el mecanismo de **sapiencia** (proporción de matrices capturadas
+ * sobre el total procesado) y el aprendizaje trivial en fase 0.
  *
  * @package Iteradores\Controlador
  * @since 1.4.5
- * @version 1.4.7
+ * @version 1.4.8
  */
 class ProcesadorDeDominio extends Objeto
 {
     /**
-     * Nombre del medio (ej. 'Archivo', 'Talamo').
+     * Nombre del dominio (ej. 'Archivo', 'Talamo', 'texto').
      *
      * @var string
+     * @since 1.4.8
      */
-    private string $medio;
+    private string $dominio;
 
     /**
      * Dirección del subdominio: 'entrada' o 'salida'.
@@ -43,12 +43,12 @@ class ProcesadorDeDominio extends Objeto
     private string $direccion;
 
     /**
-     * Antenas del procesador, indexadas por número de fase (sin prefijo).
+     * Antenas del procesador, indexadas por número de fase.
      *
      * Internamente, la fase completa se construye como
-     * `{$medio}:{$direccion}:{$numero}`.
+     * `{$dominio}:{$direccion}:{$numero}`.
      *
-     * @var array<int, Antena>
+     * @var array<int, AntenaComun>
      */
     private array $antenas;
 
@@ -61,12 +61,40 @@ class ProcesadorDeDominio extends Objeto
     private ?int $maxima_fase = null;
 
     /**
-     * Lista de p‑gramas capturados durante el último procesamiento.
+     * Elementos capturados durante el último recibir_senal().
      *
-     * @var array<int, array<int>>
-     * @since 1.4.7
+     * Cada elemento es un array asociativo:
+     *   - 'nodo' => NodoNumerico
+     *   - 'fase' => int    (siempre 0 en esta versión)
+     *
+     * @var array<int, array{nodo: NodoNumerico, fase: int}>
+     * @since 1.4.8
      */
-    private array $elementos_procesados = [];
+    private array $elementos_recibidos = [];
+
+    /**
+     * Matrices capturadas por patrones existentes durante el último procesamiento.
+     *
+     * @var int
+     * @since 1.4.8
+     */
+    private int $matrices_capturadas = 0;
+
+    /**
+     * Matrices aprendidas (aprendizaje trivial) durante el último procesamiento.
+     *
+     * @var int
+     * @since 1.4.8
+     */
+    private int $matrices_aprendidas = 0;
+
+    /**
+     * Sapiencia calculada en el último procesamiento (valor entre 0.0 y 1.0).
+     *
+     * @var float
+     * @since 1.4.8
+     */
+    private float $sapiencia_ultima = 1.0;
 
     /**
      * Token de seguridad para operaciones restringidas.
@@ -91,14 +119,16 @@ class ProcesadorDeDominio extends Objeto
     /**
      * Constructor.
      *
-     * @param string $medio     Nombre del medio.
+     * @param string $dominio   Nombre del dominio.
      * @param string $direccion 'entrada' o 'salida'.
+     * @since 1.4.5
+     * @version 1.4.8
      */
-    public function __construct(string $medio, string $direccion)
+    public function __construct(string $dominio, string $direccion)
     {
-        $this->medio = $medio;
+        $this->dominio   = $dominio;
         $this->direccion = $direccion;
-        $this->antenas = [];
+        $this->antenas   = [];
     }
 
     /**
@@ -109,35 +139,24 @@ class ProcesadorDeDominio extends Objeto
      */
     private function prefijar_fase(int $fase): string
     {
-        return "{$this->medio}:{$this->direccion}:{$fase}";
+        return "{$this->dominio}:{$this->direccion}:{$fase}";
     }
 
     /**
      * Obtiene la antena para una fase específica, creándola si no existe.
      *
      * @param int $fase Número de fase (sin prefijo).
-     * @return Antena
+     * @return AntenaComun
+     * @since 1.4.5
+     * @version 1.4.8
      */
-    public function antena(int $fase): Antena
+    public function antena(int $fase): AntenaComun
     {
         if (!isset($this->antenas[$fase])) {
             $fase_completa = $this->prefijar_fase($fase);
-            $this->antenas[$fase] = new Antena($fase_completa);
+           // $this->antenas[$fase] = new AntenaComun($fase_completa);
         }
         return $this->antenas[$fase];
-    }
-
-    /**
-     * Registra un nodo como patrón en la antena de la fase indicada.
-     *
-     * @param NodoNumerico $nodo Nodo a registrar.
-     * @param int          $fase Número de fase.
-     * @return void
-     */
-    public function _patron(NodoNumerico $nodo, int $fase): void
-    {
-        $antena = $this->antena($fase);
-        $antena->_patron($nodo);
     }
 
     /**
@@ -153,62 +172,73 @@ class ProcesadorDeDominio extends Objeto
     }
 
     /**
-     * Procesa una señal aplicando el bucle de captura voraz con reinicio.
+     * Inicializa la antena de fase 0 con los dipolos de acción y marcado.
      *
-     * La señal no se modifica; el índice de consumo es local al método.
-     * Los p‑gramas capturados se almacenan en {@link $elementos_procesados}
-     * y pueden recuperarse con {@link elementos_procesados()}.
+     * Registra como dipolos los primos de marcado (índices 256‑259)
+     * y los primos de acción (índices 260‑264) definidos en
+     * {@link \Iteradores\Conf::PRIMOS_PRECARGADOS}.
+     * Estos dipolos permiten al Tálamo (y a cualquier dominio que los
+     * necesite) reconocer instantáneamente los NodoPrimo que el
+     * Controlador inyecta durante la ejecución de comandos.
+     *
+     * @return void
+     * @since 1.4.8
+     */
+    public function inicializar_acciones(): void
+    {
+        $primos = Conf::PRIMOS_PRECARGADOS;
+        // Registrar marcadores (256..259) y acciones (260..264)
+        for ($indice = 256; $indice <= 264; $indice++) {
+            $numero_primo = $primos[$indice];
+            $nodo_primo   = NodoNumerico::crear_primo($numero_primo);
+            if ($nodo_primo !== null) {
+                $matriz_identidad = $nodo_primo->identidad();
+                $this->antena(0)->_dipolo([$matriz_identidad], $nodo_primo);
+            }
+        }
+    }
+
+    /**
+     * Recibe una señal y la procesa exclusivamente con la antena de fase 0.
+     *
+     * Ya no existe bucle voraz entre fases. Cada matriz de la señal se
+     * intenta capturar con la antena de fase 0. Si no es reconocida,
+     * se activa el aprendizaje trivial (creación de un nuevo NodoPrimo
+     * y registro de su dipolo en la misma fase 0).
      *
      * @param Senal $senal Señal a procesar.
      * @return void
-     * @since 1.4.5
-     * @version 1.4.7
+     * @since 1.4.8
      */
-    public function procesar(Senal $senal): void
+    public function recibir_senal(Senal $senal): void
     {
-        $this->elementos_procesados = [];
+        $this->elementos_recibidos   = [];
+        $this->matrices_capturadas   = 0;
+        $this->matrices_aprendidas   = 0;
+
         $matrices = $senal->matrices();
-        $total = count($matrices);
-        $i = 0;
-      //  echo "TTTT".$total;
-      //  echo "MMM".count($this->antenas);
-        $cont1=1;
-        $cont2=1;
+        $total    = count($matrices);
+        $i        = 0;
+
+        // Aseguramos que exista la antena de fase 0
+        $antena_fase_0 = $this->antena(0);
+
+        // Fase actual antes de cualquier cambio
         $fase_anterior = NodoElectrico::fase();
 
         while ($i < $total) {
-            // Fases disponibles, orden descendente
-            $fases = array_keys($this->antenas);
-            rsort($fases);
-            //echo "MM2M".count($fases);
+            [$longitud, $patron] = $antena_fase_0->intentar_capturar($senal, $i);
 
-            $capturado = false;
-           
-            foreach ($fases as $num_fase) {
-                
-                $fase_dominio_cero = $this->prefijar_fase($num_fase);
-                NodoElectrico::_fase(self::$token,$fase_dominio_cero);
-                // Respetar límite de fase máxima
-                if ($this->maxima_fase !== null && $num_fase > $this->maxima_fase) {
-                    continue;
-                }
-
-                $antena = $this->antenas[$num_fase];
-                [$longitud, $patron] = $antena->intentar_capturar($senal, $i);
-
-                if ($longitud > 0 && $patron !== null) {
-                    $this->elementos_procesados[] = $patron->pgrama();
-                    $i += $longitud;
-                    $capturado = true;
-                    //echo "SIII";
-                    break; // reiniciar desde fase máxima
-                }
-            }
-            $cont1++;
-            if (!$capturado) {
-                $cont2++;
-                // ─── Aprendizaje trivial ───
-                //$fase_anterior = NodoElectrico::fase();
+            if ($longitud > 0 && $patron !== null) {
+                // Captura exitosa en fase 0
+                $this->elementos_recibidos[] = [
+                    'nodo' => $patron,
+                    'fase' => 0,
+                ];
+                $this->matrices_capturadas += $longitud;
+                $i += $longitud;
+            } else {
+                // ─── Aprendizaje trivial (fase 0) ───
                 $fase_dominio_cero = $this->prefijar_fase(0);
                 NodoElectrico::_fase(self::$token, $fase_dominio_cero);
 
@@ -217,58 +247,66 @@ class ProcesadorDeDominio extends Objeto
                 }
 
                 $numero = NodoNumerico::siguiente_primo_positivo($fase_dominio_cero);
-                $primo = NodoNumerico::crear_primo($numero);
+                $primo  = NodoNumerico::crear_primo($numero);
                 if ($primo) {
-                    $primo->_dato(['matriz_original' => $matrices[$i]], 'abajo');
-                    echo "DEBUG APRENDIZAJE: nodo " . $primo->id() . " pgrama=" . json_encode($primo->pgrama()) . " abajo=" . var_export($primo->dato('abajo'), true) . "\n";
-                    $this->antena(0)->_patron($primo);
-                    $this->elementos_procesados[] = $primo->pgrama();
+                    // Registrar el dipolo en la antena de fase 0
+                    $antena_fase_0->_dipolo([$matrices[$i]], $primo);
+
+                    $this->elementos_recibidos[] = [
+                        'nodo' => $primo,
+                        'fase' => 0,
+                    ];
                 }
 
-
+                $this->matrices_aprendidas++;
+                NodoElectrico::_fase(self::$token, $fase_anterior);
                 $i++;
             }
-
-           // echo "C1:".$cont1."C2:".$cont2."";
         }
+
+        // Restaurar fase original
         NodoElectrico::_fase(self::$token, $fase_anterior);
-      //  echo "YYYY".count($this->elementos_procesados);
+
+        // Calcular sapiencia
+        $total_matrices = $this->matrices_capturadas + $this->matrices_aprendidas;
+        $this->sapiencia_ultima = ($total_matrices > 0)
+            ? $this->matrices_capturadas / $total_matrices
+            : 1.0;
     }
 
     /**
-     * Devuelve los p‑gramas capturados durante el último procesamiento.
+     * Devuelve los elementos recibidos durante el último {@link recibir_senal()}.
      *
-     * @return array<int, array<int>>
-     * @since 1.4.7
+     * @return array<int, array{nodo: NodoNumerico, fase: int}>
+     * @since 1.4.8
      */
-    public function elementos_procesados(): array
+    public function elementos_recibidos(): array
     {
-        return $this->elementos_procesados;
+        return $this->elementos_recibidos;
     }
 
+
     /**
-     * Emite una señal a partir de los p‑gramas capturados.
+     * Devuelve la sapiencia calculada en el último procesamiento.
      *
-     * Utiliza la antena de fase 0 para convertir los p‑gramas
-     * en sus secuencias de matrices originales.
-     *
-     * @return Senal|null Señal emitida o null si falla la emisión.
-     * @since 1.4.7
+     * @return float Valor entre 0.0 (todo aprendido) y 1.0 (todo capturado).
+     * @since 1.4.8
      */
-    public function emitir_senal(): ?Senal
+    public function sapiencia(): float
     {
-        $antena = $this->antena(0);
-        return $antena->emitir($this->elementos_procesados);
+        return $this->sapiencia_ultima;
     }
 
+
     /**
-     * Devuelve el nombre del medio.
+     * Devuelve el nombre del dominio.
      *
      * @return string
+     * @since 1.4.8
      */
-    public function medio(): string
+    public function dominio(): string
     {
-        return $this->medio;
+        return $this->dominio;
     }
 
     /**
@@ -284,7 +322,7 @@ class ProcesadorDeDominio extends Objeto
     /**
      * Devuelve todas las antenas del procesador.
      *
-     * @return array<int, Antena>
+     * @return array<int, AntenaComun>
      */
     public function antenas(): array
     {

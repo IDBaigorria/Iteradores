@@ -22,11 +22,14 @@ use Iteradores\Nucleo\Objeto;
  * | **Prima positiva** | `[[p, 0], [1, 1]]` | Comando constructivo (hacer)|
  * | **Prima negativa** | `[[-p, 0], [1, 1]]`| Comando destructivo (deshacer)|
  * | **Inicial**        | `[[1, 0], [1, 1]]` | Semilla de NodoNumerico     |
+ * | **Cero**           | `[[0, 0], [1, 1]]` | Delimitador de fin de secuencia (det = 0) |
  *
  * - Las matrices **positivas** representan acciones constructivas.
  * - Las matrices **negativas** representan las correspondientes acciones
  *   destructivas (deshaceres), permitiendo revertir cualquier operación.
- *
+ * - La **Matriz Cero** se utiliza como marcador de fin de transmisión
+ *   en las comunicaciones nodo a nodo.
+ * 
  * ## No conmutatividad y orden
  *
  * El producto de matrices no es conmutativo: `M(A) × M(B) ≠ M(B) × M(A)`.
@@ -49,7 +52,7 @@ use Iteradores\Nucleo\Objeto;
  * descenso de fase, sin necesidad de búsquedas en índices externos.
  *
  * @package Iteradores\Nodos
- * @version 1.4.4
+ * @version 1.4.8
  * @since 1.4.0
  * @author Ignacio David Baigorria
  * @extends Objeto
@@ -232,6 +235,19 @@ class Matriz2x2 extends Objeto
             return null;
         }
         return new self((int)$arr[0], (int)$arr[1], (int)$arr[2], (int)$arr[3]);
+    }
+
+    /**
+     * Matriz Cero utilizada como delimitador de fin de secuencia.
+     *
+     * Forma: `[[0, 0], [1, 1]]` – determinante 0.
+     *
+     * @return Matriz2x2
+     * @since 1.4.8
+     */
+    public static function cero(): Matriz2x2
+    {
+        return new self(0, 0, 1, 1);
     }
 
     // ═══════════════════════════════════════════
