@@ -509,6 +509,68 @@ class Conf {
         3533, 3539, 3541, 3547, 3557, 3559, 3571, 3581, 3583, 3593, 3607, 3613,
         3617, 3623, 3631, 3637, 3643, 3659, 3671,
     ];
+
+        // ═══════════════════════════════════════════════════════════
+    // VERBOS DE ACCIÓN (v1.4.9)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Verbo de cierre: indica el fin de una comunicación entre Iteradores.
+     * @var int
+     * @since 1.4.9
+     */
+    public const VERBO_CIERRE = 0;
+
+    /**
+     * Verbo: aprender un nuevo patrón o secuencia.
+     * @var int
+     * @since 1.4.9
+     */
+    public const VERBO_APRENDER = 1;
+
+    /**
+     * Verbo: ejecutar una acción ya aprendida.
+     * @var int
+     * @since 1.4.9
+     */
+    public const VERBO_EJECUTAR = 2;
+
+    /**
+     * Verbo: tomar el control de un recurso o iterador.
+     * @var int
+     * @since 1.4.9
+     */
+    public const VERBO_CONTROLAR = 3;
+
+    /**
+     * Verbo: corregir un patrón o secuencia previamente aprendida.
+     * @var int
+     * @since 1.4.9
+     */
+    public const VERBO_CORREGIR = 4;
+
+    /**
+     * Verbo: solicitar una predicción basada en patrones conocidos.
+     * @var int
+     * @since 1.4.9
+     */
+    public const VERBO_PREDECIR = 5;
+
+    /**
+     * Verbo: generar contenido nuevo a partir de lo aprendido.
+     * @var int
+     * @since 1.4.9
+     */
+    public const VERBO_IMAGINAR = 6;
+
+    /**
+     * Verbo: supervisar el funcionamiento de otro Iterador.
+     * @var int
+     * @since 1.4.9
+     */
+    public const VERBO_SUPERVISAR = 7;
+
+    // Se pueden añadir más verbos según sea necesario, idealmente de forma secuencial.
 }
 
 ?>

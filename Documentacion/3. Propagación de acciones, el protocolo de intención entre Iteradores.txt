@@ -1,0 +1,98 @@
+# Propagación de acciones: el protocolo de intención entre Iteradores
+
+**Autor: Ignacio David Baigorria**  
+**Versión 1.4.9 – Julio 2026**
+
+---
+
+## 1. Introducción
+
+En el framework *Iteradores*, el conocimiento no es estático: se construye, se refina y se comparte a través de la colaboración entre componentes especializados llamados *Iteradores*. Para que esta colaboración sea efectiva, no basta con transmitir datos; es necesario transmitir **intención**. Un Iterador que envía información a otro debe poder indicarle *qué hacer* con ella: si debe aprender un nuevo patrón, ejecutar una acción, verificar la seguridad de un resultado o simplemente prepararse para recibir una secuencia de comandos.
+
+El presente trabajo describe el subsistema de **propagación de acciones**, un mecanismo diseñado para comunicar intenciones de forma explícita y estructurada entre Iteradores. Este subsistema se apoya en dos nuevos elementos —la **Señal de Acción** y la **Antena de Acción**— y en un protocolo de comunicación que garantiza que cada intercambio de información esté precedido por una declaración clara de propósito y finalizado con una señal de cierre.
+
+A lo largo de este documento se presentan los conceptos fundamentales del sistema: los verbos de acción, las señales que los transportan, las antenas que los emiten y reciben, y el protocolo que rige el diálogo entre Iteradores. Se describe también la conexión con el mundo exterior a través del **Controlador** y su antena de traducción de acciones.
+
+---
+
+## 2. Verbos de acción: el alfabeto de la intención
+
+El núcleo del sistema de propagación es un conjunto pequeño y fijo de **verbos de acción**, representados por números enteros constantes. Cada verbo expresa una intención atómica que un Iterador puede comunicar a otro. Los verbos definidos son:
+
+| Verbo | Valor | Significado |
+|-------|-------|-------------|
+| `CIERRE` | 0 | Fin de una comunicación; indica que no se enviarán más datos. |
+| `APRENDER` | 1 | Solicita al receptor que aprenda un nuevo patrón o secuencia. |
+| `EJECUTAR` | 2 | Solicita la ejecución de una acción ya conocida. |
+| `CONTROLAR` | 3 | Activa un mecanismo de control para verificar la seguridad de un comando o resultado antes de su ejecución o entrega. |
+| `CORREGIR` | 4 | Solicita la corrección de un patrón previamente aprendido. |
+| `PREDECIR` | 5 | Solicita una predicción basada en patrones conocidos. |
+| `IMAGINAR` | 6 | Solicita la generación de contenido nuevo a partir de lo aprendido. |
+| `SUPERVISAR` | 7 | Solicita la supervisión del funcionamiento de otro Iterador. |
+
+Estos verbos no son comandos del sistema ni representan acciones que el Iterador receptor deba ejecutar de inmediato. Son **declaraciones de intención**: informan al receptor sobre la naturaleza de la comunicación que está a punto de recibir, permitiéndole preparar su estado interno y, en el futuro, enganchar la lógica de procesamiento adecuada.
+
+El verbo `CIERRE` ocupa un lugar especial: no transmite una intención de trabajo, sino que marca el final de un intercambio. Su valor numérico es `0`, lo que lo distingue claramente de cualquier verbo activo.
+
+---
+
+## 3. La Señal de Acción: un mensaje sin contenido
+
+Para transportar un verbo entre Iteradores se utiliza la **Señal de Acción** (`SenalAccion`). A diferencia de la Señal matricial, que porta una o varias matrices de identidad, la Señal de Acción es extraordinariamente simple: contiene únicamente un número entero (el verbo) y la fase de origen desde la que se emite.
+
+Esta simplicidad es intencionada. La Señal de Acción no necesita matrices porque su propósito no es identificar una secuencia de comandos, sino comunicar una actitud. Es un mensaje mínimo que dice: "prepárate, porque voy a hacer esto". El contenido real —los datos, los patrones, las secuencias— viajará después, en señales separadas, a través de las antenas de comunicación matricial.
+
+La Señal de Acción es, por tanto, un prefacio. Y como todo prefacio, no tiene valor por sí mismo, sino en relación con lo que anuncia.
+
+---
+
+## 4. Antena de Acción: el punto de propagación
+
+La **Antena de Acción** (`AntenaAccion`) es el componente encargado de emitir y recibir las señales de acción. Al igual que las antenas de comunicación matricial, es un **singleton multifase**: una única instancia que opera en todas las fases del sistema, utilizando la fase global activa para mantener un registro independiente de la *acción actual* en cada una de ellas.
+
+### 4.1. Emisión
+
+Cuando un Iterador desea comunicar una intención, utiliza el método de emisión de la Antena de Acción. Si se le proporciona un verbo, la antena crea una nueva Señal de Acción con ese verbo y la fase actual, la almacena como la acción actual de la fase, y la retorna. Si no se le proporciona ningún verbo, la antena simplemente devuelve la acción actual registrada en la fase.
+
+Esta doble funcionalidad permite que la antena actúe como un *memorándum* de lo que se está haciendo en cada momento, y a la vez como un generador de nuevas intenciones.
+
+### 4.2. Recepción
+
+En el lado receptor, la Antena de Acción recibe la Señal de Acción, actualiza la acción actual de la fase con esta nueva señal, y devuelve el número de verbo. El Iterador que la invoca obtiene así un valor entero que puede utilizar —en el futuro— para decidir qué lógica de procesamiento activar. Por ahora, los puntos de recepción contienen marcadores de lugar donde el Iterador enlazará su comportamiento.
+
+Cuando el verbo recibido es `CIERRE` (0), la antena no realiza ninguna acción especial más allá de registrar la señal. El significado del cierre —detener la escucha, procesar lo acumulado, liberar recursos— será implementado por el futuro Iterador.
+
+---
+
+## 5. El protocolo de comunicación entre Iteradores
+
+La interacción entre dos Iteradores sigue un protocolo de tres fases claramente delimitado:
+
+1. **Anuncio de intención**: El Iterador A (emisor) desea comunicar algo a B (receptor). Antes de enviar cualquier dato, A emite una Señal de Acción con el verbo correspondiente (por ejemplo, `APRENDER`) y la envía a B. El Iterador B recibe esta señal en su Antena de Acción, obtiene el verbo y se prepara internamente.
+
+2. **Transmisión de contenido**: A continuación, A envía las señales de contenido —comunes o de marcado— a las antenas correspondientes de B. Estas señales contienen los patrones, secuencias o mensajes que constituyen el cuerpo de la comunicación.
+
+3. **Cierre de la comunicación**: Cuando A ha terminado de enviar todos los datos, emite una Señal de Acción con el verbo `CIERRE` y la envía a B. Al recibir esta señal, B sabe que no llegará más información y puede proceder a procesar todo lo recibido.
+
+Este protocolo garantiza que ningún Iterador reciba datos sin saber qué hacer con ellos, y que toda comunicación tenga un final explícito y ordenado. Es, en esencia, un apretón de manos en tres tiempos: "voy a hacer esto", "aquí están los datos", "he terminado".
+
+---
+
+## 6. El Controlador y la Antena de Traducción de Acción
+
+El **Controlador**, como capa externa del sistema, también necesita participar en este protocolo. Sin embargo, a diferencia de los Iteradores, el Controlador no trabaja con Señales de Acción como objetos internos, sino con órdenes y respuestas en su propio formato. Para salvar esta distancia, se utiliza la **Antena de Traducción de Acción** (`AntenaTraduccionAccion`).
+
+Esta antena, análoga a la Antena de Traducción matricial, es una pieza sin estado que pertenece al ámbito del Controlador. Su función es doble:
+
+- **Hacia adentro**: convierte una orden externa (expresada como un verbo entero) en una Señal de Acción lista para ser inyectada en el sistema.
+- **Hacia afuera**: extrae el verbo de una Señal de Acción recibida desde el interior, permitiendo al Controlador interpretar la respuesta.
+
+Gracias a este adaptador, el Controlador puede iniciar comunicaciones con los Iteradores utilizando el mismo protocolo de anuncio/transmisión/cierre, sin necesidad de conocer los detalles internos de las antenas de acción.
+
+---
+
+## 7. Conclusión
+
+El sistema de propagación de acciones completa el mecanismo de comunicación del framework *Iteradores*. Junto con las señales matriciales y las antenas de reconocimiento de patrones, las señales de acción y las antenas de propagación forman una tríada que cubre todas las necesidades de diálogo entre componentes: la transmisión de **contenido** (a través de las antenas común y de marcado), la transmisión de **intención** (a través de la antena de acción), y la **traducción** entre el mundo interno y el externo (a través de las antenas de traducción).
+
+El protocolo de tres fases —anuncio, datos, cierre— proporciona un marco disciplinado para toda comunicación, asegurando que cada intercambio sea explícito, ordenado y auditable. Sobre esta base, los futuros Iteradores podrán implementar comportamientos complejos de aprendizaje, ejecución y supervisión, confiando en que el sustrato de comunicación les proporciona tanto el *qué* como el *para qué* de cada mensaje.
