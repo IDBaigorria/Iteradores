@@ -607,7 +607,6 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	 *   lo retorna y establece `$es_nodo` como `false`.  
 	 * - Si no se pasa ningún valor en el parámetro `$elemento`, crea un nodo vacío totalmente valido
 	 *   encapsulando `null`.  
-
 	 *
 	 * Este método es especialmente útil cuando se procesan entradas heterogéneas, ya que garantiza
 	 * que siempre se trabaje con un Nodo válido sin tener que comprobarlo manualmente.
@@ -677,7 +676,7 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	 *                            Devuelve `true` si `$elemento` ya era un nodo, `false` en caso contrario.
 	 * @return Nodo Nodo válido que encapsula el valor recibido.
 	 *
-	 * @since V2.9.3
+	 * @since V1.0.0
 	 */
 	public static function nodo($elemento=null, &$es_nodo=null): Nodo{
 		if ($elemento instanceof static){

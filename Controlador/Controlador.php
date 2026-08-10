@@ -76,17 +76,6 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      */
     protected static string $token = '';
 
-    // ═══════════════════════════════════════════
-    // V 1.4.6 – PROCESADORES DE DOMINIO
-    // ═══════════════════════════════════════════
-
-    /**
-     * Procesadores de dominio (entrada/salida), indexados por prefijo.
-     *
-     * @var array<string, ProcesadorDeDominio>
-     * @since 1.4.6
-     */
-    private static array $procesadores = [];
 
     /**
      * Registra una clase de persistencia disponible para el sistema.
@@ -96,7 +85,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      * @return void
      */
     public static function registrar_implementacion(string $nombre, string $clase): void {
-        echo "IIII".static::$token;
+       // echo "IIII".static::$token;
         static::$implementaciones[strtoupper($nombre)] = $clase;
         // Si ya existe el token, lo transmite a la clase registrada
         if (static::$token && class_exists($clase) && method_exists($clase, 'recibir_token')) {
@@ -1385,6 +1374,15 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     // V 1.4.6 – PROCESADORES DE DOMINIO
     // ═══════════════════════════════════════════
 
+
+    /**
+     * Procesadores de dominio (entrada/salida), indexados por prefijo.
+     *
+     * @var array<string, ProcesadorDeDominio>
+     * @since 1.4.6
+     */
+    private static array $procesadores = [];
+    
     /**
      * Obtiene (o crea) el procesador para un medio y dirección.
      *
