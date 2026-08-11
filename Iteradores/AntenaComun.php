@@ -47,6 +47,8 @@ use Iteradores\Nodos\NodoElectrico;
  * - {@link antena()} devuelve la instancia única.
  * - {@link reiniciar()} la destruye (solo en entorno de pruebas).
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Iteradores
  * @since 1.4.8
  * @version 1.4.8

@@ -119,7 +119,9 @@ V3.3.1.251023 ahora esta clase es parte de un patron de diseño para lograr dife
  * Clase PerdurarSuperestructuraStringSQL
  * 
  * @version 2.9.6 (Última revisión: 01/09/2025)
- * @author ...
+ *
+ * @author Ignacio David Baigorria
+ *
  * 
  * @extends Objeto
  * 

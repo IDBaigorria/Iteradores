@@ -10,7 +10,7 @@
 namespace Iteradores\Comunicadores;
 
 use Iteradores\Comunicadores\Comunicador;
-use Iteradores\Controlador\Senal;
+use Iteradores\Iteradores\Senal;
 use Iteradores\Controlador\RegistroGlobal;
 
 /**

@@ -34,6 +34,8 @@ use Iteradores\Nodos\NodoPrimo;
  * }
  * ```
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Controlador
  * @since 1.4.6
  * @version 1.4.6

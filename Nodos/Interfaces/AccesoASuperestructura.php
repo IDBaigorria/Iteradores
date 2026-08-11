@@ -9,6 +9,8 @@ use Iteradores\Nodos\Nodo;
  * 
  * Estos métodos son implementados por la clase {@link ./classes/Iteradores-Nodos-Nodo.html Nodo}.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @since V3.2.4
  */

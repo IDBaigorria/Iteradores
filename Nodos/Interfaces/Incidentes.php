@@ -4,6 +4,7 @@ use Iteradores\Nodos\Nodo;
 /**
  * Interfaz que define el manejo de Adyacentes en un nodo.
  *
+ * @author Ignacio David Baigorria
  *
  * @package Iteradores\Nodos\Interfaces
  * @since 

@@ -2,7 +2,7 @@
 namespace Iteradores\Comunicadores;
 
 use Iteradores\Controlador\RegistroGlobal;
-use Iteradores\Controlador\Senal;
+use Iteradores\Iteradores\Senal;
 use Iteradores\Controlador\Talamo;
 
 /**
@@ -11,6 +11,8 @@ use Iteradores\Controlador\Talamo;
  * Permite enviar señales a la salida estándar y leer una línea desde
  * la entrada estándar. La traducción entre bytes y señales se delega
  * en el {@link \Iteradores\Controlador\Talamo}.
+ *
+ * @author Ignacio David Baigorria
  *
  * @package Iteradores\Comunicadores
  * @since 1.3.3 (anteriormente SalidaDepuracionConsola)

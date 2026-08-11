@@ -7,7 +7,9 @@ use Iteradores\Nodos\Nodo;
  * Permite establecer y recuperar un valor almacenado en el nodo.
  * Estos métodos son implementados por la clase {@link ./classes/Iteradores-Nodos-Nodo.html Nodo}.
  * @package Iteradores\Nodos\Interfaces
- * 
+ *
+ * @author Ignacio David Baigorria
+ *
  */
 interface Datos {
 

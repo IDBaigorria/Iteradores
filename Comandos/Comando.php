@@ -17,6 +17,8 @@ namespace Iteradores\Comandos;
  * para que el Controlador pueda validar argumentos y generar
  * automáticamente la ayuda.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Comandos
  * @since 1.3.1
  * @version 1.3.2

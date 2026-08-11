@@ -2,7 +2,7 @@
 namespace Iteradores\Comunicadores;
 
 use Iteradores\Controlador\RegistroGlobal;
-use Iteradores\Controlador\Senal;
+use Iteradores\Iteradores\Senal;
 use Iteradores\Controlador\Talamo;
 
 /**
@@ -11,6 +11,8 @@ use Iteradores\Controlador\Talamo;
  * Envía el contenido de una señal a la página web, escapando el HTML
  * y añadiéndolo a un flujo de salida estándar. No admite entrada.
  * La traducción entre bytes y señales se delega en el {@link Talamo}.
+ *
+ * @author Ignacio David Baigorria
  *
  * @package Iteradores\Comunicadores
  * @since 1.3.3 (anteriormente SalidaDepuracionHTML)

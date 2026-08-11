@@ -10,6 +10,9 @@ include_once("Incidentes.php");
  * implementar esta intarfaz. una forma de registrar los nodos incidentes y poder volver
  * en algun momento. Una linda norma seria que seimpre que se use un enlace de ida se use
  * luego en enlace de vuelta cerrando un ciclo y dando finalizado el recorrido
+ *
+ * @author Ignacio David Baigorria
+ *
  * @extends Incidentes
  * @package Iteradores\Nodos\Interfaces
  * @since 

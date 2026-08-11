@@ -10,6 +10,8 @@ use Iteradores\Nodos\Nodo;
  * 
  * Estos métodos son implementados por la clase {@link ./classes/Iteradores-Nodos-Nodo.html Nodo}.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @since V3.2.4
  */
@@ -25,8 +27,7 @@ interface AccesoAEspeciales {
      * Ejecuta una función sobre cada nodo especial.
      *
      * @param callable $funcion Función a ejecutar.
-     * @param mixed $parametro1 Parámetro opcional.
-     * @param mixed $parametro2 Parámetro opcional.
+     * @param mixed $parametros Parámetros opcionales.
      * @return array|null Resultados devueltos por la función.
      */
     public static function por_cada_nodo_especial_ejecutar(callable $funcion, mixed ...$parametros): ?array;

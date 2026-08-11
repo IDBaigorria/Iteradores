@@ -38,6 +38,8 @@ use Iteradores\Iteradores\Senal;
  * (`marcado = true`), porque están destinadas a ser procesadas por la
  * {@link AntenaDeMarcado} del Tálamo.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Iteradores
  * @since 1.4.8
  * @version 1.4.8

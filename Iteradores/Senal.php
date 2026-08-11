@@ -32,6 +32,8 @@ use Iteradores\Nodos\Matriz2x2;
  * {@link \Iteradores\Controlador\Controlador} (a través de sus antenas
  * de traducción) y del Tálamo.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Iteradores
  * @since 1.4.5
  * @version 1.4.8

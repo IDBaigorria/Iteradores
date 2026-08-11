@@ -2,7 +2,9 @@
 namespace Iteradores\Configuracion;
 /**
  * v0.0.0.250829 Inicio, creo la clase Conf para ir colocando ahi las constantes globales de configuracion
- * 
+ *
+ * @author Ignacio David Baigorria
+ *
  */
 class Conf {
     // Sobre la aplicacion

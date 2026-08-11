@@ -38,6 +38,8 @@ namespace Iteradores\Tiempo\interfaces;
  * - El método {@link _ubicacion} debe invalidar cualquier caché interna
  *   para forzar el recálculo con las nuevas coordenadas.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Tiempo
  * @since 1.3.5
  */

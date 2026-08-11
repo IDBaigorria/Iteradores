@@ -12,6 +12,8 @@ use Iteradores\Nucleo\Objeto;
  * El Controlador lee estas listas durante su inicialización y procesa
  * todos los elementos pendientes.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Controlador
  * @since 1.3.4
  */

@@ -45,6 +45,8 @@ require_once("interfaces\Dominios.php");
  * a cada clase de persistencia registrada, garantizando que solo las clases
  * autorizadas puedan ejecutar operaciones sobre la superestructura.
  *
+ * @author Ignacio David Baigorria
+ *
  * @implements PerdurarSuperestructura
  * @implements Comandos
  * @implements Comunicadores

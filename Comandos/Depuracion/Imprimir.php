@@ -15,6 +15,8 @@ echo "mmmmmmmmmmmm";
  * Solo está disponible en entornos de desarrollo y pruebas.
  * No es reversible.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Comandos\Depuracion
  * @since 1.3.1
  * @version 1.3.4

@@ -12,7 +12,9 @@ include_once(".\Controlador\PerdurarSuperestructura\PerdurarSuperestructura.php"
  * Clase PerdurarSuperestructuraXML
  * 
  * @version 1.0.0 (Última revisión: 01/09/2025)
- * @author ...
+ *
+ * @author Ignacio David Baigorria
+ *
  * 
  * @extends Objeto
  * 

@@ -16,6 +16,8 @@ use Iteradores\Nodos\Interfaces\Datos;
  *
  * Esta interfaz es una **extracción** del trabajo realizado en la versión 1.4.1.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @see \Iteradores\Nodos\NodoElectrico
  * @since 1.4.1

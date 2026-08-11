@@ -7,6 +7,8 @@ use Iteradores\Nodos\NodoNumerico;
 /**
  * Itera sobre nodos numéricos y gestiona el ascenso de patrones.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores
  * @since 1.5.0
  * @version 1.5.0

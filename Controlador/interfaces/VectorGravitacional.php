@@ -20,6 +20,8 @@ namespace Iteradores\Controlador\interfaces;
  * del ciclo en curso sin preocuparse de los detalles de obtención de la
  * ubicación ni del modelo astronómico.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Controlador\interfaces
  * @since 1.3.6
  */

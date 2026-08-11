@@ -24,6 +24,8 @@ use Iteradores\Iteradores\SenalAccion;
  * - {@link traducir_a_senal}: crea una {@link SenalAccion} a partir de un verbo.
  * - {@link traducir_a_verbo}: extrae el verbo de una {@link SenalAccion}.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Controlador
  * @since 1.4.9
  * @version 1.4.9

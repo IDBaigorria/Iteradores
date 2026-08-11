@@ -34,7 +34,9 @@ namespace Iteradores\Nucleo\Interfaces;
  * ...
  * $mi_objeto->una_funcion() or die(Mi_clase::imprimir_alertas());
  * ```
- * 
+ *
+ * @author Ignacio David Baigorria
+ *
  * @version 0.0.2 (1.3.1) Unificado el método de impresión.
  * 
  * @package Iteradores\Nucleo\Interfaces

@@ -7,6 +7,8 @@ use Iteradores\Nodos\NodoElectrico;
 /**
  * Itera sobre nodos eléctricos en el grafo.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores
  * @since 1.5.0
  * @version 1.5.0

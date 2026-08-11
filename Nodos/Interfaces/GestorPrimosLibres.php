@@ -21,6 +21,8 @@ use Iteradores\Nodos\NodoPrimo;
  * - {@link siguiente_primo_libre} extrae un nodo del pool o crea uno nuevo si no se ha alcanzado el límite.
  * - {@link devolver_primo_libre} retorna un nodo al pool para su futura reutilización.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @version 1.4.4
  * @since 1.4.4

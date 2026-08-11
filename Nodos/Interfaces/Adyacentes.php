@@ -10,6 +10,8 @@ use Iteradores\Nodos\Nodo;
  * 
  * La representacion interna puede variar segun la implementacion
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @since V0.1.9
  */
@@ -98,7 +100,7 @@ interface Adyacentes {
      * basado en el `id()` del nodo destino.  
      * Si ya existe un enlace con ese nombre, se crean variantes incrementales (`id.1`, `id.2`, ...).
      *
-     * @param Nodo $un_nodo Nodo que se desea enlazar
+     * @param Nodo $nodo Nodo que se desea enlazar
      * @return null|string Nodo adyacente recién asignado
      * @public
      */

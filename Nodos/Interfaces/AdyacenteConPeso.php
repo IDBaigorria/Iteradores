@@ -9,6 +9,8 @@ use Iteradores\Nodos\NodoElectrico;
  * Combina la creación de un enlace adyacente y la asignación de un peso en un solo paso.
  * Estos métodos son implementados por la clase {@link ./classes/Iteradores-Nodos-NodoElectrico.html NodoElectrico}.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @since 1.2.9
  */

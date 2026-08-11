@@ -45,6 +45,8 @@ use Iteradores\Configuracion\Entorno;
  * - {@link reiniciar()} la destruye (solo en entorno de pruebas, verificado
  *   con {@link \Iteradores\Configuracion\Entorno::permite_pruebas()}).
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Iteradores
  * @see AntenaComun
  * @see NodoPrimo

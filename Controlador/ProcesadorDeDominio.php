@@ -21,6 +21,8 @@ use Iteradores\Configuracion\Conf;
  * Incorpora el mecanismo de **sapiencia** (proporción de matrices capturadas
  * sobre el total procesado) y el aprendizaje trivial en fase 0.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Controlador
  * @since 1.4.5
  * @version 1.4.8

@@ -35,7 +35,8 @@ include_once ('Interfaces/DatosElectrico.php');
  * - Si solo hay un peso (sin dimensión explícita) se guarda como escalar.
  * - Si se añade una segunda dimensión, se migra a un array asociativo (clave '' para el default).
  *
- * 
+ * @author Ignacio David Baigorria
+ *
  * @class
  * @package Iteradores\Nodos
  * @since 1.2.9

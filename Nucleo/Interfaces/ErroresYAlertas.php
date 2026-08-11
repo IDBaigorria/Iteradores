@@ -9,6 +9,9 @@ require("Alertas.php");
  *
  * Las clases que implementen esta interfaz deberán proporcionar mecanismos
  * para registrar, imprimir y obtener alertas y errores formateados.
+ *
+ * @author Ignacio David Baigorria
+ *
  * @extends Errores
  * @extends Alertas
  * @package Iteradores\Nucleo\Interfaces

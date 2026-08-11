@@ -24,6 +24,8 @@ use Iteradores\Configuracion\Conf;
  * - Crear nodos compuestos (secuencias ordenadas de p‑grama).
  * - Crear nodos de sincronización (paralelos).
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @version 1.4.4
  * @since 1.4.2

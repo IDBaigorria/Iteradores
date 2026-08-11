@@ -49,6 +49,8 @@ use Iteradores\Nodos\Nodo;
  * A partir de la versión 1.5.0, esta clase base se extenderá en
  * {@link IteradorElectrico} e {@link IteradorNumerico}.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Iteradores
  * @since 1.0 (versión original consolidada)
  * @version 1.5.0 (inicio de refactorización)

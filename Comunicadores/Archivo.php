@@ -2,7 +2,7 @@
 namespace Iteradores\Comunicadores;
 
 use Iteradores\Controlador\RegistroGlobal;
-use Iteradores\Controlador\Senal;
+use Iteradores\Iteradores\Senal;
 use Iteradores\Controlador\Talamo;
 
 /**
@@ -14,6 +14,8 @@ use Iteradores\Controlador\Talamo;
  *
  * A partir de la versión 1.4.7, la conversión entre bytes y {@link Senal}
  * se delega en el {@link Talamo}.
+ *
+ * @author Ignacio David Baigorria
  *
  * @package Iteradores\Comunicadores
  * @since 1.3.4

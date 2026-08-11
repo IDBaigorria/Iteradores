@@ -13,6 +13,8 @@ namespace Iteradores\Controlador\interfaces;
  * que el {@link \Iteradores\Controlador\Controlador} expone para
  * controlar los dominios. Por ahora, solo el `Controlador` la implementa.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Controlador\interfaces
  * @since 1.3.9
  */

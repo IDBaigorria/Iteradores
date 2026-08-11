@@ -13,6 +13,8 @@ namespace Iteradores\Nodos\Interfaces;
  * La representación interna de los pesos es opaca para el usuario;
  * la interfaz garantiza el acceso uniforme.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @since 1.2.9
  */

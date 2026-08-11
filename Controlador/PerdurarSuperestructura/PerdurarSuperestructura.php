@@ -7,6 +7,8 @@ namespace Iteradores\Controlador\PerdurarSuperestructura;
  * Cada implementación concreta (SQL, JSON, Texto) debe proveer su
  * propia lógica para estos métodos.
  *
+ * @author Ignacio David Baigorria
+ *
  * @interface PerdurarSuperestructura
  * @since V3.3
  */

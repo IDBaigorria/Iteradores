@@ -1,6 +1,9 @@
 <?php
 namespace Iteradores\Nodos\Interfaces;
 /**
+ *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @since V1.2.3
  */

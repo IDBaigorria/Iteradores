@@ -19,7 +19,9 @@ use Iteradores\Nodos\Nodo;
  * ⚠️ Nota sobre `eliminar_autoenlazado`:  
  * Este método se conserva únicamente por compatibilidad histórica y está marcado como `@deprecated`.  
  * La eliminación de autoenlaces debe ser gestionada manualmente por el programador.
- * 
+ *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @since V3.2
  */

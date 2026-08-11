@@ -12,6 +12,8 @@
  * $id = generarUUID();
  * echo $id; // "e5b0d6f9-20b4-4a93-99f0-21880e78e2b0"
  *
+ * @author Ignacio David Baigorria
+ *
  * @note
  * Si se usa `random_bytes()` u `openssl_random_pseudo_bytes()`, el UUID
  * es criptográficamente seguro. El fallback con `mt_rand()` solo debe

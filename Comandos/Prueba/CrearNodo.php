@@ -15,6 +15,8 @@ use Iteradores\Nodos\NodoElectrico;
  *
  * **Reversible:** Sí – elimina el nodo creado.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Comandos\Prueba
  * @since 1.3.2
  */

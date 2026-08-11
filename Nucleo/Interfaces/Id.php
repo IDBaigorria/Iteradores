@@ -7,6 +7,8 @@ namespace Iteradores\Nucleo\Interfaces;
  * Proporciona un contrato para el manejo de identificadores únicos
  * en objetos. Permite obtener, asignar y verificar la validez de un ID.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nucleo\Interfaces
  */
 interface Id

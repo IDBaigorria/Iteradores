@@ -10,7 +10,9 @@ use Iteradores\Comunicadores\Comunicador;
  *
  * También expone un método de conveniencia para escribir directamente
  * en la salida estándar configurada según el entorno para usar en depuracion.
- * 
+ *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Comunicadores
  * @since 1.3.3
  */

@@ -24,6 +24,8 @@ use Iteradores\Nodos\Matriz2x2;
  * únicas del nodo, independientes de la fase. Esto simplifica el modelo y refleja
  * que la identidad numérica es intrínseca, no contextual.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @version 1.4.5
  * @since 1.4.2

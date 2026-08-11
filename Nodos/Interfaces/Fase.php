@@ -8,7 +8,9 @@ namespace Iteradores\Nodos\Interfaces;
  * Proporciona los metodos necesarios para el manejo de la "fase"
  * en la que trabaja todo el sistema
  * 
- * 
+ *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @since V1.2.3
  */

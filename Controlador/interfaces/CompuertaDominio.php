@@ -18,6 +18,8 @@ namespace Iteradores\Controlador\interfaces;
  *
  * Por ahora esta interfaz es solo documental y no declara métodos.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Controlador\interfaces
  * @since 1.3.8
  */

@@ -40,7 +40,9 @@ use Iteradores\Nodos\NodoElectrico;
  * de creacion capacidad y fuga. Para que sea compatible con la intefaz de nodo las pondremos opciones
  * en cada entrada de las funciones de creacion y tomaremos los valores por defecto de la clase Conf si 
  * es que no se proporcionan.
- * 
+ *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Nodos\Interfaces
  * @since V1.2.3
  */

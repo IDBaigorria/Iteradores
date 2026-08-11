@@ -22,6 +22,8 @@ use Iteradores\Nucleo\Objeto;
  * - `verbo` (int): constante de acción definida en {@link \Iteradores\Configuracion\Conf}.
  * - `fase_origen` (string): fase completa desde la que se emite la señal.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Iteradores
  * @since 1.4.9
  * @version 1.4.9

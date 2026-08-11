@@ -28,6 +28,8 @@ require_once("interfaces\ProveedorVectorGravitacional.php");
  * - Permite realizar predicciones buscando en el grafo pesos cuyos vectores
  *   sean cercanos a una configuración futura simulada.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Tiempo
  * @since 1.3.5
  * @implements ProveedorVectorGravitacional

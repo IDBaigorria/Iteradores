@@ -16,6 +16,8 @@ use Iteradores\Nucleo\Objeto;
  * **Entorno:** solo disponible en desarrollo y pruebas.
  * **Reversible:** No.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Comandos\Depuracion
  * @since 1.3.1
  * @version 1.3.4

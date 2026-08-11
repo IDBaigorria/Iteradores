@@ -56,6 +56,8 @@ header("Cache-control: no-cache, must-revalidate");
  *   hacerlo después de `Controlador::inicializar()` para que
  *   {@link RegistroGlobal} ya tenga la referencia al Controlador.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package   Iteradores
  * @since     1.0.0
  * @version   1.4.8

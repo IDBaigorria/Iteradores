@@ -10,6 +10,8 @@
  * Controlador::cargar_comunicadores_pendientes() (invocado desde la inicialización
  * del sistema) los registrará automáticamente.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Comunicadores
  * @since 1.3.3
  * @version 1.3.4

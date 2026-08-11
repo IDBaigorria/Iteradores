@@ -17,6 +17,8 @@ namespace Iteradores\Controlador\interfaces;
  * controlar el ciclo de vida del motor. Por ahora, solo el
  * `Controlador` la implementa.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Controlador\interfaces
  * @since 1.3.7
  * @version 1.3.9

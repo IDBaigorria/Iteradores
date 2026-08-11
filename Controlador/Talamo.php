@@ -11,6 +11,8 @@ use Iteradores\Nodos\NodoNumerico;
  * y precargado con los 256 patrones que mapean cada byte a su matriz prima.
  * Actúa como singleton gestionado por el {@link Controlador}.
  *
+ * @author Ignacio David Baigorria
+ *
  * @package Iteradores\Controlador
  * @since 1.4.7
  */
