@@ -258,10 +258,9 @@ class Conf {
     /**
      * Peso del vector solar en la combinación final del Reloj Astronómico.
      *
-     * Determina la influencia relativa del Sol frente a la Luna en el vector
-     * gravitacional resultante. Un valor mayor da más peso al ciclo día/noche.
-     *
      * @var float
+     * @deprecated 1.5.2 Los vectores combinados fueron eliminados.
+     *             El reloj ahora produce ramilletes de espines.
      * @see \Iteradores\Tiempo\RelojAstronomico
      * @since 1.3.5
      */
@@ -271,9 +270,64 @@ class Conf {
      * Peso del vector lunar en la combinación final del Reloj Astronómico.
      *
      * @var float
+     * @deprecated 1.5.2 Los vectores combinados fueron eliminados.
+     *             El reloj ahora produce ramilletes de espines.
      * @since 1.3.5
      */
     public const RELOJ_BETA_LUNA = 0.3;
+
+    /**
+     * Astros registrados en el Reloj Astronómico.
+     *
+     * Cada clave contiene:
+     * - `masa`: masa gravitacional asignada al astro.
+     * - `tipo`: categoría ('Astro', 'Eje', 'Prisma').
+     *
+     * `centro_tierra` actúa como prisma geográfico: es el vector que apunta
+     * desde el observador hacia el centro de la Tierra. Su dirección depende
+     * de la latitud, longitud y el tiempo sidéreo local.
+     *
+     * @var array<string, array{masa: float, tipo: string}>
+     * @since 1.5.2
+     */
+    public const RELOJ_ASTROS = [
+        'sol'           => ['masa' => 10.0, 'tipo' => 'Astro'],
+        'luna'          => ['masa' => 5.8,  'tipo' => 'Astro'],
+        'jupiter'       => ['masa' => 7.3,  'tipo' => 'Astro'],
+        'eje_terrestre' => ['masa' => 8.0,  'tipo' => 'Eje'],
+        'centro_tierra' => ['masa' => 9.0,  'tipo' => 'Prisma'],
+    ];
+    /**
+     * Longitud eclíptica del centro galáctico, en grados.
+     *
+     * @var float
+     * @since 1.5.2
+     */
+    public const RELOJ_GALACTICO_LONGITUD = 266.84;
+
+    /**
+     * Latitud eclíptica del centro galáctico, en grados.
+     *
+     * @var float
+     * @since 1.5.2
+     */
+    public const RELOJ_GALACTICO_LATITUD = -5.54;
+    
+    /**
+     * Período orbital de Júpiter en años terrestres.
+     *
+     * @var float
+     * @since 1.5.2
+     */
+    public const RELOJ_PERIODO_JUPITER_ANIOS = 11.86;
+
+    /**
+     * Período de precesión del eje terrestre en años terrestres.
+     *
+     * @var float
+     * @since 1.5.2
+     */
+    public const RELOJ_PERIODO_PRECESION_ANIOS = 25800.0;
 
     /**
      * Inclinación de la eclíptica respecto al ecuador celeste, en grados.
@@ -374,6 +428,43 @@ class Conf {
      * @since 1.3.6
      */
     public const GEOLOCALIZACION_URL = 'https://freegeoip.app/json/';
+    
+    // ═══════════════════════════════════════════════════════════
+    // RELOJ ARTIFICIAL (CICLOS RÍTMICOS)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Ciclos rítmicos de fábrica, expresados en tiempo UTC.
+     *
+     * Cada entrada contiene:
+     * - `periodo`: duración del ciclo en segundos.
+     * - `fase`: fase inicial en radianes [0, 2π).
+     * - `masa`: peso contextual del ciclo.
+     * - `tipo`: categoría ('Ritmo', 'Puente').
+     *
+     * Se incluyen ciclos puente de largo plazo:
+     * - `ciclo_128`  : 128 años julianos, desfase juliano‑trópico.
+     * - `ciclo_decada` : 10 años julianos.
+     * - `ciclo_siglo`  : 100 años julianos.
+     * - `ciclo_milenio`: 1000 años julianos.
+     * - `ciclo_precesion`: 25 800 años julianos, similar a la precesión de equinoccios.
+     *
+     * @var array<string, array{periodo: float, fase: float, masa: float, tipo: string}>
+     * @since 1.5.2
+     */
+    public const RELOJ_CICLOS_RITMICOS = [
+        'minuto'    => ['periodo' => 60.0,            'fase' => 0.0, 'masa' => 3.0, 'tipo' => 'Ritmo'],
+        'hora'      => ['periodo' => 3600.0,          'fase' => 0.0, 'masa' => 5.5, 'tipo' => 'Ritmo'],
+        'dia_noche' => ['periodo' => 86400.0,         'fase' => 0.0, 'masa' => 6.0, 'tipo' => 'Ritmo'],
+        'semana'    => ['periodo' => 604800.0,        'fase' => 0.0, 'masa' => 4.5, 'tipo' => 'Ritmo'],
+        'mes'       => ['periodo' => 2592000.0,       'fase' => 0.0, 'masa' => 4.0, 'tipo' => 'Ritmo'],
+        'anno'      => ['periodo' => 31557600.0,      'fase' => 0.0, 'masa' => 5.0, 'tipo' => 'Ritmo'],
+        'ciclo_128'     => ['periodo' => 4039372800.0,    'fase' => 0.0, 'masa' => 2.0, 'tipo' => 'Puente'],
+        'ciclo_decada'  => ['periodo' => 315576000.0,     'fase' => 0.0, 'masa' => 1.5, 'tipo' => 'Puente'],
+        'ciclo_siglo'   => ['periodo' => 3155760000.0,    'fase' => 0.0, 'masa' => 1.2, 'tipo' => 'Puente'],
+        'ciclo_milenio' => ['periodo' => 31557600000.0,   'fase' => 0.0, 'masa' => 1.0, 'tipo' => 'Puente'],
+        'ciclo_precesion' => ['periodo' => 814155840000.0,'fase' => 0.0, 'masa' => 0.8, 'tipo' => 'Puente'],
+    ];
 
     // ═══════════════════════════════════════════════════════════
     // MOTOR DE EJECUCIÓN (v1.3.7)

@@ -16,6 +16,7 @@ use Iteradores\Nodos\Interfaces\Incidentes;
 //namespace MyApp;
 /*include_once(".\Nucleo\Objeto.php");
 //include_once(".\Nodos\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL.php");*/
+
 include_once(".\Nodos\Interfaces\FabricaDeNodos.php");
 include_once(".\Nodos\Interfaces\Datos.php");
 include_once(".\Nodos\Interfaces\Adyacentes.php");

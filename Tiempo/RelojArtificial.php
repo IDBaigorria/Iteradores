@@ -1,133 +1,222 @@
 <?php
+namespace Iteradores\Tiempo;
+
+use Iteradores\Configuracion\Conf;
+use Iteradores\Nucleo\Objeto;
+use Iteradores\Tiempo\interfaces\ProveedorEspines;
 
 /**
- * RelojArtificial - Plano Rítmico ($\mathcal{R}$)
- * 
- * Ciclos culturales, artificiales y descubiertos. Espejo del RelojAstronomico
- * pero para ritmos humanos. Cada ciclo vive en $S^1$ (círculo unitario 2D).
- * 
- * Incluye Prisma Geográfico Rítmico: un espin adicional que usa la longitud
- * efectiva (longitud + LST) para distorsionar el plano rítmico según la
- * ubicación geográfica, permitiendo descubrir zonas horarias.
- * 
- * @author Ignacio David Baigorria
- * @since 1.0.0
- * @version 1.5.1
+ * Reloj Artificial — Iteradores Neuronales.
+ *
+ * Provee el **Plano Rítmico** de la arquitectura. Genera un ramillete de
+ * espines correspondiente a ciclos culturales y artificiales expresados en
+ * tiempo universal coordinado (UTC). A diferencia del {@link RelojAstronomico},
+ * este reloj no depende de la ubicación geográfica: sus ritmos son globales.
+ *
+ * Cada ciclo vive en el círculo unitario $S^1$ y se representa como un vector
+ * bidimensional proyectado en $z=0$:
+ *
+ * \[
+ * \mathbf{v}(t) = ( \cos(\theta(t)), \sin(\theta(t)), 0 )
+ * \]
+ *
+ * donde $\theta(t) = \phi_0 + 2\pi \frac{t \bmod T}{T}$.
+ *
+ * La localización geográfica no es responsabilidad de este reloj. La hora
+ * local, el día local o el inicio de la semana surgen al combinar estos
+ * espines rítmicos con el espín geográfico `centro_tierra` del plano cósmico
+ * en el {@link CompositorVentanas}.
+ *
+ * ## Ciclos puente de largo plazo
+ *
+ * Para cubrir escalas temporales mayores sin aliasing, se incluyen ciclos
+ * puente con períodos de 128 años, década, siglo, milenio y precesión.
+ * Estos ciclos permiten medir distancias temporales de forma monótona
+ * en rangos que van desde minutos hasta milenios.
+ *
+ * @package Iteradores\Tiempo
+ * @since 1.5.1
+ * @version 1.5.2
  */
-class RelojArtificial
+class RelojArtificial extends Objeto implements ProveedorEspines
 {
     /**
-     * Ciclos registrados.
-     * @var array<string, array>
-     * @since 1.0.0
-     * @version 1.5.1
+     * Ciclos rítmicos registrados.
+     *
+     * @var array<string, array{periodo: float, fase: float, masa: float, tipo: string}>
      */
     private array $ciclos = [];
 
     /**
-     * Latitud del observador.
-     * @var float
-     * @since 1.5.1
-     * @version 1.5.1
-     */
-    private float $latitud;
-
-    /**
-     * Longitud del observador.
-     * @var float
-     * @since 1.5.1
-     * @version 1.5.1
-     */
-    private float $longitud;
-
-    /**
-     * Caché de espines.
-     * @var array|null
-     * @since 1.0.0
-     * @version 1.5.1
-     */
-    private ?array $_cache_espines = null;
-
-    /**
-     * Timestamp de la caché.
+     * Último tiempo Unix para el que se calculó el ramillete.
+     *
      * @var int|null
-     * @since 1.0.0
-     * @version 1.5.1
      */
-    private ?int $_cache_ts = null;
+    private ?int $ultimo_tiempo_unix = null;
 
     /**
-     * LST de la caché.
-     * @var float|null
-     * @since 1.5.1
-     * @version 1.5.1
+     * Último ramillete de espines calculado (caché).
+     *
+     * @var array<array{nombre: string, tipo: string, masa: float, vector: array{x: float, y: float, z: float}}>|null
      */
-    private ?float $_cache_lst = null;
+    private ?array $ultimo_espines = null;
+
+    /**
+     * Escalas temporales y ciclos relevantes para medir distancias sin
+     * ambigüedad por enrollamiento de fase.
+     *
+     * @var array<string, string[]>
+     * @since 1.5.2
+     */
+    private const ESCALAS_TEMPORALES = [
+        'segundos' => ['minuto'],
+        'minutos'  => ['hora'],
+        'horas'    => ['dia_noche'],
+        'dias'     => ['semana'],
+        'semanas'  => ['mes'],
+        'meses'    => ['anno'],
+        'anios'    => ['ciclo_128'],
+        'decadas'  => ['ciclo_siglo'],
+        'siglos'   => ['ciclo_milenio'],
+        'milenios' => ['ciclo_precesion'],
+    ];
 
     /**
      * Constructor.
-     * 
-     * @param float $latitud Latitud del observador.
-     * @param float $longitud Longitud del observador.
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
+     *
+     * Inicializa los ciclos de fábrica desde
+     * {@link \Iteradores\Configuracion\Conf::RELOJ_CICLOS_RITMICOS}.
+     *
+     * @since 1.5.1
+     * @version 1.5.2
      */
-    public function __construct(float $latitud = 0.0, float $longitud = 0.0)
+    public function __construct()
     {
-        $this->latitud = $latitud;
-        $this->longitud = $longitud;
-        $this->inicializar_ciclos_fabrica();
+        $this->ciclos = Conf::RELOJ_CICLOS_RITMICOS;
     }
 
     /**
-     * Inicializa los ciclos de fábrica.
-     * 
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
+     * Actualiza la ubicación geográfica del proveedor.
+     *
+     * Este reloj no utiliza ubicación, por lo que el método no produce
+     * ningún efecto. Se mantiene por compatibilidad con la interfaz
+     * {@link ProveedorEspines}.
+     *
+     * @param float $latitud  Ignorada.
+     * @param float $longitud Ignorada.
+     * @return void
+     * @since 1.5.2
      */
-    private function inicializar_ciclos_fabrica(): void
+    public function _ubicacion(float $latitud, float $longitud): void
     {
-        $this->ciclos = [
-            'dia_noche' => ['periodo' => 86400.0, 'fase' => 0.0, 'masa' => 6.0, 'tipo' => 'Ritmo'],
-            'semana'    => ['periodo' => 604800.0, 'fase' => 0.0, 'masa' => 4.5, 'tipo' => 'Ritmo'],
-            'anno'      => ['periodo' => 31557600.0, 'fase' => 0.0, 'masa' => 5.0, 'tipo' => 'Ritmo'],
-            'hora'      => ['periodo' => 3600.0, 'fase' => 0.0, 'masa' => 5.5, 'tipo' => 'Ritmo'],
-            'minuto'    => ['periodo' => 60.0, 'fase' => 0.0, 'masa' => 3.0, 'tipo' => 'Ritmo'],
-        ];
+        // Este proveedor es global y no depende de la ubicación.
     }
 
     /**
-     * Agrega un ciclo nuevo.
-     * 
-     * @param string $nombre Nombre del ciclo.
-     * @param float $periodo Período en segundos.
-     * @param float $fase Fase inicial en radianes.
-     * @param float $masa Masa del ciclo.
-     * @param string $tipo Tipo del ciclo.
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
+     * Devuelve el ramillete de espines rítmicos para el instante dado.
+     *
+     * @param int|null $tiempo_unix Tiempo Unix en segundos. Si es null, usa time().
+     * @return array<array{nombre: string, tipo: string, masa: float, vector: array{x: float, y: float, z: float}}>
+     * @since 1.5.1
+     * @version 1.5.2
      */
-    public function agregar_ciclo(string $nombre, float $periodo, float $fase, float $masa, string $tipo = 'Ritmo'): void
+    public function espines(?int $tiempo_unix = null): array
     {
+        $ts = $tiempo_unix ?? time();
+
+        if ($this->ultimo_tiempo_unix === $ts && $this->ultimo_espines !== null) {
+            return $this->ultimo_espines;
+        }
+
+        $espines = [];
+        foreach ($this->ciclos as $nombre => $config) {
+            $espines[] = $this->calcular_espin_ciclo($nombre, $ts);
+        }
+
+        $this->ultimo_tiempo_unix = $ts;
+        $this->ultimo_espines = $espines;
+
+        return $espines;
+    }
+
+    /**
+     * Devuelve el espin de un ciclo específico.
+     *
+     * @param string   $nombre      Nombre del ciclo.
+     * @param int|null $tiempo_unix Tiempo Unix en segundos. Si es null, usa time().
+     * @return array{nombre: string, tipo: string, masa: float, vector: array{x: float, y: float, z: float}}|null
+     * @since 1.5.1
+     * @version 1.5.2
+     */
+    public function espin(string $nombre, ?int $tiempo_unix = null): ?array
+    {
+        if (!isset($this->ciclos[$nombre])) {
+            return null;
+        }
+
+        $ts = $tiempo_unix ?? time();
+        return $this->calcular_espin_ciclo($nombre, $ts);
+    }
+
+    /**
+     * Devuelve el ramillete filtrado por escala temporal.
+     *
+     * @param string   $escala      Una de: 'segundos', 'minutos', 'horas', 'dias', 'semanas', 'meses', 'anios', 'decadas', 'siglos', 'milenios'.
+     * @param int|null $tiempo_unix Tiempo Unix en segundos. Si es null, usa time().
+     * @return array<array{nombre: string, tipo: string, masa: float, vector: array{x: float, y: float, z: float}}>
+     * @since 1.5.2
+     */
+    public function espines_por_escala(string $escala, ?int $tiempo_unix = null): array
+    {
+        $espines = $this->espines($tiempo_unix);
+        $nombres = self::ESCALAS_TEMPORALES[$escala] ?? array_keys($this->ciclos);
+        return array_values(array_filter(
+            $espines,
+            fn($e) => in_array($e['nombre'], $nombres, true)
+        ));
+    }
+
+    /**
+     * Agrega un nuevo ciclo rítmico.
+     *
+     * @param string $nombre  Nombre único del ciclo.
+     * @param float  $periodo Período en segundos (mayor que 0).
+     * @param float  $fase    Fase inicial en radianes [0, 2π).
+     * @param float  $masa    Peso contextual del ciclo.
+     * @param string $tipo    Categoría del ritmo.
+     * @return void
+     * @since 1.5.1
+     * @version 1.5.2
+     */
+    public function agregar_ciclo(
+        string $nombre,
+        float $periodo,
+        float $fase = 0.0,
+        float $masa = 1.0,
+        string $tipo = 'Ritmo'
+    ): void {
+        if ($periodo <= 0.0) {
+            self::_error("El período del ciclo '{$nombre}' debe ser mayor que cero.");
+            return;
+        }
+
         $this->ciclos[$nombre] = [
             'periodo' => $periodo,
-            'fase'    => $fase,
+            'fase'    => fmod($fase, 2.0 * M_PI),
             'masa'    => $masa,
             'tipo'    => $tipo,
         ];
+
         $this->invalidar_cache();
     }
 
     /**
-     * Elimina un ciclo.
-     * 
+     * Elimina un ciclo rítmico.
+     *
      * @param string $nombre Nombre del ciclo.
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
+     * @return void
+     * @since 1.5.1
+     * @version 1.5.2
      */
     public function eliminar_ciclo(string $nombre): void
     {
@@ -136,13 +225,12 @@ class RelojArtificial
     }
 
     /**
-     * Obtiene la configuración de un ciclo.
-     * 
+     * Devuelve la configuración de un ciclo.
+     *
      * @param string $nombre Nombre del ciclo.
-     * @return array|null Configuración o null.
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
+     * @return array{periodo: float, fase: float, masa: float, tipo: string}|null
+     * @since 1.5.1
+     * @version 1.5.2
      */
     public function ciclo(string $nombre): ?array
     {
@@ -151,11 +239,10 @@ class RelojArtificial
 
     /**
      * Devuelve todos los ciclos registrados.
-     * 
-     * @return array<string, array>
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
+     *
+     * @return array<string, array{periodo: float, fase: float, masa: float, tipo: string}>
+     * @since 1.5.1
+     * @version 1.5.2
      */
     public function ciclos_registrados(): array
     {
@@ -163,41 +250,42 @@ class RelojArtificial
     }
 
     /**
-     * Descubre un ciclo a partir de un período estimado.
-     * 
-     * @param string $nombre Nombre del ciclo.
-     * @param float $periodo Período estimado en segundos.
-     * @param float $ts_ref Timestamp de referencia.
-     * @param float $masa_inicial Masa inicial.
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
+     * Descubre un nuevo ciclo a partir de un período estimado.
+     *
+     * @param string $nombre            Nombre propuesto para el ciclo.
+     * @param float  $periodo           Período estimado en segundos.
+     * @param int    $tiempo_referencia Tiempo Unix donde el ciclo está en su fase cero.
+     * @param float  $masa_inicial      Masa inicial (por defecto 1.0).
+     * @return void
+     * @since 1.5.1
+     * @version 1.5.2
      */
-    public function descubrir_ciclo(string $nombre, float $periodo, float $ts_ref, float $masa_inicial = 1.0): void
-    {
-        $fase = fmod($ts_ref, $periodo) / $periodo * 2.0 * M_PI;
+    public function descubrir_ciclo(
+        string $nombre,
+        float $periodo,
+        int $tiempo_referencia,
+        float $masa_inicial = 1.0
+    ): void {
+        $fase = fmod($tiempo_referencia, $periodo) / $periodo * 2.0 * M_PI;
         $this->agregar_ciclo($nombre, $periodo, $fase, $masa_inicial, 'RitmoDescubierto');
     }
 
     /**
-     * Calcula el espin de un ciclo.
-     * 
+     * Calcula el espín de un ciclo en un instante dado.
+     *
      * @param string $nombre Nombre del ciclo.
-     * @param int $timestamp Timestamp.
-     * @return array Espin del ciclo.
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
+     * @param int    $ts     Tiempo Unix.
+     * @return array{nombre: string, tipo: string, masa: float, vector: array{x: float, y: float, z: float}}
      */
-    private function calcular_espin_ciclo(string $nombre, int $timestamp): array
+    private function calcular_espin_ciclo(string $nombre, int $ts): array
     {
-        $config = $this->ciclos[$nombre];
+        $config  = $this->ciclos[$nombre];
         $periodo = $config['periodo'];
-        $fase = $config['fase'];
-        $masa = $config['masa'];
-        $tipo = $config['tipo'];
+        $fase    = $config['fase'];
+        $masa    = $config['masa'];
+        $tipo    = $config['tipo'];
 
-        $angulo = $fase + (fmod($timestamp, $periodo) / $periodo) * 2.0 * M_PI;
+        $angulo = $fase + (fmod($ts, $periodo) / $periodo) * 2.0 * M_PI;
 
         return [
             'nombre' => $nombre,
@@ -212,159 +300,13 @@ class RelojArtificial
     }
 
     /**
-     * Calcula el espin prisma rítmico geográfico.
-     * 
-     * Usa la longitud efectiva (longitud + LST) para situar al observador
-     * en el círculo rítmico, permitiendo distorsión geográfica del plano.
-     * 
-     * @param float $lst Tiempo sidéreo local en radianes.
-     * @return array Espin prisma.
-     * @author Ignacio David Baigorria
-     * @since 1.5.1
-     * @version 1.5.1
-     */
-    private function calcular_espin_prisma(float $lst): array
-    {
-        $theta = deg2rad($this->longitud) + $lst;
-
-        return [
-            'nombre' => 'prisma_ritmico',
-            'tipo'   => 'Prisma',
-            'masa'   => 4.0,
-            'vector' => [
-                'x' => cos($theta),
-                'y' => sin($theta),
-                'z' => 0.0,
-            ],
-        ];
-    }
-
-    /**
-     * Devuelve el ramillete de espines rítmicos.
-     * 
-     * @param int|null $timestamp Timestamp. Si es null, usa time().
-     * @param float|null $lst Tiempo sidéreo local en radianes. Si se proporciona, incluye el prisma rítmico.
-     * @return array Ramillete de espines.
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
-     */
-    public function espines(?int $timestamp = null, ?float $lst = null): array
-    {
-        $ts = $timestamp ?? time();
-
-        if ($this->_cache_espines !== null && $this->_cache_ts === $ts && $this->_cache_lst === $lst) {
-            return $this->_cache_espines;
-        }
-
-        $espines = [];
-        foreach ($this->ciclos as $nombre => $config) {
-            $espines[] = $this->calcular_espin_ciclo($nombre, $ts);
-        }
-
-        if ($lst !== null) {
-            $espines[] = $this->calcular_espin_prisma($lst);
-        }
-
-        $this->_cache_espines = $espines;
-        $this->_cache_ts = $ts;
-        $this->_cache_lst = $lst;
-
-        return $espines;
-    }
-
-    /**
-     * Devuelve un espin específico.
-     * 
-     * @param string $nombre Nombre del espin.
-     * @param int|null $timestamp Timestamp.
-     * @param float|null $lst LST en radianes.
-     * @return array|null Espin o null.
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
-     */
-    public function espin(string $nombre, ?int $timestamp = null, ?float $lst = null): ?array
-    {
-        if ($nombre === 'prisma_ritmico') {
-            if ($lst === null) {
-                return null;
-            }
-            return $this->calcular_espin_prisma($lst);
-        }
-
-        if (!isset($this->ciclos[$nombre])) {
-            return null;
-        }
-
-        $ts = $timestamp ?? time();
-        return $this->calcular_espin_ciclo($nombre, $ts);
-    }
-
-    /**
-     * Calcula el vector de activación combinado.
-     * 
-     * @param int|null $timestamp Timestamp.
-     * @param float|null $lst LST en radianes.
-     * @return array Vector {x, y, z}.
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
-     */
-    public function vector_activacion(?int $timestamp = null, ?float $lst = null): array
-    {
-        $espines = $this->espines($timestamp, $lst);
-
-        $sx = 0.0;
-        $sy = 0.0;
-        $sz = 0.0;
-        $masa_total = 0.0;
-
-        foreach ($espines as $espin) {
-            $m = $espin['masa'];
-            $sx += $m * $espin['vector']['x'];
-            $sy += $m * $espin['vector']['y'];
-            $sz += $m * $espin['vector']['z'];
-            $masa_total += $m;
-        }
-
-        if ($masa_total < 1e-12) {
-            return ['x' => 0.0, 'y' => 0.0, 'z' => 0.0];
-        }
-
-        return [
-            'x' => $sx / $masa_total,
-            'y' => $sy / $masa_total,
-            'z' => $sz / $masa_total,
-        ];
-    }
-
-    /**
-     * Alias de vector_activacion.
-     * 
-     * @param int|null $timestamp Timestamp.
-     * @param float|null $lst LST en radianes.
-     * @return array Vector {x, y, z}.
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
-     */
-    public function vector(?int $timestamp = null, ?float $lst = null): array
-    {
-        return $this->vector_activacion($timestamp, $lst);
-    }
-
-    /**
      * Invalida la caché interna.
-     * 
-     * @author Ignacio David Baigorria
-     * @since 1.0.0
-     * @version 1.5.1
+     *
+     * @return void
      */
     private function invalidar_cache(): void
     {
-        $this->_cache_espines = null;
-        $this->_cache_ts = null;
-        $this->_cache_lst = null;
+        $this->ultimo_tiempo_unix = null;
+        $this->ultimo_espines     = null;
     }
 }

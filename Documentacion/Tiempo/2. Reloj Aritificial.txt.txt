@@ -1,0 +1,491 @@
+Reloj Artificial v1.5.2
+Plano Rítmico, ciclos culturales y el puente calendárico de 128 años
+Autor: Ignacio David Baigorria
+Versión: 1.5.2
+Fecha: Agosto 2026
+
+Resumen
+El RelojArtificial es el generador del Plano Rítmico dentro de la arquitectura de los Iteradores Neuronales. Modela ciclos culturales y artificiales expresados en tiempo universal coordinado (UTC), independientemente de la ubicación geográfica. Cada ciclo es un punto en el círculo unitario 
+S
+1
+S 
+1
+ , y el conjunto completo forma un ramillete de espines que constituye una huella temporal global.
+
+El modelo incorpora ciclos puente de largo plazo, entre los que destaca el ciclo de 128 años julianos. Este ciclo actúa como puente calendárico: captura la deriva entre el año juliano (365,25 días) y el año trópico real (365,2421897 días), acumulando exactamente un día de desfase cada 128 años. Combinado con el ciclo anual y otros marcadores, permite reconstruir fechas gregorianas a partir de espines rítmicos, o viceversa, sin perder precisión.
+
+El presente documento describe el modelo matemático, las escalas temporales, la relación con el plano cósmico y el mecanismo de traducción entre tiempos artificiales y cósmicos mediante el ciclo de 128 años.
+
+1. Introducción
+La experiencia humana está estructurada por ritmos que no provienen directamente de los astros: el minuto, la hora, el día civil, la semana laboral, el mes, el año. Estos ciclos son convenciones, pero poseen una regularidad que puede modelarse matemáticamente.
+
+El RelojArtificial convierte esos ritmos en espines direccionales, análogos a los del RelojAstronomico. Al representarlos como vectores unitarios en 
+S
+1
+S 
+1
+ , se integran naturalmente en el sistema de ventanas, productos escalares y llaves matriciales de los Iteradores Neuronales.
+
+La decisión de mantener todos los ciclos en UTC y no incluir geografía en este reloj permite una separación limpia: los ritmos son globales; la localización emerge de la combinación con el plano cósmico.
+
+2. Representación matemática de un ciclo rítmico
+2.1 El círculo unitario 
+S
+1
+S 
+1
+ 
+Cada ciclo rítmico vive en un círculo unitario bidimensional, proyectado en el plano 
+x
+y
+xy del espacio tridimensional.
+
+Dado un tiempo Unix 
+t
+t, el ángulo de fase de un ciclo con período 
+T
+T y fase inicial 
+ϕ
+0
+ϕ 
+0
+​
+  es:
+
+θ
+(
+t
+)
+=
+ϕ
+0
++
+2
+π
+t
+ 
+mod
+ 
+T
+T
+θ(t)=ϕ 
+0
+​
+ +2π 
+T
+tmodT
+​
+ 
+El espín correspondiente es:
+
+v
+(
+t
+)
+=
+(
+cos
+⁡
+θ
+(
+t
+)
+sin
+⁡
+θ
+(
+t
+)
+0
+)
+v(t)= 
+​
+  
+cosθ(t)
+sinθ(t)
+0
+​
+  
+​
+ 
+Este vector es siempre unitario porque 
+cos
+⁡
+2
+θ
++
+sin
+⁡
+2
+θ
+=
+1
+cos 
+2
+ θ+sin 
+2
+ θ=1.
+
+2.2 Parámetros de un ciclo
+Parámetro	Símbolo	Descripción
+Período	
+T
+T	Duración del ciclo en segundos
+Fase inicial	
+ϕ
+0
+ϕ 
+0
+​
+ 	Desplazamiento angular en radianes
+Masa	
+m
+m	Peso contextual del ciclo
+Tipo	—	Categoría (Ritmo, Puente, RitmoDescubierto)
+La masa no altera la dirección; modula la influencia del espín en combinaciones posteriores.
+
+3. Ciclos de fábrica y ciclos puente
+3.1 Ciclos rítmicos base
+Ciclo	Período (s)	Masa	Tipo
+minuto	60	3.0	Ritmo
+hora	3.600	5.5	Ritmo
+dia_noche	86.400	6.0	Ritmo
+semana	604.800	4.5	Ritmo
+mes	2.592.000 (30 días)	4.0	Ritmo
+anno	31.557.600 (365,25 días)	5.0	Ritmo
+3.2 Ciclos puente de largo plazo
+Ciclo	Período (s)	Masa	Tipo
+ciclo_128	4.039.372.800 (128 años julianos)	2.0	Puente
+ciclo_decada	315.576.000 (10 años julianos)	1.5	Puente
+ciclo_siglo	3.155.760.000 (100 años julianos)	1.2	Puente
+ciclo_milenio	31.557.600.000 (1000 años julianos)	1.0	Puente
+ciclo_precesion	814.155.840.000 (25.800 años julianos)	0.8	Puente
+Estos ciclos no corresponden a ritmos culturales cotidianos, sino a escalas mayores que evitan el aliasing y sirven de puente para traducciones calendáricas.
+
+4. El ramillete de espines rítmicos
+El ramillete completo en un instante 
+t
+t es el conjunto ordenado de todos los espines:
+
+R
+R
+(
+t
+)
+=
+{
+v
+minuto
+(
+t
+)
+,
+v
+hora
+(
+t
+)
+,
+v
+dia_noche
+(
+t
+)
+,
+v
+semana
+(
+t
+)
+,
+v
+mes
+(
+t
+)
+,
+v
+anno
+(
+t
+)
+,
+v
+ciclo_128
+(
+t
+)
+,
+…
+}
+R 
+R
+​
+ (t)={v 
+minuto
+​
+ (t),v 
+hora
+​
+ (t),v 
+dia_noche
+​
+ (t),v 
+semana
+​
+ (t),v 
+mes
+​
+ (t),v 
+anno
+​
+ (t),v 
+ciclo_128
+​
+ (t),…}
+Cada espín aporta una textura temporal distinta. El ramillete es la firma rítmica del instante.
+
+5. Escalas temporales y regla contra el aliasing
+Para comparar dos instantes sin ambigüedad, se debe elegir un ciclo cuyo período sea mayor que el doble del intervalo a medir:
+
+Δ
+t
+<
+T
+2
+Δt< 
+2
+T
+​
+ 
+Si 
+Δ
+t
+Δt supera este límite, el vector del ciclo puede dar una distancia decreciente (aliasing). Las escalas definidas en el reloj son:
+
+Escala	Ciclo utilizado
+segundos	minuto
+minutos	hora
+horas	dia_noche
+días	semana
+semanas	mes
+meses	anno
+años	ciclo_128
+décadas	ciclo_siglo
+siglos	ciclo_milenio
+milenios	ciclo_precesion
+El método espines_por_escala() filtra el ramillete según la escala deseada.
+
+6. Distancia entre ramilletes
+La distancia entre dos ramilletes de la misma escala se define como la media de las distancias euclidianas entre sus espines:
+
+D
+(
+R
+1
+,
+R
+2
+)
+=
+1
+n
+∑
+k
+=
+1
+n
+∥
+v
+1
+k
+−
+v
+2
+k
+∥
+D(R 
+1
+​
+ ,R 
+2
+​
+ )= 
+n
+1
+​
+  
+k=1
+∑
+n
+​
+ ∥v 
+1k
+​
+ −v 
+2k
+​
+ ∥
+Como los vectores son unitarios, esta distancia está acotada entre 
+0
+0 y 
+2
+2, y se relaciona con el ángulo 
+θ
+θ entre vectores:
+
+∥
+a
+−
+b
+∥
+=
+2
+sin
+⁡
+(
+θ
+2
+)
+∥a−b∥=2sin( 
+2
+θ
+​
+ )
+7. Caché y determinismo
+El RelojArtificial cachea el último ramillete calculado para un tiempo_unix. Si el mismo instante se solicita dos veces, se devuelve la misma referencia. Si el tiempo cambia, se recalcula.
+
+El cálculo es completamente determinista: dos instancias con los mismos ciclos y el mismo tiempo_unix generan exactamente el mismo ramillete.
+
+8. Relación con el Plano Cósmico
+El RelojAstronomico captura ciclos astronómicos (Sol, Luna, Júpiter, eje terrestre) y el vector geográfico centro_tierra. El RelojArtificial captura ciclos culturales en UTC.
+
+Ambos comparten el mismo tiempo Unix. La localización geográfica no está en el reloj artificial, sino que emerge de la combinación del espín geográfico cósmico con los ritmos globales. Por ejemplo:
+
+Hora local: combinación de hora (UTC) con centro_tierra.
+
+Día/noche local: combinación de sol con centro_tierra.
+
+Fecha local: combinación de dia_noche, anno y ciclo_128 con centro_tierra.
+
+9. El ciclo de 128 años como puente calendárico
+9.1 El desfase juliano-trópico
+El año juliano usado en el modelo tiene 365,25 días. El año trópico real dura aproximadamente 365,2421897 días. La diferencia es:
+
+Δ
+d
+=
+365,25
+−
+365,2421897
+=
+0,0078103
+ d
+ı
+ˊ
+as/a
+n
+˜
+o
+Δd=365,25−365,2421897=0,0078103 d 
+ı
+ˊ
+ as/a 
+n
+˜
+ o
+Este desfase acumula un día completo en:
+
+1
+0,0078103
+≈
+128
+ a
+n
+˜
+os
+0,0078103
+1
+​
+ ≈128 a 
+n
+˜
+ os
+Por eso se incluye el ciclo ciclo_128, con período exacto de 
+128
+×
+365,25
+128×365,25 días julianos.
+
+9.2 Traducción a fecha gregoriana
+Dado un tiempo Unix 
+t
+t, el calendario gregoriano puede reconstruirse a partir de:
+
+Día juliano (JD): 
+JD
+=
+t
+86400
++
+2440587.5
+JD= 
+86400
+t
+​
+ +2440587.5
+
+Año juliano: fase del ciclo anno.
+
+Ciclo de 128 años: fase del ciclo ciclo_128.
+
+La fase de ciclo_128 indica cuánto se ha acumulado el desfase juliano-trópico. Combinando estas fases, se obtiene el desfase total y, con él, la corrección necesaria para convertir el año juliano en año gregoriano.
+
+La conversión completa sigue estos pasos:
+
+Se extrae la fase del ciclo anno para obtener el día juliano dentro del año juliano.
+
+Se extrae la fase del ciclo ciclo_128 para saber cuántos días de desfase se han acumulado.
+
+Se suma ese desfase al día juliano.
+
+Se aplica el algoritmo de conversión de día juliano a fecha gregoriana.
+
+De este modo, los espines rítmicos permiten recuperar la fecha gregoriana exacta, incluyendo años bisiestos, sin necesidad de tablas adicionales.
+
+9.3 Traducción en sentido inverso
+Dada una fecha gregoriana, se convierte a día juliano, luego a tiempo Unix, y de allí se calculan todos los espines rítmicos y cósmicos. El ciclo ciclo_128 actúa como testigo de coherencia: si el desfase acumulado no coincide con la fase esperada, se detecta un error de calendario.
+
+10. Ventajas del modelo
+Independencia geográfica: los ritmos UTC son globales.
+
+Separación de planos: la geografía está en el plano cósmico; la ritmicidad, en el artificial.
+
+Escalas temporales: evitan el aliasing y permiten comparaciones monótonas.
+
+Ciclos puente: permiten medir desde segundos hasta milenios.
+
+Extensibilidad: se pueden agregar ciclos en caliente o descubrirlos automáticamente.
+
+Compatibilidad con ventanas: los espines rítmicos se integran en las llaves matriciales del sistema.
+
+Traducción calendárica precisa: el ciclo de 128 años hace de puente entre el calendario juliano y el gregoriano.
+
+11. Aplicaciones en Iteradores Neuronales
+Los espines rítmicos alimentan el CompositorVentanas junto con los espines cósmicos y de estado. La llave matricial resultante se almacena en el PoolVentanas.
+
+Una neurona puede aprender, por ejemplo, que cierta acción es exitosa los lunes a las 10 de la mañana, no porque tenga un calendario, sino porque la llave matricial de ese contexto coincide con la de experiencias previas. El ciclo ciclo_128 añade una componente de largo plazo que permite distinguir décadas o siglos, útil para memorias que se extienden más allá de un año.
+
+La combinación de planos también permite predecir: si se simula una llave futura, se puede buscar en el pool qué ventanas resonaron bajo llaves similares.
+
+12. Conclusión
+El RelojArtificial v1.5.2 es un proveedor puro de ritmos culturales UTC. Incorpora ciclos puente de largo plazo, siendo el más importante el ciclo de 128 años julianos. Este ciclo captura el desfase entre el año juliano y el año trópico, y actúa como puente para traducir entre espines rítmicos y fechas gregorianas.
+
+La representación de ciclos como vectores unitarios en 
+S
+1
+S 
+1
+  permite calcular distancias temporales de forma natural, evitar el aliasing mediante escalas y combinarse con otros planos en una llave matricial única.
+
+El reloj no da la hora local; da la fase de los ritmos humanos y el pulso del calendario. La localización emerge de la danza entre los planos.

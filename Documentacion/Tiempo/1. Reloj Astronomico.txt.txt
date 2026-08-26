@@ -1,0 +1,533 @@
+# Reloj Astronómico v1.5.2
+
+## Marco galáctico-eclíptico, espines cósmicos y memoria contextual
+
+**Autor:** Ignacio David Baigorria  
+**Versión:** 1.5.2  
+**Fecha:** Agosto 2026  
+
+---
+
+## Resumen
+
+El `RelojAstronomico` es el generador del **Plano Cósmico** dentro de la arquitectura de los Iteradores Neuronales. Su función no es medir el tiempo en el sentido calendárico, sino producir un **ramillete de espines**: un conjunto de vectores unitarios tridimensionales que representan de forma determinista la configuración astronómica de un instante y de un lugar.
+
+Cada espín actúa como una **firma direccional**. En lugar de almacenar una fecha, el sistema almacena un patrón de vectores que puede compararse con otros patrones. La distancia entre dos ramilletes permite saber cuánto tiempo pasó, cuánta distancia geográfica hay entre dos observadores, o ambas cosas a la vez, según qué espines se utilicen.
+
+En la versión 1.5.2, el reloj separa claramente:
+
+- **El plano cósmico**, común a toda la Tierra para un mismo instante.
+- **El plano geográfico**, representado únicamente por el espín `centro_tierra`.
+
+Esta separación es fundamental para que el grafo neuronal pueda distinguir contexto temporal de contexto espacial, y para que el sistema pueda comparar memorias creadas en distintos lugares sin que la geografía contamine la percepción del tiempo.
+
+---
+
+## 1. Introducción
+
+Los sistemas de aprendizaje secuencial necesitan registrar no solo *qué* ocurrió, sino también *cuándo* y *en qué circunstancias*. Si una neurona artificial aprende un patrón, no alcanza con guardar la secuencia de datos; es necesario guardar también la **huella contextual** que rodeó a ese aprendizaje.
+
+El `RelojAstronomico` provee una huella contextual natural, basada en movimientos astronómicos reales. La posición del Sol, la fase de la Luna, el lento avance de Júpiter y la orientación del eje terrestre forman un paisaje vectorial irrepetible en escalas humanas. Dos momentos diferentes producen ramilletes diferentes; dos momentos iguales producen exactamente el mismo ramillete.
+
+Además, el reloj no depende de un servicio externo: calcula todo mediante modelos geométricos simplificados. Esto garantiza que el sistema sea autónomo, determinista y reproducible.
+
+---
+
+## 2. Marco de referencia galáctico-eclíptico
+
+### 2.1 Necesidad de un marco común
+
+Para que dos observadores en distintos lugares de la Tierra puedan compartir una misma huella temporal, los astros deben expresarse en un marco de referencia común. Si cada observador usara su propio horizonte local, dos personas en Buenos Aires y Madrid verían al Sol con vectores diferentes, aunque el instante fuera el mismo. Eso haría imposible saber si dos memorias fueron creadas al mismo tiempo.
+
+La solución es expresar los astros cósmicos en un marco **galáctico-eclíptico**, común a todo el planeta.
+
+### 2.2 Ejes del marco
+
+El marco galáctico-eclíptico se define mediante tres ejes ortonormales:
+
+\[
+\hat{e}_1, \quad \hat{e}_2, \quad \hat{e}_3
+\]
+
+- \(\hat{e}_1\) apunta hacia el **centro galáctico**.
+- \(\hat{e}_3\) apunta hacia el **norte de la eclíptica**.
+- \(\hat{e}_2\) completa la terna ortogonal.
+
+Estos ejes son prácticamente idénticos para cualquier observador dentro del sistema solar. La dirección del centro galáctico y el plano de la eclíptica no dependen de la ubicación geográfica.
+
+### 2.3 Transformación desde coordenadas eclípticas
+
+Los modelos orbitales generan vectores en coordenadas eclípticas. Para llevarlos al marco galáctico-eclíptico se aplica una rotación simple.
+
+Dado un vector \(\mathbf{v}\) en coordenadas eclípticas, su transformación al marco galáctico-eclíptico se obtiene proyectándolo sobre los ejes \(\hat{e}_1, \hat{e}_2, \hat{e}_3\). La base elegida es:
+
+\[
+\begin{aligned}
+\hat{e}_1 &= (\cos \lambda_g, \; \sin \lambda_g, \; 0) \\
+\hat{e}_2 &= (-\sin \lambda_g, \; \cos \lambda_g, \; 0) \\
+\hat{e}_3 &= (0, \; 0, \; 1)
+\end{aligned}
+\]
+
+donde \(\lambda_g\) es la longitud eclíptica del centro galáctico.
+
+De este modo, un vector que en coordenadas eclípticas era \(\mathbf{v} = (v_x, v_y, v_z)\) se convierte en:
+
+\[
+\mathbf{v}' = 
+\begin{pmatrix}
+v_x \cos\lambda_g + v_y \sin\lambda_g \\
+-v_x \sin\lambda_g + v_y \cos\lambda_g \\
+v_z
+\end{pmatrix}
+\]
+
+El resultado se normaliza para obtener un vector unitario.
+
+---
+
+## 3. El concepto de espín
+
+### 3.1 Definición
+
+Un **espín** es un vector unitario en \(\mathbb{R}^3\) acompañado de metadatos. Formalmente:
+
+\[
+s = (\text{nombre}, \text{tipo}, \text{masa}, \mathbf{v})
+\]
+
+donde:
+
+- `nombre` identifica al astro o componente.
+- `tipo` categoriza al espín (`Astro`, `Eje`, `Prisma`).
+- `masa` es un peso contextual, que modula la influencia del espín.
+- \(\mathbf{v}\) es un vector unitario.
+
+La condición de unitariedad es:
+
+\[
+\|\mathbf{v}\| = \sqrt{x^2 + y^2 + z^2} = 1
+\]
+
+Esto garantiza que todas las direcciones tengan el mismo peso geométrico base, y que la comparación entre espines sea justa.
+
+### 3.2 ¿Por qué vectores y no fechas?
+
+Una fecha es un número escalar. Un vector tridimensional es mucho más expresivo:
+
+- Dos instantes cercanos producen vectores cercanos.
+- Dos instantes lejanos producen vectores alejados.
+- La dirección del cambio indica en qué sentido se mueve el tiempo.
+- La configuración completa de varios vectores permite detectar ciclos de distinta escala.
+
+Los vectores permiten medir distancias y similitudes de forma natural, sin necesidad de convertir fechas a números artificiales.
+
+---
+
+## 4. El ramillete de espines
+
+### 4.1 Composición
+
+El reloj produce un ramillete con cinco espines:
+
+| Espín | Tipo | Masa | Descripción |
+|-------|------|------|-------------|
+| `sol` | Astro | 10.0 | Dirección del Sol |
+| `luna` | Astro | 5.8 | Dirección de la Luna |
+| `jupiter` | Astro | 7.3 | Dirección de Júpiter |
+| `eje_terrestre` | Eje | 8.0 | Orientación del eje de rotación |
+| `centro_tierra` | Prisma | 9.0 | Vector hacia el centro del planeta |
+
+### 4.2 Ramillete como conjunto ordenado
+
+El ramillete completo en un instante \(t\) es:
+
+\[
+R(t) = \left\{ s_{\text{sol}}(t), s_{\text{luna}}(t), s_{\text{jupiter}}(t), s_{\text{eje}}(t), s_{\text{centro}}(t) \right\}
+\]
+
+Cada espín varía según su propio período. El Sol cambia en horas y días, la Luna en semanas, Júpiter en años, el eje terrestre en siglos. El resultado es una textura temporal rica.
+
+---
+
+## 5. Modelos orbitales simplificados
+
+### 5.1 Sol
+
+El Sol se modela con una órbita circular aparente de la Tierra alrededor del Sol. El ángulo anual es:
+
+\[
+\alpha(t) = \frac{2\pi \, (t \bmod T_{\text{año}})}{T_{\text{año}}}
+\]
+
+donde \(T_{\text{año}}\) es el año juliano en segundos.
+
+La posición del Sol se representa como:
+
+\[
+\mathbf{v}_{\text{sol}} = 
+\begin{pmatrix}
+\cos(\alpha) \\
+\sin(\alpha) \\
+0
+\end{pmatrix}
+\]
+
+Es un movimiento circular en el plano de la eclíptica.
+
+### 5.2 Luna
+
+La Luna combina dos movimientos:
+
+- El período sinódico, de aproximadamente 29,53 días.
+- La precesión del nodo lunar, de 18,6 años.
+
+El ángulo sinódico \(\beta(t)\) recorre \(2\pi\) cada mes sinódico. El ángulo nodal \(\gamma(t)\) recorre \(2\pi\) cada 18,6 años. La latitud eclíptica lunar se modela como:
+
+\[
+\delta_{\text{luna}}(t) = \iota \sin(\beta) \cos(\gamma)
+\]
+
+donde \(\iota\) es la inclinación de la órbita lunar.
+
+### 5.3 Júpiter
+
+Júpiter se calcula a partir de la posición relativa entre la Tierra y Júpiter en el plano de la eclíptica.
+
+La Tierra tiene un radio orbital de 1 UA y Júpiter de aproximadamente 5,2 UA. Sus ángulos orbitales son:
+
+\[
+\theta_{\text{tierra}}(t) = \frac{2\pi \, (t \bmod T_{\text{año}})}{T_{\text{año}}}
+\]
+
+\[
+\theta_{\text{júpiter}}(t) = \frac{2\pi \, (t \bmod T_{\text{júpiter}})}{T_{\text{júpiter}}}
+\]
+
+La posición relativa de Júpiter desde la Tierra se obtiene restando los vectores heliocéntricos:
+
+\[
+\mathbf{v}_{\text{júpiter}} = \mathbf{r}_{\text{júpiter}} - \mathbf{r}_{\text{tierra}}
+\]
+
+El resultado se normaliza.
+
+### 5.4 Eje terrestre
+
+El eje de rotación terrestre precesiona lentamente. El ángulo de precesión \(\theta_p(t)\) recorre \(2\pi\) cada 25.800 años.
+
+La orientación del eje se modela como un vector en coordenadas eclípticas:
+
+\[
+\mathbf{v}_{\text{eje}} = 
+\begin{pmatrix}
+\cos(\lambda) \cos(\phi) \\
+\sin(\lambda) \cos(\phi) \\
+\sin(\phi)
+\end{pmatrix}
+\]
+
+donde \(\lambda\) y \(\phi\) dependen del ángulo de precesión y de la inclinación de la eclíptica.
+
+---
+
+## 6. El espín geográfico: `centro_tierra`
+
+### 6.1 Función
+
+`centro_tierra` es el único espín que depende de la ubicación del observador. Apunta desde el observador hacia el centro del planeta.
+
+### 6.2 Construcción
+
+Para construir este espín se necesita:
+
+- La latitud del observador \(\phi\).
+- La longitud del observador \(\lambda\).
+- El tiempo sidéreo local \(\theta(t)\).
+
+Primero se obtiene el eje de rotación planetario en coordenadas eclípticas. A partir de él se construye una base ecuatorial local:
+
+\[
+\mathbf{e}_1 = \text{normalizar}(\mathbf{eje} \times \hat{z}_{\text{eclíptica}})
+\]
+
+\[
+\mathbf{e}_2 = \mathbf{eje} \times \mathbf{e}_1
+\]
+
+Luego, el vector "arriba" del observador es:
+
+\[
+\mathbf{arriba} = \cos\phi \cos\theta \, \mathbf{e}_1 + \cos\phi \sin\theta \, \mathbf{e}_2 + \sin\phi \, \mathbf{eje}
+\]
+
+Finalmente, el vector hacia el centro del planeta es el opuesto:
+
+\[
+\mathbf{centro} = -\mathbf{arriba}
+\]
+
+Este vector se normaliza y se transforma al marco galáctico-eclíptico.
+
+### 6.3 Efecto de la ubicación
+
+Dos observadores en distintos lugares de la Tierra, en el mismo instante, tendrán valores diferentes de \(\phi\), \(\lambda\) y \(\theta\). Por lo tanto, sus espines `centro_tierra` serán diferentes. En cambio, los espines cósmicos serán idénticos.
+
+Esta propiedad permite separar tiempo de espacio.
+
+---
+
+## 7. Tiempo Sidéreo Local
+
+El tiempo sidéreo local \(\theta(t)\) mide la rotación de la Tierra respecto de las estrellas fijas.
+
+\[
+\theta(t) = \text{GMST}(t) + \lambda
+\]
+
+donde \(\lambda\) es la longitud del observador y \(\text{GMST}\) es el tiempo sidéreo medio de Greenwich.
+
+El GMST se calcula a partir de los días transcurridos desde la época J2000:
+
+\[
+\text{GMST}_{\text{deg}} = 280,46061837 + 360,98564736629 \, d
+\]
+
+donde \(d\) son los días desde J2000.
+
+Este valor se reduce al rango \([0, 360)\), se convierte a radianes y se le suma la longitud.
+
+---
+
+## 8. Distancia entre espines
+
+### 8.1 Distancia euclidiana
+
+Dado que todos los espines son vectores unitarios en el mismo marco, la distancia entre dos espines se define como la distancia euclidiana:
+
+\[
+d(\mathbf{a}, \mathbf{b}) = \sqrt{(a_x - b_x)^2 + (a_y - b_y)^2 + (a_z - b_z)^2}
+\]
+
+Esta distancia está acotada:
+
+\[
+0 \le d \le 2
+\]
+
+Para vectores unitarios, la distancia euclidiana se relaciona con el ángulo \(\theta\) entre ellos:
+
+\[
+d = 2 \sin\left(\frac{\theta}{2}\right)
+\]
+
+Esto la convierte en una métrica natural para direcciones.
+
+### 8.2 Distancia entre ramilletes
+
+Para comparar dos ramilletes \(R_1\) y \(R_2\), se toma el promedio de las distancias entre sus espines correspondientes:
+
+\[
+D(R_1, R_2) = \frac{1}{n} \sum_{k=1}^{n} d(\mathbf{v}_{1k}, \mathbf{v}_{2k})
+\]
+
+Cuando se comparan dos ramilletes del mismo lugar, las diferencias son puramente temporales. Cuando se comparan dos ramilletes de distintos lugares, las diferencias incluyen también la componente geográfica.
+
+---
+
+## 9. Escalas temporales y aliasing
+
+### 9.1 El problema del aliasing
+
+Si se promedian todos los espines para comparar instantes muy lejanos, aparece un fenómeno de **aliasing**: los ciclos rápidos se enrollan y pueden dar distancias pequeñas para intervalos grandes, o distancias grandes para intervalos medianos.
+
+Por ejemplo, la Luna completa una órbita en 29,53 días. Si comparamos dos instantes separados por 29 días, la Luna habrá dado casi una vuelta completa y su vector será muy parecido al original. Esto produce una distancia pequeña a pesar del largo intervalo.
+
+### 9.2 Solución: escalas temporales
+
+Para evitar el aliasing, se seleccionan espines cuyo período sea mucho mayor que el doble del intervalo a comparar:
+
+\[
+\Delta t \ll \frac{T}{2}
+\]
+
+La clase define escalas temporales con astros adecuados:
+
+| Escala | Espines utilizados |
+|--------|-------------------|
+| segundos, horas | `centro_tierra` |
+| días, semanas, meses | `sol` |
+| años | `jupiter` |
+| décadas, siglos, milenios | `eje_terrestre` |
+
+De este modo, la distancia crece de forma monótona con el intervalo.
+
+---
+
+## 10. Separación cósmico/geográfico
+
+### 10.1 Principio
+
+Gracias al marco común, los espines cósmicos no dependen de la ubicación:
+
+- Para un instante dado, `sol`, `luna`, `jupiter` y `eje_terrestre` son idénticos en toda la Tierra.
+- El único espín que varía con la ubicación es `centro_tierra`.
+
+### 10.2 Implicaciones
+
+Esto permite realizar dos tipos de comparaciones puras:
+
+- **Tiempo puro**: comparar ramilletes de distintos instantes en el mismo lugar, ignorando `centro_tierra`.
+- **Espacio puro**: comparar ramilletes de distintos lugares en el mismo instante, usando solo `centro_tierra`.
+
+También permite combinarlos: una memoria puede tener una huella temporal y una huella espacial separadas.
+
+---
+
+## 11. Aplicaciones en los Iteradores Neuronales
+
+### 11.1 Nodos neuronales
+
+Un nodo neuronal, al ser creado, recibe una colección de espines correspondiente a la configuración celeste del momento. Esa colección es su **memoria contextual indeleble**.
+
+Cuando el nodo se activa, su vector de activación se combina con el vector de sintonía de sus ramas de salida mediante producto escalar. Las ramas más alineadas son las más probables de ser transitadas.
+
+### 11.2 Ventanas de sintonía
+
+Cada rama de un enlace posee una ventana de sintonía. La distancia entre el espín almacenado en la ventana y el espín actual indica cuán alineada está la rama con el presente.
+
+Las ventanas pueden "tironearse" con la experiencia: cuando una rama es exitosa, su ventana se desplaza ligeramente hacia el vector de activación actual. Esto genera especialización contextual automática.
+
+### 11.3 Pool de ventanas
+
+El `PoolVentanas` es el tejido conectivo global. Cada llave matricial compuesta por espines se registra en el pool. Los nodos que comparten la misma llave quedan conectados lateralmente, como si resonaran entre sí.
+
+El reloj alimenta este pool con espines frescos en cada pulso. La combinación de espines cósmicos, rítmicos y de estado forma una llave matricial única. Dos nodos creados bajo llaves similares tenderán a resonar.
+
+---
+
+## 12. Consideraciones futuras
+
+### 12.1 Baricentro
+
+Actualmente el origen del marco de referencia es el centro de la Tierra. En el futuro podría evaluarse el uso del **baricentro Tierra-Luna** como origen dinámico. La Luna y la Tierra orbitan ese baricentro, que se encuentra a unos 4.671 km del centro terrestre.
+
+Para los astros lejanos la diferencia sería despreciable. Para la Luna, en cambio, el error actual es sistemático. Usar el baricentro mejoraría la precisión del espín lunar sin alterar la arquitectura.
+
+### 12.2 Cambio de ubicación planetaria
+
+El marco galáctico-eclíptico es portable a otros planetas. Si el sistema se ejecutara en Marte, bastaría con:
+
+- Cambiar el espín geográfico para que apunte al centro de Marte.
+- Ajustar el período de rotación sidéreo.
+- Ajustar la inclinación del eje.
+- Reemplazar la Luna por los satélites marcianos.
+- Agregar a la Tierra como astro visible.
+
+Los espines cósmicos cambiarían naturalmente, porque la posición de Marte alrededor del Sol es distinta de la terrestre. Dos nodos creados al mismo tiempo en la Tierra y en Marte tendrían ramilletes cósmicos diferentes, pero cada uno internamente coherente.
+
+---
+
+## 13. Resultados experimentales
+
+Se ejecutó una batería de pruebas con ubicación base en Tres Arroyos, Argentina (latitud \(-34.0^\circ\), longitud \(-64.0^\circ\)), y tiempo base el 15 de julio de 2026 a las 12:00 UTC.
+
+### 13.1 Estructura del ramillete
+
+El reloj generó correctamente un ramillete con los cinco espines esperados. Todos los vectores resultaron unitarios.
+
+### 13.2 Caché
+
+Dos llamadas con el mismo tiempo Unix devolvieron la misma referencia de ramillete. Al cambiar el tiempo, se recalculó.
+
+### 13.3 Separación cósmico/geográfico
+
+Se compararon ramilletes de Buenos Aires y Madrid en el mismo instante.
+
+| Espín | ¿Idéntico? |
+|-------|-----------|
+| `sol` | Sí |
+| `luna` | Sí |
+| `jupiter` | Sí |
+| `eje_terrestre` | Sí |
+| `centro_tierra` | No |
+
+La distancia entre `centro_tierra` de Buenos Aires y Madrid fue:
+
+\[
+d = 1,418309
+\]
+
+Esto confirma que la geografía quedó aislada en un solo espín.
+
+### 13.4 Distancia temporal por escala
+
+**Escala segundos (centro_tierra):**
+
+| Intervalo | Distancia |
+|-----------|-----------|
+| 1 segundo | 0,000060 |
+| 1 hora | 0,217011 |
+| 6 horas | 1,174955 |
+
+La distancia creció de forma monótona.
+
+**Escala días (sol):**
+
+| Intervalo | Distancia |
+|-----------|-----------|
+| 1 día | 0,017202 |
+| 15 días | 0,257321 |
+| 30 días | 0,510365 |
+
+Monotonía correcta.
+
+**Escala años (júpiter):**
+
+| Intervalo | Distancia |
+|-----------|-----------|
+| 1 año | 0,493650 |
+| 5 años | 1,831487 |
+
+Monotonía correcta.
+
+**Escala siglos (eje_terrestre):**
+
+| Intervalo | Distancia |
+|-----------|-----------|
+| 100 años | 0,009711 |
+| 1000 años | 0,096869 |
+
+Monotonía correcta.
+
+### 13.5 Distancia espacial
+
+Se compararon los espines `centro_tierra` de Buenos Aires con Madrid y Sidney.
+
+| Comparación | Distancia |
+|-------------|-----------|
+| Buenos Aires ↔ Madrid | 1,418309 |
+| Buenos Aires ↔ Sidney | 1,598336 |
+
+Sidney, más lejana, produjo una distancia mayor. La métrica espacial es coherente.
+
+### 13.6 Determinismo
+
+Dos relojes con la misma ubicación y el mismo tiempo generaron exactamente el mismo ramillete. El sistema es determinista y reproducible.
+
+---
+
+## 14. Conclusión
+
+El `RelojAstronomico` v1.5.2 demuestra que es posible construir una **memoria temporal vectorial** a partir de configuraciones astronómicas simplificadas.
+
+Sus principales logros son:
+
+- Generar ramilletes de espines unitarios y deterministas.
+- Separar limpiamente el plano cósmico del plano geográfico.
+- Permitir comparaciones puras de tiempo y de espacio.
+- Evitar el aliasing mediante escalas temporales específicas.
+- Servir como base para ventanas de sintonía y nodos neuronales contextuales.
+- Mantener la portabilidad hacia otros planetas sin cambios arquitectónicos.
+
+El resultado es un componente central para los Iteradores Neuronales: un reloj que no da la hora, sino que **pinta el paisaje celeste del instante**.

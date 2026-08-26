@@ -106,4 +106,4 @@ include_once("Comunicadores/index.php");
 include_once("Controlador/Controlador.php");
 
 // --- Pruebas (solo desarrollo) -------------------------
-include_once("pruebas/Prueba149.php");
+include_once("pruebas/PruebaRelojArtificial_152.php");
