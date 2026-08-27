@@ -1035,7 +1035,581 @@ class Iterador extends Objeto
         return $enlace;
     }
 
+	//********************************************************************************
+	//------------------------------------------------------------------------------->
+	//---------------------- INTERFAZ Actual ---------------------------------------->
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+		/*Notas generales de la interfaz:
+			Permite obtener y asignar el nodo que representa la posición "actual" del iterador.
+			La posición actual es un enlace del cuerpo del iterador con nombre "actual".
+		*/
 
+	/**
+	 * Obtiene el nodo marcado como la posición "actual" del iterador.
+	 *
+	 * 🔗 Interfaz: Actual
+	 * Caso de uso: Obtener el nodo actual del iterador.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.2
+	 *
+	 * @return Nodo|bool|null Nodo actual, `null` si no hay ninguno, `false` si no está ocupado.
+	 */
+	public function actual() {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->actual() el iterador no esta ocupado");
+			return false;
+		}
+		$act = $cuerpo->adyacente("actual");
+		if (!$act) {
+			$this->_alerta("Iterador->actual() el Iterador no tiene asignado ninguna posicion actual");
+			return null;
+		}
+		return $act;
+	}
+
+	/**
+	 * Asigna la posición "actual" del iterador.
+	 *
+	 * 🔗 Interfaz: Actual
+	 * Caso de uso: Asignar el nodo actual del iterador.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.2
+	 *
+	 * @param mixed      $elemento Elemento a convertir en nodo y asignar como actual. Si es null, se crea un nodo vacío.
+	 * @param bool|null &$es_nodo Por referencia, indica si `$elemento` ya era un Nodo.
+	 * @return bool|Nodo|null `true` si se asignó correctamente, `false` en caso de error, `null` si falla la conversión.
+	 */
+    public function _actual($elemento = null, &$es_nodo = null) {
+        if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+            Iterador::_error("Iterador->_actual(elemento=null, &es_nodo=null) el iterador no esta ocupado");
+            return false;
+        }
+
+        // Eliminar nodo actual anterior si existe
+        if ($cuerpo->adyacente("actual")) {
+            $cuerpo->eliminar_adyacente("actual");
+        }
+
+        $nodo = null;
+        if (!$nodo = $this->nodo($elemento, $es_nodo)) {
+            $this->_error("Iterador _actual(elemento=null, &es_nodo=null), posiblemente elemento no sea valido");
+            return null;
+        }
+
+        // Si el seguimiento de visitas está activo, se registrará el nodo actual
+        if ($cuerpo->adyacente("guardar recorrido")) {
+            $ndatos = $this->visitados_auxiliar_crear_obtener_lista($cuerpo);
+            $this->guardar_visitado_interno($ndatos, $nodo);
+        }
+
+        return $cuerpo->_adyacente_en($nodo, "actual");
+    }
+
+	//********************************************************************************
+	//------------------------------------------------------------------------------->
+	//---------------------- INTERFAZ Avanzar --------------------------------------->
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+		/*Notas generales de la interfaz:
+			PARA LA VERSION 3.0 se propone que avanzar aumente sus poderes en dos etapas:
+				primero: aumentar el poder de movimiento añadiendo un simbolo que indiques opciones de enlaces a seguir basadas en comprarar el dato del nodo actual con un string en la cadena-camino. VER MAQUINAS DE ESTADOS.
+				segundo: añadir un simbolo que permita ejecutar una funcion, esta funcion debera estar registrada previamente, con lo cual se propone un registro de funciones y "acortadores de nombres" que permitan referenciarlas desde la cadena-camino. Para ingresarle datos a estas funciones dbeera considerarse utlizar el registro de datos que tiene cada iterador.
+		*/
+
+	/**
+	 * Convierte una cadena en una estructura de camino (lista enlazada de nodos).
+	 *
+	 * 🔗 Interfaz: Avanzar
+	 * Caso de uso: Convertir cadena en camino de nodos.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.2
+	 *
+	 * @param string $cadena Cadena con sintaxis de camino.
+	 * @return Nodo|null Nodo cabeza del camino, o null si hubo error.
+	 */
+	public function camino($cadena) {
+		$i = 0;
+		$fin = strlen($cadena);
+		$cantidad = 0;
+
+		$eslabonant = Nodo::crear();
+		$res = $eslabonant;
+
+		while ($i != $fin) {
+			$eslabontext = "";
+			$c = $cadena[$i];
+
+			// lo primero que tiene que leer es el alias
+			if (($c == ">") or ($c == ";")) {
+				$this->_error("Iterador->private camino(cadena). error de sintaxis(1)");
+				$this->eliminar_camino($res);
+				return null;
+			}
+
+			// leo el alias
+			if ($c == "/") {
+				$i++;
+				$eslabontext .= $c;
+				if ($i == $fin) {
+					$this->_error("Iterador->private camino(cadena). error de sintaxis(2)");
+					$this->eliminar_camino($res);
+					return null;
+				}
+			}
+
+			$c = $cadena[$i];
+			$aliastext = $c;
+			$i++;
+			$eslabontext .= $c;
+			$fin2 = false;
+
+			while (($i != $fin) and (!$fin2)) {
+				$c = $cadena[$i];
+				if (($c != ";") && ($c != ">")) {
+					if ($c == "/") {
+						$i++;
+						$eslabontext .= $c;
+						if ($i == $fin) {
+							$this->_error("Iterador->private camino(cadena). error de sintaxis(3)");
+							$this->eliminar_camino($res);
+							return null;
+						}
+						$c = $cadena[$i];
+					}
+					$aliastext .= $c;
+					$i++;
+					$eslabontext .= $c;
+				} else {
+					$fin2 = true;
+				}
+			}
+
+			$alias = Nodo::crear_con_dato($aliastext);
+			$eslabonnue = Nodo::crear();
+			$eslabonant->_adyacente_en($eslabonnue, "eslabon");
+			$eslabonnue->_adyacente_en($alias, "alias");
+			$eslabonant = $eslabonnue;
+
+			// leo simbolo
+			$creosim = false;
+			$simbolo = null;
+			if ($i != $fin) {
+				$c = $cadena[$i];
+				if ($c != ";") {
+					$simbolotext = $c;
+					$alias->_adyacente_en($simbolo = Nodo::crear_con_dato($c), "simbolo");
+					$i++;
+					$eslabontext .= $c;
+					$creosim = true;
+				}
+			}
+
+			// leo parametro
+			$parametrotext = "";
+			if (($creosim) && ($i != $fin)) {
+				$c = $cadena[$i];
+				if ($c != ";") {
+					if ($c == "/") {
+						$i++;
+						$eslabontext .= $c;
+						if ($i == $fin) {
+							$this->_error("Iterador->private camino(cadena). error de sintaxis(2.1)");
+							$this->eliminar_camino($res);
+							return null;
+						}
+					}
+					$c = $cadena[$i];
+					$parametrotext .= $c;
+					$i++;
+					$eslabontext .= $c;
+					$fin3 = false;
+					while (($i != $fin) && (!$fin3)) {
+						$c = $cadena[$i];
+						if (($c != ";") && ($c != ">")) {
+							if ($c == "/") {
+								$i++;
+								$eslabontext .= $c;
+								if ($i == $fin) {
+									$this->_error("Iterador->private camino(cadena). error de sintaxis(4)");
+									$this->eliminar_camino($res);
+									return null;
+								}
+								$c = $cadena[$i];
+							}
+							$parametrotext .= $c;
+							$i++;
+							$eslabontext .= $c;
+						} else {
+							$fin3 = true;
+						}
+					}
+					$simbolo->_adyacente_en(Nodo::crear_con_dato($parametrotext), "parametro");
+				}
+			}
+
+			// leo punto y coma
+			if ($i != $fin) {
+				$c = $cadena[$i];
+				if ($c != ";") {
+					$this->_error("Iterador->private camino(cadena). error de sintaxis(5)");
+					$this->eliminar_camino($res);
+					return null;
+				}
+			}
+			if ($i != $fin) {
+				$i++;
+				$eslabontext .= $c;
+			}
+			$cantidad++;
+			$eslabonnue->_dato($eslabontext);
+		}
+
+		$res->_dato($cantidad);
+		return $res;
+	}
+
+	/**
+	 * Elimina una estructura de camino completa.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.2
+	 * @param Nodo $nodo Nodo cabeza del camino.
+	 * @return void
+	 */
+	public function eliminar_camino($nodo) {
+		while ($sig = $nodo->adyacente("eslabon")) {
+			if (!Nodo::eliminar($nodo)) {
+				$this->_error("Iterador->private eliminar_camino no se pudo eliminar el nodo (1)");
+			}
+			if ($alias = $sig->adyacente("alias")) {
+				$sig->eliminar_adyacente("alias");
+				if ($sim = $alias->adyacente("simbolo")) {
+					$alias->eliminar_adyacente("simbolo");
+					if ($par = $sim->adyacente("parametro")) {
+						$sim->eliminar_adyacente("parametro");
+						if (!Nodo::eliminar($par)) {
+							$this->_error("Iterador->private eliminar_camino no se pudo eliminar el nodo (2)");
+						}
+					}
+					if (!Nodo::eliminar($sim)) {
+						$this->_error("Iterador->private eliminar_camino no se pudo eliminar el nodo (3)");
+					}
+				}
+				if (!Nodo::eliminar($alias)) {
+					$this->_error("Iterador->private eliminar_camino no se pudo eliminar el nodo (4)");
+				}
+			}
+			$nodo = $sig;
+		}
+		if (!Nodo::eliminar($nodo)) {
+			$this->_error("Iterador->private eliminar_camino no se pudo eliminar el nodo (5)");
+		}
+	}
+
+	/**
+	 * Verifica si un carácter es especial para la sintaxis de camino.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.2
+	 * @param string $caracter Carácter a verificar.
+	 * @return bool `true` si es especial.
+	 */
+	private function avanzar_especial($caracter) {
+		$res = false;
+		switch ($caracter) {
+			case ";":
+			case ">":
+			case "*":
+				$res = true;
+		}
+		return $res;
+	}
+
+	/**
+	 * Escapa caracteres especiales anteponiendo `/`.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.2
+	 * @param string $string Cadena a escapar.
+	 * @return string|null Cadena escapada, o `null` si el argumento no es string.
+	 */
+	public function avanzar_escapar($string) {
+		if (!is_string($string)) {
+			$this->_error("Iterador->avanzar_escapar(string) el argumento pasado por parametro debe ser un string");
+			return null;
+		}
+		$stringres = "";
+		$stringlength = strlen($string);
+		for ($pos = 0; $pos < $stringlength; $pos++) {
+			$caracter = $string[$pos];
+			if ($this->avanzar_especial($caracter) or ($caracter == "/")) {
+				$stringres .= "/";
+			}
+			$stringres .= $caracter;
+		}
+		return $stringres;
+	}
+
+    /**
+     * Avanza por el camino indicado, con retroceso si falla.
+     *
+     * @since 1.0
+     * @version 1.5i.2
+     *
+     * @param string      $cadena           Camino a recorrer.
+     * @param int|null    $cant             Cantidad de eslabones a recorrer.
+     * @param string|null &$camino_recorrido Por referencia, camino ya recorrido.
+     * @param string|null &$camino_restante  Por referencia, camino que resta.
+     * @return bool `true` si se completó, `false` en caso de error.
+     */
+    public function avanzar_interno($cadena, $cant = null, &$camino_recorrido = null, &$camino_restante = null) {
+        $cuerpo = $this->raiz_cuerpo;
+        $origen = $cuerpo->adyacente("actual");
+
+        // caché de caminos registrados
+        if (!$ncaminos = Nodo::nodo_por_id("caminos registrados")) {
+            $ncaminos = Nodo::crear_con_id("caminos registrados");
+        }
+        $yaestaba = false;
+        if (!$camino = $ncaminos->adyacente($cadena)) {
+            if (!$camino = $this->camino($cadena)) {
+                $this->_error("Iterador->avanzar_interno() no se pudo validar la cadena pasada como parametro");
+                return false;
+            }
+        } else {
+            $yaestaba = true;
+        }
+
+        $camino_recorrido = "";
+        $camino_orig = $camino;
+        $canttotal = $camino->dato();
+        $sobra = false;
+
+        if ($cant and is_int($cant)) {
+            if ($cant > 0) {
+                if ($cant < $canttotal) {
+                    $cantarecorrer = $cant;
+                    $sobra = $canttotal - $cant;
+                } elseif ($cant == $canttotal) {
+                    $cantarecorrer = $canttotal;
+                } else {
+                    $this->_error("Iterador->avanzar_interno() la cantidad de eslabones de la cadena a recorrer no puede ser mayor al total de eslabones de la cadena (1)");
+                    if (!$yaestaba) {
+                        $this->eliminar_camino($camino_orig);
+                    }
+                    return false;
+                }
+            } else {
+                $resaux = $canttotal + $cant;
+                if ($resaux < $canttotal) {
+                    $cantarecorrer = $resaux;
+                    $sobra = -$cant;
+                } elseif ($resaux == $canttotal) {
+                    $cantarecorrer = $canttotal;
+                } else {
+                    $this->_error("Iterador->avanzar_interno() la cantidad de eslabones de la cadena a recorrer no puede ser mayor al total de eslabones de la cadena (2)");
+                    if (!$yaestaba) {
+                        $this->eliminar_camino($camino_orig);
+                    }
+                    return false;
+                }
+            }
+        } else {
+            $cantarecorrer = $canttotal;
+        }
+
+        $cantrecorrido = 0;
+        while ($camino = $camino->adyacente("eslabon") and ($cantrecorrido < $cantarecorrer)) {
+            $alias = $camino->adyacente("alias");
+            $simb = $alias->adyacente("simbolo");
+            if (!$enlace = $this->enlace($alias = $alias->dato())) {
+                $this->_error("Iterador->avanzar_interno() error el alias " . $alias . " no esta permitido. Camino recorrido: " . $camino_recorrido);
+                if (!$yaestaba) {
+                    $this->eliminar_camino($camino_orig);
+                }
+                // restaurar actual
+                $cuerpo->eliminar_adyacente("actual");
+                $cuerpo->_adyacente_en($origen, "actual");
+                return false;
+            }
+
+            if ($simb == null) {
+                $anterior = $cuerpo->adyacente("actual");
+                if ($sig = $anterior->adyacente($enlace)) {
+                    // eliminar actual anterior y asignar nuevo
+                    $cuerpo->eliminar_adyacente("actual");
+                    $cuerpo->_adyacente_en($sig, "actual");
+                } else {
+                    $this->_error("Iterador->avanzar_interno() no existe adyacente en " . $enlace . ". Camino recorrido: " . $camino_recorrido);
+                    if (!$yaestaba) {
+                        $this->eliminar_camino($camino_orig);
+                    }
+                    $cuerpo->eliminar_adyacente("actual");
+                    $cuerpo->_adyacente_en($origen, "actual");
+                    return false;
+                }
+            } else {
+                switch ($simb->dato()) {
+                    case ">":
+                        if ($nodopar = $simb->adyacente("parametro")) {
+                            $par = $nodopar->dato();
+                            if (!is_numeric($par)) {
+                                $this->_error("Iterador->avanzar_interno() error de sintaxis, el parametro despues de > tiene que ser un numero entero. Camino recorrido: " . $camino_recorrido);
+                                if (!$yaestaba) {
+                                    $this->eliminar_camino($camino_orig);
+                                }
+                                $cuerpo->eliminar_adyacente("actual");
+                                $cuerpo->_adyacente_en($origen, "actual");
+                                return false;
+                            }
+                            $i = 1;
+                            while ($i <= $par) {
+                                $anterior = $cuerpo->adyacente("actual");
+                                if ($sig = $anterior->adyacente($enlace)) {
+                                    $cuerpo->eliminar_adyacente("actual");
+                                    $cuerpo->_adyacente_en($sig, "actual");
+                                } else {
+                                    $this->_error("Iterador->avanzar_interno() no existe adyacente en " . $enlace . ". Camino recorrido: " . $camino_recorrido);
+                                    if (!$yaestaba) {
+                                        $this->eliminar_camino($camino_orig);
+                                    }
+                                    $cuerpo->eliminar_adyacente("actual");
+                                    $cuerpo->_adyacente_en($origen, "actual");
+                                    return false;
+                                }
+                                $i++;
+                            }
+                        } else {
+                            $fin = false;
+                            while (!$fin) {
+                                $anterior = $cuerpo->adyacente("actual");
+                                if ($sig = $anterior->adyacente($enlace)) {
+                                    $cuerpo->eliminar_adyacente("actual");
+                                    $cuerpo->_adyacente_en($sig, "actual");
+                                } else {
+                                    $fin = true;
+                                }
+                            }
+                        }
+                        break;
+                }
+            }
+            $cantrecorrido++;
+            $camino_recorrido .= $camino->dato();
+        }
+
+        if (!$yaestaba) {
+            $ncaminos->_adyacente_en($camino_orig, $cadena);
+        }
+        if ($sobra) {
+            $sig = $camino;
+            $camino_restante .= $camino->dato();
+            while ($sig = $sig->adyacente("eslabon")) {
+                $camino_restante .= $sig->dato();
+            }
+            if (!$ncaminos->adyacente($camino_restante)) {
+                $caminofal = Nodo::nodo($sobra);
+                $caminofal->_adyacente_en($camino, "eslabon");
+                $ncaminos->_adyacente_en($caminofal, $camino_restante);
+            }
+        }
+        return true;
+    }
+
+	/**
+	 * Avanza por el camino dado, verificando ocupación y posición actual.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.2
+	 * @param string      $camino           Camino a recorrer.
+	 * @param int|null    $cant             Cantidad de eslabones a recorrer.
+	 * @param string|null &$camino_recorrido Por referencia, camino recorrido.
+	 * @param string|null &$camino_restante  Por referencia, camino restante.
+	 * @return Nodo|bool|null Nodo actual si éxito, `false` si no ocupado, `null` si error.
+	 */
+	public function avanzar($camino, $cant = null, &$camino_recorrido = null, &$camino_restante = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->avanzar(camino) el iterador no esta ocupado");
+			return false;
+		}
+		if (!$cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->avanzar(camino) el iterador no tiene posición actual");
+			return null;
+		}
+		if (!$this->avanzar_interno($camino, $cant, $camino_recorrido, $camino_restante)) {
+			$this->_error("Iterador->avanzar(camino) posiblemente el camino pasado como parametro no sea valido tenga un error de sintaxis o no existan esos enlaces en la estructura. Ver las alertas para más información.");
+			return null;
+		}
+		$actual = $cuerpo->adyacente("actual");
+		if ($cuerpo->adyacente("guardar recorrido")) {
+			$ndatos = $this->visitados_auxiliar_crear_obtener_lista($cuerpo);
+			$this->guardar_visitado_interno($ndatos, $actual);
+		}
+		return $actual;
+	}
+
+    /**
+     * Inserta un nodo en el enlace indicado y avanza hasta él.
+     *
+     * @since 1.0
+     * @version 1.5i.2
+     * @param string      $alias            Alias del enlace donde insertar.
+     * @param mixed       $elemento         Elemento a insertar.
+     * @param string|null $camino           Camino previo opcional.
+     * @param bool|null  &$es_nodo          Por referencia, indica si elemento era nodo.
+     * @param int|null    $cant             Cantidad de eslabones a recorrer.
+     * @param string|null &$camino_recorrido Por referencia.
+     * @param string|null &$camino_restante  Por referencia.
+     * @return Nodo|bool|null Nodo insertado, `false` si no ocupado, `null` en error.
+     */
+    public function _avanzar($alias, $elemento = null, $camino = null, &$es_nodo = null, $cant = null, &$camino_recorrido = null, &$camino_restante = null) {
+        if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+            Iterador::_error("Iterador->_avanzar(alias, elemento, camino, es_nodo) el iterador no esta ocupado");
+            return false;
+        }
+        $origen = null;
+        if (!$origen = $cuerpo->adyacente("actual")) {
+            $this->_error("Iterador-> _avanzar(alias, elemento, camino, es_nodo) el iterador no tiene asignada una posición actual");
+            return null;
+        }
+        $enlace = null;
+        if (!$enlace = $this->enlace($alias)) {
+            $this->_error("Iterador-> _avanzar(alias, elemento, camino, es_nodo) no se pudo validar el alias pasado como parametro");
+            return null;
+        }
+        $avanzo = false;
+        if (($camino) && (!$avanzo = $this->avanzar_interno($camino, $cant, $camino_recorrido, $camino_restante))) {
+            $this->_error("Iterador->_avanzar(alias, elemento, camino, es_nodo) posiblemente el camino pasado como parametro no sea valido tenga un error de sintaxis o no existan esos enlaces en la estructura. Ver las alertas para más información.");
+            return null;
+        }
+        if (!$nodo = $this->nodo($elemento, $es_nodo)) {
+            $this->_error("Iterador->_avanzar(alias, elemento, camino, es_nodo) no se pudo validar el elemento para agregarlo a la estructura");
+            if ($avanzo) {
+                $cuerpo->eliminar_adyacente("actual");
+                $cuerpo->_adyacente_en($origen, "actual");
+            }
+            return null;
+        }
+        $actual = $cuerpo->adyacente("actual");
+        if ($actual->adyacente($enlace)) {
+            $this->_alerta("Iterador->_avanzar(alias, elemento, camino, es_nodo) se esta reemplazando un nodo en ese enlace");
+        }
+        $actual->_adyacente_en($nodo, $enlace);
+        // actualizar posición actual
+        $cuerpo->eliminar_adyacente("actual");
+        $cuerpo->_adyacente_en($nodo, "actual");
+
+        if ($cuerpo->adyacente("guardar recorrido")) {
+            $ndatos = $this->visitados_auxiliar_crear_obtener_lista($cuerpo);
+            $this->guardar_visitado_interno($ndatos, $nodo);
+        }
+        return $nodo;
+    }
 
 
 
@@ -1047,7 +1621,26 @@ class Iterador extends Objeto
 
     //placeholder
     
-    
+        /**
+     * Placeholder: crea u obtiene la lista auxiliar de visitados.
+     * @since 1.0
+     * @version 1.5i.2
+     * @return mixed
+     */
+    protected function visitados_auxiliar_crear_obtener_lista($cuerpo) {
+        return null; // Pendiente de implementación
+    }
+
+    /**
+     * Placeholder: guarda un nodo visitado en la lista.
+     * @since 1.0
+     * @version 1.5i.2
+     * @return void
+     */
+    protected function guardar_visitado_interno($lista, $nodo) {
+        // Pendiente de implementación
+    }
+
     /**
      * Devuelve el nodo de alias permitidos para la clase.
      * Placeholder: debe ser implementado por subclases si se requiere.
