@@ -304,7 +304,7 @@ class Iterador extends Objeto
         // retorna el iterador
         return $iterador;
     }
-    
+
     /**
      * Destruye internamente el iterador.
      *
@@ -377,7 +377,7 @@ class Iterador extends Objeto
         }
         if (!($iterador instanceof Iterador)) {
             Iterador::_error("Iterador::cargar_interno(nombre, iterador, elemento=null, &es_nodo=null) el iterador de entrada tiene que ser de la clase Iterador o de una clase heredera de la misma");
-            return false;
+            return null;
         }
         if ($iterador->raiz_cuerpo) {
             Iterador::_error("Iterador::cargar_interno(nombre, iterador, elemento=null, &es_nodo=null) el iterador pasado por parametro ya fue creado antes");
@@ -468,7 +468,7 @@ class Iterador extends Objeto
         }
         if (!($iterador instanceof Iterador)) {
             Iterador::_error("Iterador::iterador_interno(nombre, iterador, &nuevo=null, elemento=null, &es_nodo=null) el iterador de entrada tiene que ser de la clase Iterador o de una clase heredera de la misma");
-            return false;
+            return null;
         }
         if ($iterador->raiz_cuerpo) {
             Iterador::_error("Iterador::iterador_interno(nombre, iterador, &nuevo=null, elemento=null, &es_nodo=null) el iterador pasado por parametro ya fue creado antes");
@@ -620,8 +620,435 @@ class Iterador extends Objeto
         return $iter;
     }
 
+
+    //********************************************************************************
+	//------------------------------------------------------------------------------->
+	//---------------------- INTERFAZ de Propiedades del Iterador ------------------->
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+
+	/**
+	 * Verifica si el elemento dado es una instancia de Iterador.
+	 *
+	 * 🔗 Interfaz: Propiedades del Iterador
+	 * Caso de uso: saber si un elemento es iterador.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 *
+	 * @param mixed $elemento Elemento a comprobar.
+	 * @return bool `true` si es un Iterador, `false` en caso contrario.
+	 */
+	static public function es_iterador($elemento) {
+		$es = false;
+		if ($elemento instanceof Iterador) {
+			$es = true;
+		}
+		return $es;
+	}
+
+	/**
+	 * Obtiene el nombre del iterador.
+	 *
+	 * 🔗 Interfaz: Propiedades del Iterador
+	 * Caso de uso: obtener nombre del iterador.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 *
+	 * @return string|false El nombre del iterador, `false` si no está ocupado o no tiene cuerpo.
+	 */
+	public function nombre() {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->nombre() el iterador no esta ocupado");
+			return false;
+		}
+		return $cuerpo->dato();
+	}
+
+	//********************************************************************************
+	//------------------------------------------------------------------------------->
+	//---------------------- INTERFAZ de Marca de ocupado---------------------------->
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+	/**
+	 * Notas generales de la interfaz:
+	 * Esta interfaz tiene como tarea administrar el acceso a la "marca de ocupado" del iterador.
+	 * Esta marca en la realidad no es más que un enlace de la raíz del iterador a sí misma.
+	 */
+
+	/**
+	 * Activa la "marca de ocupado".
+	 *
+	 * 🔗 Interfaz: INTERFAZ OCUPAR/DESOCUPAR/OCUPADO
+	 * Caso de uso: Activar la "marca de ocupado".
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 *
+	 * @return bool `true` si se activó, `false` si ya estaba ocupado o no tiene cuerpo.
+	 */
+	protected function ocupar() {
+		if (!$cuerpo = $this->raiz_cuerpo) {
+			$this->_error("Iterador->ocupar() el iterador no tiene cuerpo!!");
+			return false;
+		}
+		if (!$cuerpo->adyacente("ocupado")) {
+			$cuerpo->_adyacente_en($cuerpo, "ocupado");
+			return true;
+		} else {
+			$this->_alerta("Iterador->ocupar() el iterador ya esta ocupado");
+			return false;
+		}
+	}
+
+    /**
+     * Elimina la "marca de ocupado".
+     *
+     * 🔗 Interfaz: INTERFAZ OCUPAR/DESOCUPAR/OCUPADO
+     * Caso de uso: Desactivar la "marca de ocupado".
+     *
+     * @since 1.0
+     * @version 1.5i.1
+     *
+     * @return bool `true` si se desactivó, `false` si no estaba ocupado.
+     */
+    public function desocupar() {
+        if (!$cuerpo = $this->raiz_cuerpo) {
+            $this->_alerta("Iterador->desocupar() el iterador ya esta desocupado(1)");
+            return false;
+        }
+        if ($cuerpo->adyacente("ocupado")) {
+            $this->liberar(); // placeholder para liberación adicional
+            $this->destruir_datos_temporales();
+            $cuerpo->eliminar_adyacente("ocupado");
+            $this->raiz_cuerpo = null;
+            return true;
+        } else {
+            $this->_alerta("Iterador->desocupar() el iterador ya esta desocupado (2)");
+            return false;
+        }
+    }
+
+	/**
+	 * Comprueba si el iterador está ocupado.
+	 *
+	 * 🔗 Interfaz: INTERFAZ OCUPAR/DESOCUPAR/OCUPADO
+	 * Caso de uso: Saber si existe "marca de ocupado".
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 *
+	 * @return bool `true` si está ocupado, `false` en caso contrario.
+	 */
+	public function ocupado() {
+		if (($cuerpo = $this->raiz_cuerpo) and ($cuerpo->adyacente("ocupado"))) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+
+	//********************************************************************************
+	//------------------------------------------------------------------------------->
+	//----------------------manejo de ALIAS------------------------------------------>
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+		/*Notas generales de la interfaz:
+			Esta interfaz administra la relación bidireccional entre alias (nombres simbólicos)
+			y enlaces reales dentro del iterador. Se apoya en dos nodos auxiliares:
+			- "alias": mapea alias → enlace.
+			- "enlaces alias": mapea enlace → alias.
+			En la clase base cualquier string es un alias válido y se permite su uso sin restricciones.
+			Las subclases pueden sobrescribir _alias_permitidos() y es_alias_valido() para limitar los alias.
+		*/
+
+	/**
+	 * Devuelve el nodo con los alias permitidos para esta clase.
+	 *
+	 * En la clase base devuelve un nodo vacío (sin restricciones). Las subclases deben
+	 * sobrescribir este método para retornar un nodo cuyos enlaces a sí mismo representen
+	 * los alias permitidos.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 * @return Nodo Nodo con los alias permitidos (vacío por defecto).
+	 */
+	static protected function _alias_permitidos() {
+		return Nodo::crear();
+	}
+
+	/**
+	 * Verifica si un alias es válido para el iterador dado.
+	 *
+	 * En la clase base solo se exige que sea un string. Las subclases pueden sobrescribir
+	 * este método para aplicar restricciones adicionales (por ejemplo, listas de alias permitidos).
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 * @param mixed  $alias     Alias a validar.
+	 * @param Iterador $iterador Iterador sobre el que se valida.
+	 * @return bool `true` si es un string válido, `false` en caso contrario.
+	 */
+	static protected function es_alias_valido($alias, $iterador) {
+		if (!is_string($alias)) {
+			Iterador::_error("Iterador::es_alias_valido(alias) el alias debe ser un string");
+			return false;
+		}
+		return true;
+	}
+
+    /**
+     * Verifica si un enlace es válido para el iterador dado.
+     *
+     * En la clase base se acepta string. Las subclases pueden sobrescribir
+     * este método para restringir los enlaces permitidos.
+     *
+     * @since 1.0
+     * @version 1.5i.1
+     * @param mixed     $enlace   Enlace a validar.
+     * @param Iterador $iterador Iterador sobre el que se valida.
+     * @return bool `true` si es válido, `false` en caso contrario.
+     */
+    static protected function es_enlace_valido($enlace, $iterador) {
+        if (!is_string($enlace)) {
+            Iterador::_error("Iterador::es_enlace_valido(enlace) el enlace debe ser un string");
+            return false;
+        }
+        return true;
+    }
+
+	/**
+	 * Asigna un alias a un enlace.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 * @param int|string $enlace Enlace al que se asignará el alias.
+	 * @param string     $alias  Alias a asignar.
+	 * @return bool `true` si se asignó correctamente, `false` en caso de error.
+	 */
+	public function _alias($enlace, $alias) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador::_alias(enlace, alias) el iterador no esta ocupado");
+			return false;
+		}
+		if (!Iterador::es_alias_valido($alias, $this)) {
+			$this->_error("Iterador::_alias(enlace, alias) el alias no es válido");
+			return false;
+		}
+		// Inicialización perezosa de nodos
+		if (!$nalias = $cuerpo->adyacente("alias")) {
+			$cuerpo->_adyacente_en($nalias = Nodo::crear(), "alias");
+		}
+		if (!$nenlacesalias = $cuerpo->adyacente("enlaces alias")) {
+			$cuerpo->_adyacente_en($nenlacesalias = Nodo::crear(), "enlaces alias");
+		}
+
+		// Si el alias ya existía, actualizar su enlace y eliminar la entrada inversa antigua
+		if ($ant = $nalias->adyacente($alias)) {
+			$datoant = $ant->dato();
+			$ant->_dato($enlace);
+			$nodoeli = $nenlacesalias->eliminar_adyacente($datoant);
+			if ($nodoeli) Nodo::eliminar($nodoeli);
+		} else {
+			$nalias->_adyacente_en(Nodo::crear_con_dato($enlace), $alias);
+		}
+
+		// Si el enlace ya tenía alias, actualizar y eliminar la entrada directa antigua
+		if ($ant = $nenlacesalias->adyacente($enlace)) {
+			$datoant = $ant->dato();
+			$ant->_dato($alias);
+			$nodoeli = $nalias->eliminar_adyacente($datoant);
+			if ($nodoeli) Nodo::eliminar($nodoeli);
+		} else {
+			$nenlacesalias->_adyacente_en(Nodo::crear_con_dato($alias), $enlace);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Elimina un alias individualmente.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 * @param string $alias Alias a eliminar.
+	 * @return bool `true` si se eliminó, `false` en caso contrario.
+	 */
+	public function eliminar_alias($alias) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->eliminar_alias(alias) el iterador no esta ocupado");
+			return false;
+		}
+		if (($todoslosalias = $cuerpo->adyacente("alias")) and ($nodo1 = $todoslosalias->adyacente($alias))) {
+			$enlace = $nodo1->dato();
+			if (($todoslosenlacesalias = $cuerpo->adyacente("enlaces alias")) and ($nodo2 = $todoslosenlacesalias->adyacente($enlace))) {
+				$todoslosalias->eliminar_adyacente($alias);
+				Nodo::eliminar($nodo1);
+				$todoslosenlacesalias->eliminar_adyacente($enlace);
+				Nodo::eliminar($nodo2);
+				return true;
+			} else {
+				$this->_alerta("no existe el alias que intenta eliminar(1)");
+				return false;
+			}
+		} else {
+			$this->_alerta("no existe el alias que intenta eliminar(2)");
+			return false;
+		}
+	}
+
+	/**
+	 * Asigna varios alias a partir de un arreglo [alias => enlace].
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 * @param array $arreglo_alias Arreglo asociativo donde la clave es el alias y el valor el enlace.
+	 * @return bool `true` si se asignaron todos, `false` si alguno falló.
+	 */
+	public function _varios_alias($arreglo_alias) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->_varios_alias(arreglo_alias) el iterador no esta ocupado");
+			return false;
+		}
+		if (!is_array($arreglo_alias)) {
+			$this->_error("Iterador->_varios_alias(arreglo_alias) debe recibir un arreglo cuyas claves sean alias y los valores enlaces");
+			return false;
+		}
+		$error = false;
+		foreach ($arreglo_alias as $alias => $enlace) {
+			if (!$this->_alias($enlace, $alias)) {
+				$error = true;
+			}
+		}
+		if ($error) {
+			$this->_error("Iterador->_varios_alias(arreglo_alias) uno o varios pares (alias, enlace) no son válidos");
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Elimina todos los alias del iterador.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 * @return bool `true` si se eliminaron (o no había), `false` en caso de error.
+	 */
+	public function eliminar_todos_los_alias() {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->eliminar_todos_los_alias() el iterador no esta ocupado");
+			return false;
+		}
+		if ((!$nalias = $cuerpo->adyacente("alias")) or (!$nenlacesalias = $cuerpo->adyacente("enlaces alias"))) {
+			$this->_alerta("Iterador->eliminar_todos_los_alias() el iterador no tenía alias para eliminar");
+			return true;
+		}
+		if (!$nalias->por_cada_adyacente_ejecutar(
+			function($nodo, $enlace, $nalias) {
+				$nodoaelim = $nalias->adyacente($enlace);
+				$nalias->eliminar_adyacente($enlace);
+				if (!Nodo::eliminar($nodoaelim)) {
+					$this->_error("Iterador->eliminar_todos_los_alias() no se pudieron eliminar algunos alias(1)");
+				}
+			},
+			$nalias
+		)) {
+			$this->_error("Iterador->eliminar_todos_los_alias() no se pudieron eliminar algunos alias(2)");
+			return false;
+		} else {
+			$cuerpo->eliminar_adyacente("alias");
+			Nodo::eliminar($nalias);
+		}
+		if (!$nenlacesalias->por_cada_adyacente_ejecutar(
+			function($nodo, $enlace, $nenlacesalias) {
+				$nodoaelim = $nenlacesalias->adyacente($enlace);
+				$nenlacesalias->eliminar_adyacente($enlace);
+				if (!Nodo::eliminar($nodoaelim)) {
+					$this->_error("Iterador->eliminar_todos_los_alias() no se pudieron eliminar algunos alias(3)");
+				}
+			},
+			$nenlacesalias
+		)) {
+			$this->_error("Iterador->eliminar_todos_los_alias() no se pudieron eliminar algunos alias(4)");
+			return false;
+		} else {
+			$cuerpo->eliminar_adyacente("enlaces alias");
+			Nodo::eliminar($nenlacesalias);
+		}
+		return true;
+	}
+
+	/**
+	 * Devuelve el enlace correspondiente a un alias.
+	 *
+	 * Si el alias no está registrado, se devuelve el propio alias (comportamiento base).
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 * @param string|int $alias Alias a traducir.
+	 * @return mixed Enlace asociado, o el alias original si no hay traducción.
+	 */
+    public function enlace($alias) {
+        if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+            Iterador::_error("Iterador->enlace($alias) el iterador no esta ocupado");
+            return false;
+        }
+        if (!$this->es_alias_valido($alias, $this)) {
+            Iterador::_error("Iterador->enlace($alias) el alias no es válido o no está permitido");
+            return false;
+        }
+        if ($nalias = $cuerpo->adyacente("alias")) {
+            if ($nodo = $nalias->adyacente($alias)) {
+                return $nodo->dato();
+            }
+        }
+        return $alias;
+    }
+
+	/**
+	 * Devuelve el alias correspondiente a un enlace.
+	 *
+	 * Si no hay alias registrado para ese enlace, se devuelve el propio enlace.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.1
+	 * @param string|int $enlace Enlace a traducir.
+	 * @return mixed Alias asociado, o el enlace original si no hay traducción.
+	 */
+    public function alias($enlace) {
+        if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+            Iterador::_error("Iterador->alias($enlace) el iterador no esta ocupado");
+            return false;
+        }
+        if (!$this->es_enlace_valido($enlace, $this)) {
+            Iterador::_error("Iterador->alias($enlace) el enlace no es válido");
+            return false;
+        }
+        if ($nenlacesalias = $cuerpo->adyacente("enlaces alias")) {
+            if ($nodo = $nenlacesalias->adyacente($enlace)) {
+                return $nodo->dato();
+            }
+        }
+        return $enlace;
+    }
+
+
+
+
+
+
+
+
+
+
+
     //placeholder
-        /**
+    
+    
+    /**
      * Devuelve el nodo de alias permitidos para la clase.
      * Placeholder: debe ser implementado por subclases si se requiere.
      *
@@ -629,7 +1056,7 @@ class Iterador extends Objeto
      * @version 1.5i.0
      * @return Nodo|null
      */
-    protected function _alias_permitidos() { return Nodo::nodo("hola"); }
+    //protected function _alias_permitidos() { return Nodo::nodo("hola"); }
 
     /**
      * Libera los datos asociados al iterador.
@@ -669,5 +1096,18 @@ class Iterador extends Objeto
      * @version 1.5i.0
      * @return void
      */
-    protected function eliminar_todos_los_alias() {}
+   // protected function eliminar_todos_los_alias() {}
+    /**
+     * Libera recursos adicionales del iterador.
+     *
+     * Placeholder: será implementado en versiones futuras.
+     *
+     * @since 1.0
+     * @version 1.5i.1
+     * @return void
+     */
+    protected function liberar() {
+        // Pendiente de implementación
+    }
+    
 }
