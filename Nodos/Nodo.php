@@ -185,12 +185,10 @@ include_once(".\Nodos\Interfaces\AccesoAEspeciales.php");
  * - **V3.2.6.251121:** agrego interfaz Incidentes
  * - **V3.3.0.260108: Retomo despues de un tiempo con ideas mas claras. Comienzo revicion y agregado de lo que falta**
  * 
- * 
  * @class
  * @author Ignacio David Baigorria
  * @package Iteradores\Nodos
- * @version 3.2.6
- * @since 0.0
+ * @since 1.0
  * @implements Interfaces\FabricaDeNodos
  * @implements Interfaces\Datos
  * @implements Interfaces\Adyacentes
