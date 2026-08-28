@@ -1612,7 +1612,417 @@ class Iterador extends Objeto
     }
 
 
+	//********************************************************************************
+	//------------------------------------------------------------------------------->
+	//---------------------- INTERFAZ Adyacente ------------------------------------->
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+		/*Notas generales de la interfaz:
+			Permite agregar, obtener y eliminar adyacentes del nodo actual,
+			con opción de desplazarse por un camino antes de operar.
+		*/
 
+	/**
+	 * Agrega un adyacente en un alias, con elemento obligatorio.
+	 *
+	 * 🔗 Interfaz: Adyacente
+	 * Caso de uso: Agrega un adyacente en un alias.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.3
+	 *
+	 * @param mixed       $elemento  Elemento o nodo a agregar.
+	 * @param string|int  $alias     Alias del enlace donde insertar.
+	 * @param string|null $camino    Camino opcional a recorrer antes.
+	 * @param bool|null  &$es_nodo   Por referencia, indica si $elemento era Nodo.
+	 * @return Nodo|null  Nodo agregado, o null si error.
+	 */
+	public function _adyacente_en($elemento, $alias, $camino = null, &$es_nodo = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			$this->_error("Iterador->_adyacente_en(elemento, alias, camino=null, &es_nodo=null) el Iterador no está ocupado!!");
+			return null;
+		}
+		if (!$origen = $cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->_adyacente_en(elemento, alias, camino=null, &es_nodo=null) el iterador no tiene asignado nodo actual");
+			return null;
+		}
+		if (!$enlace = $this->enlace($alias)) {
+			$this->_error("Iterador->_adyacente_en(elemento, alias, camino=null, &es_nodo=null) no se pudo validar el alias");
+			return null;
+		}
+		$avanzo = false;
+		if (($camino) && (!$avanzo = $this->avanzar_interno($camino))) {
+			$this->_error("Iterador->_adyacente_en(elemento, alias, camino=null, &es_nodo=null) camino no válido");
+			return null;
+		}
+		$actual = $cuerpo->adyacente("actual");
+		$nodo = null;
+		if (!$nodo = $this->nodo($elemento, $es_nodo)) {
+			$this->_error("Iterador->_adyacente_en(elemento, alias, camino=null, &es_nodo=null) no se pudo validar el elemento");
+			if ($avanzo) {
+				$cuerpo->eliminar_adyacente("actual");
+				$cuerpo->_adyacente_en($origen, "actual");
+			}
+			return null;
+		}
+        if($actual->adyacente($enlace)){
+            $actual->eliminar_adyacente($enlace);
+            $this->_alerta("Iterador->_adyacente_en(elemento, alias, camino=null, &es_nodo=null) se esta reemplazando un nodo en ese enlace");
+        }
+		$actual->_adyacente_en($nodo, $enlace);
+		if ($avanzo) {
+			$cuerpo->eliminar_adyacente("actual");
+			$cuerpo->_adyacente_en($origen, "actual");
+		}
+		return $nodo;
+	}
+
+	/**
+	 * Agrega un adyacente en un alias, con elemento opcional.
+	 *
+	 * 🔗 Interfaz: Adyacente
+	 * Caso de uso: Agrega un adyacente en un alias 2.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.3
+	 *
+	 * @param string|int  $alias     Alias del enlace donde insertar.
+	 * @param mixed       $elemento  Elemento o nodo a agregar (opcional).
+	 * @param string|null $camino    Camino opcional a recorrer antes.
+	 * @param bool|null  &$es_nodo   Por referencia, indica si $elemento era Nodo.
+	 * @return Nodo|null  Nodo agregado, o null si error.
+	 */
+	public function _adyacente($alias, $elemento = null, $camino = null, &$es_nodo = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			$this->_error("Iterador->_adyacente(alias, elemento=null, camino=null, &es_nodo=null) el Iterador no está ocupado!!");
+			return null;
+		}
+		if (!$origen = $cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->_adyacente(alias, elemento=null, camino=null, &es_nodo=null) el iterador no tiene asignado nodo actual");
+			return null;
+		}
+		if (!$enlace = $this->enlace($alias)) {
+			$this->_error("Iterador->_adyacente(alias, elemento=null, camino=null, &es_nodo=null) no se pudo validar el alias");
+			return null;
+		}
+		$avanzo = false;
+		if (($camino) && (!$avanzo = $this->avanzar_interno($camino))) {
+			$this->_error("Iterador->_adyacente(alias, elemento=null, camino=null, &es_nodo=null) camino no válido");
+			return null;
+		}
+		$actual = $cuerpo->adyacente("actual");
+		$nodo = null;
+		if (!$nodo = $this->nodo($elemento, $es_nodo)) {
+			$this->_error("Iterador->_adyacente(alias, elemento=null, camino=null, &es_nodo=null) no se pudo validar el elemento");
+			if ($avanzo) {
+				$cuerpo->eliminar_adyacente("actual");
+				$cuerpo->_adyacente_en($origen, "actual");
+			}
+			return null;
+		}
+        if($actual->adyacente($enlace)){
+            $actual->eliminar_adyacente($enlace);
+            $this->_alerta("Iterador->_adyacente_en(elemento, alias, camino=null, &es_nodo=null) se esta reemplazando un nodo en ese enlace");
+        }
+        $actual->_adyacente_en($nodo, $enlace);
+		if ($avanzo) {
+			$cuerpo->eliminar_adyacente("actual");
+			$cuerpo->_adyacente_en($origen, "actual");
+		}
+		return $nodo;
+	}
+
+	/**
+	 * Agrega varios adyacentes desde un arreglo [alias => elemento].
+	 *
+	 * 🔗 Interfaz: Adyacente
+	 * Caso de uso: Agregar varios adyacentes.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.3
+	 *
+	 * @param array       $arreglo_elementos Arreglo asociativo alias => elemento.
+	 * @param string|null $camino            Camino opcional.
+	 * @return bool       `true` si éxito, `false` si error.
+	 */
+	public function _adyacentes($arreglo_elementos, $camino = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->_adyacentes(arreglo_elementos, camino=null) el iterador no esta ocupado");
+			return false;
+		}
+		if (!$origen = $cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->_adyacentes(arreglo_elementos, camino=null) el iterador no tiene asignado nodo actual");
+			return null;
+		}
+		if (!is_array($arreglo_elementos)) {
+			$this->_error("Iterador->_adyacentes(arreglo_elementos, camino=null) debe recibir un arreglo asociativo alias => elemento");
+			return false;
+		}
+		$avanzo = false;
+		if (($camino) && (!$avanzo = $this->avanzar_interno($camino))) {
+			$this->_error("Iterador->_adyacentes(arreglo_elementos, camino=null) camino no válido");
+			return false;
+		}
+		$actual = $cuerpo->adyacente("actual");
+		$error = false;
+		foreach ($arreglo_elementos as $alias => $elemento) {
+			$enlace = null;
+			$nodo = null;
+			if ((!$enlace = $this->enlace($alias)) or (!$nodo = $this->nodo($elemento, $es_nodo))) {
+				$error = true;
+			} else {
+				$actual->_adyacente_en($nodo, $enlace);
+			}
+		}
+		if ($avanzo) {
+			$cuerpo->eliminar_adyacente("actual");
+			$cuerpo->_adyacente_en($origen, "actual");
+		}
+		if ($error) {
+			$this->_error("Iterador->_adyacentes(arreglo_elementos, camino=null) uno o varios pares (alias, elemento) no son válidos");
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Retorna todos los adyacentes del nodo actual.
+	 *
+	 * 🔗 Interfaz: Adyacente
+	 * Caso de uso: Retornar todos los adyacentes.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.3
+	 *
+	 * @param string|null $camino Camino opcional.
+	 * @return array|null Arreglo [enlace => Nodo] o null si error.
+	 */
+	public function adyacentes($camino = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->adyacentes(camino=null) el iterador no esta ocupado");
+			return null;
+		}
+		if (!$origen = $cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->adyacentes(camino=null) el iterador no tiene asignado nodo actual");
+			return null;
+		}
+		$avanzo = false;
+		if (($camino) && (!$avanzo = $this->avanzar_interno($camino))) {
+			$this->_error("Iterador->adyacentes(camino=null) camino no válido");
+			return null;
+		}
+		$actual = $cuerpo->adyacente("actual");
+		$res = $actual->por_cada_adyacente_ejecutar(function($nodo) {
+			return $nodo;
+		});
+		if ($avanzo) {
+			$cuerpo->eliminar_adyacente("actual");
+			$cuerpo->_adyacente_en($origen, "actual");
+		}
+		return $res;
+	}
+
+	/**
+	 * Retorna un adyacente específico por alias.
+	 *
+	 * 🔗 Interfaz: Adyacente
+	 * Caso de uso: Retornar adyacente.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.3
+	 *
+	 * @param string|int  $alias  Alias del enlace.
+	 * @param string|null $camino Camino opcional.
+	 * @return Nodo|null Nodo adyacente o null.
+	 */
+	public function adyacente($alias, $camino = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->adyacente(alias, camino=null) el iterador no esta ocupado");
+			return null;
+		}
+		if (!$origen = $cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->adyacente(alias, camino=null) el iterador no tiene asignado nodo actual");
+			return null;
+		}
+		if (!$enlace = $this->enlace($alias)) {
+			$this->_error("Iterador->adyacente(alias, camino=null) no se pudo validar el alias");
+			return null;
+		}
+		$avanzo = false;
+		if (($camino) && (!$avanzo = $this->avanzar_interno($camino))) {
+			$this->_error("Iterador->adyacente(alias, camino=null) camino no válido");
+			return null;
+		}
+		$actual = $cuerpo->adyacente("actual");
+		$res = $actual->adyacente($enlace);
+		if ($avanzo) {
+			$cuerpo->eliminar_adyacente("actual");
+			$cuerpo->_adyacente_en($origen, "actual");
+		}
+		if (!$res) {
+			$this->_alerta("Iterador->adyacente(alias, camino=null) no existe adyacente en ese alias");
+			return null;
+		}
+		return $res;
+	}
+
+	/**
+	 * Elimina un adyacente por alias.
+	 *
+	 * 🔗 Interfaz: Adyacente
+	 * Caso de uso: Eliminar un adyacente.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.3
+	 *
+	 * @param string|int  $alias  Alias del enlace.
+	 * @param string|null $camino Camino opcional.
+	 * @return Nodo|bool Nodo eliminado o false.
+	 */
+	public function eliminar_adyacente($alias, $camino = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->eliminar_adyacente(alias, camino=null) el iterador no esta ocupado");
+			return false;
+		}
+		if (!$origen = $cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->eliminar_adyacente(alias, camino=null) el iterador no tiene asignado nodo actual");
+			return false;
+		}
+		if (!$enlace = $this->enlace($alias)) {
+			$this->_error("Iterador->eliminar_adyacente(alias, camino=null) no se pudo validar el alias");
+			return false;
+		}
+		$avanzo = false;
+		if (($camino) && (!$avanzo = $this->avanzar_interno($camino))) {
+			$this->_error("Iterador->eliminar_adyacente(alias, camino=null) camino no válido");
+			return false;
+		}
+		$actual = $cuerpo->adyacente("actual");
+		$elim = $actual->eliminar_adyacente($enlace);
+		if ($avanzo) {
+			$cuerpo->eliminar_adyacente("actual");
+			$cuerpo->_adyacente_en($origen, "actual");
+		}
+		if (!$elim) {
+			$this->_error("Iterador->eliminar_adyacente(alias, camino) puede que no exista nodo en el enlace");
+			return false;
+		}
+		return $elim;
+	}
+
+	/**
+	 * Elimina todos los adyacentes del nodo actual.
+	 *
+	 * 🔗 Interfaz: Adyacente
+	 * Caso de uso: Eliminar todos los adyacentes.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.3
+	 *
+	 * @param string|null $camino Camino opcional.
+	 * @return bool `true` si éxito, `false` en caso contrario.
+	 */
+	public function eliminar_adyacentes($camino = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->eliminar_adyacentes(camino=null) el iterador no esta ocupado");
+			return false;
+		}
+		if (!$origen = $cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->eliminar_adyacentes(camino=null) el iterador no tiene asignado nodo actual");
+			return false;
+		}
+		$avanzo = false;
+		if (($camino) && (!$avanzo = $this->avanzar_interno($camino))) {
+			$this->_error("Iterador->eliminar_adyacentes(camino=null) camino no válido");
+			return false;
+		}
+		$actual = $cuerpo->adyacente("actual");
+		$res = $actual->eliminar_adyacentes(); // devuelve array
+
+		if (count($res) === 0) {
+			if ($avanzo) {
+				$cuerpo->eliminar_adyacente("actual");
+				$cuerpo->_adyacente_en($origen, "actual");
+			}
+			$this->_error("Iterador->eliminar_adyacentes(camino=null) no se pudieron eliminar enlaces");
+			return false;
+		}
+
+		if ($avanzo) {
+			$cuerpo->eliminar_adyacente("actual");
+			$cuerpo->_adyacente_en($origen, "actual");
+		}
+		return true;
+	}
+
+	/**
+	 * Agrega un enlace desde el elemento hacia la estructura.
+	 *
+	 * 🔗 Interfaz: Adyacente
+	 * Caso de uso: Agrega un enlace desde el elemento a la estructura.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.3
+	 *
+	 * @param mixed       $elemento  Nodo/elemento desde el cual sale el enlace.
+	 * @param string|int  $alias     Alias del enlace.
+	 * @param string|null $camino    Camino opcional.
+	 * @param bool|null  &$es_nodo   Por referencia.
+	 * @return Nodo|null Nodo origen, o null en error.
+	 */
+	public function _como_adyacente_de_nodo_en_alias($elemento, $alias, $camino = null, &$es_nodo = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->_como_adyacente_de_nodo_en_alias(elemento, alias, camino=null, &es_nodo=null) el iterador no esta ocupado");
+			return null;
+		}
+		if (!$origen = $cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->_como_adyacente_de_nodo_en_alias(elemento, alias, camino=null, &es_nodo=null) el iterador no tiene asignado nodo actual");
+			return null;
+		}
+		if (!$enlace = $this->enlace($alias)) {
+			$this->_error("Iterador->_como_adyacente_de_nodo_en_alias(elemento, alias, camino=null, &es_nodo=null) no se pudo validar el alias");
+			return null;
+		}
+		$avanzo = false;
+		if (($camino) && (!$avanzo = $this->avanzar_interno($camino))) {
+            var_dump($avanzo);
+			$this->_error("Iterador->_como_adyacente_de_nodo_en_alias(elemento, alias, camino=null, &es_nodo=null) camino no válido");
+			return null;
+		}
+        var_dump($avanzo);
+		$nodo = null;
+		if (!$nodo = $this->nodo($elemento, $es_nodo)) {
+			$this->_error("Iterador->_como_adyacente_de_nodo_en_alias(elemento, alias, camino=null, &es_nodo=null) no se pudo validar el elemento");
+			if ($avanzo) {
+				$cuerpo->eliminar_adyacente("actual");
+				$cuerpo->_adyacente_en($origen, "actual");
+			}
+			return null;
+		}
+		$actual = $cuerpo->adyacente("actual");
+        if($nodo->adyacente($enlace)){
+            $nodo->eliminar_adyacente($enlace);
+            $this->_alerta("Iterador->_como_adyacente_de_nodo_en_alias(elemento, alias, camino=null, &es_nodo=null)  se esta reemplazando un nodo en ese enlace");
+        }
+        $nodo->_adyacente_en($actual, $enlace);
+		if ($avanzo) {
+			$cuerpo->eliminar_adyacente("actual");
+			$cuerpo->_adyacente_en($origen, "actual");
+		}
+		return $nodo;
+	}
+
+	/**
+	 * Versión alternativa de _como_adyacente_de_nodo_en_alias con orden de parámetros cambiado.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.3
+	 */
+	public function _adyacente_inverso($alias, $elemento = null, $camino = null, &$es_nodo = null) {
+		// Simplemente llama a _como_adyacente_de_nodo_en_alias con el orden correcto
+		return $this->_como_adyacente_de_nodo_en_alias($elemento, $alias, $camino, $es_nodo);
+	}
 
 
 
