@@ -1,116 +1,70 @@
 <?php
 namespace Iteradores\Configuracion;
 /**
- * v0.0.0.250829 Inicio, creo la clase Conf para ir colocando ahi las constantes globales de configuracion
+ * @version 1.5piloto.2
  *
  * @author Ignacio David Baigorria
  *
  */
 class Conf {
-    // Sobre la aplicacion
-    public const NOMBRE_APP = "MiSuperApp";
+
+    // Sobre la aplicación
+    public const NOMBRE_APP = "AdministradorDeViajes";
     public const VERSION_APP = "0.0.0";
     public const AUTOR_APP = "Ignacio David Baigorria";
 
-    const CODIGO_ADMIN = 'IBD';
+    public const CODIGO_ADMIN = 'IDB';
+    public const NOMBRE_ADMIN = 'Administrador';
     // Sobre las sesiones
     public const PREFIJO_SESSION = self::NOMBRE_APP . "_";
-    // Sobre si se ejecuta en el localhost o en hosting de internet
-    public const LOCAL = TRUE;
-    // Sobre las bases de datos
-    // Base de datos general
-    /**
-     * Dirección del servidor donde se aloja la base de datos principal.
-     * 
-     * Generalmente es "localhost" cuando la base se encuentra en el mismo servidor.
-     * @var string
-     */
-    public const HOST_SQL = "localhost";
 
-    /**
-     * Nombre de usuario utilizado para conectarse a la base de datos principal.
-     * 
-     * Debe tener permisos de lectura y escritura sobre la base de datos especificada.
-     * @var string
-     */
-    public const USUARIO_SQL = "root";
 
-    /**
-     * Contraseña asociada al usuario de la base de datos principal.
-     * 
-     * Puede ser una cadena vacía en entornos locales sin contraseña.
-     * @var string
-     */
-    public const CONTRASENA_SQL = "";
 
-    /**
-     * Nombre de la base de datos principal utilizada por el sistema.
-     * 
-     * Contiene las tablas para hilos y superestructuras.
-     * @var string
-     */
-    public const NOMBRE_BD_SQL = "HyS";
-    
+    // Sobre si se ejecuta en localhost o en hosting de internet
+    public const LOCAL = true;  // Cambiar a false en producción
+
+    // --- Constantes específicas para entorno local ---
+    public const HOST_SQL_LOCAL = "localhost";
+    public const USUARIO_SQL_LOCAL = "root";
+    public const CONTRASENA_SQL_LOCAL = "";
+    public const NOMBRE_BD_SQL_LOCAL = "HyS";
+
+    // --- Constantes específicas para entorno remoto ---
+    public const HOST_SQL_REMOTO = "sql200.infinityfree.com";
+    public const USUARIO_SQL_REMOTO = "if0_42773340";
+    public const CONTRASENA_SQL_REMOTO = "aBjxN1w0SF";
+    public const NOMBRE_BD_SQL_REMOTO = "if0_42773340_HyS";
+
+    // --- Constantes finales (se eligen según LOCAL) ---
+    public const HOST_SQL = self::LOCAL ? self::HOST_SQL_LOCAL : self::HOST_SQL_REMOTO;
+    public const USUARIO_SQL = self::LOCAL ? self::USUARIO_SQL_LOCAL : self::USUARIO_SQL_REMOTO;
+    public const CONTRASENA_SQL = self::LOCAL ? self::CONTRASENA_SQL_LOCAL : self::CONTRASENA_SQL_REMOTO;
+    public const NOMBRE_BD_SQL = self::LOCAL ? self::NOMBRE_BD_SQL_LOCAL : self::NOMBRE_BD_SQL_REMOTO;
+
     /**
      * Método predeterminado utilizado para guardar y recuperar la superestructura.
-     * 
-     * Define la tecnología o formato de persistencia que se empleará por defecto.
-     * Los valores posibles pueden ser, por ejemplo: "sql", "json" o "texto_plano".
-     * 
      * @var string
-     * @default "sql"
      */
     public const SUPERESTRUCTURA_METODO_PERDURAR = "SQL";
 
-    /**
-     * Servidor SQL destinado a la persistencia de la superestructura.
-     * 
-     * Por defecto, utiliza el mismo host que la base de datos principal.
-     * @var string
-     */
+    // --- Constantes para la persistencia de la superestructura ---
+    // Se heredan de las constantes principales (ya elegidas según LOCAL)
     public const SUPERESTRUCTURA_HOST_SQL = self::HOST_SQL;
-
-    /**
-     * Usuario SQL con permisos para operar sobre la base de datos de la superestructura.
-     * 
-     * Generalmente es el mismo usuario que el de la base de datos principal.
-     * @var string
-     */
     public const SUPERESTRUCTURA_USUARIO_SQL = self::USUARIO_SQL;
-
-    /**
-     * Contraseña correspondiente al usuario SQL de la superestructura.
-     * 
-     * Puede heredarse de la configuración principal del sistema.
-     * @var string
-     */
     public const SUPERESTRUCTURA_CONTRASENA_SQL = self::CONTRASENA_SQL;
-
-    /**
-     * Nombre de la base de datos SQL utilizada para guardar la superestructura.
-     * 
-     * Normalmente coincide con la base de datos principal.
-     * @var string
-     */
     public const SUPERESTRUCTURA_NOMBRE_BD_SQL = self::NOMBRE_BD_SQL;
 
     /**
      * Carpeta donde se guardarán los archivos de la superestructura en formato JSON.
-     * 
-     * Puede definirse una ruta absoluta o relativa dentro del proyecto.
      * @var string
      */
     public const SUPERESTRUCTURA_CARPETA_GUARDAR_JSON = "JSON";
 
     /**
      * Carpeta donde se guardarán los archivos de la superestructura en formato XML.
-     * 
-     * Puede definirse una ruta absoluta o relativa dentro del proyecto.
      * @var string
      */
-    public const SUPERESTRUCTURA_CARPETA_GUARDAR_XML  = "XML";
-
-
+    public const SUPERESTRUCTURA_CARPETA_GUARDAR_XML = "XML";
     //////////////////////////////////////////////////////////////////////////////////////
     //  Sobre los errores y alertas //////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////

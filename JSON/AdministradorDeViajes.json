@@ -1,0 +1,39 @@
+{
+    "metadata": {
+        "fecha_creacion": "2026-08-29T00:08:31+02:00",
+        "total_nodos": 5
+    },
+    "nodos": [
+        {
+            "id": "usuarios",
+            "dato": null,
+            "adyacentes": {
+                "Administrador": "1"
+            }
+        },
+        {
+            "id": 1,
+            "dato": "",
+            "adyacentes": {
+                "nombre_real": "2",
+                "nivel": "3",
+                "codigo_acceso": "4"
+            }
+        },
+        {
+            "id": 2,
+            "dato": "Administrador",
+            "adyacentes": []
+        },
+        {
+            "id": 3,
+            "dato": "admin",
+            "adyacentes": []
+        },
+        {
+            "id": 4,
+            "dato": "IDB",
+            "adyacentes": []
+        }
+    ]
+}

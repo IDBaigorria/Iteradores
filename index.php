@@ -1,7 +1,11 @@
 <?php
 session_start();
 header("Cache-control: no-cache, must-revalidate");
+
 use Iteradores\Controlador\Controlador;
+use Iteradores\Configuracion\Conf;
+use Iteradores\Nodos\Nodo;
+
 /**
  * Punto de entrada principal del framework.
  *
@@ -11,21 +15,15 @@ use Iteradores\Controlador\Controlador;
  * {@link \Iteradores\Controlador\RegistroGlobal} antes de que el
  * {@link \Iteradores\Controlador\Controlador} sea inicializado.
  *
- * ## Cambios en v1.5i.piloto
- * - Se añade el enrutador de peticiones POST/GET mediante los archivos
- *   `aplicacion_POST.php` y `aplicacion_GET.php`.
- * - Se incorpora la gestión de persistencia: se carga la estructura
- *   si existe o se crea una nueva.
- * - Se agrega la pestaña de administración con control de acceso.
- *
- * ## Orden de carga y justificación
- * (se mantiene igual que en versiones anteriores)
+ * ## Cambios en v1.5piloto.2
+ * - Se modulariza la interfaz en archivos separados (HTML, CSS, JS).
+ * - Se corrige namespace de Configuración y método de persistencia.
+ * - Se integra autenticación por código y niveles de acceso.
  *
  * @author Ignacio David Baigorria
- *
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5i.piloto
+ * @version   1.5piloto.2
  */
 
 // --- Utilidades base ----------------------------------
@@ -33,7 +31,7 @@ include_once("miscelaneas/benchmark.php");
 include_once("miscelaneas/generarUUID.php");
 
 // --- Configuración ------------------------------------
-include_once("configuracion/Configuracion.php");
+include_once("Configuracion/Configuracion.php");
 
 // --- Núcleo -------------------------------------------
 include_once("Nucleo/Objeto.php");
@@ -53,7 +51,7 @@ include_once("Nodos/NodoParalelo.php");
 include_once("Iteradores/Senal.php");
 include_once("Iteradores/AntenaComun.php");
 include_once("Iteradores/AntenaDeMarcado.php");
-include_once("Controlador/AntenaTraduccion.php");   // en namespace Controlador
+include_once("Controlador/AntenaTraduccion.php");
 
 // --- Iteradores ---------------------------------------
 include_once("Controlador/ProcesadorDeDominio.php");
@@ -70,29 +68,50 @@ include_once("Comunicadores/index.php");
 // --- Controlador (inicialización) ----------------------
 include_once("Controlador/Controlador.php");
 
-// --- Inicialización de la persistencia ----------------
-// Establecer método de persistencia (puede ser 'JSON', 'SQL', etc.)
-Controlador::establecer_metodo('JSON'); // o el que corresponda
+// Inicialización de la persistencia
+Controlador::establecer_metodo('SQL');
 
-// Nombre del almacenamiento (archivo o base de datos)
-$nombre_app = 'sistema_viajes';
-
+$nombre_app = Conf::NOMBRE_APP;
 if (Controlador::existe($nombre_app)) {
     Controlador::cargar($nombre_app);
 } else {
-    // Si no existe, creamos la estructura inicial vacía
     Controlador::guardar($nombre_app);
 }
 
-// --- Pruebas (solo desarrollo) -------------------------
-//include_once("Pruebas/pruebas_iterador_persistencia.php");
+// Incluir módulos de la aplicación
+require_once __DIR__ . '/Aplicacion/Usuarios/Usuario.php';
+require_once __DIR__ . '/Aplicacion/Sesiones/Sesion.php';
+require_once __DIR__ . '/Aplicacion/Admin/Admin.php';
+require_once __DIR__ . '/Aplicacion/Autenticacion/Autenticacion.php';
+require_once __DIR__ . '/Aplicacion/Enrutador.php';
 
-// --- Enrutador de peticiones ---------------------------
+// Crear usuario administrador si no existe
+if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_usuarios) {
+        Nodo::crear_con_id('usuarios');
+        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    }
+    $nodo_admin = Nodo::crear_con_dato('');
+    $nodo_admin->_adyacente_en(Nodo::crear_con_dato(Conf::NOMBRE_ADMIN), 'nombre_real');
+    $nodo_admin->_adyacente_en(Nodo::crear_con_dato('admin'), 'nivel');
+    $nodo_admin->_adyacente_en(Nodo::crear_con_dato(Conf::CODIGO_ADMIN), 'codigo_acceso');
+    $raiz_usuarios->_adyacente_en($nodo_admin, Conf::NOMBRE_ADMIN);
+    Controlador::guardar($nombre_app);
+}
+
+// Enrutar según método
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     header('Content-Type: application/json; charset=utf-8');
-    require_once __DIR__ . '/aplicacion_POST.php';
+    enrutar_peticion_post($_POST['accion'], $_POST);
+
+    Controlador::guardar($nombre_app);
+    Controlador::establecer_metodo('JSON');
+    Controlador::guardar($nombre_app);
+    //Controlador::imprimir_alertas();
+    //Controlador::imprimir_errores();
     exit;
 }
 
-// Si es GET (o cualquier otra), servimos la interfaz
-readfile(__DIR__ . '/aplicacion_GET.php');
+// Si es GET, mostrar la interfaz
+readfile(__DIR__ . '/aplicacion_GET.html');

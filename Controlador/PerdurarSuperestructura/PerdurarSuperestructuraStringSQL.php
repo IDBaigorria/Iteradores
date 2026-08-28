@@ -93,6 +93,7 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 		} else {
 			if ($sql = new \mysqli(Conf::SUPERESTRUCTURA_HOST_SQL, Conf::SUPERESTRUCTURA_USUARIO_SQL, Conf::SUPERESTRUCTURA_CONTRASENA_SQL, Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL)) {
 				//self::crear_base_de_datos_sql($sql)
+				//$sql->select_db(Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL);
 				self::crear_tablas_sql($sql);
 				//return $sql;
 			} else {

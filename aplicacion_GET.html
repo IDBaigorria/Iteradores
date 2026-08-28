@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administrador de Viajes - Pquia. del Carmen Tres Arroyos</title>
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<!-- Pantalla de login (código de acceso) -->
+<div id="pantalla_login" class="login-overlay">
+  <div class="login-box">
+    <h2>Administrador de Viajes</h2>
+    <div class="row">
+      <label for="codigo_acceso">Ingrese código de acceso:</label>
+      <input type="password" id="codigo_acceso" style="width:200px">
+      <button class="btn primary" id="boton_ingresar">Ingresar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Aplicación principal (oculta hasta autenticar) -->
+<div id="aplicacion" class="hidden">
+  <header class="header">
+    <div class="brand">Administrador de Viajes, Pquia. del Carmen Tres Arroyos</div>
+    <div class="terminal-box">
+      <span id="nombre_usuario_actual"></span>
+      <span>(<span id="nivel_usuario_actual"></span>)</span>
+      <button class="btn" id="boton_salir">Salir</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="pestanas">
+    <!-- Las pestañas se generan dinámicamente según nivel -->
+  </nav>
+
+  <main>
+    <!-- Contenido de pestañas -->
+    <section id="admin" class="tab-content hidden">
+      <!-- Panel de administración (solo admin) -->
+      <div id="panel_admin" >
+        <div class="panel">
+          <h2>Panel de Administración</h2>
+          <button class="btn primary" id="boton_agregar_usuario">Agregar usuario</button>
+        </div>
+        <div id="formulario_nuevo_usuario" class="panel hidden">
+          <h3>Nuevo usuario</h3>
+          <div class="form-grid">
+            <div class="field"><label>Nombre de usuario</label><input id="nuevo_nombre_usuario"></div>
+            <div class="field"><label>Contraseña</label><input type="password" id="nuevo_contrasena"></div>
+            <div class="field"><label>Nombre real</label><input id="nuevo_nombre_real"></div>
+            <div class="field"><label>Código de acceso</label><input id="nuevo_codigo_acceso"></div>
+            <div class="field"><label>Nivel</label>
+              <select id="nuevo_nivel">
+                <option value="terminal">Terminal</option>
+                <option value="dueno">Dueño</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+            <div class="field" id="campo_dueno" style="display:none"><label>Dueño (para terminales)</label><input id="nuevo_dueno"></div>
+            <div class="field"><label>Efectivo inicial</label><input id="nuevo_efectivo" value="0"></div>
+            <div class="field"><label>Banco (nombre)</label><input id="nuevo_banco_nombre"></div>
+            <div class="field"><label>Cuenta bancaria</label><input id="nuevo_banco_cuenta"></div>
+          </div>
+          <div class="actions" style="margin-top:12px">
+            <button class="btn primary" id="boton_guardar_usuario">Guardar</button>
+            <button class="btn" id="boton_cancelar_nuevo_usuario">Cancelar</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Usuarios registrados</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Usuario</th><th>Nombre real</th><th>Nivel</th><th>Código</th><th>Efectivo</th><th>Banco</th><th>Cuenta</th></tr></thead>
+              <tbody id="tabla_usuarios_admin"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Sesiones activas</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Token</th><th>Usuario</th><th>Creado</th></tr></thead>
+              <tbody id="tabla_sesiones_admin"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="terminales" class="tab-content hidden">
+      <div class="panel">
+        <h2>Terminales</h2>
+        <div class="row">
+          <label for="selector_terminal">Terminal:</label>
+          <select id="selector_terminal"><option>Secretaria</option><option>Gaspar</option></select>
+          <button class="btn" data-placeholder>Agregar terminal</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="section-title">Resumen de la terminal</div>
+        <div class="info-card" style="max-width:330px">
+          <span class="muted">Cantidad de pasajes vendidos:</span>
+          <strong id="ventas_terminal">37</strong>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="placeholder">Acá pueden ir más datos</div>
+      </div>
+      <div class="panel"><button class="btn" data-placeholder>Imprimir</button></div>
+    </section>
+
+    <section id="viajes" class="tab-content hidden">
+      <div class="panel">
+        <h2>Viajes</h2>
+        <div class="row">
+          <label for="selector_viaje">Viaje:</label>
+          <select id="selector_viaje"><option>Leon XIV en Lujan</option></select>
+        </div>
+        <div class="info-grid" style="margin-top:16px">
+          <div class="info-card"><span class="muted">Fecha</span><strong>XX/XX/XXXX</strong></div>
+          <div class="info-card"><span class="muted">Hora de salida</span><strong>XX:XX</strong></div>
+          <div class="info-card"><span class="muted">Origen</span><strong>Tres Arroyos</strong></div>
+          <div class="info-card"><span class="muted">Destino</span><strong>Luján</strong></div>
+        </div>
+        <div class="stats" style="margin-top:12px">
+          <div class="stat">Ocupación: <b>28 / 44</b></div>
+          <div class="stat">Disponibles: <b id="contador_disponibles">12</b></div>
+          <div class="stat">Seleccionados: <b id="contador_seleccionados">2</b></div>
+          <div class="stat">Vendidos: <b id="contador_vendidos">30</b></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="row">
+          <label for="selector_micro">Micro:</label>
+          <select id="selector_micro"><option>Colectivo de 44 asientos</option></select>
+          <button class="btn" data-placeholder>Agregar micro</button>
+        </div>
+      </div>
+
+      <div class="travel-layout">
+        <div class="panel bus-area">
+          <div class="section-title">Croquis del colectivo</div>
+          <div id="croquis" class="bus" aria-label="Croquis del colectivo de 44 asientos">
+            <div class="bus-front">FRENTE · CONDUCTOR</div>
+            <div id="filas_asientos"></div>
+            <div class="bus-back">PARTE TRASERA</div>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><span class="swatch sw-free"></span> Libre</div>
+            <div class="legend-item"><span class="swatch sw-selected"></span> Seleccionado</div>
+            <div class="legend-item"><span class="swatch sw-sold"></span> Vendido</div>
+          </div>
+          <button class="btn" style="margin-top:14px" data-placeholder>Imprimir todo el pasaje</button>
+        </div>
+
+        <aside class="panel side-panel">
+          <div class="section-title">Información del asiento</div>
+          <div id="detalle_asiento" class="detail-box">
+            <div class="muted">Seleccione un asiento del colectivo.</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="micros" class="tab-content hidden">
+      <div class="panel">
+        <h2>Empresas / Micros</h2>
+        <div class="row">
+          <label for="selector_empresa">Nombre de empresa:</label>
+          <select id="selector_empresa"><option>Empresa de ejemplo</option><option>Otra empresa</option></select>
+          <button class="btn" data-placeholder>Agregar empresa</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="row">
+          <label for="selector_vehiculo">Seleccionar vehículo:</label>
+          <select id="selector_vehiculo"><option>Colectivo de 44 asientos</option></select>
+          <button class="btn" data-placeholder>Agregar vehículo</button>
+          <button class="btn primary" data-placeholder>Modificar colectivo</button>
+        </div>
+      </div>
+      <div class="panel bus-area">
+        <div class="section-title">Configuración física del colectivo</div>
+        <div class="bus">
+          <div class="bus-front">FRENTE · CONDUCTOR</div>
+          <div id="filas_asientos_estaticas"></div>
+          <div class="bus-back">PARTE TRASERA</div>
+        </div>
+        <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
+      </div>
+    </section>
+
+    <section id="vendidos" class="tab-content hidden">
+      <div class="panel">
+        <h2>Ventas realizadas</h2>
+        <div class="row">
+          <label for="selector_viaje_vendido">Viaje:</label>
+          <select id="selector_viaje_vendido"><option>Leon XIV en Lujan</option></select>
+          <label for="filtro_vendedor">Vendedor:</label>
+          <select id="filtro_vendedor"><option>Todos</option><option>Secretaria</option><option>Gaspar</option></select>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="sales-list" id="lista_ventas"></div>
+        <button class="btn" style="margin-top:15px" data-placeholder>Imprimir ventas</button>
+      </div>
+    </section>
+
+    <section id="pasajeros" class="tab-content hidden">
+      <div class="panel">
+        <h2>Pasajeros / Clientes</h2>
+        <div class="customer-layout">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Nombre</th><th>DNI</th><th>Email</th><th>Celular personal</th><th>Emergencia</th><th>Acción</th></tr></thead>
+              <tbody id="tabla_pasajeros"></tbody>
+            </table>
+          </div>
+          <div id="detalle_pasajero" class="customer-detail">
+            <div class="detail-box">
+              <h3>Datos del pasajero</h3>
+              <div class="form-grid">
+                <div class="field full"><label>Nombre</label><input id="pasajero_nombre"></div>
+                <div class="field"><label>DNI</label><input id="pasajero_dni"></div>
+                <div class="field"><label>Email (opcional)</label><input id="pasajero_email"></div>
+                <div class="field"><label>Celular personal</label><input id="pasajero_celular"></div>
+                <div class="field"><label>Celular emergencias</label><input id="pasajero_emergencia"></div>
+              </div>
+              <button class="btn primary" style="margin-top:12px" data-placeholder>Guardar</button>
+              <h3 style="margin-top:20px">Pasajes vendidos</h3>
+              <div id="pasajes_pasajero"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="footer-note">Prototipo visual — datos ficticios — funciones administrativas en desarrollo.</div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="aplicacion.js"></script>
+</body>
+</html>
