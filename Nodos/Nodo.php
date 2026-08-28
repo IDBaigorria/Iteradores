@@ -263,7 +263,7 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	 * @return void
 	 */
 	function __destruct() {
-		echo ".destuido.";
+		//echo ".destuido.";
 		self::$cant--;
 	}
 	
@@ -1005,7 +1005,7 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	 * @see Nodo::adyacente()
 	 */
 	static public function por_cada_nodo_ejecutar(string $token, callable $funcion, mixed ...$parametros): ?array {
-		echo ("<br>a".$token."<br>*b*".self::$token."<br>c");
+		//echo ("<br>a".$token."<br>*b*".self::$token."<br>c");
 		if ($token===self::$token){
 			if (count(Nodo::$superestructura)==0) {
 				static::_alerta("alerta no existe adyacente");

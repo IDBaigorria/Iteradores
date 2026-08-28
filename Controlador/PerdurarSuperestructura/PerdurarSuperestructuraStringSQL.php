@@ -288,33 +288,29 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
      * 
      * @notes Genera una consulta INSERT con todos los nodos de la superestructura actual.
      */
-	static private function crear_consulta_insertar_sql($nombre)
+	static private function crear_consulta_insertar_sql($sql, $nombre)
 	{
-
-		//$nombre=session_id()."_".$GLOBALS['num_hilo'];
-		//recupero datos
-		//echo "recuperodatos".self::$token;
 		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
-			return $nodo->dato(); }, null);
+			return $nodo->dato();
+		}, null);
 
-		//creao consulta
 		$consulta = "INSERT INTO nodo (idsuperestructura, idnodo, dato) values";
 		$separador = " ";
 		$primero = true;
-		//if (is_array($datos)){echo "si es";};
 
 		foreach ($datos as $id => $dato) {
-			if (!is_string($dato) and !is_null($dato) and !is_int($dato)) {
+			if (!is_string($dato) && !is_null($dato) && !is_int($dato)) {
 				$dato = null;
 			}
-			$consulta = $consulta . $separador . "('" . $nombre . "','" . $id . "','" ./*utf8_encode(*/ $dato/*)*/ . "')";
+			$id_escapado = mysqli_real_escape_string($sql, (string)$id);
+			$dato_escapado = is_null($dato) ? '' : mysqli_real_escape_string($sql, (string)$dato);
+			$consulta .= $separador . "('" . $nombre . "','" . $id_escapado . "','" . $dato_escapado . "')";
 			if ($primero) {
 				$primero = false;
 				$separador = ", ";
 			}
 		}
-		$consulta = $consulta . ";";
-		//echo $consulta;
+		$consulta .= ";";
 		return $consulta;
 	}
     /**
@@ -328,25 +324,25 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
      * 
      * @notes Genera una consulta INSERT con todas las relaciones adyacentes de la superestructura.
      */
-	static private function crear_consulta_insertar2_sql($nombre)
+	static private function crear_consulta_insertar2_sql($sql, $nombre)
 	{
-
-		//$nombre=session_id()."_".$GLOBALS['num_hilo'];
-		//recupero datos
 		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
 			return $nodo->por_cada_adyacente_ejecutar(function ($nodo) {
-				return $nodo->id(); }); });
+				return $nodo->id();
+			});
+		});
 
-		//creao consulta
 		$consulta = 'INSERT INTO adyacente (idsuperestructura, idnodo, enlace, idadyacente) values';
 		$separador = " ";
 		$primero = true;
-		//if (is_array($datos)){echo "si es";};
 
 		foreach ($datos as $idnodo => $arreglo) {
 			if (is_array($arreglo)) {
 				foreach ($arreglo as $enlace => $idadyacente) {
-					$consulta = $consulta . $separador . "('" . $nombre . "','" . $idnodo . "','" . $enlace . "','" . $idadyacente . "')";
+					$idnodo_escapado = mysqli_real_escape_string($sql, (string)$idnodo);
+					$enlace_escapado = mysqli_real_escape_string($sql, (string)$enlace);
+					$idadyacente_escapado = mysqli_real_escape_string($sql, (string)$idadyacente);
+					$consulta .= $separador . "('" . $nombre . "','" . $idnodo_escapado . "','" . $enlace_escapado . "','" . $idadyacente_escapado . "')";
 					if ($primero) {
 						$primero = false;
 						$separador = ", ";
@@ -354,8 +350,7 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 				}
 			}
 		}
-		$consulta = $consulta . ';';
-		//echo $consulta;
+		$consulta .= ';';
 		return $consulta;
 	}
     /**
@@ -387,8 +382,8 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 		PerdurarSuperestructuraString::crear_tablas_sql($sql);*/
 		$sql->query("DELETE FROM `nodo` WHERE `idsuperestructura`='" . $nombre . "';");
 		$sql->query("DELETE FROM `adyacente` WHERE `idsuperestructura`='" . $nombre . "';");
-		$sql->query(self::crear_consulta_insertar_sql($nombre));
-		$sql->query(self::crear_consulta_insertar2_sql($nombre));
+		$sql->query(self::crear_consulta_insertar_sql($sql, $nombre));
+		$sql->query(self::crear_consulta_insertar2_sql($sql, $nombre));
 		$sql->close();
 		//return session_id()."_".$GLOBALS['num_hilo'];
 		return true;
@@ -513,8 +508,16 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 			if (!self::es_id_especial($idady)) {
 				$idady = $equivalencias[$adyacente["idadyacente"]];
 			}
+			/*$nodoady = Nodo::nodo_por_id($idady);
+			$nodo->_adyacente_en($nodoady, $adyacente["enlace"]);*/
 			$nodoady = Nodo::nodo_por_id($idady);
-			$nodo->_adyacente_en($nodoady, $adyacente["enlace"]);
+
+			if (!$nodo || !$nodoady) {
+				self::_error("No se pudo reconstruir el enlace: idnodo=$idnod, idadyacente=$idady, enlace={$adyacente['enlace']}");
+				continue;
+			}
+
+			$nodo->_adyacente_en($nodoady, $adyacente["enlace"]);		
 			$adyacente = $adyacentes->fetch_assoc();
 		}
 		$sql->close();

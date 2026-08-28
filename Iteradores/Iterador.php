@@ -53,7 +53,7 @@ use Iteradores\Nodos\Nodo;
  *
  * @package Iteradores\Iteradores
  * @since 1.0 (versión original consolidada)
- * @version 1.5.0 (inicio de refactorización)
+ * @version 1.5i.4 (inicio de refactorización)
  * @author Ignacio David Baigorria
  * @extends Objeto
  */
@@ -256,7 +256,7 @@ class Iterador extends Objeto
         return $cuerpoi;
     }
 
-        /**
+    /**
      * Crea un nuevo iterador con el nombre dado.
      *
      * Registra la clase, crea el cuerpo, lo marca ocupado y opcionalmente asigna un elemento
@@ -620,6 +620,41 @@ class Iterador extends Objeto
         return $iter;
     }
 
+    /**
+     * Verifica si existe un iterador con el nombre dado en la superestructura.
+     *
+     * No emite alertas ni errores; simplemente devuelve `true` o `false`.
+     *
+     * @since 1.0
+     * @version 1.5i.4
+     *
+     * @param string $nombre Nombre del iterador a comprobar.
+     * @return bool `true` si existe, `false` en caso contrario.
+     */
+    static public function existe(string $nombre): bool
+    {
+        if (!is_string($nombre)) {
+            return false;
+        }
+
+        $iteradores = Nodo::nodo_por_id("iteradores");
+        if (!$iteradores) {
+            return false;
+        }
+
+        $nombrec = static::class;
+        $nclase = $iteradores->adyacente($nombrec);
+        if (!$nclase) {
+            return false;
+        }
+
+        $nits = $nclase->adyacente("iteradores");
+        if (!$nits) {
+            return false;
+        }
+
+        return $nits->adyacente($nombre) !== null;
+    }
 
     //********************************************************************************
 	//------------------------------------------------------------------------------->
@@ -1753,7 +1788,7 @@ class Iterador extends Objeto
 		}
 		if (!$origen = $cuerpo->adyacente("actual")) {
 			$this->_error("Iterador->_adyacentes(arreglo_elementos, camino=null) el iterador no tiene asignado nodo actual");
-			return null;
+			return false;
 		}
 		if (!is_array($arreglo_elementos)) {
 			$this->_error("Iterador->_adyacentes(arreglo_elementos, camino=null) debe recibir un arreglo asociativo alias => elemento");
@@ -2025,7 +2060,134 @@ class Iterador extends Objeto
 	}
 
 
+	//********************************************************************************
+	//------------------------------------------------------------------------------->
+	//---------------------- INTERFAZ Dato ------------------------------------------>
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
 
+	/**
+	 * Asigna un dato al nodo actual.
+	 *
+	 * 🔗 Interfaz: Dato
+	 * Caso de uso: Asignar dato al nodo actual, con opción de avanzar por un camino.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.4
+	 *
+	 * @param mixed       $dato   Dato a asignar. No puede ser un Nodo.
+	 * @param string|null $camino Camino opcional a recorrer antes de asignar.
+	 * @return Nodo|null  Nodo con el dato asignado, o null si error.
+	 */
+	public function _dato($dato, $camino = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->_dato(dato, camino=null) el iterador no esta ocupado");
+			return null;
+		}
+		if (!$origen = $cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->_dato(dato, camino=null) el iterador no tiene asignado nodo actual");
+			return null;
+		}
+
+		$es_nodo = null;
+		$datoaux = $dato;
+		if (!$this->es_elemento_valido($datoaux, $es_nodo)) {
+			$this->_error("Iterador->_dato(dato, camino=null) el dato no pasa la prueba es_elemento_valido");
+			return null;
+		}
+		if ($es_nodo) {
+			$this->_error("Iterador->_dato(dato, camino=null) el dato es un nodo. No se puede guardar un nodo dentro de un nodo");
+			return null;
+		}
+
+		$avanzo = false;
+		if (($camino) && (!$avanzo = $this->avanzar_interno($camino))) {
+			$this->_error("Iterador->_dato(dato, camino=null) camino no válido");
+			return null;
+		}
+
+		$actual = $cuerpo->adyacente("actual");
+		$actual->_dato($datoaux);
+
+		if ($avanzo) {
+			$cuerpo->eliminar_adyacente("actual");
+			$cuerpo->_adyacente_en($origen, "actual");
+		}
+		return $actual;
+	}
+
+	/**
+	 * Retorna el dato del nodo actual.
+	 *
+	 * 🔗 Interfaz: Dato
+	 * Caso de uso: Obtener dato del nodo actual, con opción de avanzar.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.4
+	 *
+	 * @param string|null $camino Camino opcional a recorrer antes de obtener.
+	 * @return mixed|null Dato del nodo, o null si error.
+	 */
+	public function dato($camino = null) {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador->dato(camino=null) el iterador no esta ocupado");
+			return null;
+		}
+		if (!$origen = $cuerpo->adyacente("actual")) {
+			$this->_error("Iterador->dato(camino=null) el iterador no tiene asignado nodo actual");
+			return null;
+		}
+
+		$avanzo = false;
+		if (($camino) && (!$avanzo = $this->avanzar_interno($camino))) {
+			$this->_error("Iterador->dato(camino=null) camino no válido");
+			return null;
+		}
+
+		$res = $cuerpo->adyacente("actual")->dato();
+
+		if ($avanzo) {
+			$cuerpo->eliminar_adyacente("actual");
+			$cuerpo->_adyacente_en($origen, "actual");
+		}
+		return $res;
+	}
+
+	//********************************************************************************
+	//------------------------------------------------------------------------------->
+	//---------------------- Liberar ////////////////////////////////////////////////>
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+	//------------------------------------------------------------------------------->
+	/**
+	 * Libera el nodo actual, estableciendo como actual el propio cuerpo.
+	 *
+	 * 🔗 Interfaz: Liberar
+	 * Caso de uso: Liberar el nodo actual.
+	 *
+	 * @since 1.0
+	 * @version 1.5i.4
+	 *
+	 * @return Nodo|bool|null Nodo que era actual, `false` si no ocupado, `null` si ya estaba liberado.
+	 */
+	public function liberar() {
+		if ((!$cuerpo = $this->raiz_cuerpo) or (!$cuerpo->adyacente("ocupado"))) {
+			Iterador::_error("Iterador::liberar() el iterador no esta ocupado");
+			return false;
+		}
+		$act = $cuerpo->adyacente("actual");
+		if ($act === $cuerpo) {
+			$this->_error("Iterador->liberar() el Iterador ya estaba liberado");
+			return null;
+		}
+		// Eliminar actual anterior y asignar cuerpo
+		if ($act) {
+			$cuerpo->eliminar_adyacente("actual");
+		}
+		$cuerpo->_adyacente_en($cuerpo, "actual");
+		return $act;
+	}
 
 
 
@@ -2109,8 +2271,8 @@ class Iterador extends Objeto
      * @version 1.5i.1
      * @return void
      */
-    protected function liberar() {
+  /*  protected function liberar() {
         // Pendiente de implementación
-    }
+    }*/
     
 }
