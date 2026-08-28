@@ -17,12 +17,12 @@ use Iteradores\Nodos\Interfaces\Incidentes;
 /*include_once(".\Nucleo\Objeto.php");
 //include_once(".\Nodos\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL.php");*/
 
-include_once(".\Nodos\Interfaces\FabricaDeNodos.php");
-include_once(".\Nodos\Interfaces\Datos.php");
-include_once(".\Nodos\Interfaces\Adyacentes.php");
-include_once(".\Nodos\Interfaces\Incidentes.php");
-include_once(".\Nodos\Interfaces\AccesoASuperestructura.php");
-include_once(".\Nodos\Interfaces\AccesoAEspeciales.php");
+include_once("./Nodos/Interfaces/FabricaDeNodos.php");
+include_once("./Nodos/Interfaces/Datos.php");
+include_once("./Nodos/Interfaces/Adyacentes.php");
+include_once("./Nodos/Interfaces/Incidentes.php");
+include_once("./Nodos/Interfaces/AccesoASuperestructura.php");
+include_once("./Nodos/Interfaces/AccesoAEspeciales.php");
 //include_once(".\miscelaneas\generarUUID.php");*/
 /**
  * Clase: Nodo
@@ -189,6 +189,7 @@ include_once(".\Nodos\Interfaces\AccesoAEspeciales.php");
  * @author Ignacio David Baigorria
  * @package Iteradores\Nodos
  * @since 1.0
+ * @version 1.5i.4
  * @implements Interfaces\FabricaDeNodos
  * @implements Interfaces\Datos
  * @implements Interfaces\Adyacentes
@@ -1069,6 +1070,8 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
      * } else {
      *     echo "Error: token inválido o acceso no autorizado.";
      * }
+	 * 
+	 * @version 1.5i.4
      */
     public static function vaciar_superestructura(string $token): ?bool
     {
@@ -1076,6 +1079,7 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
             static::$superestructura = [];
             static::$cant = 0;
             static::$nodos_especiales = [];
+            Objeto::limpiar_ids_especiales();
             return true;
         } else {
             static::_error("Intento de acceso no autorizado");

@@ -7,8 +7,8 @@ use Iteradores\Nucleo\Interfaces\ErroresYAlertas;
 
 /*require_once(".\configuracion\Configuracion.php");
 require_once(".\configuracion\Entorno.php");*/
-require_once(".\Nucleo\Interfaces\Id.php");
-require_once(".\Nucleo\Interfaces\ErroresYAlertas.php");
+require_once("./Nucleo/Interfaces/Id.php");
+require_once("./Nucleo/Interfaces/ErroresYAlertas.php");
 /**
  * Clase base de todo el sistema en PHP.
  * 
@@ -169,8 +169,8 @@ require_once(".\Nucleo\Interfaces\ErroresYAlertas.php");
  * @class
  * @author Ignacio David Baigorria
  * @package Iteradores\Nucleo
- * @version 2.0.1.251006
- * @since 0.0
+ * @version 1.5i.4
+ * @since 1.0
  * @implements Interfaces\Id
  * @implements Interfaces\ErroresYAlertas
  */
@@ -2161,6 +2161,24 @@ class Objeto implements Id, ErroresYAlertas
 		//mysql_close($link);
 		self::$inicializo = true;
 	}
+
+	    /**
+     * Limpia los identificadores especiales (no numéricos) del depósito interno.
+     *
+     * Este método es útil al vaciar la superestructura, ya que los IDs especiales
+     * asociados a nodos (como "iteradores") dejan de estar en uso y pueden reutilizarse.
+     *
+     * @version 1.5i.4
+     * @return void
+     */
+    public static function limpiar_ids_especiales(): void
+    {
+        foreach (self::$deposito_de_ids as $id => $val) {
+            if (self::es_id_especial($id)) {
+                unset(self::$deposito_de_ids[$id]);
+            }
+        }
+    }
 }//FIN Clase Objeto
 //Nodo::inicializacion();
 //funcion global para imprimir los errores

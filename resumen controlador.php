@@ -1,352 +1,551 @@
 <?php
-namespace Iteradores\Controlador;
+namespace Iteradores\Nucleo;
 use Iteradores\Configuracion\Conf;
 use Iteradores\Configuracion\Entorno;
-use Iteradores\Controlador\interfaces\Dominios;
-use Iteradores\Controlador\interfaces\VectorGravitacional;
-use Iteradores\Controlador\interfaces\Motor;
-use Iteradores\Nodos\NodoElectrico;
-use Iteradores\Nucleo\Objeto;
-use Iteradores\Nodos\Nodo;
-use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructura;
-use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL;
-use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringJSON;
-use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringXML;
-use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL;
-use iteradores\Nodos\NodoNumerico;
-use Iteradores\Controlador\interfaces\Comandos;
-use Iteradores\Comandos\Comando;
-use Iteradores\Controlador\interfaces\Comunicadores;
-use Iteradores\Comunicadores\Comunicador;
-use Iteradores\Controlador\RegistroGlobal;
-use Iteradores\Tiempo\RelojAstronomico;
-use Iteradores\Controlador\ProcesadorDeDominio;
-use Iteradores\Controlador\Senal;
-use Iteradores\Controlador\Talamo;
+use Iteradores\Nucleo\Interfaces\Id;
+use Iteradores\Nucleo\Interfaces\ErroresYAlertas;
 
-require_once("PerdurarSuperestructura\PerdurarSuperestructura.php");
-require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringSQL.php");
-require_once("PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL.php");
-require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringJSON.php");
-require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringXML.php");
-require_once("interfaces\Comandos.php");
-require_once("interfaces\Comunicadores.php");
-require_once("interfaces\VectorGravitacional.php");
-require_once("interfaces\Motor.php");
-require_once("interfaces\Dominios.php");
-
+/*require_once(".\configuracion\Configuracion.php");
+require_once(".\configuracion\Entorno.php");*/
+require_once(".\Nucleo\Interfaces\Id.php");
+require_once(".\Nucleo\Interfaces\ErroresYAlertas.php");
 /**
- * Clase Controlador
+ * Clase base de todo el sistema en PHP.
  * 
- * Coordina el acceso seguro a las distintas implementaciones de persistencia
- * (SQL, JSON, texto, etc.) que implementan la interfaz PerdurarSuperestructura.
- * 
- * Gestiona el token de seguridad otorgado por la clase Nodo y lo distribuye
- * a cada clase de persistencia registrada, garantizando que solo las clases
- * autorizadas puedan ejecutar operaciones sobre la superestructura.
+ * Esta clase fue creada para ser el “padre” de todas las clases implementadas en el sistema.
+ * Su objetivo principal es agrupar funciones y propiedades comunes a todos los objetos del sistema.
+ * Los objetivos especificos se iran imponiendo segun las necesidades con cambios de version.
  *
+ * En la **version 2.0** su propósito principal puede agruparse en tres grandes ejes:
+ *
+ * ---
+ *
+ * ### 📌 Gestión de identificadores únicos (Interface {@link ./classes/Iteradores-Nucleo-Interfaces-Id.html Id})
+ *
+ * Cada instancia de `Objeto` posee un **identificador único** que se genera automáticamente
+ * de forma perezosa. Esto significa que el id se asigna solo en el momento en que es requerido
+ * por primera vez, a través de {@link ./classes/Iteradores-Nucleo-Objeto.html#method_id id()}.
+ *
+ * Además, se permite asignar manualmente un id "especial" (cadenas no numéricas) mediante
+ * {@link ./classes/Iteradores-Nucleo-Objeto.html#method__id _id()}. Antes de aceptar el id,
+ * el sistema valida que:
+ *
+ * - Sea un id especial, verificado por {@link ./classes/Iteradores-Nucleo-Objeto.html#method_es_id_especial es_id_especial()}.
+ * - No exista otro objeto en ejecución con el mismo id.
+ *
+ * También se puede comprobar si el id actual es especial usando
+ * {@link ./classes/Iteradores-Nucleo-Objeto.html#method_es_especial es_especial()}.
+ *
+ * Esta funcionalidad está definida contractualmente por la interfaz
+ * {@link ./classes/Iteradores-Nucleo-Interfaces-Id.html Id}, que establece que todo objeto
+ * debe ser capaz de proporcionar su identificador único.
+ *
+ * ---
+ *
+ * ### ⚠️ Sistema de recolección de errores y alertas
+ *
+ * `Objeto` implementa un sistema de **registro y recolección de errores y alertas**
+ * diseñado para facilitar el seguimiento de incidencias en tiempo de ejecución.
+ * Esta capacidad proviene de implementar las interfaces
+ * {@link ./classes/Iteradores-Nucleo-Interfaces-Errores.html Errores} y
+ * {@link ./classes/Iteradores-Nucleo-Interfaces-Alertas.html Alertas},
+ * unificadas en la interfaz compuesta
+ * {@link ./classes/Iteradores-Nucleo-Interfaces-ErroresYAlertas.html ErroresYAlertas}.
+ *
+ * Cada error o alerta registrado incluye su mensaje y la traza de la pila de llamadas en el
+ * momento en que ocurrió. Estos datos se almacenan de forma interna y pueden visualizarse
+ * posteriormente.
+ *
+ * Entre los métodos destacados que gestionan este sistema se incluyen:
+ *
+ * - Registro interno (solo uso protegido):
+ *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method__error _error()}
+ *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method__alerta _alerta()}
+ *
+ * - Activación y desactivación dinámica de la recolección:
+ *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_activar_errores activar_errores()}
+ *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_desactivar_errores desactivar_errores()}
+ *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_activar_alertas activar_alertas()}
+ *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_desactivar_alertas desactivar_alertas()}
+ *   - También existen variantes combinadas:
+ *     {@link ./classes/Iteradores-Nucleo-Objeto.html#method_activar_errores_y_alertas activar_errores_y_alertas()} y
+ *     {@link ./classes/Iteradores-Nucleo-Objeto.html#method_desactivar_errores_y_alertas desactivar_errores_y_alertas()}
+ *
+ * - Visualización de los errores y alertas acumulados:
+ *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_imprimir_errores imprimir_errores()}
+ *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_html_errores html_errores()}
+ *   - Y sus equivalentes para alertas
+ *
+ * - Exportación en formato JSON para depuración automatizada:
+ *   - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_json_errores json_errores()}
+ *   - y su equivalete para alertas
+ *
+ * Este mecanismo se activa o desactiva de forma predeterminada según la configuración inicial
+ * provista por la clase {@link ./classes/Iteradores-Configuracion-Conf.html Conf}, pero puede
+ * cambiarse dinámicamente durante la ejecución.
+ *
+ * ---
+ *
+ * ### ⚙️ Configuración mediante constantes (Clase {@link ./classes/Iteradores-Configuracion-Conf.html Conf})
+ *
+ * `Objeto` depende de varias constantes definidas en la clase
+ * {@link ./classes/Iteradores-Configuracion-Conf.html Conf}, que controlan su comportamiento
+ * inicial y el nivel de detalle que se almacena:
+ *
+ * - **Activación predeterminada de recolección:**
+ *   - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ACTIVAR_ERRORES ACTIVAR_ERRORES}
+ *   - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ACTIVAR_ALERTAS ACTIVAR_ALERTAS}
+ *
+ *   Estas constantes determinan si la recolección de errores y alertas comienza activada o
+ *   desactivada al construir cualquier objeto. Sin embargo, este estado inicial puede ser
+ *   modificado en tiempo de ejecución mediante los métodos de activación y desactivación.
+ *
+ * - **Control de la pila de llamadas almacenada:**
+ *   - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__LIMITE ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__LIMITE}
+ *   - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_ARGUMENTOS ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_ARGUMENTOS}
+ *   - {@link ./classes/Iteradores-Configuracion-Conf.html#constant_ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_OBJETOS ERRORES_Y_ALERTAS__PILA_DE_LLAMADAS__INCLUIR_OBJETOS}
+ *
+ *   Estas constantes determinan cuántos niveles de la pila se guardan junto con cada error
+ *   o alerta, y si se incluyen o no los argumentos y los objetos referenciados en cada nivel.
+ *   Esto permite controlar el consumo de memoria, ya que capturar argumentos y objetos puede
+ *   implicar estructuras muy pesadas.
+ *
+ * ---
+ *
+ * ### 🧩 Rol como clase base en el sistema
+ *
+ * La clase `Objeto` está pensada para ser **extendida** por todas las clases del sistema ya que
+ * requerirán:
+ *
+ * - Un identificador único garantizado y gestionado automáticamente.
+ * - Capacidades integradas para recolectar, almacenar y mostrar errores y alertas.
+ * - Un comportamiento configurable centralizadamente desde la clase
+ *   {@link ./classes/Iteradores-Configuracion-Conf.html Conf}.
+ *
+ * Gracias a esta arquitectura, cualquier clase que herede de `Objeto` obtiene de inmediato
+ * estas capacidades sin necesidad de reimplementarlas.
+ *
+ *
+ * ---
+ * ### HISTORIAL DE CAMBIOS
+ *
+ * - **V1.4.1**: Cambiada la funcion `error()` de `private` a `public`.
+ * - **V1.5**: Refactorizacion, cambiando el protocolo de errores.
+ *   - Interfaces: `Error`, `Id`.
+ * - **V1.6**: Estable.
+ * - **V1.7**: Interface `Alerta`.
+ * - **26/07/2013 (V1.7)**: Eliminado error en etiqueta HTML `<br>` en `imprimirErrores()` y `imprimirAlertas()`.
+ * - **V1.7.1**: Agregado `devolverErrores()` y `devolverAlertas()`.
+ * - **28/12/2016 (V1.161228)**: Cambio de nomenclatura.
+ * - **30/01/2017 (V1.170130)**: Se agrega fecha y hora a cada mensaje de alerta y error.
+ * - **V1.1.171103**: Adaptacion a PHP 7.
+ * - **V1.1.171108**: Agregadas funciones para activar/desactivar recoleccion de mensajes de error/alerta.
+ * - **V1.1.180425**: Actualizacion de `microtime()`.
+ * - **V1.1.180818**: Refactorizacion a BETA.
+ * - **V1.2.180818**: Seguridad en `_id()`; no se puede asignar ID a un objeto que ya tenia uno.
+ * - **V1.3.180822**: Funciones para IDs “especiales” asignados por el usuario.
+ *   - `static es_id_especial($id)`
+ *   - `es_especial()`
+ * - **V1.4.210524**: Constantes para host, usuario, contrasena y nombre de BD.
+ * - **V1.4.210603**: Pruebas en 000WEBHOST; decision sobre base de datos HyS.
+ * - **V1.5.250826**: Ajuste para PHP 8, se eliminan numeros de version visibles.
+ * - **V1.5.1.250829**: Se agrega archivo de configuracion y reemplazo variables locales/BD por constantes.
+ * - **V1.5.2.250904**: Cambios en inicializacion de base de datos y formato de errores y alertas.
+ *   - Ahora muestra pila de llamadas y argumentos de funciones.
+ * - **V1.5.3.250910**: Comienzo de documentacion con PHPDoc.
+ *   - Inicializacion de bases de datos via `inicializacion()`.
+ * - **V1.5.4.250911**: Agrego interfaces
+ *   - agrego `Interface\Id`
+ *   - decrepo num_hilo y la iniclizacion de las bases de datos (`inicializacion()`)
+ * - **V2.0.0.250917**: Quedó totalmente refactorizada a PHP 8.2 y Documentada con PHPDoc
+ *   - Las interfaces se declaron en archivos aparte en un subpaquete (namespace y carpeta)
+ *   - Se agrego json_errores y json_alertas 
+ * - **V2.0.0.250930**: Cambio los imprimir, la variable $ini incializa con 1 o 2 y no siempre 2,
+ * 						además agrego un if para que no muestre el mensaje "Pila de llamadas" si no es necesario
+ * - **V2.0.1.251006**: Agrego _id_interno() y realizo optimizaciones en toda la interfaz id para que consuma menos cpu
+ * 						y memoria.
+ * 
+ * 
+ * @class
  * @author Ignacio David Baigorria
- *
- * @implements PerdurarSuperestructura
- * @implements Comandos
- * @implements Comunicadores
- * @implements VectorGravitacional
- * @implements Dominios
- * @since V1.2.0
+ * @package Iteradores\Nucleo
+ * @version 2.0.1.251006
+ * @since 0.0
+ * @implements Interfaces\Id
+ * @implements Interfaces\ErroresYAlertas
  */
-class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor, Dominios {
-
-    /** 
-     * @var string Método de persistencia activo por defecto 
-     */
-    protected static string $metodo = Conf::SUPERESTRUCTURA_METODO_PERDURAR;
-
-    /**
-     * @var array<string, string> Mapa de clases de persistencia disponibles.
-     * La clave es el identificador del método (por ejemplo: 'sql', 'json', etc.)
-     * y el valor es el nombre completo de la clase.
-     */
-    protected static array $implementaciones = [];
-
-    /**
-     * @var ?string Nombre de la clase de persistencia actualmente activa.
-     */
-    protected static ?string $claseActual = null;
-
-    /**
-     * @var string Token de seguridad recibido de la clase Nodo.
-     */
-    protected static string $token = '';
+class Objeto implements Id, ErroresYAlertas
+{
+/*.......................................*/
 
 
-    /**
-     * Registra una clase de persistencia disponible para el sistema.
-     *
-     * @param string $nombre Identificador del método ('sql', 'json', 'texto', etc.)
-     * @param string $clase  Nombre completo de la clase de implementación.
-     * @return void
-     */
-    public static function registrar_implementacion(string $nombre, string $clase): void {
-       // echo "IIII".static::$token;
-        static::$implementaciones[strtoupper($nombre)] = $clase;
-        // Si ya existe el token, lo transmite a la clase registrada
-        if (static::$token && class_exists($clase) && method_exists($clase, 'recibir_token')) {
-            $clase::recibir_token(static::$token, "por_cada_nodo_ejecutar");
-        }
-    }
+	////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////////////
+	//// INTERFACE ID	
+	////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * Establece qué método de persistencia será el actual.
-     *
-     * @param string $nuevo_metodo Identificador de la implementación ('sql', 'json', 'texto', etc.)
-     * @return bool Devuelve `true` si el método fue reconocido y configurado correctamente.
-     */
-    public static function establecer_metodo(string $nuevo_metodo): bool {
-        $nuevo_metodo=strtoupper($nuevo_metodo);
-        if (isset(static::$implementaciones[$nuevo_metodo])) {
-            static::$metodo = $nuevo_metodo;
-            static::$claseActual = static::$implementaciones[$nuevo_metodo];
-            return true;
-        }
-        static::_alerta("Método de persistencia '$nuevo_metodo' no reconocido");
-        return false;
-    }
+	////////////////////////////////////////////////////////////////////////////////////////
+	// Interface Id - Métodos y variables auxiliares
+	////////////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * Recibe el token de seguridad desde la clase Nodo y lo distribuye
-     * a todas las implementaciones de persistencia registradas.
-     *
-     * @param string $token Token de seguridad proporcionado por Nodo.
-     * @return void
-     */
-    public static function recibir_token(string $token): void {
-        static::$token = $token;
-        foreach (static::$implementaciones as $clase) {
-            if (class_exists($clase) && method_exists($clase, 'recibir_token')) {
-                $clase::recibir_token($token);
-            }
-        }
-    }
+	//VARIABLES DE CLASE PRIVADAS:
 
-    /**
-     * Ejecuta una operación delegada a la clase de persistencia activa.
-     *
-     * @param string $funcion Nombre del método a ejecutar.
-     * @param mixed $nombre   Parámetro principal de la operación.
-     * @return mixed|null Devuelve el resultado de la operación o `null` si no fue posible.
-     */
-    protected static function delegar(string $funcion, $nombre): mixed {
-        if (!is_string($nombre)){
-			static::_error("el nombre no es un string");
-			return null;
+	/**
+	 * Contador interno de IDs generados.
+	 *
+	 * @internal
+	 * @var int
+	 */
+	private static $contador_ids = 1; //esta prohibido el id 0
+
+	/**
+	 * Depósito interno de IDs ya asignados.
+	 *
+	 * Evita que se repitan IDs entre objetos.
+	 *
+	 * @internal
+	 * @var array<string, bool>
+	 */
+	private static $deposito_de_ids=[];
+
+	//VARIABLES DE INSTANCIA PRIVADAS:
+
+	/**
+	 * ID del objeto.
+	 *
+	 * @internal
+	 * @var string|null
+	 */
+	private $id;
+
+	//METODOS AUXILIARES
+	/**
+	 * Genera un nuevo ID único para un objeto.
+	 *
+	 * Este método utiliza un contador interno y devuelve un string único.
+	 * Es un método auxiliar, solo accesible dentro de la clase.
+	 *
+	 * @internal
+	 * @return string El ID generado.
+	 * @deprecated aunque elegante en el papel ineficiente cuando se van a crear muchisimos objetos.
+	 * 				Ahora se realiza directamente en el id()
+	 */
+
+	private static function crear_id(): string
+	{
+		//$id= "s_".session_id()."_".$GLOBALS['num_hilo']."_".Objeto::$contador_ids;
+		$id = Objeto::$contador_ids;
+		Objeto::$contador_ids++;
+		return (string)$id;
+	}
+
+	/**
+	 * Intenta agregar un ID al depósito de IDs existentes.
+	 *
+	 * Garantiza que el ID no se haya asignado a ningún otro objeto.
+	 * Se utiliza internamente en el sistema de generación de IDs.
+	 *
+	 * @internal
+	 * @param string $id El ID que se intenta agregar.
+	 * @return bool True si el ID fue agregado exitosamente (no estaba repetido), false si ya existía.
+	 * @deprecated aunque elegante en el papel ineficiente cuando se van a crear muchisimos objetos.
+	 * 				Ahora se realiza directamente en el _id()
+	 */
+	private static function agregar_id($id): bool
+	{
+		if (!isset(Objeto::$deposito_de_ids[$id])) {
+			Objeto::$deposito_de_ids[$id] = true;
+			return true;
+		} else {
+			return false;
 		}
-        $clase = static::$claseActual;
-        if (!static::$claseActual){
-            static::_alerta("salio por aca.");
-            return null;
-        }elseif(!class_exists($clase)) {
-            static::_alerta("Clase ".static::$claseActual." de persistencia no disponible para el método actual.");
-            return null;
-        }
-       
+	}
 
-        if (!method_exists($clase, $funcion)) {
-            static::_alerta("El método '$funcion' no existe en la clase '$clase'.");
-            return null;
-        }
+	////////////////////////////////////////////////////////////////////////////////////////
+	// Interface Id - Métodos auxiliares protegidos
+	////////////////////////////////////////////////////////////////////////////////////////
 
-        return $clase::$funcion($nombre);
-    }
+	/**
+	 * Verifica si un identificador dado es especial.
+	 * 
+	 * Este metodo pertenece a la interfaz:
+	 *  - {@link ./classes/Iteradores-Nucleo-Interfaces-Id.html Interfaz Id}
+	 * 
+	 * Un **id especial** es aquel que es una cadena no numérica.  
+	 * Se utiliza internamente para determinar si un id proporcionado
+	 * es válido para ser asignado a un objeto mediante el método
+	 * {@link ./classes/Iteradores-Nucleo-Objeto.html#method__id _id()}.
+	 *
+	 * Ejemplo de uso:
+	 * ```php
+	 * if (self::es_id_especial($id)) {
+	 *		echo "el id $id es especial";
+	 * }else{
+	 * 		echo "el id no es especial";
+	 * }
+	 *```		 
+ 	 * @note Actualmente, lo que determina si un id es especial es simplemente
+     *       que sea un string no numérico. Esto podría cambiar en el futuro
+     *       si se implementa un sistema para evitar ids repetidos.
+	 * @param string $id El id a comprobar.
+	 * @return bool `true` si el id es especial, `false` en caso contrario.
+	 */
+	public static function es_id_especial(string $id): bool
+	{
+		return is_string($id) && !is_numeric($id);
+	}
+	/**
+	 * Asigna un identificador único **sin realizar comprobaciones adicionales**.
+	 *
+	 * Este método pertenece a la interfaz:
+	 *  - {@link ./classes/Iteradores-Nucleo-Interfaces-Id.html Interfaz Id}
+	 *
+	 * A diferencia de {@link ./classes/Iteradores-Nucleo-Objeto.html#method__id _id()}, 
+	 * esta versión **no verifica** si el objeto ya posee id ni si el id es especial.
+	 * Se debe usar **exclusivamente** en clases que heredan de esta, y **bajo responsabilidad del programador**,
+	 * asegurando que:
+	 * - El id no haya sido previamente asignado.
+	 * - El id sea válido y único.
+	 *
+	 * Está pensada para contextos donde el control ya se realiza externamente,
+	 * permitiendo ahorrar CPU y memoria al omitir verificaciones redundantes.
+	 *
+	 * Si el id ya existe en el depósito global, se registra un error y devuelve `false`.
+	 * 
+	 * Métodos relacionados:
+	 * {@link ./classes/Iteradores-Nucleo-Objeto.html#method__id _id()} Versión segura con comprobaciones.
+	 *
+	 * @param string $id El id a asignar.
+	 * @return bool `true` si fue asignado exitosamente, `false` en caso contrario.
+	 *
+	 * @since V2.0.1
+	 * @example
+	 * // Ejemplo dentro de una clase heredera:
+	 * protected function crearNodoRapido($id) {
+	 * 		if (Objeto::es_id_especial($id)) {
+	 *     		return $this->_id_interno($id);
+	 * 		}
+	 * }
+	 */
+	protected function _id_interno(string $id): bool
+	{
+		//agrego id al deposito
+		if (isset(Objeto::$deposito_de_ids[$id])) {
+			$this->_error("Ya existe ese id");
+			return false;
+		}
+		Objeto::$deposito_de_ids[$id] = true;
+		$this->id = $id;
+		return true;
+	}
+	////////////////////////////////////////////////////////////////////////////////////////
+	// Interface Id - Métodos publicos
+	////////////////////////////////////////////////////////////////////////////////////////
 
-    // ======= Métodos públicos de operación =======
+	/**
+	 * Devuelve el identificador único del objeto (Interfaz Id).
+	 *
+	 * Este metodo pertenece a la interfaz:
+	 *  - {@link ./classes/Iteradores-Nucleo-Interfaces-Id.html Interfaz Id}
+	 * 
+	 * Si el objeto aún no tiene un id, se le asigna uno nuevo de forma automática
+	 * mediante **inicialización perezosa**, asegurando que no esté repetido.
+	 *
+	 * Este método se usa para obtener un id persistente que identifique de forma
+	 * única a cada instancia del objeto en el sistema.
+	 *
+	 * Métodos relacionados:
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method__id _id()}
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_es_especial es_especial()}
+	 *
+	 * Ejemplo de uso:
+	 * ```php
+	 * echo $mi_objeto->id(); // Ej: "obj_12345"
+	 * ```
+	 * @note A futuro se podría mejorar el algoritmo para garantizar unicidad
+	 *       global incluso entre sesiones distintas.
+	 * @return string El id único del objeto.
+	 */
+	public function id(): string
+	{
+		//inicializacion perezosa
+		if ($this->id===null) {
+			return $this->id=Objeto::$contador_ids++;
+		}
+		return $this->id;
+	}
 
-    /** @return bool */
-    public static function guardar($nombre): bool {
-        return (bool) static::delegar('guardar', $nombre);
-    }
+	/**
+	 * Asigna un identificador único al objeto (Interfaz Id).
+	 *
+	 * Este método pertenece a la interfaz:
+	 *  - {@link ./classes/Iteradores-Nucleo-Interfaces-Id.html Interfaz Id}
+	 * 
+	 * Solo puede ejecutarse con éxito si el objeto no posee ya un id asignado.
+	 * Además, el id proporcionado debe ser **especial** (debe pasar positivamente la 
+	 * verificación realizada por {@link ./classes/Iteradores-Nucleo-Objeto.html#method_es_id_especial es_id_especial(id)})
+	 * y no estar repetido en otros objetos.
+	 *
+	 * Este método complementa a:
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_id id()} (para obtener el id actual)
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method_es_especial es_especial()} (para verificar si es especial)
+	 * - {@link ./classes/Iteradores-Nucleo-Objeto.html#method__id_interno _id_interno()} (versión optimizada para herencia y uso interno)
+	 *
+	 * ⚠️ Nota: Si estás implementando una clase que hereda de esta, podés usar
+	 * {@link ./classes/Iteradores-Nucleo-Objeto.html#method__id_interno _id_interno()} 
+	 * cuando estés seguro de que el id aún no fue asignado y es válido, para evitar comprobaciones redundantes.
+	 *
+	 * Si la asignación falla, se registrará un error mediante el sistema de errores
+	 * centralizado de la clase.
+	 *
+	 * @param string $id El id a asignar (debe ser una cadena no numérica).
+	 * @return bool `true` si el id fue asignado exitosamente, `false` en caso contrario.
+	 *
+	 * @example
+	 * if ($obj->_id("mi_id_especial")) {
+	 *     echo "Asignado id especial: ".$obj->id();
+	 * } else {
+	 *     echo "Error asignando id especial";
+	 * }
+	 */
+	public function _id(string $id): bool
+	{
+		if ($this->id!==null) {
+			$this->_error("El objeto ya tenia id");
+			return false;
+		}
+		if (Objeto::es_id_especial($id)) {
+					//agrego id al deposito
+			if (isset(Objeto::$deposito_de_ids[$id])) {
+				$this->_error("Ya existe ese id");
+				return false;
+			}
+			Objeto::$deposito_de_ids[$id] = true;
+			$this->id = $id;
+			return true;
+		}
+		$this->_error("Para asignar un id, este debe ser especial");
+		return false;
+	}
 
-    /** @return bool */
-    public static function cargar($nombre): bool {
-        return (bool) static::delegar('cargar', $nombre);
-    }
 
-    /** @return bool */
-    public static function eliminar($nombre): bool {
-        return (bool) static::delegar('eliminar', $nombre);
-    }
 
-    /** @return bool */
-    public static function existe($nombre): bool {
-        return (bool) static::delegar('existe', $nombre);
-    }
+	/**
+	 * Comprueba si el objeto actual posee un id especial (Interfaz Id).
+	 *
+	 * Se considera especial cuando el id del objeto es una cadena no numérica.
+	 * 
+	 * Ejemplo de uso:
+	 * ```php
+	 * if ($mi_objeto-> es_especial()){
+	 *      echo "el objeto tiene id especial: ".$mi_objeto->id();
+	 * }else{
+	 *      echo "el objeto no es especial";
+	 * }
+	 * ```
+	 * @note Si el objeto no tenia Id especial ni común antes de llamar a este metodo, se le asigna uno comun.
+	 * @see Interfaces\Id (Interface)
+	 * @see Objeto::id()
+	 * @see Objeto::_id()
+	 * @return bool `true` si el objeto tiene un id especial, `false` en caso contrario.
+	 */
+	public function es_especial(): bool
+	{
+		if ($this->id===null){
+			return false;
+		}
+		return Objeto::es_id_especial($this->id);
+	}
 
-    /**
-     * Imprime todos los nodos de la superestructura en el formato adecuado
-     * según el entorno configurado (HTML o consola).
-     *
-     * Delega en {@link Nodo::imprimir()} (o el método correspondiente de
-     * cada nodo) para la representación individual. La iteración se realiza a
-     * través del método protegido {@link Nodo::por_cada_nodo_ejecutar()}, usando el
-     * token interno que {@link Controlador} recibió durante la inicialización.
-     *
-     * Si la superestructura está vacía, muestra un mensaje informativo
-     * en lugar de una alerta.
-     *
-     * @return bool `true` si se ejecutó sin errores, `false` en caso de problema.
-     *
-     * @since 1.3.0 Unifica imprimir_superestructura e imprimir_superestructura2.
-     * @version 1.3.2 Añadido mensaje informativo cuando la superestructura está vacía.
-     *
-     * @see Nodo::imprimir()
-     * @see Configuracion.Entorno
-     */
-    public static function imprimir_superestructura(): bool
-    {
-        $encabezado = "===== SUPERESTRUCTURA =====";
-        $colores = Conf::NODOS_COLORES;
+	//****************************************************//
+	//		REALIZA LAS OPERACIONES PARA QUE FUNCIONE LA  // 
+	//		CLASE Objeto (YA NO SE USA)					  //
+	//****************************************************//
 
-        // Modo consola: aplicar color ANSI si es posible
-        if (Entorno::es_consola()) {
-            $color = Entorno::color_ansi($colores['ansi_texto'] ?? '34');
-            $reset = $color ? Entorno::color_ansi('0') : '';
-            echo $color . $encabezado . "\n" . $reset;
-        } else {
-            // Modo HTML: usar estilos definidos en Conf
-            $fondo = htmlspecialchars($colores['fondo'] ?? '#eef6ff');
-            $texto = htmlspecialchars($colores['texto'] ?? '#003366');
-            $borde = htmlspecialchars($colores['borde'] ?? '#0066cc');
-            echo "<div style='background:{$fondo}; color:{$texto}; padding:1em; margin:1em 0; border:1px solid {$borde}; font-family:monospace; white-space:pre-wrap;'>";
-            echo "<h3>{$encabezado}</h3>";
-        }
+	/**
+	 * @var int Número de hilo utilizado anteriormente para identificar distintos hilos de las mismas
+	 * sesiones o no para identificar objetos.
+	 * @deprecated Esta propiedad ya no se utiliza. Se mantiene solo porque en el futuro puede volver
+	 * a necesitarse.
+	 */
+	private static $num_hilo = 0;
 
-        // Verificar si hay nodos
-        if (!Nodo::hay_nodos_en_superestructura()) {
-            $mensaje = "No hay nodos en la superestructura.";
-            if (Entorno::es_consola()) {
-                echo $mensaje . "\n";
-            } else {
-                echo "<p>{$mensaje}</p>";
-                echo "</div>"; // cerrar el contenedor HTML
-            }
-            return false; // No es un error, solo informativo
-        }
+	/**
+	 * @var bool Indica si la clase fue inicializada.
+	 * @deprecated Ya no se utiliza el sistema de inicialización basado en base de datos. Además el 
+	 * sistema actual de identificación de objetos no depende de la base de datos ni del número de hilo 
+	 * pero se deja porque talvez en un futuro se retome.
+	 */
+	private static $inicializo = false;
 
-        // Iterar sobre los nodos
-        $funcion = function($nodo) {
-            $nodo->imprimir();
-        };
-        Nodo::por_cada_nodo_ejecutar(self::$token, $funcion, null);
+	/**
+	 * Inicializa la clase Objeto conectando a la base de datos y gestionando el número de hilo.
+	 *
+	 * Realiza las operaciones de conexión a MySQL, crea la base de datos y la tabla `hilo` si no existen,
+	 * inserta un registro con el `session_id()` actual para obtener un identificador incremental, y lo almacena
+	 * en {@see self::$num_hilo}. Luego borra el registro anterior.
+	 *
+	 * @deprecated Este método ya no se utiliza. El sistema actual de identificación de objetos
+	 * no depende de la base de datos ni del número de hilo pero se deja porque talvez en un futuro 
+	 * se retome
+	 *
+	 * @return void
+	 */
+	public static function inicializacion()
+	{
+		if (self::$inicializo) {
+			return;
+		}
+		//conecto a la bd sql
+		$sql = null;
+		if (Conf::LOCAL) {
+			$sql = new \mysqli(Conf::HOST_SQL, Conf::USUARIO_SQL, Conf::CONTRASENA_SQL);
+			//creo BD si no fue creada
+			$sql->query("CREATE DATABASE IF NOT EXISTS " . Conf::NOMBRE_BD_SQL) or die("no creo database");
+			//selecciono la BD
+			$sql->select_db(Conf::NOMBRE_BD_SQL) or die("no select database");
+		} else {
+			$sql = new \mysqli(Conf::HOST_SQL, Conf::USUARIO_SQL, Conf::CONTRASENA_SQL, Conf::NOMBRE_BD_SQL);
+		}
 
-        // En HTML, cerrar el contenedor después de la lista de nodos
-        if (!Entorno::es_consola()) {
-            echo "</div>";
-        }
+		$charset = $sql->character_set_name();
+		if ($charset != "utf8mb4") {
+			$sql->set_charset("utf8mb4");
+		}
+		//echo $sql->character_set_name();
 
-        return true;
-    }
+		//Creo la tabla si no existe
+		$sql->query("CREATE TABLE IF NOT EXISTS hilo (
+		id MEDIUMINT NOT NULL AUTO_INCREMENT,
+		idsession CHAR(32) NOT NULL,
+		PRIMARY KEY (id)
+		)  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; ") or die("no creo tabla");
+		//Inserto el IdSession y guardo el id generado en la variable $num_hilo
+		$sql->query("INSERT INTO hilo (idsession) values ('" . session_id() . "');");
 
-    // ──────────────────────────────────────────────────────────
-    // MÉTODO PARA PRUEBAS: ejecutarPrueba
-    // ──────────────────────────────────────────────────────────
+		//**************** NUMERO DE HILO:
+		self::$num_hilo = $sql->insert_id;
+		//********************************
+		//borro el anterior de la base de datos para que no aumente de tamano
+		$sql->query("DELETE FROM `" . Conf::NOMBRE_BD_SQL . "`.`hilo` WHERE `hilo`.`id` = " . (self::$num_hilo - 1));
+		//cierro coneccion
+		$sql->close();
+		//mysql_close($link);
+		self::$inicializo = true;
+	}
+}//FIN Clase Objeto
+//Nodo::inicializacion();
+//funcion global para imprimir los errores
+/*function imprimir_errores(){
+	Objeto::imprimir_errores();
+}*/
 
-    /**
-     * Ejecuta una función de prueba inyectando el token de seguridad.
-     *
-     * Este método está diseñado exclusivamente para entornos de desarrollo y pruebas.
-     * Permite que código externo (como suites de prueba) pueda invocar operaciones
-     * que requieren el token de seguridad sin necesidad de conocerlo.
-     *
-     * El token se pasa como único argumento a la función callback, la cual puede
-     * usarlo para llamar a métodos protegidos como NodoElectrico::_fase()
-     * o NodoElectrico::por_cada_nodo_ejecutar().
-     *
-     * ⚠️ **ADVERTENCIA**: Este método no debe estar disponible en producción.
-     *
-     * @param callable $callback Función que recibirá el token como único parámetro.
-     * @return void
-     * @since 0.0.1
-     * @static
-     */
-    public static function ejecutar_prueba(callable $callback)
-    {
-        if (!Entorno::permite_pruebas()) {
-            self::_error('ejecutar_prueba() no está disponible en entorno de producción');
-            return;
-        }
-        $callback(self::$token);
-    }
+/*$o1=new Objeto;
 
- /*.................*/
-
-    // ══════════════════════════════════════════════════════
-    // INICIALIZACION
-    // ══════════════════════════════════════════════════════
-
-    /** @var bool Indica si el controlador ya ha sido inicializado. */
-    private static $inicializo = false;
-
-    /**
-     * Inicializa el controlador principal del sistema.
-     *
-     * Procesa los comandos y comunicadores pendientes desde {@link RegistroGlobal}
-     * y registra los comandos de comunicación.
-     *
-     * @return void
-     * @since V3.3.0
-     * @version 1.4.6 (inicialización del tálamo y procesadores)
-     */
-    public static function inicializar(): void
-    {
-        if (!static::$inicializo) {
-            // ─── Registro del controlador ante Nodo ────────────
-            Nodo::registrar_controlador("Iteradores\Controlador\Controlador");
-
-            // ─── Implementaciones de persistencia ──────────────
-            Controlador::registrar_implementacion("SQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL");
-            Controlador::registrar_implementacion("JSON", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringJSON");
-            Controlador::registrar_implementacion("XML", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringXML");
-            Controlador::registrar_implementacion("ESQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL");
-            Controlador::establecer_metodo("ESQL");
-
-            // ─── Inicializar cache de primos ─────────────────────
-            NodoNumerico::inicializar_cache_primos();
-
-            // ─── Inicializar Tálamo (singleton) y precargar los 256 bytes ──
-           /* $talamo = Talamo::obtener();
-            $talamo::recibir_token(self::$token);
-            $talamo->precargar();
-            self::$procesadores['Talamo:entrada'] = $talamo;*/
-
-            // ─── Procesar comandos pendientes ──────────────────
-            foreach (RegistroGlobal::$comandos_pendientes as $entrada) {
-                if (isset($entrada['clase'])) {
-                    self::registrar_comando_desde_clase($entrada['clase']);
-                } elseif (isset($entrada['nombre'])) {
-                    self::registrar_comando($entrada['nombre'], $entrada['manejador']);
-                }
-            }
-
-            // ─── Procesar comunicadores pendientes ─────────────
-            foreach (RegistroGlobal::$comunicadores_pendientes as $entrada) {
-                self::registrar_comunicador_desde_clase($entrada['clase']);
-            }
-
-            // ─── Limpiar pendientes e inyectar Controlador ─────
-            RegistroGlobal::limpiar();
-            RegistroGlobal::_controlador(self::class);
-
-            // ─── Inicializar reloj astronómico con ubicación ───────
-            $coordenadas = Entorno::coordenadas();
-            self::$_reloj = new RelojAstronomico($coordenadas['latitud'], $coordenadas['longitud']);
-
-            // ─── Comandos genéricos de comunicación ────────────
-            self::registrar_comandos_comunicacion();
-            
-            // ─── Comandos genéricos de dominio ──────────────────
-            self::registrar_comandos_dominio();
-            static::$inicializo = true;
-        }
-    }
-}
-
-Controlador::inicializar();
+$o1->_id("hola");
+$o1->_id("hola");
+$o1->_id(132132);
+echo $o1->id();
+Objeto::imprimir_errores();*/
+?>

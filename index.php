@@ -106,4 +106,4 @@ include_once("Comunicadores/index.php");
 include_once("Controlador/Controlador.php");
 
 // --- Pruebas (solo desarrollo) -------------------------
-include_once("pruebas/pruebas_iterador_persistencia.php");
+include_once("Pruebas/pruebas_iterador_persistencia.php");

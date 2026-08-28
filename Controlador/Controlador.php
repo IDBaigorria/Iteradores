@@ -24,16 +24,16 @@ use Iteradores\Controlador\ProcesadorDeDominio;
 use Iteradores\Controlador\Senal;
 use Iteradores\Controlador\Talamo;
 
-require_once("PerdurarSuperestructura\PerdurarSuperestructura.php");
-require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringSQL.php");
-require_once("PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL.php");
-require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringJSON.php");
-require_once("PerdurarSuperestructura\PerdurarSuperestructuraStringXML.php");
-require_once("interfaces\Comandos.php");
-require_once("interfaces\Comunicadores.php");
-require_once("interfaces\VectorGravitacional.php");
-require_once("interfaces\Motor.php");
-require_once("interfaces\Dominios.php");
+require_once("PerdurarSuperestructura/PerdurarSuperestructura.php");
+require_once("PerdurarSuperestructura/PerdurarSuperestructuraStringSQL.php");
+require_once("PerdurarSuperestructura/PerdurarSuperestructuraElectricosStringSQL.php");
+require_once("PerdurarSuperestructura/PerdurarSuperestructuraStringJSON.php");
+require_once("PerdurarSuperestructura/PerdurarSuperestructuraStringXML.php");
+require_once("interfaces/Comandos.php");
+require_once("interfaces/Comunicadores.php");
+require_once("interfaces/VectorGravitacional.php");
+require_once("interfaces/Motor.php");
+require_once("interfaces/Dominios.php");
 
 /**
  * Clase Controlador
@@ -157,16 +157,49 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
 
         return $clase::$funcion($nombre);
     }
+    /**
+     * Verifica que no haya nodos ocupados (autoenlace "ocupado") en la superestructura.
+     *
+     * @since 1.5i.4
+     * @version 1.5i.4
+     * @return bool `true` si todos los nodos están desocupados, `false` en caso contrario.
+     */
+    protected static function verificar_superestructura_desocupada(): bool
+    {
+        $ocupados = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
+            $ady = $nodo->adyacente("ocupado");
+            return ($ady === $nodo);
+        }, null);
+
+        if ($ocupados) {
+            foreach ($ocupados as $id => $esta_ocupado) {
+                if ($esta_ocupado) {
+                    static::_error("No se puede guardar: el nodo con ID $id está ocupado.");
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
 
     // ======= Métodos públicos de operación =======
 
-    /** @return bool */
+    /** @return bool 
+     * @version 1.5i.4
+    */
     public static function guardar($nombre): bool {
+        if (!static::verificar_superestructura_desocupada()) {
+            return false;
+        }
         return (bool) static::delegar('guardar', $nombre);
     }
 
-    /** @return bool */
+    /** @return bool 
+     * @version 1.5i.4
+    */
     public static function cargar($nombre): bool {
+        Nodo::vaciar_superestructura(static::$token);
         return (bool) static::delegar('cargar', $nombre);
     }
 

@@ -4,10 +4,10 @@ use Iteradores\Nucleo\Objeto;
 use Iteradores\Nodos\NodoElectrico;
 use Iteradores\Configuracion\Conf;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructura;
-include_once(".\Nucleo\Objeto.php");
-include_once(".\Nodos\NodoElectrico.php");
-include_once(".\Configuracion\Configuracion.php");
-include_once(".\Controlador\PerdurarSuperestructura\PerdurarSuperestructura.php");
+include_once("./Nucleo/Objeto.php");
+include_once("./Nodos/NodoElectrico.php");
+include_once("./Configuracion/Configuracion.php");
+include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php");
 
 
 //include_once("../../Nucleo.php");
