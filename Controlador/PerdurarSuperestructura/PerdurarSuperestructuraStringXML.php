@@ -64,9 +64,9 @@ class PerdurarSuperestructuraStringXML extends Objeto implements PerdurarSuperes
     static private function crear_carpeta_xml(): bool
     {
         $carpeta = Conf::SUPERESTRUCTURA_CARPETA_GUARDAR_XML;
-        echo "miiiii";
+        //echo "miiiii";
         if (!is_dir($carpeta)) {
-            echo "SIIIIIIIIIII";
+            //echo "SIIIIIIIIIII";
             if (!mkdir($carpeta, 0755, true)) {
                 self::_error("No se pudo crear la carpeta de almacenamiento XML: " . $carpeta);
                 return false;
@@ -199,7 +199,7 @@ class PerdurarSuperestructuraStringXML extends Objeto implements PerdurarSuperes
             self::_error("error en guardar, no existe ningun nodo en la superestructura");
             return false;
         }
-        echo "acaa";
+        //echo "acaa";
         if (!self::crear_carpeta_xml()) {
             return false;
         }

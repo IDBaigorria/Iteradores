@@ -11,6 +11,8 @@ class Conf {
     public const NOMBRE_APP = "MiSuperApp";
     public const VERSION_APP = "0.0.0";
     public const AUTOR_APP = "Ignacio David Baigorria";
+
+    const CODIGO_ADMIN = 'IBD';
     // Sobre las sesiones
     public const PREFIJO_SESSION = self::NOMBRE_APP . "_";
     // Sobre si se ejecuta en el localhost o en hosting de internet

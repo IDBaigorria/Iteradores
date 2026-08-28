@@ -8,7 +8,7 @@ use Iteradores\Nucleo\Objeto;
 //require_once(__DIR__."\..\Comando.php");
 //require_once(__DIR__."\..\..\Controlador\RegistroGlobal.php");
 
-echo "mmmmmmmmmmmm";
+//echo "mmmmmmmmmmmm";
 /**
  * Comando que imprime errores, alertas y la superestructura.
  *

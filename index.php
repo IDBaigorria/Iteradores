@@ -1,6 +1,7 @@
 <?php
 session_start();
 header("Cache-control: no-cache, must-revalidate");
+use Iteradores\Controlador\Controlador;
 /**
  * Punto de entrada principal del framework.
  *
@@ -10,57 +11,21 @@ header("Cache-control: no-cache, must-revalidate");
  * {@link \Iteradores\Controlador\RegistroGlobal} antes de que el
  * {@link \Iteradores\Controlador\Controlador} sea inicializado.
  *
- * ## Cambios en v1.4.8
- * - Se añaden las nuevas clases de antenas (`AntenaComun`, `AntenaDeMarcado`,
- *   `AntenaTraduccion`) y la `Senal` actualizada.
- * - Se eliminan `MapeoBytesMatrices` y `AplanadorSenal` (absorbidos por las
- *   antenas de traducción).
- * - `Talamo` y `ProcesadorDeDominio` se mantienen temporalmente hasta su
- *   refactorización completa.
+ * ## Cambios en v1.5i.piloto
+ * - Se añade el enrutador de peticiones POST/GET mediante los archivos
+ *   `aplicacion_POST.php` y `aplicacion_GET.php`.
+ * - Se incorpora la gestión de persistencia: se carga la estructura
+ *   si existe o se crea una nueva.
+ * - Se agrega la pestaña de administración con control de acceso.
  *
  * ## Orden de carga y justificación
- *
- * 1. **Nodos y utilidades base**
- *    `Nodo.php`, `NodoElectrico.php` y `miscelaneas/benchmark.php`
- *    proporcionan las clases fundamentales sin depender de comandos
- *    ni del controlador.
- *
- * 2. **Comunicación (Señal y Antenas)**
- *    Las nuevas clases de comunicación se cargan después de los nodos
- *    porque dependen de `Matriz2x2`, `NodoNumerico`, etc.
- *
- * 3. **Comandos y Comunicadores**
- *    `Comandos/index.php` y `Comunicadores/index.php` incluyen todas
- *    las definiciones de comandos y comunicadores. Cada archivo
- *    individual ejecuta al final `RegistroGlobal::encolar_comando()`
- *    o `RegistroGlobal::encolar_comunicador()` para autoencolarse.
- *    Como no importan directamente al Controlador, no disparan su
- *    inicialización prematura.
- *
- * 4. **Controlador**
- *    `Controlador/Controlador.php` define la clase Controlador y,
- *    al ser incluido, ejecuta `Controlador::inicializar()`. En ese
- *    momento los pendientes ya están encolados y se procesan
- *    correctamente.
- *
- * 5. **Pruebas (solo desarrollo)**
- *    `pruebas/Prueba148.php` se incluye al final para disponer de
- *    herramientas de prueba que pueden interactuar con el sistema
- *    ya inicializado.
- *
- * ## Notas para desarrollo
- *
- * - Cualquier nuevo comando o comunicador debe seguir el patrón
- *   de autoencolación y ser incluido en su respectivo `index.php`.
- * - Para cargar módulos opcionales o plugins, se recomienda
- *   hacerlo después de `Controlador::inicializar()` para que
- *   {@link RegistroGlobal} ya tenga la referencia al Controlador.
+ * (se mantiene igual que en versiones anteriores)
  *
  * @author Ignacio David Baigorria
  *
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.4.8
+ * @version   1.5i.piloto
  */
 
 // --- Utilidades base ----------------------------------
@@ -105,5 +70,29 @@ include_once("Comunicadores/index.php");
 // --- Controlador (inicialización) ----------------------
 include_once("Controlador/Controlador.php");
 
+// --- Inicialización de la persistencia ----------------
+// Establecer método de persistencia (puede ser 'JSON', 'SQL', etc.)
+Controlador::establecer_metodo('JSON'); // o el que corresponda
+
+// Nombre del almacenamiento (archivo o base de datos)
+$nombre_app = 'sistema_viajes';
+
+if (Controlador::existe($nombre_app)) {
+    Controlador::cargar($nombre_app);
+} else {
+    // Si no existe, creamos la estructura inicial vacía
+    Controlador::guardar($nombre_app);
+}
+
 // --- Pruebas (solo desarrollo) -------------------------
-include_once("Pruebas/pruebas_iterador_persistencia.php");
+//include_once("Pruebas/pruebas_iterador_persistencia.php");
+
+// --- Enrutador de peticiones ---------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    require_once __DIR__ . '/aplicacion_POST.php';
+    exit;
+}
+
+// Si es GET (o cualquier otra), servimos la interfaz
+readfile(__DIR__ . '/aplicacion_GET.php');
