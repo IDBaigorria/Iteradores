@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.3)
+ * ## Estructura de nodos actual (v1.5piloto.6)
  *
  * ### Nodos raíz especiales
  *
@@ -49,6 +49,30 @@
  * - El dato del nodo usuario es el nombre de usuario, lo que facilita la obtención
  *   del dueño: `$nodo_dueno->dato()` devuelve el nombre del dueño.
  *
+ * ### Nodo Empresa
+ *
+ * Las empresas son nodos contenidos dentro del enlace `empresas` de un usuario dueño.
+ * Se asume que el **nombre de empresa es único globalmente** (aunque varios dueños
+ * pueden referenciar la misma empresa, en la práctica cada dueño tiene sus propias
+ * empresas en esta versión).
+ *
+ * - Dato del nodo: `nombre_empresa` (string).
+ * - Enlaces salientes:
+ *   | Enlace      | Nodo destino y dato esperado                          |
+ *   |-------------|-------------------------------------------------------|
+ *   | `nombre`    | Nodo con dato string: nombre visible de la empresa.  |
+ *   | `vehiculos` | Nodo contenedor con dato vacío.                       |
+ *   |             | └─ Enlaces salientes: nombre = **patente del vehículo** (única globalmente). |
+ *
+ * ### Nodo Vehículo
+ *
+ * - Dato del nodo: `patente` (string).
+ * - Enlaces salientes:
+ *   | Enlace      | Nodo destino y dato esperado                          |
+ *   |-------------|-------------------------------------------------------|
+ *   | `nombre`    | Nodo con dato string: nombre visible del vehículo.   |
+ *   | `asientos`  | Nodo con dato string numérico: cantidad de asientos. |
+ *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
  * | Enlace      | Nodo destino y dato esperado                          |
@@ -68,7 +92,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.3
+ * @version   1.5piloto.6
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

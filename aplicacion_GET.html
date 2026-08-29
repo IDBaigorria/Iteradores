@@ -216,17 +216,31 @@
           </div>
         </div>
       </div>
-
       <div class="panel" id="panel_croquis_micros" style="display:none;">
-        <div class="bus-area">
-          <div class="section-title">Configuración física del vehículo</div>
-          <div class="bus">
-            <div class="bus-front">FRENTE · CONDUCTOR</div>
-            <div id="filas_asientos_estaticas_micros"></div>
-            <div class="bus-back">PARTE TRASERA</div>
+          <!-- Croquis estático -->
+          <div class="bus-area" id="area_croquis_estatico_micros">
+              <div class="section-title">Configuración física del vehículo</div>
+              <div class="bus">
+                  <div class="bus-front">FRENTE · CONDUCTOR</div>
+                  <div id="filas_asientos_estaticas_micros"></div>
+                  <div class="bus-back">PARTE TRASERA</div>
+              </div>
+              <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
           </div>
-          <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
-        </div>
+
+          <!-- Formulario de edición (oculto por defecto) -->
+          <div id="panel_edicion_vehiculo_micros" class="hidden" style="margin-top:10px;">
+              <h3>Editar vehículo</h3>
+              <div class="form-grid">
+                  <div class="field"><label>Patente (identificador)</label><input id="editar_vehiculo_patente" disabled></div>
+                  <div class="field"><label>Nombre visible</label><input id="editar_vehiculo_nombre_real"></div>
+                  <div class="field"><label>Cantidad de asientos</label><input type="number" id="editar_vehiculo_asientos" min="1"></div>
+              </div>
+              <div class="actions" style="margin-top:12px">
+                  <button class="btn primary" id="boton_guardar_edicion_vehiculo">Guardar cambios</button>
+                  <button class="btn" id="boton_cancelar_edicion_vehiculo">Cancelar</button>
+              </div>
+          </div>
       </div>
     </section>
 

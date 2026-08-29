@@ -37,6 +37,7 @@ if (DEBUG_FETCH) {
 }
 
 let usuario_actual = null;
+let vehiculo_seleccionado_micros = null; // Almacena {nombre_vehiculo, nombre, asientos}
 
 function mostrar_aviso(mensaje) {
     const aviso = $("#toast");
@@ -957,17 +958,26 @@ async function cargar_vehiculos_de_empresa(nombre_empresa) {
             // Si hay vehículos, seleccionar el primero y mostrar croquis
             if (datos.vehiculos.length > 0) {
                 select.selectedIndex = 1; // primer vehículo
+                vehiculo_seleccionado_micros = datos.vehiculos[0];
                 await mostrar_croquis_vehiculo(datos.vehiculos[0].asientos);
                 $("#panel_croquis_micros").style.display = 'block';
+                // Asegurar que el formulario de edición esté oculto
+                $("#area_croquis_estatico_micros").classList.remove("hidden");
+                $("#panel_edicion_vehiculo_micros").classList.add("hidden");
             } else {
+                vehiculo_seleccionado_micros = null;
                 $("#panel_croquis_micros").style.display = 'none';
             }
             select.onchange = async () => {
                 const vehiculo = datos.vehiculos.find(v => v.nombre_vehiculo === select.value);
                 if (vehiculo) {
+                    vehiculo_seleccionado_micros = vehiculo;
                     await mostrar_croquis_vehiculo(vehiculo.asientos);
                     $("#panel_croquis_micros").style.display = 'block';
+                    $("#area_croquis_estatico_micros").classList.remove("hidden");
+                    $("#panel_edicion_vehiculo_micros").classList.add("hidden");
                 } else {
+                    vehiculo_seleccionado_micros = null;
                     $("#panel_croquis_micros").style.display = 'none';
                 }
             };
@@ -999,6 +1009,75 @@ function mostrar_croquis_vehiculo(asientos) {
             }
         }
         contenedor.appendChild(fila_div);
+    }
+}
+function iniciar_edicion_vehiculo() {
+    if (!vehiculo_seleccionado_micros) {
+        mostrar_aviso("Seleccione un vehículo primero");
+        return;
+    }
+
+    // Llenar el formulario con los datos actuales
+    $("#editar_vehiculo_patente").value = vehiculo_seleccionado_micros.nombre_vehiculo;
+    $("#editar_vehiculo_nombre_real").value = vehiculo_seleccionado_micros.nombre;
+    $("#editar_vehiculo_asientos").value = vehiculo_seleccionado_micros.asientos;
+
+    // Mostrar formulario y ocultar croquis
+    $("#area_croquis_estatico_micros").classList.add("hidden");
+    $("#panel_edicion_vehiculo_micros").classList.remove("hidden");
+}
+
+function cancelar_edicion_vehiculo() {
+    // Ocultar formulario y volver a mostrar el croquis
+    $("#panel_edicion_vehiculo_micros").classList.add("hidden");
+    $("#area_croquis_estatico_micros").classList.remove("hidden");
+}
+
+async function guardar_edicion_vehiculo() {
+    if (!vehiculo_seleccionado_micros) {
+        mostrar_aviso("No hay vehículo seleccionado");
+        return;
+    }
+
+    const nombre_empresa = $("#selector_empresa_micros").value;
+    if (!nombre_empresa) {
+        mostrar_aviso("Seleccione una empresa");
+        return;
+    }
+
+    const nombre_real = $("#editar_vehiculo_nombre_real").value.trim();
+    const asientos = $("#editar_vehiculo_asientos").value;
+
+    if (!nombre_real) {
+        mostrar_aviso("El nombre visible no puede estar vacío");
+        return;
+    }
+    if (!asientos || parseInt(asientos) <= 0) {
+        mostrar_aviso("La cantidad de asientos debe ser mayor que cero");
+        return;
+    }
+
+    const datos = {
+        accion: "vehiculos/actualizar",
+        nombre_empresa: nombre_empresa,
+        nombre_vehiculo: vehiculo_seleccionado_micros.nombre_vehiculo,
+        nombre_real: nombre_real,
+        asientos: asientos
+    };
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(datos)
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Vehículo actualizado correctamente");
+        cancelar_edicion_vehiculo();
+        // Recargar la lista para reflejar cambios
+        await cargar_vehiculos_de_empresa(nombre_empresa);
+    } else {
+        mostrar_aviso(resultado.error || "Error al actualizar");
     }
 }
 
@@ -1086,9 +1165,10 @@ $("#boton_guardar_vehiculo").addEventListener("click", async () => {
     }
 });
 
-$("#boton_modificar_vehiculo_micros").addEventListener("click", () => {
-    mostrar_aviso("Funcionalidad en desarrollo");
-});
+$("#boton_modificar_vehiculo_micros").addEventListener("click", iniciar_edicion_vehiculo);
+$("#boton_guardar_edicion_vehiculo").addEventListener("click", guardar_edicion_vehiculo);
+$("#boton_cancelar_edicion_vehiculo").addEventListener("click", cancelar_edicion_vehiculo);
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////

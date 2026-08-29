@@ -216,7 +216,27 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = agregar_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_real, $asientos);
                     responder_json($resultado);
                     break;
+                case 'actualizar':
+                    $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
+                    $nombre_real = $post['nombre_real'] ?? null;
+                    $asientos = $post['asientos'] ?? null;
 
+                    if (empty($nombre_empresa) || empty($nombre_vehiculo)) {
+                        responder_json(['exito' => false, 'error' => 'Empresa y vehículo son obligatorios']);
+                    }
+
+                    $datos = [];
+                    if ($nombre_real !== null) {
+                        $datos['nombre_real'] = $nombre_real;
+                    }
+                    if ($asientos !== null) {
+                        $datos['asientos'] = (int)$asientos;
+                    }
+
+                    $resultado = actualizar_vehiculo($nombre_empresa, $nombre_vehiculo, $datos);
+                    responder_json($resultado);
+                    break;
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de vehículos no válida']);
             }
