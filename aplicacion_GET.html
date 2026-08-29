@@ -35,10 +35,8 @@
   </nav>
 
   <main>
-    <!-- Contenido de pestañas -->
     <section id="admin" class="tab-content hidden">
-      <!-- Panel de administración (solo admin) -->
-      <div id="panel_admin" >
+      <div id="panel_admin">
         <div class="panel">
           <h2>Panel de Administración</h2>
           <button class="btn primary" id="boton_agregar_usuario">Agregar usuario</button>
@@ -46,21 +44,26 @@
         <div id="formulario_nuevo_usuario" class="panel hidden">
           <h3>Nuevo usuario</h3>
           <div class="form-grid">
-            <div class="field"><label>Nombre de usuario</label><input id="nuevo_nombre_usuario"></div>
-            <div class="field"><label>Contraseña</label><input type="password" id="nuevo_contrasena"></div>
+            <div class="field"><label>Nombre de usuario *</label><input id="nuevo_nombre_usuario"></div>
+            <div class="field"><label>Contraseña (opcional)</label><input type="password" id="nuevo_contrasena"></div>
             <div class="field"><label>Nombre real</label><input id="nuevo_nombre_real"></div>
-            <div class="field"><label>Código de acceso</label><input id="nuevo_codigo_acceso"></div>
+            <div class="field"><label>Email (opcional)</label><input id="nuevo_email"></div>
+            <div class="field"><label>Código de acceso *</label><input id="nuevo_codigo_acceso"></div>
             <div class="field"><label>Nivel</label>
               <select id="nuevo_nivel">
                 <option value="terminal">Terminal</option>
-                <option value="dueno">Dueño</option>
+                <option value="dueno" selected>Dueño</option>
                 <option value="admin">Administrador</option>
               </select>
             </div>
-            <div class="field" id="campo_dueno" style="display:none"><label>Dueño (para terminales)</label><input id="nuevo_dueno"></div>
-            <div class="field"><label>Efectivo inicial</label><input id="nuevo_efectivo" value="0"></div>
-            <div class="field"><label>Banco (nombre)</label><input id="nuevo_banco_nombre"></div>
-            <div class="field"><label>Cuenta bancaria</label><input id="nuevo_banco_cuenta"></div>
+            <div class="field" id="campo_dueno" style="display:none">
+              <label>Dueño (para terminales) *</label>
+              <select id="nuevo_dueno_select">
+                <!-- Se llena dinámicamente -->
+              </select>
+            </div>
+            <div class="field" id="campo_banco_nombre" style="display:none"><label>Banco (nombre) *</label><input id="nuevo_banco_nombre"></div>
+            <div class="field" id="campo_banco_cuenta" style="display:none"><label>Cuenta bancaria *</label><input id="nuevo_banco_cuenta"></div>
           </div>
           <div class="actions" style="margin-top:12px">
             <button class="btn primary" id="boton_guardar_usuario">Guardar</button>
@@ -71,7 +74,21 @@
           <h3>Usuarios registrados</h3>
           <div class="table-wrap">
             <table class="data-table">
-              <thead><tr><th>Usuario</th><th>Nombre real</th><th>Nivel</th><th>Código</th><th>Efectivo</th><th>Banco</th><th>Cuenta</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Nombre real</th>
+                  <th>Email</th>
+                  <th>Nivel</th>
+                  <th>Código</th>
+                  <th>Efectivo</th>
+                  <th>Bancarizado</th>
+                  <th>Banco</th>
+                  <th>Cuenta</th>
+                  <th>Dueño</th>        <!-- Nueva columna -->
+                  <th>Acciones</th>
+                </tr>
+              </thead>
               <tbody id="tabla_usuarios_admin"></tbody>
             </table>
           </div>
@@ -80,14 +97,13 @@
           <h3>Sesiones activas</h3>
           <div class="table-wrap">
             <table class="data-table">
-              <thead><tr><th>Token</th><th>Usuario</th><th>Creado</th></tr></thead>
+              <thead><tr><th>Token</th><th>Usuario</th><th>Creado</th><th>Acción</th></tr></thead>
               <tbody id="tabla_sesiones_admin"></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
-
     <section id="terminales" class="tab-content hidden">
       <div class="panel">
         <h2>Terminales</h2>

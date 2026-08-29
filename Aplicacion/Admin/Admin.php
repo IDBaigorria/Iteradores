@@ -3,10 +3,12 @@
  * Lógica del panel de administración.
  *
  * @package   Iteradores
- * @version   1.5piloto.1
+ * @since     1.5piloto.1
+ * @version   1.5piloto.3
  */
 
 use Iteradores\Configuracion\Conf;
+include_once("./Configuracion/Configuracion.php");
 
 /**
  * Verifica el código de administrador definido en Configuracion.

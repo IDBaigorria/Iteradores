@@ -15,15 +15,10 @@ use Iteradores\Nodos\Nodo;
  * {@link \Iteradores\Controlador\RegistroGlobal} antes de que el
  * {@link \Iteradores\Controlador\Controlador} sea inicializado.
  *
- * ## Cambios en v1.5piloto.2
- * - Se modulariza la interfaz en archivos separados (HTML, CSS, JS).
- * - Se corrige namespace de Configuración y método de persistencia.
- * - Se integra autenticación por código y niveles de acceso.
- *
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.2
+ * @version   1.5piloto.3
  */
 
 // --- Utilidades base ----------------------------------
@@ -70,7 +65,6 @@ include_once("Controlador/Controlador.php");
 
 // Inicialización de la persistencia
 Controlador::establecer_metodo('SQL');
-
 $nombre_app = Conf::NOMBRE_APP;
 if (Controlador::existe($nombre_app)) {
     Controlador::cargar($nombre_app);
@@ -92,7 +86,7 @@ if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
         Nodo::crear_con_id('usuarios');
         $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     }
-    $nodo_admin = Nodo::crear_con_dato('');
+    $nodo_admin = Nodo::crear_con_dato(Conf::NOMBRE_ADMIN);
     $nodo_admin->_adyacente_en(Nodo::crear_con_dato(Conf::NOMBRE_ADMIN), 'nombre_real');
     $nodo_admin->_adyacente_en(Nodo::crear_con_dato('admin'), 'nivel');
     $nodo_admin->_adyacente_en(Nodo::crear_con_dato(Conf::CODIGO_ADMIN), 'codigo_acceso');
@@ -104,7 +98,6 @@ if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     header('Content-Type: application/json; charset=utf-8');
     enrutar_peticion_post($_POST['accion'], $_POST);
-
     Controlador::guardar($nombre_app);
     Controlador::establecer_metodo('JSON');
     Controlador::guardar($nombre_app);

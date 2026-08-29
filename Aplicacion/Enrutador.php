@@ -3,7 +3,8 @@
  * Enrutador central de peticiones POST.
  *
  * @package   Iteradores
- * @version   1.5piloto.1
+ * @since     1.5piloto.1
+ * @version   1.5piloto.3
  */
 
 /**
@@ -62,6 +63,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     responder_json(['exito' => true, 'usuarios' => listar_usuarios()]);
                     break;
 
+                case 'listar_duenos':
+                    responder_json(['exito' => true, 'duenos' => listar_duenos()]);
+                    break;
+
                 case 'listar_sesiones':
                     responder_json(['exito' => true, 'sesiones' => listar_sesiones()]);
                     break;
@@ -71,22 +76,52 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     responder_json($resultado);
                     break;
 
+                case 'actualizar_usuario':
+                    $resultado = actualizar_usuario($post);
+                    responder_json($resultado);
+                    break;
+
+                case 'eliminar_usuario':
+                    $nombre_usuario = $post['nombre_usuario'] ?? '';
+                    $resultado = eliminar_usuario($nombre_usuario);
+                    responder_json($resultado);
+                    break;
+
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de administrador no válida']);
             }
             break;
-            case 'sesiones':
-                if ($subaccion === 'cerrar') {
-                    $token = $post['token'] ?? '';
-                    if ($token && cerrar_sesion($token)) {
-                        responder_json(['exito' => true]);
-                    } else {
-                        responder_json(['exito' => false, 'error' => 'Token no válido']);
-                    }
+
+        case 'sesiones':
+            if ($subaccion === 'cerrar') {
+                $token = $post['token'] ?? '';
+                if ($token && cerrar_sesion($token)) {
+                    responder_json(['exito' => true]);
                 } else {
-                    responder_json(['exito' => false, 'error' => 'Subacción de sesiones no válida']);
+                    responder_json(['exito' => false, 'error' => 'Token no válido']);
                 }
-                break;
+            } elseif ($subaccion === 'validar') {
+                $token = $post['token'] ?? '';
+                $resultado = validar_token_sesion($token);
+                if ($resultado) {
+                    $nodo_usuario = $resultado['nodo'];
+                    $nombre_usuario = $resultado['nombre_usuario'];
+                    $nodo_nivel = $nodo_usuario->adyacente('nivel');
+                    $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
+                    $usuario = [
+                        'nombre_usuario' => $nombre_usuario,
+                        'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : $nombre_usuario,
+                        'nivel' => $nodo_nivel ? $nodo_nivel->dato() : 'terminal',
+                    ];
+                    responder_json(['exito' => true, 'usuario' => $usuario]);
+                } else {
+                    responder_json(['exito' => false, 'error' => 'Sesión no válida']);
+                }
+            } else {
+                responder_json(['exito' => false, 'error' => 'Subacción de sesiones no válida']);
+            }
+            break;
+
         default:
             responder_json(['exito' => false, 'error' => 'Módulo no reconocido']);
     }

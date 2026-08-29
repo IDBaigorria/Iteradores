@@ -1,12 +1,16 @@
 <?php
-use Iteradores\Configuracion\Conf;
-include_once("./Configuracion/Configuracion.php");
 /**
  * Autenticación de usuarios por código de acceso.
  *
  * @package   Iteradores
- * @version   1.5piloto.1
+ * @since     1.5piloto.1
+ * @version   1.5piloto.3
  */
+
+use Iteradores\Configuracion\Conf;
+use Iteradores\Nodos\Nodo;
+include_once("./Configuracion/Configuracion.php");
+include_once("./Nodos/Nodo.php");
 
 /**
  * Autentica a un usuario mediante su código de acceso.
@@ -15,16 +19,13 @@ include_once("./Configuracion/Configuracion.php");
  * @return array|null Datos del usuario autenticado o null.
  */
 function autenticar_por_codigo(string $codigo): ?array {
-    // Primero intentar con usuario normal
     $usuario = buscar_usuario_por_codigo($codigo);
     if ($usuario) {
-        // Crear sesión y añadir token a los datos del usuario
         $token = crear_sesion($usuario['nombre_usuario']);
         $usuario['token_sesion'] = $token;
         return $usuario;
     }
 
-    // Si no existe, verificar si es el código maestro de admin
     if (verificar_codigo_admin($codigo)) {
         $usuario_admin = [
             'nombre_usuario' => Conf::NOMBRE_ADMIN,
@@ -37,4 +38,34 @@ function autenticar_por_codigo(string $codigo): ?array {
     }
 
     return null;
+}
+
+/**
+ * Valida un token de sesión y devuelve el nombre de usuario y su nodo.
+ *
+ * @param string $token Token de sesión.
+ * @return array|null Array con 'nombre_usuario' y 'nodo', o null si no es válido.
+ */
+function validar_token_sesion(string $token): ?array {
+    $raiz = Nodo::nodo_por_id('sesiones');
+    if (!$raiz) return null;
+
+    $nodo_sesion = $raiz->adyacente($token);
+    if (!$nodo_sesion) return null;
+
+    $nodo_usuario = $nodo_sesion->adyacente('usuario');
+    if (!$nodo_usuario) return null;
+
+    $nombre_usuario = $nodo_usuario->dato();
+
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_usuarios) return null;
+
+    $nodo_usuario_real = $raiz_usuarios->adyacente($nombre_usuario);
+    if (!$nodo_usuario_real) return null;
+
+    return [
+        'nombre_usuario' => $nombre_usuario,
+        'nodo' => $nodo_usuario_real,
+    ];
 }
