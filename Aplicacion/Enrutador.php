@@ -237,6 +237,23 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = actualizar_vehiculo($nombre_empresa, $nombre_vehiculo, $datos);
                     responder_json($resultado);
                     break;
+                case 'actualizar_configuracion':
+                    $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
+                    $configuracion_json = $post['configuracion'] ?? '';
+
+                    if (empty($nombre_empresa) || empty($nombre_vehiculo)) {
+                        responder_json(['exito' => false, 'error' => 'Empresa y vehículo son obligatorios']);
+                    }
+
+                    $configuracion = json_decode($configuracion_json, true);
+                    if (!is_array($configuracion)) {
+                        responder_json(['exito' => false, 'error' => 'Configuración inválida']);
+                    }
+
+                    $resultado = actualizar_configuracion_vehiculo($nombre_empresa, $nombre_vehiculo, $configuracion);
+                    responder_json($resultado);
+                    break;
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de vehículos no válida']);
             }

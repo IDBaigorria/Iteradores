@@ -217,28 +217,32 @@
         </div>
       </div>
       <div class="panel" id="panel_croquis_micros" style="display:none;">
-          <!-- Croquis estático -->
-          <div class="bus-area" id="area_croquis_estatico_micros">
-              <div class="section-title">Configuración física del vehículo</div>
-              <div class="bus">
-                  <div class="bus-front">FRENTE · CONDUCTOR</div>
-                  <div id="filas_asientos_estaticas_micros"></div>
-                  <div class="bus-back">PARTE TRASERA</div>
+          <!-- Área de croquis estático -->
+          <div id="area_croquis_estatico_micros">
+              <div class="bus-area">
+                  <div class="section-title">Configuración física del vehículo</div>
+                  <div id="croquis_pisos_micros"></div> <!-- Contenedor donde se dibujarán los pisos -->
+                  <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
               </div>
-              <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
           </div>
 
-          <!-- Formulario de edición (oculto por defecto) -->
+          <!-- Editor de configuración (oculto inicialmente) -->
           <div id="panel_edicion_vehiculo_micros" class="hidden" style="margin-top:10px;">
-              <h3>Editar vehículo</h3>
-              <div class="form-grid">
-                  <div class="field"><label>Patente (identificador)</label><input id="editar_vehiculo_patente" disabled></div>
-                  <div class="field"><label>Nombre visible</label><input id="editar_vehiculo_nombre_real"></div>
-                  <div class="field"><label>Cantidad de asientos</label><input type="number" id="editar_vehiculo_asientos" min="1"></div>
+              <h3>Editor de configuración de asientos</h3>
+              <div class="form-grid" style="margin-bottom:12px;">
+                  <div class="field">
+                      <label>Número de pisos</label>
+                      <select id="editor_num_pisos">
+                          <option value="1">1 piso</option>
+                          <option value="2">2 pisos</option>
+                      </select>
+                  </div>
               </div>
-              <div class="actions" style="margin-top:12px">
-                  <button class="btn primary" id="boton_guardar_edicion_vehiculo">Guardar cambios</button>
-                  <button class="btn" id="boton_cancelar_edicion_vehiculo">Cancelar</button>
+              <div id="editor_pisos_container"></div> <!-- Aquí se generan los editores de cada piso -->
+              <div class="actions" style="margin-top:12px;">
+                  <button class="btn" id="boton_numerar_automatico">Numerar automáticamente</button>
+                  <button class="btn primary" id="boton_guardar_configuracion">Guardar cambios</button>
+                  <button class="btn" id="boton_cancelar_configuracion">Cancelar</button>
               </div>
           </div>
       </div>

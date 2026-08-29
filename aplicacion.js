@@ -856,7 +856,7 @@ async function cargar_datos_micros() {
     $("#selector_dueno_micros").innerHTML = '';
     $("#selector_empresa_micros").innerHTML = '';
     $("#selector_vehiculo_micros").innerHTML = '';
-    $("#filas_asientos_estaticas_micros").innerHTML = '';
+    $("#croquis_pisos_micros").innerHTML = '';
 
     // Ocultar paneles por defecto
     $("#panel_selector_dueno_micros").style.display = 'none';
@@ -983,35 +983,106 @@ async function cargar_vehiculos_de_empresa(nombre_empresa) {
             };
         }
     } catch (e) { console.error(e); }
+}async function cargar_vehiculos_de_empresa(nombre_empresa) {
+    try {
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ accion: "vehiculos/listar", nombre_empresa })
+        });
+        const datos = await respuesta.json();
+        if (datos.exito) {
+            const select = $("#selector_vehiculo_micros");
+            select.innerHTML = '<option value="">Seleccione vehículo...</option>';
+            datos.vehiculos.forEach(vehiculo => {
+                const opcion = document.createElement('option');
+                opcion.value = vehiculo.nombre_vehiculo;
+                opcion.textContent = vehiculo.nombre;
+                select.appendChild(opcion);
+            });
+            if (datos.vehiculos.length > 0) {
+                select.selectedIndex = 1;
+                vehiculo_seleccionado_micros = datos.vehiculos[0];
+                mostrar_croquis_vehiculo(vehiculo_seleccionado_micros);
+                $("#panel_croquis_micros").style.display = 'block';
+                // Asegurar que el editor esté oculto
+                $("#area_croquis_estatico_micros").classList.remove("hidden");
+                $("#panel_edicion_vehiculo_micros").classList.add("hidden");
+            } else {
+                vehiculo_seleccionado_micros = null;
+                $("#panel_croquis_micros").style.display = 'none';
+            }
+            select.onchange = async () => {
+                const vehiculo = datos.vehiculos.find(v => v.nombre_vehiculo === select.value);
+                if (vehiculo) {
+                    vehiculo_seleccionado_micros = vehiculo;
+                    mostrar_croquis_vehiculo(vehiculo);
+                    $("#panel_croquis_micros").style.display = 'block';
+                    $("#area_croquis_estatico_micros").classList.remove("hidden");
+                    $("#panel_edicion_vehiculo_micros").classList.add("hidden");
+                } else {
+                    vehiculo_seleccionado_micros = null;
+                    $("#panel_croquis_micros").style.display = 'none';
+                }
+            };
+        }
+    } catch (e) { console.error(e); }
 }
 
-function mostrar_croquis_vehiculo(asientos) {
-    const contenedor = $("#filas_asientos_estaticas_micros");
+function mostrar_croquis_vehiculo(vehiculo) {
+    const contenedor = $("#croquis_pisos_micros");
     contenedor.innerHTML = '';
-    const num_asientos = parseInt(asientos) || 44;
-    const filas = Math.ceil(num_asientos / 4);
-    for (let fila = 0; fila < filas; fila++) {
-        const fila_div = document.createElement('div');
-        fila_div.className = 'seat-row';
-        for (let columna = 0; columna < 5; columna++) {
-            if (columna === 2) {
-                const pasillo = document.createElement('div');
-                pasillo.className = 'aisle';
-                fila_div.appendChild(pasillo);
-                continue;
+
+    const configuracion = vehiculo.configuracion;
+    if (!configuracion || !configuracion.pisos || configuracion.pisos.length === 0) {
+        // Si no hay configuración, mostrar croquis simple basado en cantidad total (como antes)
+        const num_asientos = parseInt(vehiculo.asientos) || 44;
+        const filas = Math.ceil(num_asientos / 4);
+        const pisoDiv = document.createElement('div');
+        pisoDiv.innerHTML = `<div class="bus-area"><div class="section-title">Piso único</div><div class="bus">`;
+        // ... construir igual que antes pero dentro de este div ...
+        // Para simplificar, copiamos la lógica anterior generando filas con 4 asientos.
+        // (Se muestra solo un piso)
+        // Código similar al anterior pero ahora dentro de la estructura.
+        // Por brevedad, asumimos que se puede reutilizar el código anterior.
+    } else {
+        configuracion.pisos.forEach((piso, index) => {
+            const titulo = document.createElement('div');
+            titulo.className = 'section-title';
+            titulo.textContent = `Piso ${index + 1}`;
+            contenedor.appendChild(titulo);
+
+            const busDiv = document.createElement('div');
+            busDiv.className = 'bus';
+            busDiv.innerHTML = `<div class="bus-front">FRENTE · CONDUCTOR</div>`;
+
+            for (let fila = 1; fila <= piso.filas; fila++) {
+                const filaDiv = document.createElement('div');
+                filaDiv.className = 'seat-row';
+                for (let col = 1; col <= piso.columnas; col++) {
+                    // Buscar si hay un asiento en esta fila/columna
+                    const asiento = piso.asientos.find(a => parseInt(a.fila) === fila && parseInt(a.columna) === col);
+                    if (asiento) {
+                        const seat = document.createElement('div');
+                        seat.className = 'seat';
+                        seat.textContent = asiento.numero.padStart(2, '0');
+                        filaDiv.appendChild(seat);
+                    } else {
+                        const empty = document.createElement('div');
+                        empty.className = 'aisle'; // o 'empty-cell'
+                        filaDiv.appendChild(empty);
+                    }
+                }
+                busDiv.appendChild(filaDiv);
             }
-            const numero = fila * 4 + (columna < 2 ? columna + 1 : columna - 1);
-            if (numero <= num_asientos) {
-                const asiento = document.createElement('div');
-                asiento.className = 'seat';
-                asiento.textContent = String(numero).padStart(2, '0');
-                fila_div.appendChild(asiento);
-            }
-        }
-        contenedor.appendChild(fila_div);
+
+            busDiv.innerHTML += `<div class="bus-back">PARTE TRASERA</div>`;
+            contenedor.appendChild(busDiv);
+        });
     }
 }
-function iniciar_edicion_vehiculo() {
+
+/*function iniciar_edicion_vehiculo() {
     if (!vehiculo_seleccionado_micros) {
         mostrar_aviso("Seleccione un vehículo primero");
         return;
@@ -1026,7 +1097,7 @@ function iniciar_edicion_vehiculo() {
     $("#area_croquis_estatico_micros").classList.add("hidden");
     $("#panel_edicion_vehiculo_micros").classList.remove("hidden");
 }
-
+*//*
 function cancelar_edicion_vehiculo() {
     // Ocultar formulario y volver a mostrar el croquis
     $("#panel_edicion_vehiculo_micros").classList.add("hidden");
@@ -1080,7 +1151,7 @@ async function guardar_edicion_vehiculo() {
         mostrar_aviso(resultado.error || "Error al actualizar");
     }
 }
-
+*/
 // Botón agregar empresa
 $("#boton_agregar_empresa_micros").addEventListener("click", () => {
     $("#formulario_nueva_empresa").classList.remove("hidden");
@@ -1165,9 +1236,238 @@ $("#boton_guardar_vehiculo").addEventListener("click", async () => {
     }
 });
 
-$("#boton_modificar_vehiculo_micros").addEventListener("click", iniciar_edicion_vehiculo);
-$("#boton_guardar_edicion_vehiculo").addEventListener("click", guardar_edicion_vehiculo);
-$("#boton_cancelar_edicion_vehiculo").addEventListener("click", cancelar_edicion_vehiculo);
+// ===== Editor de configuración de asientos =====
+
+let editor_pisos_actuales = []; // Arreglo con datos temporales de cada piso
+
+function iniciar_editor_vehiculo() {
+    if (!vehiculo_seleccionado_micros) {
+        mostrar_aviso("Seleccione un vehículo primero");
+        return;
+    }
+
+    // Ocultar área estática y mostrar editor
+    $("#area_croquis_estatico_micros").classList.add("hidden");
+    $("#panel_edicion_vehiculo_micros").classList.remove("hidden");
+
+    // Cargar número de pisos
+    const configuracion = vehiculo_seleccionado_micros.configuracion;
+    const numPisos = configuracion && configuracion.pisos ? configuracion.pisos.length : 1;
+    $("#editor_num_pisos").value = numPisos;
+
+    // Inicializar editor_pisos_actuales
+    editor_pisos_actuales = [];
+    if (configuracion && configuracion.pisos) {
+        for (let i = 0; i < configuracion.pisos.length; i++) {
+            editor_pisos_actuales.push({
+                filas: configuracion.pisos[i].filas,
+                columnas: configuracion.pisos[i].columnas,
+                asientos: configuracion.pisos[i].asientos.map(a => ({
+                    fila: parseInt(a.fila),
+                    columna: parseInt(a.columna),
+                    numero: a.numero
+                }))
+            });
+        }
+    } else {
+        // Si no hay configuración previa, crear un piso por defecto 12x5 sin asientos
+        editor_pisos_actuales.push({ filas: 12, columnas: 5, asientos: [] });
+    }
+
+    generar_editor_pisos();
+}
+
+function generar_editor_pisos() {
+    const numPisos = parseInt($("#editor_num_pisos").value);
+    // Ajustar editor_pisos_actuales al número de pisos
+    while (editor_pisos_actuales.length < numPisos) {
+        editor_pisos_actuales.push({ filas: 12, columnas: 5, asientos: [] });
+    }
+    editor_pisos_actuales.length = numPisos;
+
+    const contenedor = $("#editor_pisos_container");
+    contenedor.innerHTML = '';
+
+    editor_pisos_actuales.forEach((piso, idxPiso) => {
+        const pisoDiv = document.createElement('div');
+        pisoDiv.className = 'editor-piso';
+        pisoDiv.innerHTML = `<h4>Piso ${idxPiso + 1}</h4>
+            <div class="form-grid" style="margin-bottom:8px;">
+                <div class="field"><label>Filas</label><input type="number" class="input-filas" value="${piso.filas}" min="1"></div>
+                <div class="field"><label>Columnas</label><input type="number" class="input-columnas" value="${piso.columnas}" min="1"></div>
+            </div>
+            <div class="cuadricula-editor" data-piso="${idxPiso}"></div>`;
+
+        contenedor.appendChild(pisoDiv);
+
+        // Eventos para cambiar filas/columnas
+        const inputFilas = pisoDiv.querySelector('.input-filas');
+        const inputColumnas = pisoDiv.querySelector('.input-columnas');
+        inputFilas.addEventListener('change', () => {
+            piso.filas = parseInt(inputFilas.value) || 1;
+            renderizar_cuadricula_editor(pisoDiv, idxPiso);
+        });
+        inputColumnas.addEventListener('change', () => {
+            piso.columnas = parseInt(inputColumnas.value) || 1;
+            renderizar_cuadricula_editor(pisoDiv, idxPiso);
+        });
+
+        renderizar_cuadricula_editor(pisoDiv, idxPiso);
+    });
+}
+
+function renderizar_cuadricula_editor(contenedorPiso, idxPiso) {
+    const piso = editor_pisos_actuales[idxPiso];
+    const cuadricula = contenedorPiso.querySelector('.cuadricula-editor');
+    cuadricula.innerHTML = '';
+
+    for (let f = 1; f <= piso.filas; f++) {
+        const filaDiv = document.createElement('div');
+        filaDiv.className = 'seat-row';
+        for (let c = 1; c <= piso.columnas; c++) {
+            const celda = document.createElement('div');
+            celda.className = 'celda-editor';
+            celda.dataset.fila = f;
+            celda.dataset.columna = c;
+            celda.dataset.piso = idxPiso;
+
+            // Buscar si existe asiento en esa posición
+            const asiento = piso.asientos.find(a => a.fila === f && a.columna === c);
+            if (asiento) {
+                celda.classList.add('asiento');
+                celda.textContent = asiento.numero;
+            } else {
+                celda.classList.add('vacio');
+            }
+
+            celda.addEventListener('click', () => alternar_asiento(celda, idxPiso, f, c));
+            celda.addEventListener('dblclick', () => editar_numero_asiento(celda, idxPiso, f, c));
+
+            filaDiv.appendChild(celda);
+        }
+        cuadricula.appendChild(filaDiv);
+    }
+}
+
+function alternar_asiento(celda, idxPiso, fila, columna) {
+    const piso = editor_pisos_actuales[idxPiso];
+    const idx = piso.asientos.findIndex(a => a.fila === fila && a.columna === columna);
+    if (idx >= 0) {
+        // Quitar asiento
+        piso.asientos.splice(idx, 1);
+        celda.classList.remove('asiento');
+        celda.classList.add('vacio');
+        celda.textContent = '';
+    } else {
+        // Agregar asiento con número provisional (podría ser vacío o autogenerado)
+        const nuevoNumero = generar_numero_provisional(piso);
+        piso.asientos.push({ fila, columna, numero: nuevoNumero });
+        celda.classList.add('asiento');
+        celda.classList.remove('vacio');
+        celda.textContent = nuevoNumero;
+    }
+}
+
+function editar_numero_asiento(celda, idxPiso, fila, columna) {
+    const piso = editor_pisos_actuales[idxPiso];
+    const asiento = piso.asientos.find(a => a.fila === fila && a.columna === columna);
+    if (!asiento) return;
+
+    const nuevoNumero = prompt("Número de asiento:", asiento.numero);
+    if (nuevoNumero !== null && nuevoNumero.trim() !== '') {
+        asiento.numero = nuevoNumero.trim();
+        celda.textContent = nuevoNumero.trim();
+    }
+}
+
+function generar_numero_provisional(piso) {
+    // Buscar el mayor número actual y sumar 1
+    let max = 0;
+    piso.asientos.forEach(a => {
+        const num = parseInt(a.numero);
+        if (!isNaN(num) && num > max) max = num;
+    });
+    return String(max + 1);
+}
+
+function numerar_automaticamente() {
+    let contador = 0;
+    editor_pisos_actuales.forEach(piso => {
+        // Ordenar asientos por fila, columna
+        piso.asientos.sort((a, b) => a.fila - b.fila || a.columna - b.columna);
+        piso.asientos.forEach(a => {
+            contador++;
+            a.numero = String(contador);
+        });
+    });
+    // Redibujar las cuadrículas
+    document.querySelectorAll('.cuadricula-editor').forEach((cuadricula, idx) => {
+        renderizar_cuadricula_editor(cuadricula.parentElement, idx);
+    });
+}
+
+async function guardar_configuracion() {
+    // Recopilar configuración
+    const numPisos = parseInt($("#editor_num_pisos").value);
+    const configuracion = {
+        pisos: []
+    };
+    for (let i = 0; i < numPisos; i++) {
+        const piso = editor_pisos_actuales[i];
+        configuracion.pisos.push({
+            filas: piso.filas,
+            columnas: piso.columnas,
+            asientos: piso.asientos.map(a => ({
+                fila: String(a.fila),
+                columna: String(a.columna),
+                numero: String(a.numero)
+            }))
+        });
+    }
+
+    const nombre_empresa = $("#selector_empresa_micros").value;
+    const nombre_vehiculo = vehiculo_seleccionado_micros.nombre_vehiculo;
+
+    const datos = {
+        accion: "vehiculos/actualizar_configuracion",
+        nombre_empresa,
+        nombre_vehiculo,
+        configuracion: JSON.stringify(configuracion)
+    };
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(datos)
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Configuración actualizada");
+        // Salir del editor
+        cancelar_editor();
+        // Recargar vehículos para actualizar croquis
+        await cargar_vehiculos_de_empresa(nombre_empresa);
+    } else {
+        mostrar_aviso(resultado.error || "Error al guardar configuración");
+    }
+}
+
+function cancelar_editor() {
+    $("#panel_edicion_vehiculo_micros").classList.add("hidden");
+    $("#area_croquis_estatico_micros").classList.remove("hidden");
+    // Mostrar croquis actual (sin cambios)
+    if (vehiculo_seleccionado_micros) {
+        mostrar_croquis_vehiculo(vehiculo_seleccionado_micros);
+    }
+}
+
+
+// Eventos
+$("#boton_modificar_vehiculo_micros").addEventListener("click", iniciar_editor_vehiculo);
+$("#editor_num_pisos").addEventListener("change", generar_editor_pisos);
+$("#boton_numerar_automatico").addEventListener("click", numerar_automaticamente);
+$("#boton_guardar_configuracion").addEventListener("click", guardar_configuracion);
+$("#boton_cancelar_configuracion").addEventListener("click", cancelar_editor);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

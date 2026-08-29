@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.6)
+ * ## Estructura de nodos actual (v1.5piloto.7)
  *
  * ### Nodos raíz especiales
  *
@@ -71,7 +71,29 @@
  *   | Enlace      | Nodo destino y dato esperado                          |
  *   |-------------|-------------------------------------------------------|
  *   | `nombre`    | Nodo con dato string: nombre visible del vehículo.   |
- *   | `asientos`  | Nodo con dato string numérico: cantidad de asientos. |
+ *   | `asientos`  | Nodo contenedor con dato string = cantidad total de asientos. |
+ *   |             | ├─ Enlace `piso_1` → Nodo piso (dato vacío).           |
+ *   |             | └─ Enlace `piso_2` → Nodo piso (opcional).             |
+ *
+ * ### Nodo Piso
+ *
+ * - Dato del nodo: vacío.
+ * - Enlaces salientes:
+ *   | Enlace      | Nodo destino y dato esperado                          |
+ *   |-------------|-------------------------------------------------------|
+ *   | `filas`     | Nodo con dato string numérico (número de filas).     |
+ *   | `columnas`  | Nodo con dato string numérico (número de columnas).  |
+ *   | `asientos`  | Nodo cabeza de lista circular (dato vacío).           |
+ *   |             | └─ Enlace `primer` → primer nodo asiento de la lista. |
+ *
+ * ### Nodo Asiento (dato = número de asiento, string)
+ *
+ * - Enlaces salientes:
+ *   | Enlace      | Nodo destino y dato esperado                          |
+ *   |-------------|-------------------------------------------------------|
+ *   | `fila`      | Nodo con dato string numérico (posición en la cuadrícula). |
+ *   | `columna`   | Nodo con dato string numérico (posición en la cuadrícula). |
+ *   | `siguiente` | Nodo asiento siguiente en la lista circular, o la cabeza si es el último. |
  *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
@@ -92,9 +114,8 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.6
+ * @version   1.5piloto.7
  */
-
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.
 // Aquí simplemente ejecutamos el enrutador con los datos recibidos.
 enrutar_peticion_post($_POST['accion'] ?? '', $_POST);

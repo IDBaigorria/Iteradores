@@ -75,3 +75,50 @@ h2{margin:0 0 16px;font-size:21px} h3{margin:0 0 12px;font-size:17px}
 .login-box{max-width:420px;width:100%;margin:20px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 20px rgba(0,0,0,.2);padding:24px}
 @media(max-width:950px){.travel-layout,.customer-layout{grid-template-columns:1fr}.side-panel{position:static}.sale-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){.header{align-items:flex-start;flex-direction:column}.tabs{padding:0 8px}main{padding:14px}.brand{font-size:17px}.info-grid{grid-template-columns:1fr 1fr}.bus{width:350px}.form-grid{grid-template-columns:1fr}.sale-grid{grid-template-columns:1fr 1fr}}
+
+/* Editor de configuración de asientos */
+.editor-piso {
+    margin-bottom: 20px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #f9f9f9;
+}
+
+.cuadricula-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.cuadricula-editor .seat-row {
+    display: flex;
+    gap: 4px;
+}
+
+.celda-editor {
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 12px;
+    background: #fff;
+    transition: background 0.2s;
+}
+
+.celda-editor.vacio {
+    background: #f0f0f0;
+    border-style: dashed;
+}
+
+.celda-editor.asiento {
+    background: #d4edda;
+    border-color: #28a745;
+    font-weight: bold;
+}
