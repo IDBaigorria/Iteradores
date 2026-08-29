@@ -521,7 +521,7 @@ $("#boton_guardar_usuario").addEventListener("click", async () => {
     mostrar_aviso(datos.error || "Error al agregar usuario");
   }
 });
-async function cargar_datos_terminales() {
+/*async function cargar_datos_terminales() {
     if (!usuario_actual || usuario_actual.nivel !== 'dueno') return;
 
     // Obtener terminales del dueño actual
@@ -599,7 +599,7 @@ async function cargar_datos_terminales() {
             });
         });
     }
-}
+}*/
 
 
 // ====== Funciones para puntos de venta (dueño) ======
@@ -955,68 +955,28 @@ async function cargar_vehiculos_de_empresa(nombre_empresa) {
                 opcion.textContent = vehiculo.nombre;
                 select.appendChild(opcion);
             });
-            // Si hay vehículos, seleccionar el primero y mostrar croquis
+
             if (datos.vehiculos.length > 0) {
                 select.selectedIndex = 1; // primer vehículo
                 vehiculo_seleccionado_micros = datos.vehiculos[0];
-                await mostrar_croquis_vehiculo(datos.vehiculos[0].asientos);
-                $("#panel_croquis_micros").style.display = 'block';
-                // Asegurar que el formulario de edición esté oculto
-                $("#area_croquis_estatico_micros").classList.remove("hidden");
-                $("#panel_edicion_vehiculo_micros").classList.add("hidden");
-            } else {
-                vehiculo_seleccionado_micros = null;
-                $("#panel_croquis_micros").style.display = 'none';
-            }
-            select.onchange = async () => {
-                const vehiculo = datos.vehiculos.find(v => v.nombre_vehiculo === select.value);
-                if (vehiculo) {
-                    vehiculo_seleccionado_micros = vehiculo;
-                    await mostrar_croquis_vehiculo(vehiculo.asientos);
-                    $("#panel_croquis_micros").style.display = 'block';
-                    $("#area_croquis_estatico_micros").classList.remove("hidden");
-                    $("#panel_edicion_vehiculo_micros").classList.add("hidden");
-                } else {
-                    vehiculo_seleccionado_micros = null;
-                    $("#panel_croquis_micros").style.display = 'none';
-                }
-            };
-        }
-    } catch (e) { console.error(e); }
-}async function cargar_vehiculos_de_empresa(nombre_empresa) {
-    try {
-        const respuesta = await fetch("index.php", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({ accion: "vehiculos/listar", nombre_empresa })
-        });
-        const datos = await respuesta.json();
-        if (datos.exito) {
-            const select = $("#selector_vehiculo_micros");
-            select.innerHTML = '<option value="">Seleccione vehículo...</option>';
-            datos.vehiculos.forEach(vehiculo => {
-                const opcion = document.createElement('option');
-                opcion.value = vehiculo.nombre_vehiculo;
-                opcion.textContent = vehiculo.nombre;
-                select.appendChild(opcion);
-            });
-            if (datos.vehiculos.length > 0) {
-                select.selectedIndex = 1;
-                vehiculo_seleccionado_micros = datos.vehiculos[0];
                 mostrar_croquis_vehiculo(vehiculo_seleccionado_micros);
+                // Mostrar la foto estática
+                actualizar_foto_vehiculo(vehiculo_seleccionado_micros.foto, false);
                 $("#panel_croquis_micros").style.display = 'block';
-                // Asegurar que el editor esté oculto
                 $("#area_croquis_estatico_micros").classList.remove("hidden");
                 $("#panel_edicion_vehiculo_micros").classList.add("hidden");
             } else {
                 vehiculo_seleccionado_micros = null;
                 $("#panel_croquis_micros").style.display = 'none';
             }
+
             select.onchange = async () => {
                 const vehiculo = datos.vehiculos.find(v => v.nombre_vehiculo === select.value);
                 if (vehiculo) {
                     vehiculo_seleccionado_micros = vehiculo;
                     mostrar_croquis_vehiculo(vehiculo);
+                    // Mostrar la foto estática
+                    actualizar_foto_vehiculo(vehiculo.foto, false);
                     $("#panel_croquis_micros").style.display = 'block';
                     $("#area_croquis_estatico_micros").classList.remove("hidden");
                     $("#panel_edicion_vehiculo_micros").classList.add("hidden");
@@ -1026,8 +986,42 @@ async function cargar_vehiculos_de_empresa(nombre_empresa) {
                 }
             };
         }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error(e);
+    }
 }
+function actualizar_foto_vehiculo(ruta, es_editor = false) {
+    if (es_editor) {
+        const img = $("#foto_vehiculo_editor_img");
+        const placeholder = $("#foto_vehiculo_editor_placeholder");
+        const boton_subir = $("#boton_subir_foto");
+        const boton_cambiar = $("#boton_cambiar_foto");
+        if (ruta) {
+            img.src = ruta;
+            img.style.display = 'block';
+            placeholder.style.display = 'none';
+            boton_subir.style.display = 'none';
+            boton_cambiar.style.display = 'inline-block';
+        } else {
+            img.style.display = 'none';
+            placeholder.style.display = 'block';
+            boton_subir.style.display = 'inline-block';
+            boton_cambiar.style.display = 'none';
+        }
+    } else {
+        const img = $("#foto_vehiculo_estatica");
+        const placeholder = $("#foto_vehiculo_estatica_placeholder");
+        if (ruta) {
+            img.src = ruta;
+            img.style.display = 'block';
+            placeholder.style.display = 'none';
+        } else {
+            img.style.display = 'none';
+            placeholder.style.display = 'block';
+        }
+    }
+}
+
 
 function mostrar_croquis_vehiculo(vehiculo) {
     const contenedor = $("#croquis_pisos_micros");
@@ -1213,11 +1207,10 @@ $("#boton_guardar_vehiculo").addEventListener("click", async () => {
         accion: "vehiculos/agregar",
         nombre_empresa,
         nombre_vehiculo: $("#nuevo_vehiculo_nombre").value.trim(),
-        nombre_real: $("#nuevo_vehiculo_nombre_real").value.trim(),
-        asientos: $("#nuevo_vehiculo_asientos").value
+        nombre_real: $("#nuevo_vehiculo_nombre_real").value.trim()
     };
     if (!datos.nombre_vehiculo) {
-        mostrar_aviso("Nombre de vehículo obligatorio");
+        mostrar_aviso("Patente obligatoria");
         return;
     }
     const respuesta = await fetch("index.php", {
@@ -1227,15 +1220,76 @@ $("#boton_guardar_vehiculo").addEventListener("click", async () => {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Vehículo agregado");
+        mostrar_aviso("Vehículo agregado. Configure los asientos.");
         $("#formulario_nuevo_vehiculo").classList.add("hidden");
-        // Limpiar campos
         await cargar_vehiculos_de_empresa(nombre_empresa);
+        // Seleccionar el vehículo recién agregado y abrir editor
+        const select = $("#selector_vehiculo_micros");
+        select.value = datos.nombre_vehiculo;
+        // Disparar evento change para cargar vehículo
+        select.dispatchEvent(new Event('change'));
+        // Esperar un pequeño tiempo para que se cargue y luego abrir editor
+        setTimeout(() => {
+            if (vehiculo_seleccionado_micros && vehiculo_seleccionado_micros.nombre_vehiculo === datos.nombre_vehiculo) {
+                iniciar_editor_vehiculo();
+            }
+        }, 300);
     } else {
         mostrar_aviso(resultado.error || "Error al agregar vehículo");
     }
 });
 
+$("#boton_reiniciar_asientos").addEventListener("click", () => {
+    editor_pisos_actuales.forEach(piso => {
+        piso.asientos = [];
+    });
+    // Redibujar cuadrículas
+    document.querySelectorAll('.cuadricula-editor').forEach((cuadricula, idx) => {
+        renderizar_cuadricula_editor(cuadricula.parentElement, idx);
+    });
+    mostrar_aviso("Asientos reiniciados");
+});
+$("#boton_subir_foto").addEventListener("click", () => {
+    $("#input_foto_vehiculo").click();
+});
+
+$("#boton_cambiar_foto").addEventListener("click", () => {
+    $("#input_foto_vehiculo").click();
+});
+
+$("#input_foto_vehiculo").addEventListener("change", async (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    const nombre_empresa = $("#selector_empresa_micros").value;
+    const nombre_vehiculo = vehiculo_seleccionado_micros?.nombre_vehiculo;
+    if (!nombre_vehiculo) {
+        mostrar_aviso("Seleccione un vehículo primero");
+        return;
+    }
+    const formData = new FormData();
+    formData.append('accion', 'vehiculos/subir_foto');
+    formData.append('nombre_empresa', nombre_empresa);
+    formData.append('nombre_vehiculo', nombre_vehiculo);
+    formData.append('foto', archivo);
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        body: formData
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        // Actualizar variable global
+        if (vehiculo_seleccionado_micros) {
+            vehiculo_seleccionado_micros.foto = resultado.foto;
+        }
+        // Actualizar vistas
+        actualizar_foto_vehiculo(resultado.foto, false);
+        actualizar_foto_vehiculo(resultado.foto, true);
+        mostrar_aviso("Foto actualizada");
+    } else {
+        mostrar_aviso(resultado.error || "Error al subir foto");
+    }
+});
 // ===== Editor de configuración de asientos =====
 
 let editor_pisos_actuales = []; // Arreglo con datos temporales de cada piso
@@ -1252,8 +1306,11 @@ function iniciar_editor_vehiculo() {
 
     // Cargar número de pisos
     const configuracion = vehiculo_seleccionado_micros.configuracion;
-    const numPisos = configuracion && configuracion.pisos ? configuracion.pisos.length : 1;
-    $("#editor_num_pisos").value = numPisos;
+    let numPisos = 1;
+    if (configuracion && Array.isArray(configuracion.pisos) && configuracion.pisos.length > 0) {
+        numPisos = configuracion.pisos.length;
+    }
+    $("#editor_num_pisos").value = String(numPisos);
 
     // Inicializar editor_pisos_actuales
     editor_pisos_actuales = [];
@@ -1275,10 +1332,14 @@ function iniciar_editor_vehiculo() {
     }
 
     generar_editor_pisos();
+    actualizar_foto_vehiculo(vehiculo_seleccionado_micros.foto, true);
 }
 
 function generar_editor_pisos() {
-    const numPisos = parseInt($("#editor_num_pisos").value);
+    const select = $("#editor_num_pisos");
+    if (!select) return;
+    const numPisos = Math.max(1, parseInt(select.value, 10) || 1);
+
     // Ajustar editor_pisos_actuales al número de pisos
     while (editor_pisos_actuales.length < numPisos) {
         editor_pisos_actuales.push({ filas: 12, columnas: 5, asientos: [] });
@@ -1300,15 +1361,14 @@ function generar_editor_pisos() {
 
         contenedor.appendChild(pisoDiv);
 
-        // Eventos para cambiar filas/columnas
         const inputFilas = pisoDiv.querySelector('.input-filas');
         const inputColumnas = pisoDiv.querySelector('.input-columnas');
         inputFilas.addEventListener('change', () => {
-            piso.filas = parseInt(inputFilas.value) || 1;
+            piso.filas = parseInt(inputFilas.value, 10) || 1;
             renderizar_cuadricula_editor(pisoDiv, idxPiso);
         });
         inputColumnas.addEventListener('change', () => {
-            piso.columnas = parseInt(inputColumnas.value) || 1;
+            piso.columnas = parseInt(inputColumnas.value, 10) || 1;
             renderizar_cuadricula_editor(pisoDiv, idxPiso);
         });
 
@@ -1390,7 +1450,7 @@ function generar_numero_provisional(piso) {
     return String(max + 1);
 }
 
-function numerar_automaticamente() {
+/*function numerar_automaticamente() {
     let contador = 0;
     editor_pisos_actuales.forEach(piso => {
         // Ordenar asientos por fila, columna
@@ -1404,7 +1464,7 @@ function numerar_automaticamente() {
     document.querySelectorAll('.cuadricula-editor').forEach((cuadricula, idx) => {
         renderizar_cuadricula_editor(cuadricula.parentElement, idx);
     });
-}
+}*/
 
 async function guardar_configuracion() {
     // Recopilar configuración
@@ -1442,11 +1502,17 @@ async function guardar_configuracion() {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Configuración actualizada");
-        // Salir del editor
+        // Actualizar los datos locales del vehículo seleccionado
+        if (vehiculo_seleccionado_micros) {
+            vehiculo_seleccionado_micros.configuracion = configuracion;
+            // Calcular total de asientos
+            const total_asientos = configuracion.pisos.reduce((total, piso) => total + piso.asientos.length, 0);
+            vehiculo_seleccionado_micros.asientos = String(total_asientos);
+        }
+
+        // Salir del editor y mostrar el croquis actualizado
         cancelar_editor();
-        // Recargar vehículos para actualizar croquis
-        await cargar_vehiculos_de_empresa(nombre_empresa);
+        mostrar_aviso("Configuración actualizada");
     } else {
         mostrar_aviso(resultado.error || "Error al guardar configuración");
     }
@@ -1465,10 +1531,94 @@ function cancelar_editor() {
 // Eventos
 $("#boton_modificar_vehiculo_micros").addEventListener("click", iniciar_editor_vehiculo);
 $("#editor_num_pisos").addEventListener("change", generar_editor_pisos);
-$("#boton_numerar_automatico").addEventListener("click", numerar_automaticamente);
+//$("#boton_numerar_automatico").addEventListener("click", numerar_automaticamente);
 $("#boton_guardar_configuracion").addEventListener("click", guardar_configuracion);
 $("#boton_cancelar_configuracion").addEventListener("click", cancelar_editor);
 
+$("#boton_editar_empresa_micros").addEventListener("click", () => {
+    const nombre_empresa = $("#selector_empresa_micros").value;
+    const nombre_dueno = usuario_actual.nivel === 'admin' ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
+    if (!nombre_empresa) {
+        mostrar_aviso("Seleccione una empresa");
+        return;
+    }
+    // Obtener nombre visible actual
+    const nombre_actual = $("#selector_empresa_micros").selectedOptions[0].textContent;
+    $("#editar_empresa_nombre").value = nombre_actual;
+    $("#formulario_editar_empresa").classList.remove("hidden");
+    $("#formulario_nueva_empresa").classList.add("hidden");
+});
+
+/*$("#boton_guardar_edicion_empresa").addEventListener("click", async () => {
+    const nombre_empresa = $("#selector_empresa_micros").value;
+    const nombre_dueno = usuario_actual.nivel === 'admin' ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
+    const nuevo_nombre = $("#editar_empresa_nombre").value.trim();
+    if (!nuevo_nombre) {
+        mostrar_aviso("El nombre no puede estar vacío");
+        return;
+    }
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "empresas/editar", nombre_dueno, nombre_empresa, nuevo_nombre })
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Empresa actualizada");
+        $("#formulario_editar_empresa").classList.add("hidden");
+        await cargar_empresas_de_dueno(nombre_dueno);
+    } else {
+        mostrar_aviso(resultado.error || "Error al editar");
+    }
+});*/
+
+/*$("#boton_cancelar_edicion_empresa").addEventListener("click", () => {
+    $("#formulario_editar_empresa").classList.add("hidden");
+});*/
+
+$("#boton_eliminar_empresa_micros").addEventListener("click", async () => {
+    const nombre_empresa = $("#selector_empresa_micros").value;
+    const nombre_dueno = usuario_actual.nivel === 'admin' ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
+    if (!nombre_empresa) {
+        mostrar_aviso("Seleccione una empresa");
+        return;
+    }
+    if (!confirm(`¿Eliminar la empresa "${nombre_empresa}" y todos sus vehículos?`)) return;
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "empresas/eliminar", nombre_dueno, nombre_empresa })
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Empresa eliminada");
+        await cargar_empresas_de_dueno(nombre_dueno);
+    } else {
+        mostrar_aviso(resultado.error || "Error al eliminar");
+    }
+});
+$("#boton_eliminar_vehiculo_micros").addEventListener("click", async () => {
+    alert ("hola");
+    const nombre_empresa = $("#selector_empresa_micros").value;
+    const nombre_vehiculo = $("#selector_vehiculo_micros").value;
+    if (!nombre_vehiculo) {
+        mostrar_aviso("Seleccione un vehículo");
+        return;
+    }
+    if (!confirm(`¿Eliminar el vehículo "${nombre_vehiculo}"?`)) return;
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "vehiculos/eliminar", nombre_empresa, nombre_vehiculo })
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Vehículo eliminado");
+        await cargar_vehiculos_de_empresa(nombre_empresa);
+    } else {
+        mostrar_aviso(resultado.error || "Error al eliminar");
+    }
+});
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////

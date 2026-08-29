@@ -85,7 +85,7 @@
                   <th>Bancarizado</th>
                   <th>Banco</th>
                   <th>Cuenta</th>
-                  <th>Dueño</th>        <!-- Nueva columna -->
+                  <th>Dueño</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -104,6 +104,7 @@
         </div>
       </div>
     </section>
+
     <section id="terminales" class="tab-content hidden">
       <div class="panel">
         <h2>Puntos de venta</h2>
@@ -111,7 +112,6 @@
         <button class="btn primary" id="boton_agregar_terminal">Agregar punto de venta</button>
       </div>
 
-      <!-- Formulario para nuevo punto de venta (oculto inicialmente) -->
       <div id="formulario_nueva_terminal" class="panel hidden">
         <h3>Nuevo punto de venta</h3>
         <div class="form-grid">
@@ -184,15 +184,25 @@
           <label for="selector_empresa_micros">Empresa:</label>
           <select id="selector_empresa_micros"></select>
           <button class="btn" id="boton_agregar_empresa_micros">Agregar empresa</button>
+          <button class="btn" id="boton_editar_empresa_micros">Editar</button>
+          <button class="btn danger" id="boton_eliminar_empresa_micros">Eliminar</button>
         </div>
         <div id="formulario_nueva_empresa" class="panel hidden" style="margin-top:10px;">
           <div class="form-grid">
-            <div class="field"><label>Nombre de empresa (identificador) *</label><input id="nueva_empresa_nombre"></div>
             <div class="field"><label>Nombre visible</label><input id="nueva_empresa_nombre_real"></div>
           </div>
           <div class="actions" style="margin-top:8px">
             <button class="btn primary" id="boton_guardar_empresa">Guardar</button>
             <button class="btn" id="boton_cancelar_empresa">Cancelar</button>
+          </div>
+        </div>
+        <div id="formulario_editar_empresa" class="panel hidden" style="margin-top:10px;">
+          <div class="form-grid">
+            <div class="field"><label>Nombre visible</label><input id="editar_empresa_nombre"></div>
+          </div>
+          <div class="actions" style="margin-top:8px">
+            <button class="btn primary" id="boton_guardar_edicion_empresa">Guardar</button>
+            <button class="btn" id="boton_cancelar_edicion_empresa">Cancelar</button>
           </div>
         </div>
       </div>
@@ -203,12 +213,12 @@
           <select id="selector_vehiculo_micros"></select>
           <button class="btn" id="boton_agregar_vehiculo_micros">Agregar vehículo</button>
           <button class="btn primary" id="boton_modificar_vehiculo_micros">Modificar vehículo</button>
+          <button class="btn danger" id="boton_eliminar_vehiculo_micros">Eliminar</button>
         </div>
         <div id="formulario_nuevo_vehiculo" class="panel hidden" style="margin-top:10px;">
           <div class="form-grid">
-            <div class="field"><label>Nombre de vehículo (identificador) *</label><input id="nuevo_vehiculo_nombre"></div>
+            <div class="field"><label>Patente (identificador) *</label><input id="nuevo_vehiculo_nombre"></div>
             <div class="field"><label>Nombre visible</label><input id="nuevo_vehiculo_nombre_real"></div>
-            <div class="field"><label>Cantidad de asientos *</label><input type="number" id="nuevo_vehiculo_asientos" value="44"></div>
           </div>
           <div class="actions" style="margin-top:8px">
             <button class="btn primary" id="boton_guardar_vehiculo">Guardar</button>
@@ -216,35 +226,51 @@
           </div>
         </div>
       </div>
+
       <div class="panel" id="panel_croquis_micros" style="display:none;">
-          <!-- Área de croquis estático -->
-          <div id="area_croquis_estatico_micros">
-              <div class="bus-area">
-                  <div class="section-title">Configuración física del vehículo</div>
-                  <div id="croquis_pisos_micros"></div> <!-- Contenedor donde se dibujarán los pisos -->
-                  <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
-              </div>
+        <!-- Vista estática (croquis + foto grande) -->
+        <div id="area_croquis_estatico_micros">
+          <div class="bus-area">
+            <div class="section-title">Configuración física del vehículo</div>
+            <div id="croquis_pisos_micros"></div>
+            <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
+          </div>
+          <div class="foto-vehiculo-grande" style="margin-top:15px;">
+            <img id="foto_vehiculo_estatica" src="" alt="Foto del vehículo" style="display:none; max-width:300px; max-height:300px; border-radius:8px; border:1px solid #ccc;">
+            <div id="foto_vehiculo_estatica_placeholder" style="color:#888;">Sin foto</div>
+          </div>
+        </div>
+
+        <!-- Editor de configuración (oculto inicialmente) -->
+        <div id="panel_edicion_vehiculo_micros" class="hidden" style="margin-top:10px;">
+          <h3>Editor de configuración de asientos</h3>
+          <div class="foto-vehiculo-editor" style="display:flex; align-items:center; gap:15px; margin-bottom:15px;">
+            <div style="width:150px; height:150px; border:1px solid #ccc; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+              <img id="foto_vehiculo_editor_img" src="" alt="Foto" style="width:100%; height:100%; object-fit:cover; display:none;">
+              <span id="foto_vehiculo_editor_placeholder" style="color:#888;">Sin foto</span>
+            </div>
+            <div>
+              <button class="btn" id="boton_subir_foto">Subir foto</button>
+              <button class="btn" id="boton_cambiar_foto" style="display:none;">Cambiar foto</button>
+              <input type="file" id="input_foto_vehiculo" accept="image/*" style="display:none;">
+            </div>
           </div>
 
-          <!-- Editor de configuración (oculto inicialmente) -->
-          <div id="panel_edicion_vehiculo_micros" class="hidden" style="margin-top:10px;">
-              <h3>Editor de configuración de asientos</h3>
-              <div class="form-grid" style="margin-bottom:12px;">
-                  <div class="field">
-                      <label>Número de pisos</label>
-                      <select id="editor_num_pisos">
-                          <option value="1">1 piso</option>
-                          <option value="2">2 pisos</option>
-                      </select>
-                  </div>
-              </div>
-              <div id="editor_pisos_container"></div> <!-- Aquí se generan los editores de cada piso -->
-              <div class="actions" style="margin-top:12px;">
-                  <button class="btn" id="boton_numerar_automatico">Numerar automáticamente</button>
-                  <button class="btn primary" id="boton_guardar_configuracion">Guardar cambios</button>
-                  <button class="btn" id="boton_cancelar_configuracion">Cancelar</button>
-              </div>
+          <div class="form-grid" style="margin-bottom:12px;">
+            <div class="field">
+              <select id="editor_num_pisos">
+                <option value="1" selected>1 piso</option>
+                <option value="2">2 pisos</option>
+              </select>
+            </div>
           </div>
+          <div id="editor_pisos_container"></div>
+          <div class="actions" style="margin-top:12px;">
+            <button class="btn" id="boton_reiniciar_asientos">Reiniciar asientos</button>
+            <button class="btn primary" id="boton_guardar_configuracion">Guardar cambios</button>
+            <button class="btn" id="boton_cancelar_configuracion">Cancelar</button>
+          </div>
+        </div>
       </div>
     </section>
 

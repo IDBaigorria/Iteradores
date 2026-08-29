@@ -192,7 +192,25 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = agregar_empresa($nombre_dueno, $nombre_empresa, $nombre_real);
                     responder_json($resultado);
                     break;
-
+                case 'editar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    $nuevo_nombre = $post['nuevo_nombre'] ?? '';
+                    if (empty($nombre_dueno) || empty($nombre_empresa)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño y empresa son obligatorios']);
+                    }
+                    $resultado = editar_empresa($nombre_dueno, $nombre_empresa, $nuevo_nombre);
+                    responder_json($resultado);
+                    break;
+                case 'eliminar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    if (empty($nombre_dueno) || empty($nombre_empresa)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño y empresa son obligatorios']);
+                    }
+                    $resultado = eliminar_empresa($nombre_dueno, $nombre_empresa);
+                    responder_json($resultado);
+                    break;
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de empresas no válida']);
             }
@@ -212,8 +230,7 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombre_empresa = $post['nombre_empresa'] ?? '';
                     $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
                     $nombre_real = $post['nombre_real'] ?? '';
-                    $asientos = isset($post['asientos']) ? (int)$post['asientos'] : 44;
-                    $resultado = agregar_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_real, $asientos);
+                    $resultado = agregar_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_real);
                     responder_json($resultado);
                     break;
                 case 'actualizar':
@@ -252,6 +269,27 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
 
                     $resultado = actualizar_configuracion_vehiculo($nombre_empresa, $nombre_vehiculo, $configuracion);
+                    responder_json($resultado);
+                    break;
+                case 'eliminar':
+                    $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
+                    if (empty($nombre_empresa) || empty($nombre_vehiculo)) {
+                        responder_json(['exito' => false, 'error' => 'Empresa y vehículo son obligatorios']);
+                    }
+                    $resultado = eliminar_vehiculo($nombre_empresa, $nombre_vehiculo);
+                    responder_json($resultado);
+                    break;
+                case 'subir_foto':
+                    $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
+                    if (empty($nombre_empresa) || empty($nombre_vehiculo)) {
+                        responder_json(['exito' => false, 'error' => 'Empresa y vehículo son obligatorios']);
+                    }
+                    if (!isset($_FILES['foto'])) {
+                        responder_json(['exito' => false, 'error' => 'Archivo no enviado']);
+                    }
+                    $resultado = subir_foto_vehiculo($nombre_empresa, $nombre_vehiculo, $_FILES['foto']);
                     responder_json($resultado);
                     break;
                 default:

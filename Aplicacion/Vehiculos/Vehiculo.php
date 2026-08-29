@@ -42,24 +42,20 @@ function listar_vehiculos_de_empresa(string $nombre_empresa): array {
             $nodo_asientos = $nodo_vehiculo->adyacente('asientos');
             $asientos = $nodo_asientos ? $nodo_asientos->dato() : '0';
 
-            // Obtener configuración si existe
-            $configuracion = [
-                'pisos' => []
-            ];
+            // Foto
+            $nodo_foto = $nodo_vehiculo->adyacente('foto');
+            $foto = $nodo_foto ? $nodo_foto->dato() : '';
+
+            // Configuración
+            $configuracion = ['pisos' => []];
             if ($nodo_asientos) {
-                // Verificar si hay piso_1
-                $piso1 = $nodo_asientos->adyacente('piso_1');
-                if ($piso1) {
-                    $config_piso1 = obtener_configuracion_piso($piso1);
-                    if ($config_piso1) {
-                        $configuracion['pisos'][] = $config_piso1;
-                    }
-                }
-                $piso2 = $nodo_asientos->adyacente('piso_2');
-                if ($piso2) {
-                    $config_piso2 = obtener_configuracion_piso($piso2);
-                    if ($config_piso2) {
-                        $configuracion['pisos'][] = $config_piso2;
+                for ($i = 1; $i <= 2; $i++) {
+                    $piso = $nodo_asientos->adyacente("piso_$i");
+                    if ($piso) {
+                        $config_piso = obtener_configuracion_piso($piso);
+                        if ($config_piso) {
+                            $configuracion['pisos'][] = $config_piso;
+                        }
                     }
                 }
             }
@@ -68,6 +64,7 @@ function listar_vehiculos_de_empresa(string $nombre_empresa): array {
                 'nombre_vehiculo' => $nombre_vehiculo,
                 'nombre' => $nodo_nombre ? $nodo_nombre->dato() : $nombre_vehiculo,
                 'asientos' => $asientos,
+                'foto' => $foto,
                 'configuracion' => $configuracion
             ];
         }
@@ -94,17 +91,19 @@ function obtener_configuracion_piso($nodo_piso): ?array {
     $nodo_cabeza = $nodo_piso->adyacente('asientos');
     if ($nodo_cabeza) {
         $actual = $nodo_cabeza->adyacente('primer');
-        while ($actual && $actual !== $nodo_cabeza) {
+        $contador_seguridad = 0;
+        while ($actual && $actual->id() !== $nodo_cabeza->id() && $contador_seguridad < 1000) {
             $fila = $actual->adyacente('fila');
             $columna = $actual->adyacente('columna');
             if ($fila && $columna) {
                 $asientos[] = [
                     'fila' => $fila->dato(),
                     'columna' => $columna->dato(),
-                    'numero' => $actual->dato() // dato del nodo asiento
+                    'numero' => $actual->dato()
                 ];
             }
             $actual = $actual->adyacente('siguiente');
+            $contador_seguridad++;
         }
     }
 
@@ -117,14 +116,14 @@ function obtener_configuracion_piso($nodo_piso): ?array {
 
 /**
  * Agrega un nuevo vehículo a una empresa.
+ * Ya no recibe cantidad de asientos; se crea con asientos=0 y sin configuración.
  *
  * @param string $nombre_empresa Nombre identificador de la empresa.
  * @param string $nombre_vehiculo Nombre identificador del vehículo (patente).
  * @param string $nombre_real Nombre visible del vehículo.
- * @param int $asientos Cantidad de asientos.
  * @return array Resultado de la operación.
  */
-function agregar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, string $nombre_real = '', int $asientos = 44): array {
+function agregar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, string $nombre_real = ''): array {
     $nombre_vehiculo = trim($nombre_vehiculo);
     if (empty($nombre_vehiculo)) {
         return ['exito' => false, 'error' => 'El nombre del vehículo es obligatorio'];
@@ -151,8 +150,7 @@ function agregar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, strin
 
         $nodo_vehiculo = Nodo::crear_con_dato($nombre_vehiculo);
         $nodo_vehiculo->_adyacente_en(Nodo::crear_con_dato($nombre_real ?: $nombre_vehiculo), 'nombre');
-        // Ahora el nodo asientos es contenedor, inicialmente solo con el dato cantidad
-        $nodo_asientos = Nodo::crear_con_dato((string)$asientos);
+        $nodo_asientos = Nodo::crear_con_dato('0');
         $nodo_vehiculo->_adyacente_en($nodo_asientos, 'asientos');
 
         $nodo_vehiculos->_adyacente_en($nodo_vehiculo, $nombre_vehiculo);
@@ -258,7 +256,6 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
         return ['exito' => false, 'error' => 'No hay usuarios registrados'];
     }
 
-    // Buscar empresa y vehículo globalmente
     foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
         $nodo_empresas = $nodo_dueno->adyacente('empresas');
         if (!$nodo_empresas) continue;
@@ -275,7 +272,6 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
             return ['exito' => false, 'error' => 'Vehículo no encontrado'];
         }
 
-        // Obtener o crear nodo asientos
         $nodo_asientos = $nodo_vehiculo->adyacente('asientos');
         if (!$nodo_asientos) {
             $nodo_asientos = Nodo::crear_con_dato('0');
@@ -290,18 +286,16 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
         $indice_piso = 1;
         foreach ($configuracion['pisos'] as $piso_datos) {
             if (!isset($piso_datos['filas'], $piso_datos['columnas'], $piso_datos['asientos'])) {
-                continue; // ignorar pisos incompletos
+                continue;
             }
             $filas = (int)$piso_datos['filas'];
             $columnas = (int)$piso_datos['columnas'];
             if ($filas <= 0 || $columnas <= 0) continue;
 
-            // Crear nodo piso
             $nodo_piso = Nodo::crear_con_dato('');
             $nodo_piso->_adyacente_en(Nodo::crear_con_dato((string)$filas), 'filas');
             $nodo_piso->_adyacente_en(Nodo::crear_con_dato((string)$columnas), 'columnas');
 
-            // Crear cabeza de lista circular
             $nodo_cabeza = Nodo::crear_con_dato('');
             $nodo_piso->_adyacente_en($nodo_cabeza, 'asientos');
 
@@ -313,7 +307,6 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
                 $columna = (string)$asiento_datos['columna'];
                 $numero = (string)$asiento_datos['numero'];
 
-                // Crear nodo asiento con dato = número
                 $nodo_asiento = Nodo::crear_con_dato($numero);
                 $nodo_asiento->_adyacente_en(Nodo::crear_con_dato($fila), 'fila');
                 $nodo_asiento->_adyacente_en(Nodo::crear_con_dato($columna), 'columna');
@@ -327,7 +320,6 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
                 $total_asientos++;
             }
 
-            // Cerrar lista circular: último apunta a cabeza, cabeza apunta a primer
             if ($anterior) {
                 $anterior->_adyacente_en($nodo_cabeza, 'siguiente');
             }
@@ -335,12 +327,10 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
                 $nodo_cabeza->_adyacente_en($primer, 'primer');
             }
 
-            // Enlazar piso al nodo asientos
             $nodo_asientos->_adyacente_en($nodo_piso, 'piso_' . $indice_piso);
             $indice_piso++;
         }
 
-        // Actualizar dato de cantidad total
         $nodo_asientos->_dato((string)$total_asientos);
 
         Controlador::guardar(Conf::NOMBRE_APP);
@@ -349,4 +339,144 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
     }
 
     return ['exito' => false, 'error' => 'Empresa no encontrada'];
+}
+
+/**
+ * Elimina un vehículo de la empresa.
+ *
+ * @param string $nombre_empresa Nombre identificador de la empresa.
+ * @param string $nombre_vehiculo Identificador del vehículo (patente).
+ * @return array Resultado.
+ */
+function eliminar_vehiculo(string $nombre_empresa, string $nombre_vehiculo): array {
+    $nombre_vehiculo = trim($nombre_vehiculo);
+    if (empty($nombre_vehiculo)) {
+        return ['exito' => false, 'error' => 'Identificador de vehículo obligatorio'];
+    }
+
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
+
+    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nodo_empresas = $nodo_dueno->adyacente('empresas');
+        if (!$nodo_empresas) continue;
+        $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
+        if (!$nodo_empresa) continue;
+
+        $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
+        if (!$nodo_vehiculos) return ['exito' => false, 'error' => 'La empresa no tiene vehículos'];
+
+        $nodo_vehiculo = $nodo_vehiculos->adyacente($nombre_vehiculo);
+        if (!$nodo_vehiculo) return ['exito' => false, 'error' => 'Vehículo no encontrado'];
+
+        // TODO: Aquí falta eliminar nodos huérfanos (pisos, asientos, foto, etc.).
+        // Por ahora solo se elimina el enlace.
+        $nodo_vehiculos->eliminar_adyacente($nombre_vehiculo);
+
+        Controlador::guardar(Conf::NOMBRE_APP);
+        return ['exito' => true];
+    }
+
+    return ['exito' => false, 'error' => 'Empresa no encontrada'];
+}
+
+/**
+ * Sube una foto para un vehículo y la asocia al nodo.
+ *
+ * @param string $nombre_empresa Nombre de la empresa.
+ * @param string $nombre_vehiculo Identificador del vehículo.
+ * @param array $archivo Arreglo $_FILES['foto'].
+ * @return array Resultado con la ruta de la foto si éxito.
+ */
+function subir_foto_vehiculo(string $nombre_empresa, string $nombre_vehiculo, array $archivo): array {
+    $nombre_vehiculo = trim($nombre_vehiculo);
+    if (empty($nombre_vehiculo)) {
+        return ['exito' => false, 'error' => 'Identificador de vehículo obligatorio'];
+    }
+
+    if (!isset($archivo['tmp_name']) || !is_uploaded_file($archivo['tmp_name'])) {
+        return ['exito' => false, 'error' => 'No se recibió archivo válido'];
+    }
+
+    // Validar extensión
+    $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+    $permitidas = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    if (!in_array($extension, $permitidas)) {
+        return ['exito' => false, 'error' => 'Formato de imagen no permitido'];
+    }
+
+    // Crear carpeta si no existe
+    $directorio = __DIR__ . '/../../uploads/vehiculos/';
+    if (!is_dir($directorio)) {
+        mkdir($directorio, 0777, true);
+    }
+
+    // Nombre único: patente + timestamp + extensión
+    $nombre_archivo = $nombre_vehiculo . '_' . time() . '.' . $extension;
+    $ruta_destino = $directorio . $nombre_archivo;
+    if (!move_uploaded_file($archivo['tmp_name'], $ruta_destino)) {
+        return ['exito' => false, 'error' => 'Error al guardar la imagen'];
+    }
+
+    // Ruta relativa desde la raíz del proyecto (index.php)
+    $ruta_relativa = 'uploads/vehiculos/' . $nombre_archivo;
+
+    // Buscar vehículo y guardar enlace (insensible a mayúsculas/minúsculas)
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_usuarios) {
+        unlink($ruta_destino);
+        return ['exito' => false, 'error' => 'No hay usuarios registrados'];
+    }
+
+    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nodo_empresas = $nodo_dueno->adyacente('empresas');
+        if (!$nodo_empresas) continue;
+
+        // Buscar empresa comparando sin mayúsculas
+        $empresa_encontrada = null;
+        foreach ($nodo_empresas->adyacentes() as $nombre_empresa_actual => $nodo_empresa_actual) {
+            if (strcasecmp($nombre_empresa_actual, $nombre_empresa) === 0) {
+                $empresa_encontrada = $nodo_empresa_actual;
+                $nombre_empresa = $nombre_empresa_actual; // usar el original
+                break;
+            }
+        }
+        if (!$empresa_encontrada) continue;
+
+        $nodo_vehiculos = $empresa_encontrada->adyacente('vehiculos');
+        if (!$nodo_vehiculos) continue;
+
+        // Buscar vehículo comparando sin mayúsculas
+        $vehiculo_encontrado = null;
+        foreach ($nodo_vehiculos->adyacentes() as $nombre_vehiculo_actual => $nodo_vehiculo_actual) {
+            if (strcasecmp($nombre_vehiculo_actual, $nombre_vehiculo) === 0) {
+                $vehiculo_encontrado = $nodo_vehiculo_actual;
+                $nombre_vehiculo = $nombre_vehiculo_actual; // usar el original
+                break;
+            }
+        }
+        if (!$vehiculo_encontrado) continue;
+
+        // Eliminar foto anterior si existe
+        $foto_anterior = $vehiculo_encontrado->adyacente('foto');
+        if ($foto_anterior) {
+            $ruta_anterior = __DIR__ . '/../../' . $foto_anterior->dato();
+            if (file_exists($ruta_anterior)) {
+                unlink($ruta_anterior);
+            }
+            $vehiculo_encontrado->eliminar_adyacente('foto');
+        }
+
+        // Crear enlace foto
+        $vehiculo_encontrado->_adyacente_en(Nodo::crear_con_dato($ruta_relativa), 'foto');
+
+        // Guardar persistencia
+        Controlador::guardar(Conf::NOMBRE_APP);
+
+        return ['exito' => true, 'foto' => $ruta_relativa];
+    }
+
+    // Si no encontró vehículo, eliminar archivo
+    unlink($ruta_destino);
+    return ['exito' => false, 'error' => 'Vehículo no encontrado'];
 }
