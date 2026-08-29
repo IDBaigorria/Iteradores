@@ -174,7 +174,53 @@ function enrutar_peticion_post(string $accion, array $post): void {
                 responder_json(['exito' => false, 'error' => 'Subacción de sesiones no válida']);
             }
             break;
+        case 'empresas':
+            switch ($subaccion) {
+                case 'listar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $empresas = listar_empresas_de_dueno($nombre_dueno);
+                    responder_json(['exito' => true, 'empresas' => $empresas]);
+                    break;
 
+                case 'agregar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    $nombre_real = $post['nombre_real'] ?? '';
+                    $resultado = agregar_empresa($nombre_dueno, $nombre_empresa, $nombre_real);
+                    responder_json($resultado);
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de empresas no válida']);
+            }
+            break;
+        case 'vehiculos':
+            switch ($subaccion) {
+                case 'listar':
+                    $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    if (empty($nombre_empresa)) {
+                        responder_json(['exito' => false, 'error' => 'Empresa no especificada']);
+                    }
+                    $vehiculos = listar_vehiculos_de_empresa($nombre_empresa);
+                    responder_json(['exito' => true, 'vehiculos' => $vehiculos]);
+                    break;
+
+                case 'agregar':
+                    $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
+                    $nombre_real = $post['nombre_real'] ?? '';
+                    $asientos = isset($post['asientos']) ? (int)$post['asientos'] : 44;
+                    $resultado = agregar_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_real, $asientos);
+                    responder_json($resultado);
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de vehículos no válida']);
+            }
+            break;
         default:
             responder_json(['exito' => false, 'error' => 'Módulo no reconocido']);
     }

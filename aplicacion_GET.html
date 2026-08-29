@@ -169,6 +169,67 @@
         </div>
       </div>
     </section>
+
+    <section id="micros" class="tab-content hidden">
+      <div class="panel" id="panel_selector_dueno_micros" style="display:none;">
+        <h2>Empresas / Micros</h2>
+        <div class="row">
+          <label for="selector_dueno_micros">Dueño:</label>
+          <select id="selector_dueno_micros"></select>
+        </div>
+      </div>
+
+      <div class="panel" id="panel_empresas_micros" style="display:none;">
+        <div class="row">
+          <label for="selector_empresa_micros">Empresa:</label>
+          <select id="selector_empresa_micros"></select>
+          <button class="btn" id="boton_agregar_empresa_micros">Agregar empresa</button>
+        </div>
+        <div id="formulario_nueva_empresa" class="panel hidden" style="margin-top:10px;">
+          <div class="form-grid">
+            <div class="field"><label>Nombre de empresa (identificador) *</label><input id="nueva_empresa_nombre"></div>
+            <div class="field"><label>Nombre visible</label><input id="nueva_empresa_nombre_real"></div>
+          </div>
+          <div class="actions" style="margin-top:8px">
+            <button class="btn primary" id="boton_guardar_empresa">Guardar</button>
+            <button class="btn" id="boton_cancelar_empresa">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel_vehiculos_micros" style="display:none;">
+        <div class="row">
+          <label for="selector_vehiculo_micros">Vehículo:</label>
+          <select id="selector_vehiculo_micros"></select>
+          <button class="btn" id="boton_agregar_vehiculo_micros">Agregar vehículo</button>
+          <button class="btn primary" id="boton_modificar_vehiculo_micros">Modificar vehículo</button>
+        </div>
+        <div id="formulario_nuevo_vehiculo" class="panel hidden" style="margin-top:10px;">
+          <div class="form-grid">
+            <div class="field"><label>Nombre de vehículo (identificador) *</label><input id="nuevo_vehiculo_nombre"></div>
+            <div class="field"><label>Nombre visible</label><input id="nuevo_vehiculo_nombre_real"></div>
+            <div class="field"><label>Cantidad de asientos *</label><input type="number" id="nuevo_vehiculo_asientos" value="44"></div>
+          </div>
+          <div class="actions" style="margin-top:8px">
+            <button class="btn primary" id="boton_guardar_vehiculo">Guardar</button>
+            <button class="btn" id="boton_cancelar_vehiculo">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel_croquis_micros" style="display:none;">
+        <div class="bus-area">
+          <div class="section-title">Configuración física del vehículo</div>
+          <div class="bus">
+            <div class="bus-front">FRENTE · CONDUCTOR</div>
+            <div id="filas_asientos_estaticas_micros"></div>
+            <div class="bus-back">PARTE TRASERA</div>
+          </div>
+          <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
+        </div>
+      </div>
+    </section>
+
     <section id="viajes" class="tab-content hidden">
       <div class="panel">
         <h2>Viajes</h2>
@@ -220,34 +281,6 @@
             <div class="muted">Seleccione un asiento del colectivo.</div>
           </div>
         </aside>
-      </div>
-    </section>
-
-    <section id="micros" class="tab-content hidden">
-      <div class="panel">
-        <h2>Empresas / Micros</h2>
-        <div class="row">
-          <label for="selector_empresa">Nombre de empresa:</label>
-          <select id="selector_empresa"><option>Empresa de ejemplo</option><option>Otra empresa</option></select>
-          <button class="btn" data-placeholder>Agregar empresa</button>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="row">
-          <label for="selector_vehiculo">Seleccionar vehículo:</label>
-          <select id="selector_vehiculo"><option>Colectivo de 44 asientos</option></select>
-          <button class="btn" data-placeholder>Agregar vehículo</button>
-          <button class="btn primary" data-placeholder>Modificar colectivo</button>
-        </div>
-      </div>
-      <div class="panel bus-area">
-        <div class="section-title">Configuración física del colectivo</div>
-        <div class="bus">
-          <div class="bus-front">FRENTE · CONDUCTOR</div>
-          <div id="filas_asientos_estaticas"></div>
-          <div class="bus-back">PARTE TRASERA</div>
-        </div>
-        <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
       </div>
     </section>
 

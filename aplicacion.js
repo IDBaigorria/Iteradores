@@ -48,8 +48,8 @@ function mostrar_aviso(mensaje) {
 
 function configurar_pestanas_segun_nivel(nivel) {
     const pestanas_permitidas = {
-        admin: ['admin', 'viajes', 'micros', 'vendidos', 'pasajeros'],
-        dueno: ['terminales', 'viajes', 'micros', 'vendidos', 'pasajeros'],
+        admin: ['admin', 'micros', 'viajes', 'vendidos', 'pasajeros'],
+        dueno: ['micros', 'viajes', 'vendidos', 'pasajeros'],
         terminal: ['viajes', 'vendidos', 'pasajeros']
     };
     const permitidas = pestanas_permitidas[nivel] || [];
@@ -57,11 +57,11 @@ function configurar_pestanas_segun_nivel(nivel) {
     nav.innerHTML = '';
     const nombres_pestanas = {
         admin: 'Administrador',
-        terminales: 'Puntos de venta',
-        viajes: 'Viajes',
         micros: 'Empresas/Micros',
+        viajes: 'Viajes',
         vendidos: 'Vendidos',
-        pasajeros: 'Pasajeros/Clientes'
+        pasajeros: 'Pasajeros/Clientes',
+        terminales: 'Puntos de venta'
     };
     permitidas.forEach(id_pestana => {
         const boton = document.createElement('button');
@@ -81,7 +81,9 @@ function activar_pestana(id_pestana) {
     $$(".tab-content").forEach(seccion => seccion.classList.add("hidden"));
     const seccion_activa = document.getElementById(id_pestana);
     if (seccion_activa) seccion_activa.classList.remove("hidden");
-
+    if (id_pestana === 'micros') {
+        cargar_datos_micros();
+    }
     if (id_pestana === 'viajes' || id_pestana === 'micros') {
         construir_asientos("filas_asientos", true);
         construir_asientos("filas_asientos_estaticas", false);
@@ -847,6 +849,246 @@ async function eliminar_terminal_confirmado(nombre_usuario) {
         mostrar_aviso(datos.error || "Error al eliminar");
     }
 }
+
+async function cargar_datos_micros() {
+    // Limpiar selects
+    $("#selector_dueno_micros").innerHTML = '';
+    $("#selector_empresa_micros").innerHTML = '';
+    $("#selector_vehiculo_micros").innerHTML = '';
+    $("#filas_asientos_estaticas_micros").innerHTML = '';
+
+    // Ocultar paneles por defecto
+    $("#panel_selector_dueno_micros").style.display = 'none';
+    $("#panel_empresas_micros").style.display = 'none';
+    $("#panel_vehiculos_micros").style.display = 'none';
+    $("#panel_croquis_micros").style.display = 'none';
+
+    if (!usuario_actual) return;
+
+    if (usuario_actual.nivel === 'admin') {
+        // Mostrar selector de dueños
+        $("#panel_selector_dueno_micros").style.display = 'block';
+        await cargar_duenos_en_select_micros();
+    } else if (usuario_actual.nivel === 'dueno') {
+        // Dueño directo
+        await cargar_empresas_de_dueno(usuario_actual.nombre_usuario);
+        $("#panel_empresas_micros").style.display = 'block';
+    }
+}
+
+async function cargar_duenos_en_select_micros() {
+    try {
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ accion: "administrador/listar_duenos" })
+        });
+        const datos = await respuesta.json();
+        if (datos.exito) {
+            const select = $("#selector_dueno_micros");
+            select.innerHTML = '<option value="">Seleccione dueño...</option>';
+            datos.duenos.forEach(dueno => {
+                const opcion = document.createElement('option');
+                opcion.value = dueno.nombre_usuario;
+                opcion.textContent = dueno.nombre_real ? `${dueno.nombre_real} (${dueno.nombre_usuario})` : dueno.nombre_usuario;
+                select.appendChild(opcion);
+            });
+            select.onchange = async () => {
+                const nombre_dueno = select.value;
+                if (nombre_dueno) {
+                    await cargar_empresas_de_dueno(nombre_dueno);
+                    $("#panel_empresas_micros").style.display = 'block';
+                } else {
+                    $("#panel_empresas_micros").style.display = 'none';
+                }
+            };
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function cargar_empresas_de_dueno(nombre_dueno) {
+    try {
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ accion: "empresas/listar", nombre_dueno })
+        });
+        const datos = await respuesta.json();
+        if (datos.exito) {
+            const select = $("#selector_empresa_micros");
+            select.innerHTML = '<option value="">Seleccione empresa...</option>';
+            datos.empresas.forEach(empresa => {
+                const opcion = document.createElement('option');
+                opcion.value = empresa.nombre_empresa;
+                opcion.textContent = empresa.nombre;
+                select.appendChild(opcion);
+            });
+            select.onchange = async () => {
+                const nombre_empresa = select.value;
+                if (nombre_empresa) {
+                    await cargar_vehiculos_de_empresa(nombre_empresa);
+                    $("#panel_vehiculos_micros").style.display = 'block';
+                } else {
+                    $("#panel_vehiculos_micros").style.display = 'none';
+                    $("#panel_croquis_micros").style.display = 'none';
+                }
+            };
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function cargar_vehiculos_de_empresa(nombre_empresa) {
+    try {
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ accion: "vehiculos/listar", nombre_empresa })
+        });
+        const datos = await respuesta.json();
+        if (datos.exito) {
+            const select = $("#selector_vehiculo_micros");
+            select.innerHTML = '<option value="">Seleccione vehículo...</option>';
+            datos.vehiculos.forEach(vehiculo => {
+                const opcion = document.createElement('option');
+                opcion.value = vehiculo.nombre_vehiculo;
+                opcion.textContent = vehiculo.nombre;
+                select.appendChild(opcion);
+            });
+            // Si hay vehículos, seleccionar el primero y mostrar croquis
+            if (datos.vehiculos.length > 0) {
+                select.selectedIndex = 1; // primer vehículo
+                await mostrar_croquis_vehiculo(datos.vehiculos[0].asientos);
+                $("#panel_croquis_micros").style.display = 'block';
+            } else {
+                $("#panel_croquis_micros").style.display = 'none';
+            }
+            select.onchange = async () => {
+                const vehiculo = datos.vehiculos.find(v => v.nombre_vehiculo === select.value);
+                if (vehiculo) {
+                    await mostrar_croquis_vehiculo(vehiculo.asientos);
+                    $("#panel_croquis_micros").style.display = 'block';
+                } else {
+                    $("#panel_croquis_micros").style.display = 'none';
+                }
+            };
+        }
+    } catch (e) { console.error(e); }
+}
+
+function mostrar_croquis_vehiculo(asientos) {
+    const contenedor = $("#filas_asientos_estaticas_micros");
+    contenedor.innerHTML = '';
+    const num_asientos = parseInt(asientos) || 44;
+    const filas = Math.ceil(num_asientos / 4);
+    for (let fila = 0; fila < filas; fila++) {
+        const fila_div = document.createElement('div');
+        fila_div.className = 'seat-row';
+        for (let columna = 0; columna < 5; columna++) {
+            if (columna === 2) {
+                const pasillo = document.createElement('div');
+                pasillo.className = 'aisle';
+                fila_div.appendChild(pasillo);
+                continue;
+            }
+            const numero = fila * 4 + (columna < 2 ? columna + 1 : columna - 1);
+            if (numero <= num_asientos) {
+                const asiento = document.createElement('div');
+                asiento.className = 'seat';
+                asiento.textContent = String(numero).padStart(2, '0');
+                fila_div.appendChild(asiento);
+            }
+        }
+        contenedor.appendChild(fila_div);
+    }
+}
+
+// Botón agregar empresa
+$("#boton_agregar_empresa_micros").addEventListener("click", () => {
+    $("#formulario_nueva_empresa").classList.remove("hidden");
+});
+
+$("#boton_cancelar_empresa").addEventListener("click", () => {
+    $("#formulario_nueva_empresa").classList.add("hidden");
+});
+
+$("#boton_guardar_empresa").addEventListener("click", async () => {
+    const nombre_dueno = usuario_actual.nivel === 'admin' ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
+    if (!nombre_dueno) {
+        mostrar_aviso("Seleccione un dueño");
+        return;
+    }
+    const datos = {
+        accion: "empresas/agregar",
+        nombre_dueno,
+        nombre_empresa: $("#nueva_empresa_nombre").value.trim(),
+        nombre_real: $("#nueva_empresa_nombre_real").value.trim()
+    };
+    if (!datos.nombre_empresa) {
+        mostrar_aviso("Nombre de empresa obligatorio");
+        return;
+    }
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(datos)
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Empresa agregada");
+        $("#formulario_nueva_empresa").classList.add("hidden");
+        $("#nueva_empresa_nombre").value = "";
+        $("#nueva_empresa_nombre_real").value = "";
+        await cargar_empresas_de_dueno(nombre_dueno);
+    } else {
+        mostrar_aviso(resultado.error || "Error al agregar empresa");
+    }
+});
+
+// Botón agregar vehículo (similar)
+$("#boton_agregar_vehiculo_micros").addEventListener("click", () => {
+    $("#formulario_nuevo_vehiculo").classList.remove("hidden");
+});
+
+$("#boton_cancelar_vehiculo").addEventListener("click", () => {
+    $("#formulario_nuevo_vehiculo").classList.add("hidden");
+});
+
+$("#boton_guardar_vehiculo").addEventListener("click", async () => {
+    const nombre_empresa = $("#selector_empresa_micros").value;
+    if (!nombre_empresa) {
+        mostrar_aviso("Seleccione una empresa");
+        return;
+    }
+    const datos = {
+        accion: "vehiculos/agregar",
+        nombre_empresa,
+        nombre_vehiculo: $("#nuevo_vehiculo_nombre").value.trim(),
+        nombre_real: $("#nuevo_vehiculo_nombre_real").value.trim(),
+        asientos: $("#nuevo_vehiculo_asientos").value
+    };
+    if (!datos.nombre_vehiculo) {
+        mostrar_aviso("Nombre de vehículo obligatorio");
+        return;
+    }
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(datos)
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Vehículo agregado");
+        $("#formulario_nuevo_vehiculo").classList.add("hidden");
+        // Limpiar campos
+        await cargar_vehiculos_de_empresa(nombre_empresa);
+    } else {
+        mostrar_aviso(resultado.error || "Error al agregar vehículo");
+    }
+});
+
+$("#boton_modificar_vehiculo_micros").addEventListener("click", () => {
+    mostrar_aviso("Funcionalidad en desarrollo");
+});
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
