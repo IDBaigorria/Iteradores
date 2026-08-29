@@ -79,6 +79,7 @@ require_once __DIR__ . '/Aplicacion/Admin/Admin.php';
 require_once __DIR__ . '/Aplicacion/Autenticacion/Autenticacion.php';
 require_once __DIR__ . '/Aplicacion/Empresas/Empresa.php';
 require_once __DIR__ . '/Aplicacion/Vehiculos/Vehiculo.php';
+require_once __DIR__ . '/Aplicacion/Viajes/Viaje.php';
 require_once __DIR__ . '/Aplicacion/Enrutador.php';
 
 // Crear usuario administrador si no existe

@@ -296,6 +296,81 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     responder_json(['exito' => false, 'error' => 'Subacción de vehículos no válida']);
             }
             break;
+        case 'viajes':
+            switch ($subaccion) {
+                case 'listar_por_dueno':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $viajes = listar_viajes_de_dueno($nombre_dueno);
+                    responder_json(['exito' => true, 'viajes' => $viajes]);
+                    break;
+
+                case 'listar_por_terminal':
+                    $nombre_terminal = $post['nombre_terminal'] ?? '';
+                    if (empty($nombre_terminal)) {
+                        responder_json(['exito' => false, 'error' => 'Terminal no especificada']);
+                    }
+                    $viajes = listar_viajes_de_terminal($nombre_terminal);
+                    responder_json(['exito' => true, 'viajes' => $viajes]);
+                    break;
+
+                case 'agregar':
+                    $resultado = agregar_viaje($post);
+                    responder_json($resultado);
+                    break;
+
+                case 'editar':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $resultado = editar_viaje($nombre_viaje, $post);
+                    responder_json($resultado);
+                    break;
+
+                case 'eliminar':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $resultado = eliminar_viaje($nombre_viaje, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                case 'agregar_micro':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $resultado = agregar_micro_a_viaje($nombre_viaje, $nombre_empresa, $nombre_vehiculo, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                case 'eliminar_micro':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $resultado = eliminar_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                case 'agregar_terminal':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_terminal = $post['nombre_terminal'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $resultado = agregar_terminal_autorizada($nombre_viaje, $nombre_terminal, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                case 'eliminar_terminal':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_terminal = $post['nombre_terminal'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $resultado = eliminar_terminal_autorizada($nombre_viaje, $nombre_terminal, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de viajes no válida']);
+            }
+            break;
         default:
             responder_json(['exito' => false, 'error' => 'Módulo no reconocido']);
     }

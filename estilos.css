@@ -155,3 +155,46 @@ h2{margin:0 0 16px;font-size:21px} h3{margin:0 0 12px;font-size:17px}
     flex-direction: column;
     gap: 5px;
 }
+
+/* Viajes */
+.viaje-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fafafa;
+}
+
+.viaje-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: baseline;
+}
+
+.viaje-stats {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    font-size: 14px;
+    color: #555;
+}
+
+.micro-item, .terminal-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.micro-item span, .terminal-item span {
+    flex: 1;
+}
+
+.btn-detalle-viaje, .btn-eliminar-viaje, .btn-eliminar-micro, .btn-eliminar-terminal {
+    white-space: nowrap;
+}

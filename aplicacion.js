@@ -38,6 +38,7 @@ if (DEBUG_FETCH) {
 
 let usuario_actual = null;
 let vehiculo_seleccionado_micros = null; // Almacena {nombre_vehiculo, nombre, asientos}
+let viaje_seleccionado = null;
 
 function mostrar_aviso(mensaje) {
     const aviso = $("#toast");
@@ -50,7 +51,7 @@ function mostrar_aviso(mensaje) {
 function configurar_pestanas_segun_nivel(nivel) {
     const pestanas_permitidas = {
         admin: ['admin', 'micros', 'viajes', 'vendidos', 'pasajeros'],
-        dueno: ['micros', 'viajes', 'vendidos', 'pasajeros'],
+        dueno: ['terminales', 'micros', 'viajes', 'vendidos', 'pasajeros'],
         terminal: ['viajes', 'vendidos', 'pasajeros']
     };
     const permitidas = pestanas_permitidas[nivel] || [];
@@ -84,11 +85,12 @@ function activar_pestana(id_pestana) {
     if (seccion_activa) seccion_activa.classList.remove("hidden");
     if (id_pestana === 'micros') {
         cargar_datos_micros();
-    }
-    if (id_pestana === 'viajes' || id_pestana === 'micros') {
-        construir_asientos("filas_asientos", true);
         construir_asientos("filas_asientos_estaticas", false);
     }
+    if (id_pestana === 'viajes') {
+        cargar_viajes();
+    }
+
     if (id_pestana === 'vendidos') renderizar_ventas($("#filtro_vendedor").value);
     if (id_pestana === 'pasajeros') renderizar_pasajeros();
     if (id_pestana === 'admin') cargar_datos_admin();
@@ -1619,6 +1621,399 @@ $("#boton_eliminar_vehiculo_micros").addEventListener("click", async () => {
         mostrar_aviso(resultado.error || "Error al eliminar");
     }
 });
+// ====== Funciones auxiliares ======
+function obtener_nombre_dueno_actual() {
+    return usuario_actual.nivel === 'admin' ? $("#selector_dueno_viajes").value : usuario_actual.nombre_usuario;
+}
+
+async function cargar_viajes() {
+    const panel_dueno = $("#panel_selector_dueno_viajes");
+    const boton_agregar = $("#boton_agregar_viaje");
+    const lista = $("#lista_viajes");
+    lista.innerHTML = '';
+
+    if (usuario_actual.nivel === 'admin') {
+        panel_dueno.style.display = 'block';
+        boton_agregar.style.display = 'none';
+        await cargar_duenos_en_select_viajes();
+    } else if (usuario_actual.nivel === 'dueno') {
+        panel_dueno.style.display = 'none';
+        boton_agregar.style.display = 'inline-block';
+        await listar_viajes(usuario_actual.nombre_usuario, 'dueno');
+    } else if (usuario_actual.nivel === 'terminal') {
+        panel_dueno.style.display = 'none';
+        boton_agregar.style.display = 'none';
+        await listar_viajes(usuario_actual.nombre_usuario, 'terminal');
+    }
+}
+
+async function cargar_duenos_en_select_viajes() {
+    const select = $("#selector_dueno_viajes");
+    select.innerHTML = '<option value="">Seleccione dueño...</option>';
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "administrador/listar_duenos" })
+    });
+    const datos = await respuesta.json();
+    if (datos.exito) {
+        datos.duenos.forEach(dueno => {
+            const opcion = document.createElement('option');
+            opcion.value = dueno.nombre_usuario;
+            opcion.textContent = dueno.nombre_real ? `${dueno.nombre_real} (${dueno.nombre_usuario})` : dueno.nombre_usuario;
+            select.appendChild(opcion);
+        });
+        select.onchange = async () => {
+            if (select.value) {
+                await listar_viajes(select.value, 'dueno');
+                $("#boton_agregar_viaje").style.display = 'inline-block';
+            } else {
+                $("#lista_viajes").innerHTML = '';
+                $("#boton_agregar_viaje").style.display = 'none';
+            }
+        };
+    }
+}
+
+async function listar_viajes(nombre, tipo) {
+    let accion = tipo === 'dueno' ? 'viajes/listar_por_dueno' : 'viajes/listar_por_terminal';
+    let param = tipo === 'dueno' ? { nombre_dueno: nombre } : { nombre_terminal: nombre };
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion, ...param })
+    });
+    const datos = await respuesta.json();
+    if (datos.exito) {
+        renderizar_viajes(datos.viajes);
+    } else {
+        mostrar_aviso(datos.error || "Error al cargar viajes");
+    }
+}
+
+function renderizar_viajes(viajes) {
+    const lista = $("#lista_viajes");
+    lista.innerHTML = '';
+    viajes.forEach(viaje => {
+        const div = document.createElement('div');
+        div.className = 'viaje-card';
+        div.innerHTML = `
+            <div class="viaje-info">
+                <strong>${viaje.nombre}</strong>
+                <span>${viaje.fecha} ${viaje.hora}</span>
+                <span>${viaje.origen} → ${viaje.destino}</span>
+            </div>
+            <div class="viaje-stats">
+                <span>Ocupación: ${viaje.ocupacion}</span>
+                <span>Disponibles: ${viaje.disponibles}</span>
+                <span>Seleccionados: ${viaje.seleccionados}</span>
+                <span>Vendidos: ${viaje.vendidos}</span>
+            </div>
+            <button class="btn btn-detalle-viaje" data-viaje="${viaje.nombre_viaje}">Ver detalle</button>
+            ${usuario_actual.nivel !== 'terminal' ? `<button class="btn btn-eliminar-viaje" data-viaje="${viaje.nombre_viaje}">Eliminar</button>` : ''}
+        `;
+        lista.appendChild(div);
+
+        div.querySelector('.btn-detalle-viaje').addEventListener('click', () => ver_detalle_viaje(viaje));
+        const btnEliminar = div.querySelector('.btn-eliminar-viaje');
+        if (btnEliminar) btnEliminar.addEventListener('click', () => eliminar_viaje(viaje.nombre_viaje));
+    });
+}
+
+function ver_detalle_viaje(viaje) {
+    viaje_seleccionado = viaje;
+    $("#detalle_viaje_titulo").textContent = viaje.nombre;
+    $("#detalle_viaje").classList.remove('hidden');
+    renderizar_micros_viaje(viaje.micros);
+    renderizar_terminales_viaje(viaje.terminales_autorizadas);
+}
+
+function renderizar_micros_viaje(micros) {
+    const contenedor = $("#lista_micros_viaje");
+    contenedor.innerHTML = '';
+    micros.forEach(micro => {
+        const div = document.createElement('div');
+        div.className = 'micro-item';
+        div.innerHTML = `
+            <span>${micro.empresa} - ${micro.patente}</span>
+            <span>Ocupación: ${micro.ocupacion}</span>
+            <span>Vendidos: ${micro.vendidos}</span>
+            ${usuario_actual.nivel !== 'terminal' ? `<button class="btn btn-eliminar-micro" data-micro="${micro.nombre_micro}">Quitar</button>` : ''}
+        `;
+        contenedor.appendChild(div);
+
+        const btnQuitar = div.querySelector('.btn-eliminar-micro');
+        if (btnQuitar) btnQuitar.addEventListener('click', () => eliminar_micro(micro.nombre_micro));
+    });
+}
+
+function renderizar_terminales_viaje(terminales) {
+    const contenedor = $("#lista_terminales_viaje");
+    contenedor.innerHTML = '';
+    terminales.forEach(terminal => {
+        const div = document.createElement('div');
+        div.className = 'terminal-item';
+        div.innerHTML = `
+            <span>${terminal}</span>
+            ${usuario_actual.nivel !== 'terminal' ? `<button class="btn btn-eliminar-terminal" data-terminal="${terminal}">Quitar</button>` : ''}
+        `;
+        contenedor.appendChild(div);
+
+        const btnQuitar = div.querySelector('.btn-eliminar-terminal');
+        if (btnQuitar) btnQuitar.addEventListener('click', () => eliminar_terminal_autorizada(terminal));
+    });
+}
+
+// Eventos de formularios (agregar viaje, micro, terminal)
+$("#boton_agregar_viaje").addEventListener("click", () => {
+    $("#formulario_nuevo_viaje").classList.remove("hidden");
+});
+
+$("#boton_guardar_viaje").addEventListener("click", async () => {
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const datos = {
+        accion: "viajes/agregar",
+        nombre_dueno,
+        nombre_viaje: $("#nuevo_viaje_nombre").value.trim(),
+        nombre: $("#nuevo_viaje_nombre").value.trim(),
+        fecha: $("#nuevo_viaje_fecha").value,
+        hora: $("#nuevo_viaje_hora").value,
+        origen: $("#nuevo_viaje_origen").value,
+        destino: $("#nuevo_viaje_destino").value
+    };
+    if (!datos.nombre_viaje) {
+        mostrar_aviso("El nombre del viaje es obligatorio");
+        return;
+    }
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(datos)
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Viaje creado");
+        $("#formulario_nuevo_viaje").classList.add("hidden");
+        await cargar_viajes(); // Recargar lista principal
+    } else {
+        mostrar_aviso(resultado.error || "Error al crear viaje");
+    }
+});
+
+$("#boton_cancelar_viaje").addEventListener("click", () => {
+    $("#formulario_nuevo_viaje").classList.add("hidden");
+});
+
+async function eliminar_viaje(nombre_viaje) {
+    if (!confirm(`¿Eliminar viaje ${nombre_viaje}?`)) return;
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "viajes/eliminar", nombre_viaje, nombre_dueno })
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Viaje eliminado");
+        $("#detalle_viaje").classList.add("hidden");
+        await cargar_viajes(); // Recargar lista principal
+    } else {
+        mostrar_aviso(resultado.error || "Error al eliminar");
+    }
+}
+
+// Agregar micro
+$("#boton_agregar_micro_viaje").addEventListener("click", async () => {
+    $("#formulario_agregar_micro").classList.remove("hidden");
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const selectEmpresa = $("#selector_empresa_micro_viaje");
+    selectEmpresa.innerHTML = '<option value="">Seleccione empresa...</option>';
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "empresas/listar", nombre_dueno })
+    });
+    const datos = await resp.json();
+    if (datos.exito) {
+        datos.empresas.forEach(empresa => {
+            const opcion = document.createElement('option');
+            opcion.value = empresa.nombre_empresa;
+            opcion.textContent = empresa.nombre;
+            selectEmpresa.appendChild(opcion);
+        });
+        selectEmpresa.onchange = async () => {
+            const selectVehiculo = $("#selector_vehiculo_micro_viaje");
+            selectVehiculo.innerHTML = '<option value="">Seleccione vehículo...</option>';
+            if (selectEmpresa.value) {
+                const respV = await fetch("index.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({ accion: "vehiculos/listar", nombre_empresa: selectEmpresa.value })
+                });
+                const datosV = await respV.json();
+                if (datosV.exito) {
+                    datosV.vehiculos.forEach(vehiculo => {
+                        const opcion = document.createElement('option');
+                        opcion.value = vehiculo.nombre_vehiculo;
+                        opcion.textContent = vehiculo.nombre;
+                        selectVehiculo.appendChild(opcion);
+                    });
+                }
+            }
+        };
+    }
+});
+
+$("#boton_confirmar_micro").addEventListener("click", async () => {
+    const nombre_empresa = $("#selector_empresa_micro_viaje").value;
+    const nombre_vehiculo = $("#selector_vehiculo_micro_viaje").value;
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    if (!nombre_empresa || !nombre_vehiculo) {
+        mostrar_aviso("Seleccione empresa y vehículo");
+        return;
+    }
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/agregar_micro",
+            nombre_viaje: viaje_seleccionado.nombre_viaje,
+            nombre_empresa,
+            nombre_vehiculo,
+            nombre_dueno
+        })
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Micro agregado");
+        $("#formulario_agregar_micro").classList.add("hidden");
+        await actualizar_detalle_viaje_actual(); // Actualizar detalle
+    } else {
+        mostrar_aviso(resultado.error || "Error al agregar micro");
+    }
+});
+
+$("#boton_cancelar_micro").addEventListener("click", () => {
+    $("#formulario_agregar_micro").classList.add("hidden");
+});
+
+async function eliminar_micro(nombre_micro) {
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/eliminar_micro",
+            nombre_viaje: viaje_seleccionado.nombre_viaje,
+            nombre_micro,
+            nombre_dueno
+        })
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Micro eliminado");
+        await actualizar_detalle_viaje_actual(); // Actualizar detalle
+    } else {
+        mostrar_aviso(resultado.error || "Error al eliminar micro");
+    }
+}
+
+// Terminales autorizadas
+$("#boton_agregar_terminal_viaje").addEventListener("click", async () => {
+    $("#formulario_agregar_terminal").classList.remove("hidden");
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const selectTerminal = $("#selector_terminal_autorizada");
+    selectTerminal.innerHTML = '<option value="">Seleccione punto de venta...</option>';
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "dueno/listar_terminales", nombre_dueno })
+    });
+    const datos = await resp.json();
+    if (datos.exito) {
+        datos.terminales.forEach(terminal => {
+            const opcion = document.createElement('option');
+            opcion.value = terminal.nombre_usuario;
+            opcion.textContent = terminal.nombre_real ? `${terminal.nombre_real} (${terminal.nombre_usuario})` : terminal.nombre_usuario;
+            selectTerminal.appendChild(opcion);
+        });
+    }
+});
+
+$("#boton_confirmar_terminal").addEventListener("click", async () => {
+    const nombre_terminal = $("#selector_terminal_autorizada").value;
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    if (!nombre_terminal) {
+        mostrar_aviso("Seleccione un punto de venta");
+        return;
+    }
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/agregar_terminal",
+            nombre_viaje: viaje_seleccionado.nombre_viaje,
+            nombre_terminal,
+            nombre_dueno
+        })
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Punto de venta autorizado");
+        $("#formulario_agregar_terminal").classList.add("hidden");
+        await actualizar_detalle_viaje_actual(); // Actualizar detalle
+    } else {
+        mostrar_aviso(resultado.error || "Error al autorizar punto de venta");
+    }
+});
+
+$("#boton_cancelar_terminal").addEventListener("click", () => {
+    $("#formulario_agregar_terminal").classList.add("hidden");
+});
+
+async function eliminar_terminal_autorizada(nombre_terminal) {
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/eliminar_terminal",
+            nombre_viaje: viaje_seleccionado.nombre_viaje,
+            nombre_terminal,
+            nombre_dueno
+        })
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Punto de venta eliminado");
+        await actualizar_detalle_viaje_actual(); // Actualizar detalle
+    } else {
+        mostrar_aviso(resultado.error || "Error al eliminar punto de venta");
+    }
+}
+
+// Función para actualizar el detalle del viaje sin recargar la lista completa
+async function actualizar_detalle_viaje_actual() {
+    if (!viaje_seleccionado) return;
+
+    let nombre_dueno = obtener_nombre_dueno_actual();
+    let tipo = usuario_actual.nivel === 'terminal' ? 'terminal' : 'dueno';
+    let accion = tipo === 'dueno' ? 'viajes/listar_por_dueno' : 'viajes/listar_por_terminal';
+    let param = tipo === 'dueno' ? { nombre_dueno } : { nombre_terminal: usuario_actual.nombre_usuario };
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion, ...param })
+    });
+    const datos = await respuesta.json();
+    if (datos.exito) {
+        const viajeActualizado = datos.viajes.find(v => v.nombre_viaje === viaje_seleccionado.nombre_viaje);
+        if (viajeActualizado) {
+            ver_detalle_viaje(viajeActualizado);
+        }
+    }
+}
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////

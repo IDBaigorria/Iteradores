@@ -274,59 +274,87 @@
       </div>
     </section>
 
-    <section id="viajes" class="tab-content hidden">
-      <div class="panel">
-        <h2>Viajes</h2>
-        <div class="row">
-          <label for="selector_viaje">Viaje:</label>
-          <select id="selector_viaje"><option>Leon XIV en Lujan</option></select>
-        </div>
-        <div class="info-grid" style="margin-top:16px">
-          <div class="info-card"><span class="muted">Fecha</span><strong>XX/XX/XXXX</strong></div>
-          <div class="info-card"><span class="muted">Hora de salida</span><strong>XX:XX</strong></div>
-          <div class="info-card"><span class="muted">Origen</span><strong>Tres Arroyos</strong></div>
-          <div class="info-card"><span class="muted">Destino</span><strong>Luján</strong></div>
-        </div>
-        <div class="stats" style="margin-top:12px">
-          <div class="stat">Ocupación: <b>28 / 44</b></div>
-          <div class="stat">Disponibles: <b id="contador_disponibles">12</b></div>
-          <div class="stat">Seleccionados: <b id="contador_seleccionados">2</b></div>
-          <div class="stat">Vendidos: <b id="contador_vendidos">30</b></div>
-        </div>
-      </div>
+<section id="viajes" class="tab-content hidden">
+  <!-- Selector de dueño para admin -->
+  <div class="panel" id="panel_selector_dueno_viajes" style="display:none;">
+    <div class="row">
+      <label for="selector_dueno_viajes">Dueño:</label>
+      <select id="selector_dueno_viajes"></select>
+    </div>
+  </div>
 
-      <div class="panel">
-        <div class="row">
-          <label for="selector_micro">Micro:</label>
-          <select id="selector_micro"><option>Colectivo de 44 asientos</option></select>
-          <button class="btn" data-placeholder>Agregar micro</button>
-        </div>
-      </div>
+  <!-- Panel de viajes -->
+  <div class="panel" id="panel_viajes">
+    <div class="row" style="justify-content:space-between;">
+      <h2>Viajes</h2>
+      <button class="btn primary" id="boton_agregar_viaje" style="display:none;">Agregar viaje</button>
+    </div>
+    <div id="lista_viajes"></div>
+  </div>
 
-      <div class="travel-layout">
-        <div class="panel bus-area">
-          <div class="section-title">Croquis del colectivo</div>
-          <div id="croquis" class="bus" aria-label="Croquis del colectivo de 44 asientos">
-            <div class="bus-front">FRENTE · CONDUCTOR</div>
-            <div id="filas_asientos"></div>
-            <div class="bus-back">PARTE TRASERA</div>
-          </div>
-          <div class="legend">
-            <div class="legend-item"><span class="swatch sw-free"></span> Libre</div>
-            <div class="legend-item"><span class="swatch sw-selected"></span> Seleccionado</div>
-            <div class="legend-item"><span class="swatch sw-sold"></span> Vendido</div>
-          </div>
-          <button class="btn" style="margin-top:14px" data-placeholder>Imprimir todo el pasaje</button>
-        </div>
+  <!-- Formulario nuevo viaje -->
+  <div id="formulario_nuevo_viaje" class="panel hidden">
+    <h3>Nuevo viaje</h3>
+    <div class="form-grid">
+      <div class="field"><label>Nombre de viaje *</label><input id="nuevo_viaje_nombre"></div>
+      <div class="field"><label>Fecha</label><input type="date" id="nuevo_viaje_fecha"></div>
+      <div class="field"><label>Hora</label><input type="time" id="nuevo_viaje_hora"></div>
+      <div class="field"><label>Origen</label><input id="nuevo_viaje_origen"></div>
+      <div class="field"><label>Destino</label><input id="nuevo_viaje_destino"></div>
+    </div>
+    <div class="actions" style="margin-top:12px;">
+      <button class="btn primary" id="boton_guardar_viaje">Guardar</button>
+      <button class="btn" id="boton_cancelar_viaje">Cancelar</button>
+    </div>
+  </div>
 
-        <aside class="panel side-panel">
-          <div class="section-title">Información del asiento</div>
-          <div id="detalle_asiento" class="detail-box">
-            <div class="muted">Seleccione un asiento del colectivo.</div>
-          </div>
-        </aside>
+  <!-- Detalle del viaje (micros y terminales) -->
+  <div id="detalle_viaje" class="panel hidden">
+    <h3 id="detalle_viaje_titulo"></h3>
+    <div class="row">
+      <label>Micros:</label>
+      <button class="btn" id="boton_agregar_micro_viaje">Agregar micro</button>
+    </div>
+    <div id="lista_micros_viaje"></div>
+
+    <div class="row" style="margin-top:15px;">
+      <label>Terminales autorizadas:</label>
+      <button class="btn" id="boton_agregar_terminal_viaje">Agregar punto de venta</button>
+    </div>
+    <div id="lista_terminales_viaje"></div>
+  </div>
+
+  <!-- Formularios para agregar micro y terminal -->
+  <div id="formulario_agregar_micro" class="panel hidden">
+    <h3>Agregar micro</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label>Empresa</label>
+        <select id="selector_empresa_micro_viaje"></select>
       </div>
-    </section>
+      <div class="field">
+        <label>Vehículo</label>
+        <select id="selector_vehiculo_micro_viaje"></select>
+      </div>
+    </div>
+    <div class="actions" style="margin-top:12px;">
+      <button class="btn primary" id="boton_confirmar_micro">Confirmar</button>
+      <button class="btn" id="boton_cancelar_micro">Cancelar</button>
+    </div>
+  </div>
+
+  <div id="formulario_agregar_terminal" class="panel hidden">
+    <h3>Agregar punto de venta autorizado</h3>
+    <div class="field">
+      <label>Terminal</label>
+      <select id="selector_terminal_autorizada"></select>
+    </div>
+    <div class="actions" style="margin-top:12px;">
+      <button class="btn primary" id="boton_confirmar_terminal">Confirmar</button>
+      <button class="btn" id="boton_cancelar_terminal">Cancelar</button>
+    </div>
+  </div>
+</section>
 
     <section id="vendidos" class="tab-content hidden">
       <div class="panel">
