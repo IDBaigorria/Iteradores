@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.3
+ * @version   1.5piloto.4
  */
 
 use Iteradores\Nodos\Nodo;
@@ -60,6 +60,7 @@ function listar_usuarios(): array {
         $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
         $nodo_codigo_acceso = $nodo_usuario->adyacente('codigo_acceso');
         $nodo_email = $nodo_usuario->adyacente('email');
+        $nodo_pasajes = $nodo_usuario->adyacente('pasajes');
 
         $banco_nombre = '';
         $banco_cuenta = '';
@@ -80,6 +81,7 @@ function listar_usuarios(): array {
             'efectivo' => $nodo_efectivo ? $nodo_efectivo->dato() : '0',
             'bancarizado' => $monto_banco,
             'codigo_acceso' => $nodo_codigo_acceso ? $nodo_codigo_acceso->dato() : '',
+            'pasajes' => $nodo_pasajes ? $nodo_pasajes->dato() : '0',
             'banco' => [
                 'nombre' => $banco_nombre,
                 'cuenta' => $banco_cuenta,
@@ -357,4 +359,122 @@ function eliminar_usuario(string $nombre_usuario): array {
     Nodo::eliminar($nodo_usuario);
     Controlador::guardar(Conf::NOMBRE_APP);
     return ['exito' => true];
+}
+
+/**
+ * Lista las terminales asociadas a un dueño específico.
+ *
+ * @param string $nombre_dueno Nombre del usuario dueño.
+ * @return array Lista de terminales con sus datos.
+ */
+function listar_terminales_de_dueno(string $nombre_dueno): array {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return [];
+
+    $nodo_dueno = $raiz->adyacente($nombre_dueno);
+    if (!$nodo_dueno) return [];
+
+    $nodo_nivel = $nodo_dueno->adyacente('nivel');
+    if (!$nodo_nivel || $nodo_nivel->dato() !== 'dueno') return [];
+
+    $nodo_terminales = $nodo_dueno->adyacente('terminales');
+    if (!$nodo_terminales) return [];
+
+    $adyacentes = $nodo_terminales->adyacentes();
+    if (!$adyacentes) return [];
+
+    $terminales = [];
+    foreach ($adyacentes as $nombre_terminal => $nodo_terminal) {
+        $nodo_contrasena = $nodo_terminal->adyacente('contrasena');
+        $nodo_efectivo = $nodo_terminal->adyacente('efectivo');
+        $nodo_banco = $nodo_terminal->adyacente('banco');
+        $nodo_nivel_terminal = $nodo_terminal->adyacente('nivel');
+        $nodo_nombre_real = $nodo_terminal->adyacente('nombre_real');
+        $nodo_codigo_acceso = $nodo_terminal->adyacente('codigo_acceso');
+        $nodo_email = $nodo_terminal->adyacente('email');
+        $nodo_pasajes = $nodo_terminal->adyacente('pasajes');
+
+        $banco_nombre = '';
+        $banco_cuenta = '';
+        $monto_banco = '0';
+        if ($nodo_banco) {
+            $monto_banco = $nodo_banco->dato();
+            $nombre = $nodo_banco->adyacente('nombre');
+            $cuenta = $nodo_banco->adyacente('cuenta');
+            $banco_nombre = $nombre ? $nombre->dato() : '';
+            $banco_cuenta = $cuenta ? $cuenta->dato() : '';
+        }
+
+        $pasajes_vendidos = $nodo_pasajes ? $nodo_pasajes->dato() : '0';
+
+        $terminales[] = [
+            'nombre_usuario' => $nombre_terminal,
+            'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : '',
+            'email' => $nodo_email ? $nodo_email->dato() : '',
+            'nivel' => $nodo_nivel_terminal ? $nodo_nivel_terminal->dato() : 'terminal',
+            'codigo_acceso' => $nodo_codigo_acceso ? $nodo_codigo_acceso->dato() : '',
+            'efectivo' => $nodo_efectivo ? $nodo_efectivo->dato() : '0',
+            'bancarizado' => $monto_banco,
+            'banco' => [
+                'nombre' => $banco_nombre,
+                'cuenta' => $banco_cuenta,
+            ],
+            'dueno' => $nombre_dueno,
+            'pasajes' => $pasajes_vendidos,
+        ];
+    }
+    return $terminales;
+}
+
+/**
+ * Actualiza una terminal perteneciente al dueño actual.
+ *
+ * @param array $datos Datos del formulario.
+ * @param string $nombre_dueno_actual Nombre del dueño que realiza la operación.
+ * @return array Resultado.
+ */
+function actualizar_terminal(array $datos, string $nombre_dueno_actual): array {
+    $nombre_usuario = trim($datos['nombre_usuario'] ?? '');
+    if (empty($nombre_usuario)) {
+        return ['exito' => false, 'error' => 'Nombre de usuario no proporcionado'];
+    }
+
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
+
+    $nodo_terminal = $raiz->adyacente($nombre_usuario);
+    if (!$nodo_terminal) return ['exito' => false, 'error' => 'Terminal no encontrada'];
+
+    $nodo_dueno = $nodo_terminal->adyacente('dueno');
+    if (!$nodo_dueno || $nodo_dueno->dato() !== $nombre_dueno_actual) {
+        return ['exito' => false, 'error' => 'No tiene permiso para modificar esta terminal'];
+    }
+
+    // Forzar nivel terminal y dueño
+    $datos['nivel'] = 'terminal';
+    $datos['dueno'] = $nombre_dueno_actual;
+
+    return actualizar_usuario($datos);
+}
+
+/**
+ * Elimina una terminal perteneciente al dueño actual.
+ *
+ * @param string $nombre_usuario Nombre de la terminal.
+ * @param string $nombre_dueno_actual Nombre del dueño que realiza la operación.
+ * @return array Resultado.
+ */
+function eliminar_terminal(string $nombre_usuario, string $nombre_dueno_actual): array {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
+
+    $nodo_terminal = $raiz->adyacente($nombre_usuario);
+    if (!$nodo_terminal) return ['exito' => false, 'error' => 'Terminal no encontrada'];
+
+    $nodo_dueno = $nodo_terminal->adyacente('dueno');
+    if (!$nodo_dueno || $nodo_dueno->dato() !== $nombre_dueno_actual) {
+        return ['exito' => false, 'error' => 'No tiene permiso para eliminar esta terminal'];
+    }
+
+    return eliminar_usuario($nombre_usuario);
 }

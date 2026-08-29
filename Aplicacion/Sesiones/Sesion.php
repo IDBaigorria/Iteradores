@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.3
+ * @version   1.5piloto.4
  */
 
 use Iteradores\Nodos\Nodo;
@@ -105,4 +105,37 @@ function cerrar_sesion(string $token): bool {
     Nodo::eliminar($nodo_sesion);
     Controlador::guardar(Conf::NOMBRE_APP);
     return true;
+}
+
+/**
+ * Lista las sesiones activas de un conjunto de usuarios.
+ *
+ * @param array $nombres_usuarios Lista de nombres de usuario.
+ * @return array Lista de sesiones filtradas.
+ */
+function listar_sesiones_de_usuarios(array $nombres_usuarios): array {
+    if (empty($nombres_usuarios)) return [];
+
+    $raiz = Nodo::nodo_por_id('sesiones');
+    if (!$raiz) return [];
+
+    $adyacentes = $raiz->adyacentes();
+    if (!$adyacentes) return [];
+
+    $sesiones = [];
+    foreach ($adyacentes as $token => $nodo_sesion) {
+        $nodo_usuario = $nodo_sesion->adyacente('usuario');
+        if (!$nodo_usuario) continue;
+        $nombre_usuario = $nodo_usuario->dato();
+        if (in_array($nombre_usuario, $nombres_usuarios, true)) {
+            $nodo_creado = $nodo_sesion->adyacente('creado_en');
+            $timestamp = $nodo_creado ? (int)$nodo_creado->dato() : 0;
+            $sesiones[] = [
+                'token' => $token,
+                'usuario' => $nombre_usuario,
+                'creado_en' => $timestamp > 0 ? date('Y-m-d H:i:s', $timestamp) : '',
+            ];
+        }
+    }
+    return $sesiones;
 }

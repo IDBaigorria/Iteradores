@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.3
+ * @version   1.5piloto.4
  */
 
 /**
@@ -89,6 +89,59 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de administrador no válida']);
+            }
+            break;
+
+        case 'dueno':
+            switch ($subaccion) {
+                case 'listar_terminales':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $terminales = listar_terminales_de_dueno($nombre_dueno);
+                    responder_json(['exito' => true, 'terminales' => $terminales]);
+                    break;
+
+                case 'agregar_terminal':
+                    // Forzar nivel y dueño
+                    $post['nivel'] = 'terminal';
+                    $post['dueno'] = $post['nombre_dueno'] ?? '';
+                    if (empty($post['dueno'])) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado = agregar_usuario($post);
+                    responder_json($resultado);
+                    break;
+
+                case 'actualizar_terminal':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado = actualizar_terminal($post, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                case 'eliminar_terminal':
+                    $nombre_usuario = $post['nombre_usuario'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado = eliminar_terminal($nombre_usuario, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                case 'listar_sesiones_terminales':
+                    $terminales = json_decode($post['terminales'] ?? '[]', true);
+                    if (!is_array($terminales)) $terminales = [];
+                    $sesiones = listar_sesiones_de_usuarios($terminales);
+                    responder_json(['exito' => true, 'sesiones' => $sesiones]);
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de dueño no válida']);
             }
             break;
 

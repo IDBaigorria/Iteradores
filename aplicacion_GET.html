@@ -106,26 +106,69 @@
     </section>
     <section id="terminales" class="tab-content hidden">
       <div class="panel">
-        <h2>Terminales</h2>
-        <div class="row">
-          <label for="selector_terminal">Terminal:</label>
-          <select id="selector_terminal"><option>Secretaria</option><option>Gaspar</option></select>
-          <button class="btn" data-placeholder>Agregar terminal</button>
-        </div>
+        <h2>Puntos de venta</h2>
+        <p class="muted">Terminales asociadas a su cuenta.</p>
+        <button class="btn primary" id="boton_agregar_terminal">Agregar punto de venta</button>
       </div>
-      <div class="panel">
-        <div class="section-title">Resumen de la terminal</div>
-        <div class="info-card" style="max-width:330px">
-          <span class="muted">Cantidad de pasajes vendidos:</span>
-          <strong id="ventas_terminal">37</strong>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="placeholder">Acá pueden ir más datos</div>
-      </div>
-      <div class="panel"><button class="btn" data-placeholder>Imprimir</button></div>
-    </section>
 
+      <!-- Formulario para nuevo punto de venta (oculto inicialmente) -->
+      <div id="formulario_nueva_terminal" class="panel hidden">
+        <h3>Nuevo punto de venta</h3>
+        <div class="form-grid">
+          <div class="field"><label>Nombre de usuario *</label><input id="nuevo_terminal_nombre_usuario"></div>
+          <div class="field"><label>Contraseña (opcional)</label><input type="password" id="nuevo_terminal_contrasena"></div>
+          <div class="field"><label>Nombre real</label><input id="nuevo_terminal_nombre_real"></div>
+          <div class="field"><label>Email (opcional)</label><input id="nuevo_terminal_email"></div>
+          <div class="field"><label>Código de acceso *</label><input id="nuevo_terminal_codigo_acceso"></div>
+          <div class="field"><label>Banco (nombre) *</label><input id="nuevo_terminal_banco_nombre"></div>
+          <div class="field"><label>Cuenta bancaria *</label><input id="nuevo_terminal_banco_cuenta"></div>
+        </div>
+        <div class="actions" style="margin-top:12px">
+          <button class="btn primary" id="boton_guardar_terminal">Guardar</button>
+          <button class="btn" id="boton_cancelar_terminal">Cancelar</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Terminales</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Nombre real</th>
+                <th>Email</th>
+                <th>Código</th>
+                <th>Efectivo</th>
+                <th>Bancarizado</th>
+                <th>Banco</th>
+                <th>Cuenta</th>
+                <th>Pasajes</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla_terminales_dueno"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Sesiones de terminales</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Usuario</th>
+                <th>Creado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla_sesiones_terminales"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
     <section id="viajes" class="tab-content hidden">
       <div class="panel">
         <h2>Viajes</h2>
