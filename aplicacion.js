@@ -42,6 +42,7 @@ let viaje_seleccionado = null;
 let micro_seleccionado = null;
 let intervaloSyncAsientos = null;
 let microSyncActual = null;
+let estados_asientos_actuales = [];
 
 function mostrar_aviso(mensaje) {
     const aviso = $("#toast");
@@ -1559,14 +1560,20 @@ $("#boton_editar_empresa_micros").addEventListener("click", () => {
     $("#formulario_nueva_empresa").classList.add("hidden");
 });
 
-/*$("#boton_guardar_edicion_empresa").addEventListener("click", async () => {
+$("#boton_guardar_edicion_empresa").addEventListener("click", async () => {
     const nombre_empresa = $("#selector_empresa_micros").value;
     const nombre_dueno = usuario_actual.nivel === 'admin' ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
     const nuevo_nombre = $("#editar_empresa_nombre").value.trim();
+
+    if (!nombre_empresa) {
+        mostrar_aviso("Seleccione una empresa");
+        return;
+    }
     if (!nuevo_nombre) {
         mostrar_aviso("El nombre no puede estar vacío");
         return;
     }
+
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1580,11 +1587,11 @@ $("#boton_editar_empresa_micros").addEventListener("click", () => {
     } else {
         mostrar_aviso(resultado.error || "Error al editar");
     }
-});*/
+});
 
-/*$("#boton_cancelar_edicion_empresa").addEventListener("click", () => {
+$("#boton_cancelar_edicion_empresa").addEventListener("click", () => {
     $("#formulario_editar_empresa").classList.add("hidden");
-});*/
+});
 
 $("#boton_eliminar_empresa_micros").addEventListener("click", async () => {
     const nombre_empresa = $("#selector_empresa_micros").value;
@@ -1903,6 +1910,7 @@ async function solicitar_estado_asientos() {
     });
     const datos = await respuesta.json();
     if (datos.exito) {
+        estados_asientos_actuales = datos.asientos;
         actualizar_colores_asientos(datos.asientos);
     }
 }
@@ -1914,10 +1922,18 @@ function actualizar_colores_asientos(estados) {
         const columna = seat.dataset.columna;
         const estadoObj = estados.find(e => e.fila === fila && e.columna === columna);
         if (estadoObj) {
-            // Quitar clases de estado previas
-            seat.classList.remove('seat-libre', 'seat-seleccionado', 'seat-vendido', 'seat-no-disponible');
-            seat.classList.add(`seat-${estadoObj.estado}`);
+            seat.classList.remove('seat-libre', 'seat-seleccionado', 'seat-seleccionado-propio', 'seat-vendido', 'seat-no-disponible');
+            if (estadoObj.estado === 'seleccionado') {
+                if (estadoObj.seleccionado_por === usuario_actual.nombre_usuario) {
+                    seat.classList.add('seat-seleccionado-propio');
+                } else {
+                    seat.classList.add('seat-seleccionado');
+                }
+            } else {
+                seat.classList.add(`seat-${estadoObj.estado}`);
+            }
             seat.dataset.estado = estadoObj.estado;
+            seat.dataset.seleccionado_por = estadoObj.seleccionado_por || '';
         }
     });
 }
@@ -1926,6 +1942,8 @@ function seleccionar_asiento_pasaje(fila, columna) {
     if (!microSyncActual || !viaje_seleccionado) return;
 
     const nombre_dueno = obtener_dueno_viaje_seleccionado();
+    const nombre_terminal = usuario_actual.nombre_usuario;
+
     fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1935,16 +1953,46 @@ function seleccionar_asiento_pasaje(fila, columna) {
             nombre_micro: microSyncActual,
             fila,
             columna,
-            nombre_dueno
+            nombre_dueno,
+            nombre_terminal
         })
     })
     .then(resp => resp.json())
     .then(resultado => {
         if (resultado.exito) {
             mostrar_aviso("Asiento seleccionado");
-            solicitar_estado_asientos(); // refrescar colores
+            solicitar_estado_asientos();
         } else {
             mostrar_aviso(resultado.error || "No se pudo seleccionar");
+        }
+    });
+}
+function deseleccionar_asiento_pasaje(fila, columna) {
+    if (!microSyncActual || !viaje_seleccionado) return;
+
+    const nombre_dueno = obtener_dueno_viaje_seleccionado();
+    const nombre_terminal = usuario_actual.nombre_usuario;
+
+    fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/deseleccionar_asiento",
+            nombre_viaje: viaje_seleccionado.nombre_viaje,
+            nombre_micro: microSyncActual,
+            fila,
+            columna,
+            nombre_dueno,
+            nombre_terminal
+        })
+    })
+    .then(resp => resp.json())
+    .then(resultado => {
+        if (resultado.exito) {
+            mostrar_aviso("Asiento liberado");
+            solicitar_estado_asientos();
+        } else {
+            mostrar_aviso(resultado.error || "No se pudo liberar");
         }
     });
 }
@@ -1958,7 +2006,9 @@ function mostrar_info_asiento(asiento) {
         <div class="detail-line"><span>Fila/Col:</span><strong>${asiento.fila} - ${asiento.columna}</strong></div>
         <div class="detail-line"><span>Estado:</span><strong class="status-${asiento.estado}">${asiento.estado.toUpperCase()}</strong></div>
     `;
-
+    if (asiento.seleccionado_por) {
+        html += `<div class="detail-line"><span>Seleccionado por:</span><strong>${asiento.seleccionado_por}</strong></div>`;
+    }
     if (asiento.pasajero) {
         html += `<h4 style="margin-top:10px;">Pasajero</h4>`;
         Object.entries(asiento.pasajero).forEach(([campo, valor]) => {
@@ -2032,19 +2082,18 @@ function renderizar_pasaje_micro(micro) {
             const fila = seat.dataset.fila;
             const columna = seat.dataset.columna;
 
-            // Buscar asiento en datos para mostrar info
-            let asientoEncontrado = null;
-            for (const piso of configuracion.pisos) {
-                asientoEncontrado = piso.asientos.find(a => 
-                    parseInt(a.fila) === parseInt(fila) && parseInt(a.columna) === parseInt(columna)
-                );
-                if (asientoEncontrado) break;
-            }
-            if (asientoEncontrado) {
-                mostrar_info_asiento(asientoEncontrado);
-                // Si es terminal y el asiento está libre, intentar seleccionar
-                if (usuario_actual.nivel === 'terminal' && asientoEncontrado.estado === 'libre') {
+            // Buscar asiento en estados actuales (más recientes)
+            const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            if (!asiento) return;
+
+            // Mostrar información actualizada
+            mostrar_info_asiento(asiento);
+
+            if (usuario_actual.nivel === 'terminal') {
+                if (asiento.estado === 'libre') {
                     seleccionar_asiento_pasaje(fila, columna);
+                } else if (asiento.estado === 'seleccionado' && asiento.seleccionado_por === usuario_actual.nombre_usuario) {
+                    deseleccionar_asiento_pasaje(fila, columna);
                 }
             }
         });

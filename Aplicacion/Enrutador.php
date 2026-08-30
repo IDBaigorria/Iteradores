@@ -395,17 +395,30 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = obtener_estados_asientos_micro($nombre_viaje, $nombre_micro, $nombre_dueno);
                     responder_json($resultado);
                     break;
-
                 case 'seleccionar_asiento':
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_micro = $post['nombre_micro'] ?? '';
                     $fila = $post['fila'] ?? '';
                     $columna = $post['columna'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
-                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno)) {
+                    $nombre_terminal = $post['nombre_terminal'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno) || empty($nombre_terminal)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = seleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno);
+                    $resultado = seleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal);
+                    responder_json($resultado);
+                    break;
+                case 'deseleccionar_asiento':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $fila = $post['fila'] ?? '';
+                    $columna = $post['columna'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $nombre_terminal = $post['nombre_terminal'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno) || empty($nombre_terminal)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = deseleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal);
                     responder_json($resultado);
                     break;
                 default:
