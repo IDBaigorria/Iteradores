@@ -339,7 +339,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombre_empresa = $post['nombre_empresa'] ?? '';
                     $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
-                    $resultado = agregar_micro_a_viaje($nombre_viaje, $nombre_empresa, $nombre_vehiculo, $nombre_dueno);
+                    $monto = $post['monto'] ?? '0';
+                    $resultado = agregar_micro_a_viaje($nombre_viaje, $nombre_empresa, $nombre_vehiculo, $nombre_dueno, $monto);
                     responder_json($resultado);
                     break;
 
@@ -374,6 +375,37 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
                     $resultado = obtener_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+                case 'actualizar_monto_micro':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $monto = $post['monto'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $resultado = actualizar_monto_micro($nombre_viaje, $nombre_micro, $monto, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+                case 'estado_asientos':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = obtener_estados_asientos_micro($nombre_viaje, $nombre_micro, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                case 'seleccionar_asiento':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $fila = $post['fila'] ?? '';
+                    $columna = $post['columna'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = seleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno);
                     responder_json($resultado);
                     break;
                 default:

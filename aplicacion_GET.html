@@ -35,6 +35,7 @@
   </nav>
 
   <main>
+    <!-- Sección Administración -->
     <section id="admin" class="tab-content hidden">
       <div id="panel_admin">
         <div class="panel">
@@ -105,6 +106,7 @@
       </div>
     </section>
 
+    <!-- Sección Puntos de venta -->
     <section id="terminales" class="tab-content hidden">
       <div class="panel">
         <h2>Puntos de venta</h2>
@@ -170,6 +172,7 @@
       </div>
     </section>
 
+    <!-- Sección Empresas / Micros -->
     <section id="micros" class="tab-content hidden">
       <div class="panel" id="panel_selector_dueno_micros" style="display:none;">
         <h2>Empresas / Micros</h2>
@@ -228,7 +231,6 @@
       </div>
 
       <div class="panel" id="panel_croquis_micros" style="display:none;">
-        <!-- Vista estática (croquis + foto grande) -->
         <div id="area_croquis_estatico_micros">
           <div class="bus-area">
             <div class="section-title">Configuración física del vehículo</div>
@@ -241,7 +243,6 @@
           </div>
         </div>
 
-        <!-- Editor de configuración (oculto inicialmente) -->
         <div id="panel_edicion_vehiculo_micros" class="hidden" style="margin-top:10px;">
           <h3>Editor de configuración de asientos</h3>
           <div class="foto-vehiculo-editor" style="display:flex; align-items:center; gap:15px; margin-bottom:15px;">
@@ -274,97 +275,104 @@
       </div>
     </section>
 
-<section id="viajes" class="tab-content hidden">
-  <!-- Selector de dueño para admin -->
-  <div class="panel" id="panel_selector_dueno_viajes" style="display:none;">
-    <div class="row">
-      <label for="selector_dueno_viajes">Dueño:</label>
-      <select id="selector_dueno_viajes"></select>
-    </div>
-  </div>
+    <!-- Sección Viajes -->
+    <section id="viajes" class="tab-content hidden">
+      <div class="panel" id="panel_selector_dueno_viajes" style="display:none;">
+        <div class="row">
+          <label for="selector_dueno_viajes">Dueño:</label>
+          <select id="selector_dueno_viajes"></select>
+        </div>
+      </div>
 
-  <!-- Panel de viajes -->
-  <div class="panel" id="panel_viajes">
-    <div class="row" style="justify-content:space-between;">
-      <h2>Viajes</h2>
-      <button class="btn primary" id="boton_agregar_viaje" style="display:none;">Agregar viaje</button>
-    </div>
-    <div id="lista_viajes"></div>
-  </div>
+      <div class="panel" id="panel_viajes">
+        <div class="row" style="justify-content:space-between;">
+          <h2>Viajes</h2>
+          <button class="btn primary" id="boton_agregar_viaje" style="display:none;">Agregar viaje</button>
+        </div>
+        <div id="lista_viajes"></div>
+      </div>
 
-  <!-- Formulario nuevo viaje -->
-  <div id="formulario_nuevo_viaje" class="panel hidden">
-    <h3>Nuevo viaje</h3>
-    <div class="form-grid">
-      <div class="field"><label>Nombre de viaje *</label><input id="nuevo_viaje_nombre"></div>
-      <div class="field"><label>Fecha</label><input type="date" id="nuevo_viaje_fecha"></div>
-      <div class="field"><label>Hora</label><input type="time" id="nuevo_viaje_hora"></div>
-      <div class="field"><label>Origen</label><input id="nuevo_viaje_origen"></div>
-      <div class="field"><label>Destino</label><input id="nuevo_viaje_destino"></div>
-    </div>
-    <div class="actions" style="margin-top:12px;">
-      <button class="btn primary" id="boton_guardar_viaje">Guardar</button>
-      <button class="btn" id="boton_cancelar_viaje">Cancelar</button>
-    </div>
-  </div>
+      <div id="formulario_nuevo_viaje" class="panel hidden">
+        <h3>Nuevo viaje</h3>
+        <div class="form-grid">
+          <div class="field"><label>Nombre de viaje *</label><input id="nuevo_viaje_nombre"></div>
+          <div class="field"><label>Fecha</label><input type="date" id="nuevo_viaje_fecha"></div>
+          <div class="field"><label>Hora</label><input type="time" id="nuevo_viaje_hora"></div>
+          <div class="field"><label>Origen</label><input id="nuevo_viaje_origen"></div>
+          <div class="field"><label>Destino</label><input id="nuevo_viaje_destino"></div>
+        </div>
+        <div class="actions" style="margin-top:12px;">
+          <button class="btn primary" id="boton_guardar_viaje">Guardar</button>
+          <button class="btn" id="boton_cancelar_viaje">Cancelar</button>
+        </div>
+      </div>
 
-  <!-- Detalle del viaje (micros y terminales) -->
-  <div id="detalle_viaje" class="panel hidden">
-      <h3 id="detalle_viaje_titulo"></h3>
-      <div class="row">
+      <!-- Detalle del viaje -->
+      <div id="detalle_viaje" class="panel hidden">
+        <h3 id="detalle_viaje_titulo"></h3>
+        <div class="row">
           <label>Micros:</label>
           <button class="btn" id="boton_agregar_micro_viaje">Agregar micro</button>
-      </div>
-      <div id="lista_micros_viaje"></div>
+        </div>
+        <div id="lista_micros_viaje"></div>
 
-      <!-- Pasaje del micro seleccionado -->
+        <!-- Pasaje del micro seleccionado (único bloque, sin duplicados) -->
       <div id="pasaje_micro_viaje" class="panel hidden" style="margin-top:15px;">
           <h4>Pasaje del micro</h4>
           <div id="foto_micro_viaje" style="margin-bottom:10px;"></div>
-          <div id="croquis_pasaje_micro"></div>
+          <div class="pasaje-layout">
+              <div id="croquis_pasaje_micro"></div>
+              <div id="info_asiento_viaje" class="panel hidden" style="padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
+          </div>
       </div>
 
-      <div id="seccion_terminales_viaje">
-        <div class="row" style="margin-top:15px;">
+        <div id="seccion_terminales_viaje">
+          <div class="row" style="margin-top:15px;">
             <label>Terminales autorizadas:</label>
             <button class="btn" id="boton_agregar_terminal_viaje">Agregar punto de venta</button>
+          </div>
+          <div id="lista_terminales_viaje"></div>
         </div>
-        <div id="lista_terminales_viaje"></div>
       </div>
-  </div>
 
-  <!-- Formularios para agregar micro y terminal -->
-  <div id="formulario_agregar_micro" class="panel hidden">
-    <h3>Agregar micro</h3>
-    <div class="form-grid">
-      <div class="field">
-        <label>Empresa</label>
-        <select id="selector_empresa_micro_viaje"></select>
+      <!-- Formulario agregar micro -->
+      <div id="formulario_agregar_micro" class="panel hidden">
+        <h3>Agregar micro</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label>Empresa</label>
+            <select id="selector_empresa_micro_viaje"></select>
+          </div>
+          <div class="field">
+            <label>Vehículo</label>
+            <select id="selector_vehiculo_micro_viaje"></select>
+          </div>
+          <div class="field">
+              <label>Monto del pasaje *</label>
+              <input type="number" id="monto_micro_viaje" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div class="actions" style="margin-top:12px;">
+          <button class="btn primary" id="boton_confirmar_micro">Confirmar</button>
+          <button class="btn" id="boton_cancelar_micro">Cancelar</button>
+        </div>
       </div>
-      <div class="field">
-        <label>Vehículo</label>
-        <select id="selector_vehiculo_micro_viaje"></select>
+
+      <!-- Formulario agregar terminal autorizada -->
+      <div id="formulario_agregar_terminal" class="panel hidden">
+        <h3>Agregar punto de venta autorizado</h3>
+        <div class="field">
+          <label>Terminal</label>
+          <select id="selector_terminal_autorizada"></select>
+        </div>
+        <div class="actions" style="margin-top:12px;">
+          <button class="btn primary" id="boton_confirmar_terminal">Confirmar</button>
+          <button class="btn" id="boton_cancelar_terminal_viaje">Cancelar</button>
+        </div>
       </div>
-    </div>
-    <div class="actions" style="margin-top:12px;">
-      <button class="btn primary" id="boton_confirmar_micro">Confirmar</button>
-      <button class="btn" id="boton_cancelar_micro">Cancelar</button>
-    </div>
-  </div>
+    </section>
 
-  <div id="formulario_agregar_terminal" class="panel hidden">
-    <h3>Agregar punto de venta autorizado</h3>
-    <div class="field">
-      <label>Terminal</label>
-      <select id="selector_terminal_autorizada"></select>
-    </div>
-    <div class="actions" style="margin-top:12px;">
-      <button class="btn primary" id="boton_confirmar_terminal">Confirmar</button>
-      <button class="btn" id="boton_cancelar_terminal_viaje">Cancelar</button>
-    </div>
-  </div>
-</section>
-
+    <!-- Sección Vendidos -->
     <section id="vendidos" class="tab-content hidden">
       <div class="panel">
         <h2>Ventas realizadas</h2>
@@ -381,6 +389,7 @@
       </div>
     </section>
 
+    <!-- Sección Pasajeros -->
     <section id="pasajeros" class="tab-content hidden">
       <div class="panel">
         <h2>Pasajeros / Clientes</h2>

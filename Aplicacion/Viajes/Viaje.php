@@ -79,6 +79,7 @@ function clonar_vehiculo($nodo_vehiculo_original) {
                     if ($columna) {
                         $nodo_asiento_copia->_adyacente_en(Nodo::crear_con_dato($columna->dato()), 'columna');
                     }
+                    $nodo_asiento_copia->_adyacente_en(Nodo::crear_con_dato('libre'), 'estado');
 
                     if ($anterior_copia) {
                         $anterior_copia->_adyacente_en($nodo_asiento_copia, 'siguiente');
@@ -195,6 +196,7 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje): array {
                 'ocupacion' => $nodo_micro->adyacente('ocupacion') ? $nodo_micro->adyacente('ocupacion')->dato() : '0',
                 'seleccionados' => $nodo_micro->adyacente('seleccionados') ? $nodo_micro->adyacente('seleccionados')->dato() : '0',
                 'vendidos' => $nodo_micro->adyacente('vendidos') ? $nodo_micro->adyacente('vendidos')->dato() : '0',
+                'monto' => $nodo_micro->adyacente('monto') ? $nodo_micro->adyacente('monto')->dato() : '0',
             ];
         }
     }
@@ -286,23 +288,21 @@ function eliminar_viaje(string $nombre_viaje, string $nombre_dueno): array {
     return ['exito' => true];
 }
 
-function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno): array {
+function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno, string $monto = '0'): array {
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
     if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
 
-    // Buscar empresa y vehículo
+    // Obtener raíz usuarios y dueño
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios'];
 
-    $nodo_empresa_encontrada = null;
-    $nodo_vehiculo_encontrado = null;
-    // Solo buscar dentro del dueño
     $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
     if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
+    // Buscar empresa y vehículo
     $nodo_empresas = $nodo_dueno->adyacente('empresas');
     if (!$nodo_empresas) return ['exito' => false, 'error' => 'El dueño no tiene empresas'];
 
@@ -318,11 +318,18 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
     // Clonar vehículo
     $nodo_copia = clonar_vehiculo($nodo_vehiculo);
 
+    // Validar monto
+    $monto = (string) $monto;
+    if (!is_numeric($monto) || (float)$monto < 0) {
+        return ['exito' => false, 'error' => 'Monto inválido'];
+    }
+
     // Crear micro
     $nodo_micro = Nodo::crear_con_dato('');
     $nodo_micro->_adyacente_en(Nodo::crear_con_dato($nombre_empresa), 'empresa');
     $nodo_micro->_adyacente_en(Nodo::crear_con_dato($nombre_vehiculo), 'patente');
     $nodo_micro->_adyacente_en($nodo_copia, 'vehiculo_copia');
+    $nodo_micro->_adyacente_en(Nodo::crear_con_dato($monto), 'monto');
     $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), 'ocupacion');
     $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), 'seleccionados');
     $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), 'vendidos');
@@ -334,7 +341,7 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
     }
 
     $adyacentes_micros = (array) $nodo_micros->adyacentes();
-    $indice = count($adyacentes_micros) + 1;   
+    $indice = count($adyacentes_micros) + 1;
     $nombre_micro = 'micro_' . $indice;
     $nodo_micros->_adyacente_en($nodo_micro, $nombre_micro);
 
@@ -429,6 +436,66 @@ function actualizar_contadores_viaje(string $nombre_viaje, string $nombre_dueno)
     $nodo_viaje->adyacente('vendidos')->_dato((string)$total_vendidos);
     $nodo_viaje->adyacente('disponibles')->_dato((string)$total_disponibles);
 }
+function obtener_configuracion_piso_con_estado($nodo_piso): ?array {
+    $nodo_filas = $nodo_piso->adyacente('filas');
+    $nodo_columnas = $nodo_piso->adyacente('columnas');
+    if (!$nodo_filas || !$nodo_columnas) return null;
+
+    $filas = (int)$nodo_filas->dato();
+    $columnas = (int)$nodo_columnas->dato();
+
+    $asientos = [];
+    $nodo_cabeza = $nodo_piso->adyacente('asientos');
+    if ($nodo_cabeza) {
+        $actual = $nodo_cabeza->adyacente('primer');
+        $contador = 0;
+        while ($actual && $actual->id() !== $nodo_cabeza->id() && $contador < 1000) {
+            $fila = $actual->adyacente('fila');
+            $columna = $actual->adyacente('columna');
+            $estado = $actual->adyacente('estado');
+            $asiento_info = [
+                'fila' => $fila ? $fila->dato() : '',
+                'columna' => $columna ? $columna->dato() : '',
+                'numero' => $actual->dato(),
+                'estado' => $estado ? $estado->dato() : 'libre',
+                'pasajero' => null,
+                'venta' => null
+            ];
+
+            // Si estado es vendido o no disponible, buscar pasajero
+            if (in_array($asiento_info['estado'], ['vendido', 'no disponible'])) {
+                $nodo_pasajero = $actual->adyacente('pasajero');
+                if ($nodo_pasajero) {
+                    $pasajero = [];
+                    $adyacentes_pasajero = (array) $nodo_pasajero->adyacentes();
+                    foreach ($adyacentes_pasajero as $campo => $nodo_campo) {
+                        $pasajero[$campo] = $nodo_campo->dato();
+                    }
+                    $asiento_info['pasajero'] = $pasajero;
+                }
+            }
+
+            // Si estado es vendido, buscar venta
+            if ($asiento_info['estado'] === 'vendido') {
+                $nodo_venta = $actual->adyacente('venta');
+                if ($nodo_venta) {
+                    // Por ahora solo indicamos que existe, los detalles en próxima versión
+                    $asiento_info['venta'] = true;
+                }
+            }
+
+            $asientos[] = $asiento_info;
+            $actual = $actual->adyacente('siguiente');
+            $contador++;
+        }
+    }
+
+    return [
+        'filas' => $filas,
+        'columnas' => $columnas,
+        'asientos' => $asientos
+    ];
+}
 
 /**
  * Obtiene los datos completos de un micro de un viaje, incluyendo la configuración de la copia.
@@ -457,6 +524,7 @@ function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, stri
     $ocupacion = $nodo_micro->adyacente('ocupacion') ? $nodo_micro->adyacente('ocupacion')->dato() : '0';
     $seleccionados = $nodo_micro->adyacente('seleccionados') ? $nodo_micro->adyacente('seleccionados')->dato() : '0';
     $vendidos = $nodo_micro->adyacente('vendidos') ? $nodo_micro->adyacente('vendidos')->dato() : '0';
+    $monto = $nodo_micro->adyacente('monto') ? $nodo_micro->adyacente('monto')->dato() : '0';
 
     // Obtener copia del vehículo
     $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
@@ -472,7 +540,7 @@ function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, stri
         for ($i = 1; $i <= 2; $i++) {
             $piso = $nodo_asientos_copia->adyacente("piso_$i");
             if ($piso) {
-                $config_piso = obtener_configuracion_piso($piso); // definida en Vehiculo.php
+                $config_piso = obtener_configuracion_piso_con_estado($piso);
                 if ($config_piso) {
                     $configuracion['pisos'][] = $config_piso;
                 }
@@ -491,7 +559,141 @@ function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, stri
             'vendidos' => $vendidos,
             'nombre' => $nombre,
             'foto' => $foto,
+            'monto' => $monto,
             'configuracion' => $configuracion
         ]
     ];
+}
+
+function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, string $monto, string $nombre_dueno): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) return ['exito' => false, 'error' => 'No hay micros'];
+
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
+
+    if (!is_numeric($monto) || (float)$monto < 0) {
+        return ['exito' => false, 'error' => 'Monto inválido'];
+    }
+
+    $nodo_monto = $nodo_micro->adyacente('monto');
+    if ($nodo_monto) {
+        $nodo_monto->_dato((string)$monto);
+    } else {
+        $nodo_micro->_adyacente_en(Nodo::crear_con_dato((string)$monto), 'monto');
+    }
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+    return ['exito' => true];
+}
+
+/**
+ * Obtiene los estados de todos los asientos de un micro de un viaje.
+ */
+function obtener_estados_asientos_micro(string $nombre_viaje, string $nombre_micro, string $nombre_dueno): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) return ['exito' => false, 'error' => 'No hay micros'];
+
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
+
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) return ['exito' => false, 'error' => 'No existe copia del vehículo'];
+
+    $asientos_estados = [];
+    $nodo_asientos = $nodo_copia->adyacente('asientos');
+    if ($nodo_asientos) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$piso) continue;
+            $cabeza = $piso->adyacente('asientos');
+            if (!$cabeza) continue;
+            $actual = $cabeza->adyacente('primer');
+            while ($actual && $actual->id() !== $cabeza->id()) {
+                $fila = $actual->adyacente('fila');
+                $columna = $actual->adyacente('columna');
+                $estado = $actual->adyacente('estado');
+                $asientos_estados[] = [
+                    'fila' => $fila ? $fila->dato() : '',
+                    'columna' => $columna ? $columna->dato() : '',
+                    'numero' => $actual->dato(),
+                    'estado' => $estado ? $estado->dato() : 'libre'
+                ];
+                $actual = $actual->adyacente('siguiente');
+            }
+        }
+    }
+
+    return ['exito' => true, 'asientos' => $asientos_estados];
+}
+
+/**
+ * Cambia el estado de un asiento a "seleccionado" si está libre.
+ */
+function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) return ['exito' => false, 'error' => 'No hay micros'];
+
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
+
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) return ['exito' => false, 'error' => 'No existe copia del vehículo'];
+
+    // Buscar asiento por fila/columna en la copia
+    $nodo_asiento_encontrado = null;
+    $nodo_asientos = $nodo_copia->adyacente('asientos');
+    if ($nodo_asientos) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$piso) continue;
+            $cabeza = $piso->adyacente('asientos');
+            if (!$cabeza) continue;
+            $actual = $cabeza->adyacente('primer');
+            while ($actual && $actual->id() !== $cabeza->id()) {
+                $f = $actual->adyacente('fila');
+                $c = $actual->adyacente('columna');
+                if ($f && $c && $f->dato() === $fila && $c->dato() === $columna) {
+                    $nodo_asiento_encontrado = $actual;
+                    break 2;
+                }
+                $actual = $actual->adyacente('siguiente');
+            }
+        }
+    }
+
+    if (!$nodo_asiento_encontrado) return ['exito' => false, 'error' => 'Asiento no encontrado'];
+
+    $estado = $nodo_asiento_encontrado->adyacente('estado');
+    if ($estado && $estado->dato() !== 'libre') {
+        return ['exito' => false, 'error' => 'El asiento ya no está libre'];
+    }
+
+    // Actualizar estado a seleccionado
+    if ($estado) {
+        $estado->_dato('seleccionado');
+    } else {
+        $nodo_asiento_encontrado->_adyacente_en(Nodo::crear_con_dato('seleccionado'), 'estado');
+    }
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+    return ['exito' => true];
 }
