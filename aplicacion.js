@@ -1,6 +1,6 @@
 /***
  * Aplicación principal.
- * @version 1.5piloto.4
+ * @version 1.5piloto.10
  */
 
 // Utilidades
@@ -39,6 +39,7 @@ if (DEBUG_FETCH) {
 let usuario_actual = null;
 let vehiculo_seleccionado_micros = null; // Almacena {nombre_vehiculo, nombre, asientos}
 let viaje_seleccionado = null;
+let micro_seleccionado = null;
 
 function mostrar_aviso(mensaje) {
     const aviso = $("#toast");
@@ -77,6 +78,9 @@ function configurar_pestanas_segun_nivel(nivel) {
 }
 
 function activar_pestana(id_pestana) {
+    if (id_pestana !== 'viajes') {
+        ocultar_detalle_viaje();
+    }
     $$(".tab").forEach(boton => boton.classList.remove("active"));
     const boton_activo = document.querySelector(`.tab[data-tab="${id_pestana}"]`);
     if (boton_activo) boton_activo.classList.add("active");
@@ -126,6 +130,7 @@ async function ingresar_con_codigo() {
 }
 
 async function salir() {
+    ocultar_detalle_viaje();
     if (usuario_actual && usuario_actual.token_sesion) {
         try {
             await fetch("index.php", {
@@ -161,6 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 $("#nombre_usuario_actual").textContent = usuario_actual.nombre_usuario;
                 $("#nivel_usuario_actual").textContent = usuario_actual.nivel;
                 configurar_pestanas_segun_nivel(usuario_actual.nivel);
+                ocultar_detalle_viaje();
             } else {
                 localStorage.removeItem('token_sesion');
                 localStorage.removeItem('usuario_actual');
@@ -1631,7 +1637,7 @@ async function cargar_viajes() {
     const boton_agregar = $("#boton_agregar_viaje");
     const lista = $("#lista_viajes");
     lista.innerHTML = '';
-
+    ocultar_detalle_viaje();
     if (usuario_actual.nivel === 'admin') {
         panel_dueno.style.display = 'block';
         boton_agregar.style.display = 'none';
@@ -1664,6 +1670,7 @@ async function cargar_duenos_en_select_viajes() {
             select.appendChild(opcion);
         });
         select.onchange = async () => {
+            ocultar_detalle_viaje();
             if (select.value) {
                 await listar_viajes(select.value, 'dueno');
                 $("#boton_agregar_viaje").style.display = 'inline-block';
@@ -1673,6 +1680,17 @@ async function cargar_duenos_en_select_viajes() {
             }
         };
     }
+}
+
+function ocultar_detalle_viaje() {
+    $("#detalle_viaje").classList.add("hidden");
+    $("#formulario_agregar_micro").classList.add("hidden");
+    $("#formulario_agregar_terminal").classList.add("hidden");
+    viaje_seleccionado = null;
+    micro_seleccionado = null;
+    $("#croquis_pasaje_micro").innerHTML = '';
+    $("#foto_micro_viaje").innerHTML = '';
+    $("#pasaje_micro_viaje").classList.add("hidden");
 }
 
 async function listar_viajes(nombre, tipo) {
@@ -1721,11 +1739,30 @@ function renderizar_viajes(viajes) {
 }
 
 function ver_detalle_viaje(viaje) {
+    ocultar_detalle_viaje();
+
     viaje_seleccionado = viaje;
     $("#detalle_viaje_titulo").textContent = viaje.nombre;
     $("#detalle_viaje").classList.remove('hidden');
+
+    // Restricciones para terminal
+    if (usuario_actual.nivel === 'terminal') {
+        $("#boton_agregar_micro_viaje").style.display = 'none';
+        $("#boton_agregar_terminal_viaje").style.display = 'none';
+        $("#seccion_terminales_viaje").style.display = 'none'; // ocultar terminales autorizadas
+    } else {
+        $("#boton_agregar_micro_viaje").style.display = '';
+        $("#boton_agregar_terminal_viaje").style.display = '';
+        $("#seccion_terminales_viaje").style.display = ''; // mostrar terminales
+    }
+
     renderizar_micros_viaje(viaje.micros);
-    renderizar_terminales_viaje(viaje.terminales_autorizadas);
+    // Solo renderizar terminales si no es terminal
+    if (usuario_actual.nivel !== 'terminal') {
+        renderizar_terminales_viaje(viaje.terminales_autorizadas);
+    } else {
+        $("#lista_terminales_viaje").innerHTML = ''; // limpiar por si acaso
+    }
 }
 
 function renderizar_micros_viaje(micros) {
@@ -1738,13 +1775,97 @@ function renderizar_micros_viaje(micros) {
             <span>${micro.empresa} - ${micro.patente}</span>
             <span>Ocupación: ${micro.ocupacion}</span>
             <span>Vendidos: ${micro.vendidos}</span>
+            <button class="btn btn-ver-pasaje" data-micro="${micro.nombre_micro}">Ver pasaje</button>
             ${usuario_actual.nivel !== 'terminal' ? `<button class="btn btn-eliminar-micro" data-micro="${micro.nombre_micro}">Quitar</button>` : ''}
         `;
         contenedor.appendChild(div);
 
+        // Evento para ver pasaje
+        div.querySelector('.btn-ver-pasaje').addEventListener('click', () => seleccionar_micro_viaje(micro.nombre_micro));
         const btnQuitar = div.querySelector('.btn-eliminar-micro');
         if (btnQuitar) btnQuitar.addEventListener('click', () => eliminar_micro(micro.nombre_micro));
     });
+}
+async function seleccionar_micro_viaje(nombre_micro) {
+    micro_seleccionado = nombre_micro;
+
+    // Obtener dueño correcto según nivel
+    let nombre_dueno;
+    if (usuario_actual.nivel === 'terminal') {
+        nombre_dueno = viaje_seleccionado.dueno; // viene de formatear_viaje
+    } else {
+        nombre_dueno = obtener_nombre_dueno_actual();
+    }
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/obtener_micro",
+            nombre_viaje: viaje_seleccionado.nombre_viaje,
+            nombre_micro,
+            nombre_dueno
+        })
+    });
+    const datos = await respuesta.json();
+    if (datos.exito && datos.micro) {
+        renderizar_pasaje_micro(datos.micro);
+    } else {
+        mostrar_aviso(datos.error || "Error al obtener micro");
+    }
+}
+function renderizar_pasaje_micro(micro) {
+    const contenedorCroquis = $("#croquis_pasaje_micro");
+    const contenedorFoto = $("#foto_micro_viaje");
+    contenedorCroquis.innerHTML = '';
+    contenedorFoto.innerHTML = '';
+
+    // Mostrar foto si existe
+    if (micro.foto) {
+        contenedorFoto.innerHTML = `<img src="${micro.foto}" alt="Foto del micro" style="max-width:200px; max-height:200px; border-radius:8px;">`;
+    }
+
+    const configuracion = micro.configuracion;
+    if (configuracion && configuracion.pisos && configuracion.pisos.length > 0) {
+        configuracion.pisos.forEach((piso, index) => {
+            const titulo = document.createElement('div');
+            titulo.className = 'section-title';
+            titulo.textContent = `Piso ${index + 1}`;
+            contenedorCroquis.appendChild(titulo);
+
+            const busDiv = document.createElement('div');
+            busDiv.className = 'bus';
+            busDiv.innerHTML = `<div class="bus-front">FRENTE · CONDUCTOR</div>`;
+
+            for (let fila = 1; fila <= piso.filas; fila++) {
+                const filaDiv = document.createElement('div');
+                filaDiv.className = 'seat-row';
+                for (let col = 1; col <= piso.columnas; col++) {
+                    const asiento = piso.asientos.find(a => parseInt(a.fila) === fila && parseInt(a.columna) === col);
+                    if (asiento) {
+                        const seat = document.createElement('div');
+                        seat.className = 'seat';
+                        seat.textContent = String(asiento.numero).padStart(2, '0');
+                        filaDiv.appendChild(seat);
+                    } else {
+                        const empty = document.createElement('div');
+                        empty.className = 'aisle';
+                        filaDiv.appendChild(empty);
+                    }
+                }
+                busDiv.appendChild(filaDiv);
+            }
+            busDiv.innerHTML += `<div class="bus-back">PARTE TRASERA</div>`;
+            contenedorCroquis.appendChild(busDiv);
+        });
+    } else {
+        contenedorCroquis.innerHTML = '<p>No hay configuración de asientos.</p>';
+    }
+
+    // Mostrar panel de pasaje
+    $("#pasaje_micro_viaje").classList.remove("hidden");
+
+
 }
 
 function renderizar_terminales_viaje(terminales) {
@@ -1898,6 +2019,7 @@ $("#boton_cancelar_micro").addEventListener("click", () => {
 });
 
 async function eliminar_micro(nombre_micro) {
+    if (!confirm(`¿Quitar el micro "${nombre_micro}" del viaje?`)) return;
     const nombre_dueno = obtener_nombre_dueno_actual();
     const respuesta = await fetch("index.php", {
         method: "POST",
@@ -1967,7 +2089,7 @@ $("#boton_confirmar_terminal").addEventListener("click", async () => {
     }
 });
 
-$("#boton_cancelar_terminal").addEventListener("click", () => {
+$("#boton_cancelar_terminal_viaje").addEventListener("click", () => {
     $("#formulario_agregar_terminal").classList.add("hidden");
 });
 
@@ -1996,6 +2118,9 @@ async function eliminar_terminal_autorizada(nombre_terminal) {
 async function actualizar_detalle_viaje_actual() {
     if (!viaje_seleccionado) return;
 
+    const nombre_viaje_actual = viaje_seleccionado.nombre_viaje; // guardar antes de ocultar
+    ocultar_detalle_viaje(); // ahora sí se puede limpiar
+
     let nombre_dueno = obtener_nombre_dueno_actual();
     let tipo = usuario_actual.nivel === 'terminal' ? 'terminal' : 'dueno';
     let accion = tipo === 'dueno' ? 'viajes/listar_por_dueno' : 'viajes/listar_por_terminal';
@@ -2008,7 +2133,7 @@ async function actualizar_detalle_viaje_actual() {
     });
     const datos = await respuesta.json();
     if (datos.exito) {
-        const viajeActualizado = datos.viajes.find(v => v.nombre_viaje === viaje_seleccionado.nombre_viaje);
+        const viajeActualizado = datos.viajes.find(v => v.nombre_viaje === nombre_viaje_actual);
         if (viajeActualizado) {
             ver_detalle_viaje(viajeActualizado);
         }

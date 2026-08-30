@@ -13,6 +13,7 @@ use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
+include_once("./Aplicacion/Vehiculos/Vehiculo.php");
 
 /**
  * Clona la estructura completa de un vehículo original para asociarla a un viaje.
@@ -180,7 +181,7 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje): array {
     $datos['disponibles'] = $nodo_viaje->adyacente('disponibles') ? $nodo_viaje->adyacente('disponibles')->dato() : '0';
     $datos['seleccionados'] = $nodo_viaje->adyacente('seleccionados') ? $nodo_viaje->adyacente('seleccionados')->dato() : '0';
     $datos['vendidos'] = $nodo_viaje->adyacente('vendidos') ? $nodo_viaje->adyacente('vendidos')->dato() : '0';
-
+    $datos['dueno'] = $nodo_viaje->adyacente('dueno') ? $nodo_viaje->adyacente('dueno')->dato() : '';
     // Micros
     $micros = [];
     $nodo_micros = $nodo_viaje->adyacente('micros');
@@ -427,4 +428,70 @@ function actualizar_contadores_viaje(string $nombre_viaje, string $nombre_dueno)
     $nodo_viaje->adyacente('seleccionados')->_dato((string)$total_seleccionados);
     $nodo_viaje->adyacente('vendidos')->_dato((string)$total_vendidos);
     $nodo_viaje->adyacente('disponibles')->_dato((string)$total_disponibles);
+}
+
+/**
+ * Obtiene los datos completos de un micro de un viaje, incluyendo la configuración de la copia.
+ *
+ * @param string $nombre_viaje Identificador del viaje.
+ * @param string $nombre_micro Nombre del micro dentro del viaje.
+ * @param string $nombre_dueno Nombre del dueño.
+ * @return array Resultado con los datos del micro.
+ */
+function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, string $nombre_dueno): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) return ['exito' => false, 'error' => 'No hay micros'];
+
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
+
+    // Datos básicos del micro
+    $empresa = $nodo_micro->adyacente('empresa') ? $nodo_micro->adyacente('empresa')->dato() : '';
+    $patente = $nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '';
+    $ocupacion = $nodo_micro->adyacente('ocupacion') ? $nodo_micro->adyacente('ocupacion')->dato() : '0';
+    $seleccionados = $nodo_micro->adyacente('seleccionados') ? $nodo_micro->adyacente('seleccionados')->dato() : '0';
+    $vendidos = $nodo_micro->adyacente('vendidos') ? $nodo_micro->adyacente('vendidos')->dato() : '0';
+
+    // Obtener copia del vehículo
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) return ['exito' => false, 'error' => 'No existe copia del vehículo'];
+
+    $nombre = $nodo_copia->adyacente('nombre') ? $nodo_copia->adyacente('nombre')->dato() : '';
+    $foto = $nodo_copia->adyacente('foto') ? $nodo_copia->adyacente('foto')->dato() : '';
+
+    // Extraer configuración de asientos de la copia
+    $configuracion = ['pisos' => []];
+    $nodo_asientos_copia = $nodo_copia->adyacente('asientos');
+    if ($nodo_asientos_copia) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos_copia->adyacente("piso_$i");
+            if ($piso) {
+                $config_piso = obtener_configuracion_piso($piso); // definida en Vehiculo.php
+                if ($config_piso) {
+                    $configuracion['pisos'][] = $config_piso;
+                }
+            }
+        }
+    }
+
+    return [
+        'exito' => true,
+        'micro' => [
+            'nombre_micro' => $nombre_micro,
+            'empresa' => $empresa,
+            'patente' => $patente,
+            'ocupacion' => $ocupacion,
+            'seleccionados' => $seleccionados,
+            'vendidos' => $vendidos,
+            'nombre' => $nombre,
+            'foto' => $foto,
+            'configuracion' => $configuracion
+        ]
+    ];
 }

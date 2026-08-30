@@ -366,7 +366,16 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = eliminar_terminal_autorizada($nombre_viaje, $nombre_terminal, $nombre_dueno);
                     responder_json($resultado);
                     break;
-
+                case 'obtener_micro':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = obtener_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de viajes no válida']);
             }

@@ -310,18 +310,27 @@
 
   <!-- Detalle del viaje (micros y terminales) -->
   <div id="detalle_viaje" class="panel hidden">
-    <h3 id="detalle_viaje_titulo"></h3>
-    <div class="row">
-      <label>Micros:</label>
-      <button class="btn" id="boton_agregar_micro_viaje">Agregar micro</button>
-    </div>
-    <div id="lista_micros_viaje"></div>
+      <h3 id="detalle_viaje_titulo"></h3>
+      <div class="row">
+          <label>Micros:</label>
+          <button class="btn" id="boton_agregar_micro_viaje">Agregar micro</button>
+      </div>
+      <div id="lista_micros_viaje"></div>
 
-    <div class="row" style="margin-top:15px;">
-      <label>Terminales autorizadas:</label>
-      <button class="btn" id="boton_agregar_terminal_viaje">Agregar punto de venta</button>
-    </div>
-    <div id="lista_terminales_viaje"></div>
+      <!-- Pasaje del micro seleccionado -->
+      <div id="pasaje_micro_viaje" class="panel hidden" style="margin-top:15px;">
+          <h4>Pasaje del micro</h4>
+          <div id="foto_micro_viaje" style="margin-bottom:10px;"></div>
+          <div id="croquis_pasaje_micro"></div>
+      </div>
+
+      <div id="seccion_terminales_viaje">
+        <div class="row" style="margin-top:15px;">
+            <label>Terminales autorizadas:</label>
+            <button class="btn" id="boton_agregar_terminal_viaje">Agregar punto de venta</button>
+        </div>
+        <div id="lista_terminales_viaje"></div>
+      </div>
   </div>
 
   <!-- Formularios para agregar micro y terminal -->
@@ -351,7 +360,7 @@
     </div>
     <div class="actions" style="margin-top:12px;">
       <button class="btn primary" id="boton_confirmar_terminal">Confirmar</button>
-      <button class="btn" id="boton_cancelar_terminal">Cancelar</button>
+      <button class="btn" id="boton_cancelar_terminal_viaje">Cancelar</button>
     </div>
   </div>
 </section>

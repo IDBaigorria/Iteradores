@@ -1942,7 +1942,7 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	 */
 	public function adyacentes(): array|null{
 		if (!$this->tiene_adyacente()) {
-				return null;
+				return [];//modicicado en 1.5piloto.10
 		}else {
 			return $this->adyacentes;
 		}

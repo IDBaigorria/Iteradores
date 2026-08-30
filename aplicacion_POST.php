@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.7)
+ * ## Estructura de nodos actual (v1.5piloto.10)
  *
  * ### Nodos raíz especiales
  *
@@ -40,10 +40,15 @@
  * |                 | El nodo destino tiene como dato el nombre del dueño (string).                          |
  * | `terminales`    | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
  * |                 | └─ Enlaces salientes con nombre de cada terminal apuntando a su nodo usuario.          |
+ * | `empresas`      | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
+ * |                 | └─ Enlaces salientes con nombre de cada empresa apuntando a su nodo empresa.           |
+ * | `viajes`        | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
+ * |                 | └─ Enlaces salientes con nombre de cada viaje apuntando a su nodo viaje.               |
  *
  * **Observaciones:**
  * - Los enlaces `efectivo`, `banco` y `dueno` solo existen en nodos de nivel `terminal`.
  * - El enlace `terminales` solo existe en nodos de nivel `dueno`.
+ * - El enlace `empresas` y `viajes` solo existe en nodos de nivel `dueno`.
  * - `contrasena`, `nombre_real` y `email` pueden no existir si no se proporcionaron.
  * - El monto en `efectivo` y en `banco` es automático (inicial `"0"`) y no se solicita al crear el usuario.
  * - El dato del nodo usuario es el nombre de usuario, lo que facilita la obtención
@@ -71,6 +76,7 @@
  *   | Enlace      | Nodo destino y dato esperado                          |
  *   |-------------|-------------------------------------------------------|
  *   | `nombre`    | Nodo con dato string: nombre visible del vehículo.   |
+ *   | `foto`      | Nodo con dato string: ruta relativa de la foto (opcional). |
  *   | `asientos`  | Nodo contenedor con dato string = cantidad total de asientos. |
  *   |             | ├─ Enlace `piso_1` → Nodo piso (dato vacío).           |
  *   |             | └─ Enlace `piso_2` → Nodo piso (opcional).             |
@@ -95,6 +101,47 @@
  *   | `columna`   | Nodo con dato string numérico (posición en la cuadrícula). |
  *   | `siguiente` | Nodo asiento siguiente en la lista circular, o la cabeza si es el último. |
  *
+ * ### Nodo Viaje
+ *
+ * - Dato del nodo: `nombre_viaje` (string, identificador único dentro del dueño).
+ * - Enlaces salientes:
+ *   | Enlace                   | Nodo destino y dato esperado                          |
+ *   |--------------------------|-------------------------------------------------------|
+ *   | `dueno`                  | Nodo con dato string: nombre del dueño.               |
+ *   | `nombre`                 | Nodo con dato string: nombre visible del viaje.      |
+ *   | `fecha`                  | Nodo con dato string: fecha (YYYY-MM-DD).            |
+ *   | `hora`                   | Nodo con dato string: hora (HH:MM).                  |
+ *   | `origen`                 | Nodo con dato string: lugar de partida.              |
+ *   | `destino`                | Nodo con dato string: destino.                       |
+ *   | `ocupacion`              | Nodo con dato string numérico: total asientos ocupados. |
+ *   | `disponibles`            | Nodo con dato string numérico: total asientos disponibles. |
+ *   | `seleccionados`          | Nodo con dato string numérico: total asientos seleccionados. |
+ *   | `vendidos`               | Nodo con dato string numérico: total asientos vendidos. |
+ *   | `micros`                 | Nodo contenedor con dato vacío.                       |
+ *   |                          | └─ Enlaces salientes con nombre único (`micro_1`, `micro_2`, etc.) apuntando a nodos micro. |
+ *   | `terminales_autorizadas` | Nodo contenedor con dato vacío.                       |
+ *   |                          | └─ Enlaces salientes con nombre de terminal apuntando a nodos terminal (dato = nombre). |
+ *
+ * ### Nodo Micro (dentro de `micros` de un viaje)
+ *
+ * - Dato del nodo: vacío.
+ * - Enlaces salientes:
+ *   | Enlace           | Nodo destino y dato esperado                          |
+ *   |------------------|-------------------------------------------------------|
+ *   | `empresa`        | Nodo con dato string: identificador de la empresa original. |
+ *   | `patente`        | Nodo con dato string: patente del vehículo original.  |
+ *   | `vehiculo_copia` | Enlace al nodo raíz de la copia clonada del vehículo. |
+ *   | `ocupacion`      | Nodo con dato string numérico: asientos ocupados del micro. |
+ *   | `seleccionados`  | Nodo con dato string numérico: asientos seleccionados. |
+ *   | `vendidos`       | Nodo con dato string numérico: asientos vendidos.     |
+ *
+ * ### Nodo Copia Vehículo (clonado para un micro de viaje)
+ *
+ * Tiene la misma estructura que un Nodo Vehículo original:
+ * - Dato: patente original.
+ * - Enlaces: `nombre`, `foto`, `asientos` (con pisos y lista circular de asientos).
+ * - Es independiente del vehículo original; cualquier cambio posterior en el original no afecta a la copia.
+ *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
  * | Enlace      | Nodo destino y dato esperado                          |
@@ -114,8 +161,9 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.7
+ * @version   1.5piloto.10
  */
+
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.
 // Aquí simplemente ejecutamos el enrutador con los datos recibidos.
 enrutar_peticion_post($_POST['accion'] ?? '', $_POST);
