@@ -427,23 +427,35 @@ function enrutar_peticion_post(string $accion, array $post): void {
             break;
         case 'ventas':
             switch ($subaccion) {
-                case 'confirmar':
-                    $nombre_terminal = $post['nombre_terminal'] ?? '';
-                    $metodo_pago = $post['metodo_pago'] ?? 'efectivo';
-                    $cuotas = (int)($post['cuotas'] ?? 1);
-                    $pago_inicial = (int)($post['pago_inicial'] ?? 0);
-                    $comprador_dni = $post['comprador_dni'] ?? '';
-                    $pasajeros_json = $post['pasajeros'] ?? '[]';
-                    $pasajeros_por_asiento = json_decode($pasajeros_json, true);
-                    if (!is_array($pasajeros_por_asiento)) $pasajeros_por_asiento = [];
+            case 'confirmar':
+                $nombre_terminal = $post['nombre_terminal'] ?? '';
+                $metodo_pago = $post['metodo_pago'] ?? 'efectivo';
+                $cuotas = (int)($post['cuotas'] ?? 1);
+                $pago_inicial = (int)($post['pago_inicial'] ?? 0);
+                $comprador_dni = $post['comprador_dni'] ?? '';
+                $comprador_nombre = $post['comprador_nombre'] ?? '';
+                $comprador_email = $post['comprador_email'] ?? '';
+                $comprador_celular = $post['comprador_celular'] ?? '';
+                $pasajeros_json = $post['pasajeros'] ?? '[]';
+                $pasajeros_por_asiento = json_decode($pasajeros_json, true);
+                if (!is_array($pasajeros_por_asiento)) $pasajeros_por_asiento = [];
 
-                    if (empty($nombre_terminal)) {
-                        responder_json(['exito' => false, 'error' => 'Terminal no especificada']);
-                    }
-                    $resultado = confirmar_venta_actual($nombre_terminal, $metodo_pago, $cuotas, $pago_inicial, $comprador_dni, $pasajeros_por_asiento);
-                    responder_json($resultado);
-                    break;
-
+                if (empty($nombre_terminal)) {
+                    responder_json(['exito' => false, 'error' => 'Terminal no especificada']);
+                }
+                $resultado = confirmar_venta_actual(
+                    $nombre_terminal,
+                    $metodo_pago,
+                    $cuotas,
+                    $pago_inicial,
+                    $comprador_dni,
+                    $comprador_nombre,
+                    $comprador_email,
+                    $comprador_celular,
+                    $pasajeros_por_asiento
+                );
+                responder_json($resultado);
+                break;
                 case 'listar':
                     $tipo = $post['tipo'] ?? 'dueno';
                     $nombre = $post['nombre'] ?? '';

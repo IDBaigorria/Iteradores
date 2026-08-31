@@ -65,6 +65,7 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
         'email' => $nodo_pasajero->adyacente('email') ? $nodo_pasajero->adyacente('email')->dato() : '',
         'celular' => $nodo_pasajero->adyacente('celular') ? $nodo_pasajero->adyacente('celular')->dato() : '',
         'celular_emergencia' => $nodo_pasajero->adyacente('celular_emergencia') ? $nodo_pasajero->adyacente('celular_emergencia')->dato() : '',
+        'fecha_nacimiento' => $nodo_pasajero->adyacente('fecha_nacimiento') ? $nodo_pasajero->adyacente('fecha_nacimiento')->dato() : '',
     ];
 }
 
@@ -126,7 +127,7 @@ function actualizar_pasajero(string $dni, array $datos): array {
     $nodo_pasajero = $raiz->adyacente($dni);
     if (!$nodo_pasajero) return ['exito' => false, 'error' => 'Pasajero no encontrado'];
 
-    $campos = ['nombre', 'email', 'celular', 'celular_emergencia'];
+    $campos = ['nombre', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento'];
     foreach ($campos as $campo) {
         if (isset($datos[$campo])) {
             $valor = trim($datos[$campo]);

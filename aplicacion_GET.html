@@ -328,7 +328,7 @@
             </div>
             <!-- Botón para confirmar venta (solo terminal) -->
             <div id="contenedor_boton_confirmar_venta" class="hidden" style="margin-top:15px; text-align:right;">
-                <button class="btn primary" id="boton_confirmar_venta">Confirmar venta</button>
+                <button class="btn primary" id="boton_confirmar_venta">Vender</button>
             </div>
         </div>
 
@@ -462,15 +462,14 @@
           </div>
         </div>
         <div id="datos_comprador" style="margin-top:15px;">
-          <h4>Comprador</h4>
-          <div class="form-grid">
-            <div class="field"><label>DNI</label><input id="comprador_dni"></div>
-            <div class="field"><label>Nombre</label><input id="comprador_nombre"></div>
-            <div class="field"><label>Email</label><input id="comprador_email"></div>
-            <div class="field"><label>Celular</label><input id="comprador_celular"></div>
-            <div class="field"><label>Emergencia</label><input id="comprador_emergencia"></div>
-          </div>
-          <button class="btn small" id="usar_pasajero_como_comprador">Usar primer pasajero</button>
+            <h4>Comprador</h4>
+            <div class="form-grid">
+                <div class="field"><label>DNI *</label><input id="comprador_dni"></div>
+                <div class="field"><label>Nombre *</label><input id="comprador_nombre"></div>
+                <div class="field"><label>Email</label><input id="comprador_email"></div>
+                <div class="field"><label>Celular *</label><input id="comprador_celular"></div>
+            </div>
+            <button class="btn small" id="usar_pasajero_como_comprador">Usar primer pasajero</button>
         </div>
         <div id="pasajeros_venta" style="margin-top:20px;"></div>
         <div class="actions" style="margin-top:20px;">
@@ -486,6 +485,12 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="aplicacion.js"></script>
+<script src="aplicacion.js?v=1.5piloto.15"></script>
+<script src="Aplicacion/admin.js"></script>
+<script src="Aplicacion/terminales.js"></script>
+<script src="Aplicacion/micros.js"></script>
+<script src="Aplicacion/viajes.js"></script>
+<script src="Aplicacion/ventas.js"></script>
+<script src="Aplicacion/pasajeros.js"></script>
 </body>
 </html>

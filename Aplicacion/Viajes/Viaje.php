@@ -819,3 +819,27 @@ function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro,
     Controlador::guardar(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
+
+function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, string $monto, string $nombre_dueno): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) return ['exito' => false, 'error' => 'No hay micros'];
+
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
+
+    $nodo_monto = $nodo_micro->adyacente('monto');
+    if ($nodo_monto) {
+        $nodo_monto->_dato($monto);
+    } else {
+        $nodo_micro->_adyacente_en(Nodo::crear_con_dato($monto), 'monto');
+    }
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+    return ['exito' => true];
+}

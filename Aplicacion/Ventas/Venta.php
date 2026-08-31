@@ -52,7 +52,7 @@ function obtener_o_crear_pasajero(string $dni, array $datos_pasajero): ?Nodo {
     }
 
     // Actualizar datos si se proporcionan
-    $campos = ['nombre', 'email', 'celular', 'celular_emergencia'];
+    $campos = ['nombre', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento'];
     foreach ($campos as $campo) {
         if (isset($datos_pasajero[$campo]) && $datos_pasajero[$campo] !== '') {
             $nodo_campo = $nodo_pasajero->adyacente($campo);
@@ -110,10 +110,21 @@ function actualizar_contadores_micro(Nodo $nodo_micro): void {
  * @param int    $cuotas Número de cuotas (1-3, solo efectivo).
  * @param int    $pago_inicial Número de cuotas pagadas ahora (0-3).
  * @param string $comprador_dni DNI del comprador (puede ser uno de los pasajeros).
- * @param array  $pasajeros_por_asiento Array de pasajeros por asiento.
+ * @param string $comprador_fecha_nacimiento Fecha de nacimiento del comprador (obligatoria).
+ * @param array  $pasajeros_por_asiento Array de pasajeros por asiento. Cada pasajero debe incluir 'dni', 'nombre', 'fecha_nacimiento', y opcionales 'email', 'celular', 'celular_emergencia'.
  * @return array Resultado con éxito o error.
  */
-function confirmar_venta_actual(string $nombre_terminal, string $metodo_pago, int $cuotas, int $pago_inicial, string $comprador_dni, array $pasajeros_por_asiento): array {
+function confirmar_venta_actual(
+    string $nombre_terminal,
+    string $metodo_pago,
+    int $cuotas,
+    int $pago_inicial,
+    string $comprador_dni,
+    string $comprador_nombre,
+    string $comprador_email,
+    string $comprador_celular,
+    array $pasajeros_por_asiento
+): array {
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
 
@@ -211,17 +222,13 @@ function confirmar_venta_actual(string $nombre_terminal, string $metodo_pago, in
     $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)$monto_pagado), 'pagado');
 
     // Obtener o crear comprador
+    $comprador_datos = [];
     if (!empty($comprador_dni)) {
-        $comprador_datos = [];
-        foreach ($pasajeros_por_asiento as $pasajero) {
-            if (isset($pasajero['dni']) && $pasajero['dni'] === $comprador_dni) {
-                $comprador_datos = $pasajero;
-                break;
-            }
-        }
-        if (empty($comprador_datos)) {
-            $comprador_datos = ['nombre' => '', 'email' => '', 'celular' => '', 'celular_emergencia' => ''];
-        }
+        $comprador_datos = [
+            'nombre' => $comprador_nombre,
+            'email' => $comprador_email,
+            'celular' => $comprador_celular,
+        ];
         $nodo_comprador = obtener_o_crear_pasajero($comprador_dni, $comprador_datos);
         if ($nodo_comprador) $nodo_venta->_adyacente_en($nodo_comprador, 'comprador');
     }
@@ -236,8 +243,10 @@ function confirmar_venta_actual(string $nombre_terminal, string $metodo_pago, in
     foreach ($asientos_seleccionados as $asiento_real) {
         $datos_pasajero = $pasajeros_por_asiento[$indice_asiento] ?? [];
         $dni_pasajero = $datos_pasajero['dni'] ?? '';
-        if (empty($dni_pasajero)) {
-            return ['exito' => false, 'error' => 'Falta DNI para el asiento ' . ($indice_asiento + 1)];
+        $fecha_nacimiento_pasajero = $datos_pasajero['fecha_nacimiento'] ?? '';
+
+        if (empty($dni_pasajero) || empty($fecha_nacimiento_pasajero) || empty($datos_pasajero['celular']) || empty($datos_pasajero['celular_emergencia'])) {
+            return ['exito' => false, 'error' => 'Faltan datos obligatorios del pasajero ' . ($indice_asiento + 1)];
         }
 
         $nodo_pasajero = obtener_o_crear_pasajero($dni_pasajero, $datos_pasajero);
@@ -436,6 +445,7 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
             'email' => $nodo_comprador->adyacente('email') ? $nodo_comprador->adyacente('email')->dato() : '',
             'celular' => $nodo_comprador->adyacente('celular') ? $nodo_comprador->adyacente('celular')->dato() : '',
             'celular_emergencia' => $nodo_comprador->adyacente('celular_emergencia') ? $nodo_comprador->adyacente('celular_emergencia')->dato() : '',
+            'fecha_nacimiento' => $nodo_comprador->adyacente('fecha_nacimiento') ? $nodo_comprador->adyacente('fecha_nacimiento')->dato() : '',
         ];
     }
 
@@ -459,6 +469,7 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
                     'email' => $nodo_pasajero->adyacente('email') ? $nodo_pasajero->adyacente('email')->dato() : '',
                     'celular' => $nodo_pasajero->adyacente('celular') ? $nodo_pasajero->adyacente('celular')->dato() : '',
                     'celular_emergencia' => $nodo_pasajero->adyacente('celular_emergencia') ? $nodo_pasajero->adyacente('celular_emergencia')->dato() : '',
+                    'fecha_nacimiento' => $nodo_pasajero->adyacente('fecha_nacimiento') ? $nodo_pasajero->adyacente('fecha_nacimiento')->dato() : '',
                 ];
             }
             $asientos[] = $asiento_info;
