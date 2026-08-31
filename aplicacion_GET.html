@@ -321,17 +321,17 @@
         <div id="pasaje_micro_viaje" class="panel hidden" style="margin-top:15px;">
             <h4>Pasaje del micro</h4>
             <div id="foto_micro_viaje" style="margin-bottom:10px;"></div>
-            <div class="pasaje-layout">
-                <div id="croquis_pasaje_micro"></div>
-                <div id="info_asiento_viaje" class="panel hidden" style="padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
-                <div id="formulario_confirmacion_venta" class="panel hidden" style="padding:15px; border:1px solid #ddd; border-radius:6px; max-width:500px;"></div>
-            </div>
-            <!-- Botón para confirmar venta (solo terminal) -->
-            <div id="contenedor_boton_confirmar_venta" class="hidden" style="margin-top:15px; text-align:right;">
-                <button class="btn primary" id="boton_confirmar_venta">Vender</button>
+            <div class="pasaje-layout" style="display:flex; flex-wrap:wrap; justify-content:center; gap:15px; align-items:flex-start; max-width:1200px; margin:0 auto;">
+                <div id="croquis_pasaje_micro" style="flex:1 1 300px; min-width:300px; display:flex; flex-direction:column; align-items:center;"></div>
+                <div class="columna-derecha" style="flex:1 1 250px; min-width:250px; display:flex; flex-direction:column; gap:10px;">
+                    <div id="info_asiento_viaje" class="panel hidden" style="padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
+                    <div id="contenedor_boton_confirmar_venta" class="hidden" style="text-align:left;">
+                        <button class="btn primary" id="boton_confirmar_venta">Vender</button>
+                    </div>
+                    <div id="formulario_confirmacion_venta" class="panel hidden" style="padding:15px; border:1px solid #ddd; border-radius:6px;"></div>
+                </div>
             </div>
         </div>
-
         <div id="seccion_terminales_viaje">
           <div class="row" style="margin-top:15px;">
             <label>Terminales autorizadas:</label>

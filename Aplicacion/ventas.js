@@ -180,6 +180,10 @@ function generar_formularios_pasajeros(asientos) {
                 <div class="field"><label>Celular *</label><input id="pasajero_celular_${index}" value=""></div>
                 <div class="field"><label>Celular Emergencia *</label><input id="pasajero_emergencia_${index}" value=""></div>
                 <div class="field"><label>Fecha de nacimiento *</label><input type="date" id="pasajero_fecha_nacimiento_${index}" value=""></div>
+                <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
+                    <label style="margin:0;">¿Padece algún problema de salud?</label>
+                    <button type="button" class="btn" id="btn_ficha_salud_${index}" data-index="${index}">Anexar ficha de salud</button>
+                </div>
             </div>
         `;
         contenedor.appendChild(div);
@@ -188,6 +192,9 @@ function generar_formularios_pasajeros(asientos) {
 
 // Confirmar la venta
 async function confirmar_venta_modal() {
+    // Forzar blur en todos los inputs de fecha para actualizar su valor
+    document.querySelectorAll('input[type="date"]').forEach(input => input.blur());
+    await new Promise(resolve => setTimeout(resolve, 100));
     // Forzar pérdida de foco para actualizar valores de inputs
     if (document.activeElement && document.activeElement.blur) {
         document.activeElement.blur();

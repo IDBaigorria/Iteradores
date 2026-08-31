@@ -507,6 +507,8 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
 
     $nodo_micro = $nodo_venta->adyacente('micro');
     if ($nodo_micro) {
+        $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+        $datos['micro_nombre_visible'] = $nodo_copia && $nodo_copia->adyacente('nombre') ? $nodo_copia->adyacente('nombre')->dato() : '';
         $datos['empresa'] = $nodo_micro->adyacente('empresa') ? $nodo_micro->adyacente('empresa')->dato() : '';
         $datos['patente'] = $nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '';
     }
