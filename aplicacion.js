@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.15
+ * @version 1.5piloto.16
  */
 
 // Utilidades
@@ -47,6 +47,7 @@ let microSyncActual = null;
 let estados_asientos_actuales = [];
 let venta_form_abierto = false;
 let tipo_aviso_actual = 'info';
+let operacion_asiento_en_curso = false;
 
 // Función de avisos con tipos visuales
 function mostrar_aviso(mensaje, tipo = 'info') {

@@ -301,6 +301,9 @@ function actualizar_colores_asientos(estados) {
 
 async function seleccionar_asiento_pasaje(fila, columna) {
     if (!micro_seleccionado || !viaje_seleccionado) return;
+    if (operacion_asiento_en_curso) return; // evitar doble clic
+
+    operacion_asiento_en_curso = true;
 
     const nombre_dueno = obtener_dueno_viaje_seleccionado();
     const nombre_terminal = usuario_actual.nombre_usuario;
@@ -315,7 +318,7 @@ async function seleccionar_asiento_pasaje(fila, columna) {
             body: new URLSearchParams({
                 accion: "viajes/seleccionar_asiento",
                 nombre_viaje: viaje_seleccionado.nombre_viaje,
-                nombre_micro,
+                nombre_micro: nombre_micro,
                 fila,
                 columna,
                 nombre_dueno,
@@ -323,17 +326,34 @@ async function seleccionar_asiento_pasaje(fila, columna) {
             })
         });
         const resultado = await respuesta.json();
+
         if (resultado.exito) {
-            await solicitar_estado_asientos();
+            // Actualizar estado local directamente sin esperar polling
+            const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            if (asiento) {
+                asiento.estado = 'seleccionado';
+                asiento.seleccionado_por = nombre_terminal;
+            }
+            actualizar_colores_asientos(estados_asientos_actuales);
             mostrar_aviso("Asiento seleccionado", 'exito');
         } else {
-            await solicitar_estado_asientos();
-            mostrar_aviso(resultado.error || "No se pudo seleccionar", 'error');
+            // Verificar si el asiento quedó seleccionado por nosotros (posible sincronización)
+            const estado_actual = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            if (estado_actual && estado_actual.estado === 'seleccionado' && estado_actual.seleccionado_por === nombre_terminal) {
+                // Realmente se seleccionó pero el servidor respondió error por carrera
+                mostrar_aviso("Asiento seleccionado", 'exito');
+            } else {
+                mostrar_aviso(resultado.error || "No se pudo seleccionar", 'error');
+                // Actualizar estados para reflejar el estado real
+                await solicitar_estado_asientos();
+            }
         }
     } catch (error) {
         console.error("Error en selección:", error);
         mostrar_aviso("Error de comunicación", 'error');
+        await solicitar_estado_asientos();
     } finally {
+        operacion_asiento_en_curso = false;
         if (viaje_seleccionado && micro_seleccionado) {
             iniciar_sync_asientos();
         }
@@ -342,6 +362,9 @@ async function seleccionar_asiento_pasaje(fila, columna) {
 
 async function deseleccionar_asiento_pasaje(fila, columna) {
     if (!micro_seleccionado || !viaje_seleccionado) return;
+    if (operacion_asiento_en_curso) return;
+
+    operacion_asiento_en_curso = true;
 
     const nombre_dueno = obtener_dueno_viaje_seleccionado();
     const nombre_terminal = usuario_actual.nombre_usuario;
@@ -356,7 +379,7 @@ async function deseleccionar_asiento_pasaje(fila, columna) {
             body: new URLSearchParams({
                 accion: "viajes/deseleccionar_asiento",
                 nombre_viaje: viaje_seleccionado.nombre_viaje,
-                nombre_micro,
+                nombre_micro: nombre_micro,
                 fila,
                 columna,
                 nombre_dueno,
@@ -364,17 +387,25 @@ async function deseleccionar_asiento_pasaje(fila, columna) {
             })
         });
         const resultado = await respuesta.json();
+
         if (resultado.exito) {
-            await solicitar_estado_asientos();
+            const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            if (asiento) {
+                asiento.estado = 'libre';
+                asiento.seleccionado_por = null;
+            }
+            actualizar_colores_asientos(estados_asientos_actuales);
             mostrar_aviso("Asiento liberado", 'exito');
         } else {
-            await solicitar_estado_asientos();
             mostrar_aviso(resultado.error || "No se pudo liberar", 'error');
+            await solicitar_estado_asientos();
         }
     } catch (error) {
         console.error("Error en deselección:", error);
         mostrar_aviso("Error de comunicación", 'error');
+        await solicitar_estado_asientos();
     } finally {
+        operacion_asiento_en_curso = false;
         if (viaje_seleccionado && micro_seleccionado) {
             iniciar_sync_asientos();
         }
@@ -457,7 +488,7 @@ function renderizar_pasaje_micro(micro) {
         });
 
         contenedorCroquis.addEventListener('click', (event) => {
-            if (venta_form_abierto) return;
+            if (venta_form_abierto || operacion_asiento_en_curso) return;
             const seat = event.target.closest('.seat');
             if (!seat) return;
             const fila = seat.dataset.fila;

@@ -5,6 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
+ * @version   1.5piloto.16
  */
 
 use Iteradores\Nodos\Nodo;
@@ -108,17 +109,19 @@ function actualizar_contadores_micro(Nodo $nodo_micro): void {
  * @param string $nombre_terminal Nombre de la terminal.
  * @param string $metodo_pago 'efectivo' o 'transferencia'.
  * @param int    $cuotas Número de cuotas (1-3, solo efectivo).
- * @param int    $pago_inicial Número de cuotas pagadas ahora (0-3).
- * @param string $comprador_dni DNI del comprador (puede ser uno de los pasajeros).
- * @param string $comprador_fecha_nacimiento Fecha de nacimiento del comprador (obligatoria).
- * @param array  $pasajeros_por_asiento Array de pasajeros por asiento. Cada pasajero debe incluir 'dni', 'nombre', 'fecha_nacimiento', y opcionales 'email', 'celular', 'celular_emergencia'.
+ * @param float  $monto_pagado Monto abonado en el momento de la venta.
+ * @param string $comprador_dni DNI del comprador.
+ * @param string $comprador_nombre Nombre del comprador.
+ * @param string $comprador_email Email del comprador (opcional).
+ * @param string $comprador_celular Celular del comprador.
+ * @param array  $pasajeros_por_asiento Array de pasajeros por asiento.
  * @return array Resultado con éxito o error.
  */
 function confirmar_venta_actual(
     string $nombre_terminal,
     string $metodo_pago,
     int $cuotas,
-    int $pago_inicial,
+    float $monto_pagado,
     string $comprador_dni,
     string $comprador_nombre,
     string $comprador_email,
@@ -166,13 +169,9 @@ function confirmar_venta_actual(
     }
     if ($metodo_pago === 'transferencia') {
         $cuotas = 1;
-        $pago_inicial = 1;
     } else {
         if ($cuotas < 1 || $cuotas > 3) {
             return ['exito' => false, 'error' => 'Cantidad de cuotas inválida (1-3)'];
-        }
-        if ($pago_inicial < 0 || $pago_inicial > $cuotas) {
-            return ['exito' => false, 'error' => 'Cuotas pagadas ahora inválidas'];
         }
     }
 
@@ -200,12 +199,28 @@ function confirmar_venta_actual(
     $monto_por_asiento = $nodo_monto ? (float)$nodo_monto->dato() : 0;
     $total = $monto_por_asiento * count($asientos_seleccionados);
 
-    $monto_pagado = 0;
+    // Validar monto pagado
+    if ($monto_pagado <= 0) {
+        return ['exito' => false, 'error' => 'El monto a pagar debe ser mayor que cero'];
+    }
+    if ($monto_pagado > $total) {
+        return ['exito' => false, 'error' => 'El monto a pagar no puede superar el total'];
+    }
+
+    // Calcular cuotas restantes
+    $cuotas_restantes = 0;
     if ($metodo_pago === 'efectivo') {
-        if ($cuotas > 0) {
-            $monto_pagado = ($total / $cuotas) * $pago_inicial;
+        if ($cuotas == 1) {
+            $cuotas_restantes = 0;
+        } else {
+            if ($monto_pagado < $total) {
+                $cuotas_restantes = $cuotas - 1;
+            } else {
+                $cuotas_restantes = 0;
+            }
         }
-    } else {
+    } else { // transferencia
+        $cuotas_restantes = 0;
         $monto_pagado = $total;
     }
 
@@ -220,15 +235,15 @@ function confirmar_venta_actual(
     $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)$total), 'total');
     $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)$cuotas), 'cuotas');
     $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)$monto_pagado), 'pagado');
+    $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)$cuotas_restantes), 'cuotas_restantes');
 
     // Obtener o crear comprador
-    $comprador_datos = [];
+    $comprador_datos = [
+        'nombre' => $comprador_nombre,
+        'email' => $comprador_email,
+        'celular' => $comprador_celular,
+    ];
     if (!empty($comprador_dni)) {
-        $comprador_datos = [
-            'nombre' => $comprador_nombre,
-            'email' => $comprador_email,
-            'celular' => $comprador_celular,
-        ];
         $nodo_comprador = obtener_o_crear_pasajero($comprador_dni, $comprador_datos);
         if ($nodo_comprador) $nodo_venta->_adyacente_en($nodo_comprador, 'comprador');
     }
@@ -321,6 +336,7 @@ function confirmar_venta_actual(
         'id_venta' => $id_venta,
         'total' => (string)$total,
         'pagado' => (string)$monto_pagado,
+        'cuotas_restantes' => (string)$cuotas_restantes,
         'asientos' => count($asientos_seleccionados),
     ];
 }
@@ -333,7 +349,7 @@ function listar_ventas_por_dueno(string $nombre_dueno): array {
     if (!$contenedor) return [];
 
     $ventas = [];
-    $actual = hmi($contenedor); // primer hijo
+    $actual = hmi($contenedor);
     while ($actual) {
         $ventas[] = formatear_venta_resumida($actual);
         $actual = hd($actual);
@@ -436,6 +452,7 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
     $datos['metodo_pago'] = $nodo_venta->adyacente('metodo_pago') ? $nodo_venta->adyacente('metodo_pago')->dato() : '';
     $datos['cuotas'] = $nodo_venta->adyacente('cuotas') ? $nodo_venta->adyacente('cuotas')->dato() : '1';
     $datos['pagado'] = $nodo_venta->adyacente('pagado') ? $nodo_venta->adyacente('pagado')->dato() : '0';
+    $datos['cuotas_restantes'] = $nodo_venta->adyacente('cuotas_restantes') ? $nodo_venta->adyacente('cuotas_restantes')->dato() : '0';
 
     $nodo_comprador = $nodo_venta->adyacente('comprador');
     if ($nodo_comprador) {
@@ -495,7 +512,6 @@ function cancelar_venta(string $id_venta): array {
         $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
         if (!$contenedor) continue;
 
-        // Buscar venta en el árbol de ventas
         $anterior = null;
         $actual = hmi($contenedor);
         while ($actual) {
@@ -550,7 +566,6 @@ function cancelar_venta(string $id_venta): array {
 
                 // Eliminar la venta del árbol
                 if ($anterior) {
-                    // Si no es el primer hijo, eliminar hermano derecho
                     $siguiente = hd($actual);
                     if ($siguiente) {
                         $anterior->_adyacente_en($siguiente, 'hd', true);
@@ -558,7 +573,6 @@ function cancelar_venta(string $id_venta): array {
                         $anterior->eliminar_adyacente('hd');
                     }
                 } else {
-                    // Es el primer hijo (hmi de la raíz)
                     $siguiente = hd($actual);
                     if ($siguiente) {
                         $contenedor->_adyacente_en($siguiente, 'hmi', true);

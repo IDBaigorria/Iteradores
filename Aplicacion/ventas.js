@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.15
+ * @version 1.5piloto.16
  */
 
 let ventas_actuales = [];
@@ -36,6 +36,7 @@ function abrir_modal_confirmacion_venta() {
     const micro = viaje_seleccionado.micros.find(m => m.nombre_micro === microSyncActual);
     const monto = micro ? parseFloat(micro.monto) : 0;
     const total = monto * asientos_seleccionados.length;
+    window.total_venta = total; // almacenar para cálculos
 
     // Ocultar botón Vender y mostrar formulario
     venta_form_abierto = true;
@@ -67,14 +68,9 @@ function abrir_modal_confirmacion_venta() {
                     <option value="3">3</option>
                 </select>
             </div>
-            <div class="field" id="campo_pago_inicial">
-                <label>Cuotas pagadas ahora</label>
-                <select id="pago_inicial">
-                    <option value="0">0</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                </select>
+            <div class="field" id="campo_monto_pagado">
+                <label>Monto a pagar ahora *</label>
+                <input type="number" id="monto_pagado" step="0.01" min="0.01" value="">
             </div>
         </div>
         <div id="datos_comprador" style="margin-top:15px;">
@@ -97,8 +93,7 @@ function abrir_modal_confirmacion_venta() {
     // Valores por defecto
     $("#metodo_pago").value = 'efectivo';
     $("#cuotas_venta").value = '1';
-    $("#pago_inicial").value = '1';
-    actualizar_visibilidad_cuotas();
+    actualizar_visibilidad_cuotas(); // Configura input de monto pagado
 
     // Limpiar campos del comprador
     $("#comprador_dni").value = '';
@@ -111,24 +106,16 @@ function abrir_modal_confirmacion_venta() {
     // Eventos para los nuevos elementos
     $("#metodo_pago").addEventListener("change", actualizar_visibilidad_cuotas);
     $("#cuotas_venta").addEventListener("change", function() {
-        const cuotas = parseInt(this.value);
-        const selectPago = $("#pago_inicial");
-        selectPago.innerHTML = '';
-        for (let i = 0; i <= cuotas; i++) {
-            const opcion = document.createElement('option');
-            opcion.value = i;
-            opcion.textContent = i;
-            selectPago.appendChild(opcion);
-        }
+        actualizar_visibilidad_cuotas();
     });
-    $("#cuotas_venta").dispatchEvent(new Event('change'));
 
     // Evento para usar pasajero como comprador
     $("#usar_pasajero_como_comprador").addEventListener("click", () => {
-        const primerDni = document.querySelector('.pasajero_dni').value;
-        const primerNombre = document.querySelector('.pasajero_nombre').value;
-        const primerEmail = document.querySelector('.pasajero_email').value;
-        const primerCelular = document.querySelector('.pasajero_celular').value;
+        // Usamos el primer pasajero (índice 0)
+        const primerDni = $("#pasajero_dni_0").value.trim();
+        const primerNombre = $("#pasajero_nombre_0").value.trim();
+        const primerEmail = $("#pasajero_email_0").value.trim();
+        const primerCelular = $("#pasajero_celular_0").value.trim();
         if (primerDni) {
             $("#comprador_dni").value = primerDni;
             $("#comprador_nombre").value = primerNombre;
@@ -151,17 +138,27 @@ function abrir_modal_confirmacion_venta() {
     });
 }
 
-// Actualizar visibilidad de cuotas según método de pago
+// Actualizar visibilidad de cuotas y monto a pagar según método de pago
 function actualizar_visibilidad_cuotas() {
     const metodo = $("#metodo_pago").value;
+    const cuotas = parseInt($("#cuotas_venta").value);
+    const total = parseFloat(window.total_venta || 0);
+
     if (metodo === 'transferencia') {
         $("#campo_cuotas").style.display = 'none';
-        $("#campo_pago_inicial").style.display = 'none';
         $("#cuotas_venta").value = '1';
-        $("#pago_inicial").value = '1';
+        $("#monto_pagado").value = total.toFixed(2);
+        $("#monto_pagado").disabled = true;
     } else {
         $("#campo_cuotas").style.display = '';
-        $("#campo_pago_inicial").style.display = '';
+        if (cuotas === 1) {
+            $("#monto_pagado").value = total.toFixed(2);
+            $("#monto_pagado").disabled = true;
+        } else {
+            const valorCuota = total / cuotas;
+            $("#monto_pagado").value = valorCuota.toFixed(2);
+            $("#monto_pagado").disabled = false;
+        }
     }
 }
 
@@ -176,12 +173,12 @@ function generar_formularios_pasajeros(asientos) {
         div.innerHTML = `
             <h5>Asiento ${asiento.numero} (F${asiento.fila}, C${asiento.columna})</h5>
             <div class="form-grid">
-                <div class="field"><label>DNI *</label><input class="pasajero_dni" data-index="${index}" value=""></div>
-                <div class="field"><label>Nombre *</label><input class="pasajero_nombre" data-index="${index}" value=""></div>
-                <div class="field"><label>Email</label><input class="pasajero_email" data-index="${index}" value=""></div>
-                <div class="field"><label>Celular *</label><input class="pasajero_celular" data-index="${index}" value=""></div>
-                <div class="field"><label>Celular Emergencia *</label><input class="pasajero_emergencia" data-index="${index}" value=""></div>
-                <div class="field"><label>Fecha de nacimiento *</label><input type="date" class="pasajero_fecha_nacimiento" data-index="${index}" value=""></div>
+                <div class="field"><label>DNI *</label><input id="pasajero_dni_${index}" value=""></div>
+                <div class="field"><label>Nombre *</label><input id="pasajero_nombre_${index}" value=""></div>
+                <div class="field"><label>Email</label><input id="pasajero_email_${index}" value=""></div>
+                <div class="field"><label>Celular *</label><input id="pasajero_celular_${index}" value=""></div>
+                <div class="field"><label>Celular Emergencia *</label><input id="pasajero_emergencia_${index}" value=""></div>
+                <div class="field"><label>Fecha de nacimiento *</label><input type="date" id="pasajero_fecha_nacimiento_${index}" value=""></div>
             </div>
         `;
         contenedor.appendChild(div);
@@ -190,6 +187,11 @@ function generar_formularios_pasajeros(asientos) {
 
 // Confirmar la venta
 async function confirmar_venta_modal() {
+    // Forzar pérdida de foco para actualizar valores de inputs
+    if (document.activeElement && document.activeElement.blur) {
+        document.activeElement.blur();
+    }
+
     // Obtener datos del comprador
     const comprador_dni = $("#comprador_dni").value.trim();
     const comprador_nombre = $("#comprador_nombre").value.trim();
@@ -205,22 +207,49 @@ async function confirmar_venta_modal() {
     // Obtener método de pago y cuotas
     const metodo_pago = $("#metodo_pago").value;
     const cuotas = parseInt($("#cuotas_venta").value);
-    const pago_inicial = parseInt($("#pago_inicial").value);
+    const monto_pagado = parseFloat($("#monto_pagado").value);
+    const total = parseFloat(window.total_venta || 0);
 
-    // Recopilar pasajeros
+    if (isNaN(monto_pagado) || monto_pagado <= 0) {
+        mostrar_aviso("Ingrese un monto a pagar válido", 'error');
+        return;
+    }
+    if (monto_pagado > total) {
+        mostrar_aviso("El monto a pagar no puede superar el total", 'error');
+        return;
+    }
+
+    // Recopilar pasajeros (usando IDs únicos)
     const pasajeros = [];
-    const dniInputs = document.querySelectorAll('.pasajero_dni');
-    for (let i = 0; i < dniInputs.length; i++) {
-        const dni = dniInputs[i].value.trim();
-        const nombre = document.querySelector(`.pasajero_nombre[data-index="${i}"]`).value.trim();
-        const fecha_nacimiento = document.querySelector(`.pasajero_fecha_nacimiento[data-index="${i}"]`).value.trim();
-        const celular = document.querySelector(`.pasajero_celular[data-index="${i}"]`).value.trim();
-        const celular_emergencia = document.querySelector(`.pasajero_emergencia[data-index="${i}"]`).value.trim();
-        const email = document.querySelector(`.pasajero_email[data-index="${i}"]`).value.trim();
+    const cantidadPasajeros = document.querySelectorAll('[id^="pasajero_dni_"]').length;
 
-        // Validar obligatorios
-        if (!dni || !nombre || !fecha_nacimiento || !celular || !celular_emergencia) {
-            mostrar_aviso(`Complete todos los datos obligatorios del pasajero ${i+1}`, 'error');
+    for (let i = 0; i < cantidadPasajeros; i++) {
+        const dni = $(`#pasajero_dni_${i}`).value.trim();
+        const nombre = $(`#pasajero_nombre_${i}`).value.trim();
+        const email = $(`#pasajero_email_${i}`).value.trim();
+        const celular = $(`#pasajero_celular_${i}`).value.trim();
+        const celular_emergencia = $(`#pasajero_emergencia_${i}`).value.trim();
+        const fecha_nacimiento = $(`#pasajero_fecha_nacimiento_${i}`).value.trim();
+
+        // Validación campo por campo con mensajes específicos
+        if (!dni) {
+            mostrar_aviso(`Complete el DNI del pasajero ${i+1}`, 'error');
+            return;
+        }
+        if (!nombre) {
+            mostrar_aviso(`Complete el nombre del pasajero ${i+1}`, 'error');
+            return;
+        }
+        if (!fecha_nacimiento) {
+            mostrar_aviso(`Complete la fecha de nacimiento del pasajero ${i+1}`, 'error');
+            return;
+        }
+        if (!celular) {
+            mostrar_aviso(`Complete el celular del pasajero ${i+1}`, 'error');
+            return;
+        }
+        if (!celular_emergencia) {
+            mostrar_aviso(`Complete el celular de emergencia del pasajero ${i+1}`, 'error');
             return;
         }
 
@@ -240,7 +269,7 @@ async function confirmar_venta_modal() {
         nombre_terminal: usuario_actual.nombre_usuario,
         metodo_pago,
         cuotas,
-        pago_inicial,
+        monto_pagado: monto_pagado.toFixed(2),
         comprador_dni,
         comprador_nombre,
         comprador_email,
@@ -264,15 +293,11 @@ async function confirmar_venta_modal() {
         console.error("Error:", error);
         mostrar_aviso("Error de comunicación", 'error');
     } finally {
-        // Ocultar formulario y limpiar
         $("#formulario_confirmacion_venta").classList.add("hidden");
         $("#info_asiento_viaje").classList.remove("hidden");
         venta_form_abierto = false;
-        // Actualizar estados
         await solicitar_estado_asientos();
-        // Mostrar botón Vender si corresponde
         mostrar_boton_confirmar_venta();
-        // Actualizar detalle del viaje para reflejar contadores
         await actualizar_detalle_viaje_actual();
     }
 }
