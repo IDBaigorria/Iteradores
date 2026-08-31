@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.10)
+ * ## Estructura de nodos actual (v1.5piloto.12)
  *
  * ### Nodos raíz especiales
  *
@@ -44,11 +44,12 @@
  * |                 | └─ Enlaces salientes con nombre de cada empresa apuntando a su nodo empresa.           |
  * | `viajes`        | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
  * |                 | └─ Enlaces salientes con nombre de cada viaje apuntando a su nodo viaje.               |
+ * | `venta_actual`  | Enlace a un nodo venta actual (solo para `terminal`). Si no existe venta activa, el enlace no existe. |
  *
  * **Observaciones:**
- * - Los enlaces `efectivo`, `banco` y `dueno` solo existen en nodos de nivel `terminal`.
+ * - Los enlaces `efectivo`, `banco`, `dueno` y `venta_actual` solo existen en nodos de nivel `terminal`.
  * - El enlace `terminales` solo existe en nodos de nivel `dueno`.
- * - El enlace `empresas` y `viajes` solo existe en nodos de nivel `dueno`.
+ * - Los enlaces `empresas` y `viajes` solo existen en nodos de nivel `dueno`.
  * - `contrasena`, `nombre_real` y `email` pueden no existir si no se proporcionaron.
  * - El monto en `efectivo` y en `banco` es automático (inicial `"0"`) y no se solicita al crear el usuario.
  * - El dato del nodo usuario es el nombre de usuario, lo que facilita la obtención
@@ -92,14 +93,19 @@
  *   | `asientos`  | Nodo cabeza de lista circular (dato vacío).           |
  *   |             | └─ Enlace `primer` → primer nodo asiento de la lista. |
  *
- * ### Nodo Asiento (dato = número de asiento, string)
+ * ### Nodo Asiento (en vehículo original o copia)
  *
+ * - Dato del nodo: número de asiento (string).
  * - Enlaces salientes:
- *   | Enlace      | Nodo destino y dato esperado                          |
- *   |-------------|-------------------------------------------------------|
- *   | `fila`      | Nodo con dato string numérico (posición en la cuadrícula). |
- *   | `columna`   | Nodo con dato string numérico (posición en la cuadrícula). |
- *   | `siguiente` | Nodo asiento siguiente en la lista circular, o la cabeza si es el último. |
+ *   | Enlace             | Nodo destino y dato esperado                          |
+ *   |--------------------|-------------------------------------------------------|
+ *   | `fila`             | Nodo con dato string numérico (posición en la cuadrícula). |
+ *   | `columna`          | Nodo con dato string numérico (posición en la cuadrícula). |
+ *   | `siguiente`        | Nodo asiento siguiente en la lista circular, o la cabeza si es el último. |
+ *   | `estado`           | Nodo con dato string: `"libre"`, `"seleccionado"`, `"vendido"` o `"no disponible"`. |
+ *   | `seleccionado_por` | Enlace directo al **nodo usuario** de la terminal que seleccionó el asiento. Solo existe si `estado` es `"seleccionado"`. |
+ *   | `pasajero`         | Nodo contenedor con datos del pasajero (si `estado` es `"vendido"` o `"no disponible"`). |
+ *   | `venta`            | Enlace directo al nodo venta (si `estado` es `"vendido"`). |
  *
  * ### Nodo Viaje
  *
@@ -130,7 +136,9 @@
  *   |------------------|-------------------------------------------------------|
  *   | `empresa`        | Nodo con dato string: identificador de la empresa original. |
  *   | `patente`        | Nodo con dato string: patente del vehículo original.  |
+ *   | `monto`          | Nodo con dato string numérico: precio del pasaje.     |
  *   | `vehiculo_copia` | Enlace al nodo raíz de la copia clonada del vehículo. |
+ *   | `viaje`          | Enlace directo al nodo viaje al que pertenece.        |
  *   | `ocupacion`      | Nodo con dato string numérico: asientos ocupados del micro. |
  *   | `seleccionados`  | Nodo con dato string numérico: asientos seleccionados. |
  *   | `vendidos`       | Nodo con dato string numérico: asientos vendidos.     |
@@ -141,6 +149,27 @@
  * - Dato: patente original.
  * - Enlaces: `nombre`, `foto`, `asientos` (con pisos y lista circular de asientos).
  * - Es independiente del vehículo original; cualquier cambio posterior en el original no afecta a la copia.
+ * - Sus asientos poseen `estado`, `seleccionado_por`, `pasajero` y `venta` (según corresponda).
+ *
+ * ### Nodo Venta Actual (colgando del nodo usuario terminal)
+ *
+ * - Dato del nodo: vacío.
+ * - Enlaces salientes:
+ *   | Enlace     | Nodo destino y dato esperado                                      |
+ *   |------------|-------------------------------------------------------------------|
+ *   | `terminal` | Enlace al nodo usuario de la terminal propietaria de la venta.    |
+ *   | `micro`    | Nodo con dato string = nombre del micro sobre el que se vende.    |
+ *   | `asientos` | Nodo cabeza de lista circular (dato vacío).                       |
+ *   |            | └─ Enlace `primer` → primer nodo asiento-en-venta.                |
+ *
+ * ### Nodo Asiento-en-Venta (dentro de la lista circular de la venta actual)
+ *
+ * - Dato del nodo: vacío.
+ * - Enlaces salientes:
+ *   | Enlace      | Nodo destino y dato esperado                                      |
+ *   |-------------|-------------------------------------------------------------------|
+ *   | `asiento`   | Enlace directo al nodo asiento real en la copia del vehículo.     |
+ *   | `siguiente` | Siguiente nodo asiento-en-venta, o la cabeza si es el último.     |
  *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
@@ -161,7 +190,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.10
+ * @version   1.5piloto.12
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

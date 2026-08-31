@@ -634,6 +634,13 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
         $venta_actual->_adyacente_en($nodo_terminal, 'terminal');
         $venta_actual->_adyacente_en(Nodo::crear_con_dato(''), 'asientos');
     }
+    // Guardar también el nombre del viaje en la venta actual
+    $viaje_venta = $venta_actual->adyacente('viaje');
+    if ($viaje_venta) {
+        $viaje_venta->_dato($nombre_viaje);
+    } else {
+        $venta_actual->_adyacente_en(Nodo::crear_con_dato($nombre_viaje), 'viaje');
+    }
 
     // Asegurar que el micro de la venta actual coincida
     $micro_venta = $venta_actual->adyacente('micro');

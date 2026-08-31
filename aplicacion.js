@@ -1,6 +1,6 @@
 /***
  * Aplicación principal.
- * @version 1.5piloto.10
+ * @version 1.5piloto.14
  */
 
 // Utilidades
@@ -37,19 +37,31 @@ if (DEBUG_FETCH) {
 }
 
 let usuario_actual = null;
-let vehiculo_seleccionado_micros = null; // Almacena {nombre_vehiculo, nombre, asientos}
+let vehiculo_seleccionado_micros = null;
 let viaje_seleccionado = null;
 let micro_seleccionado = null;
 let intervaloSyncAsientos = null;
 let microSyncActual = null;
 let estados_asientos_actuales = [];
 
-function mostrar_aviso(mensaje) {
+let tipo_aviso_actual = 'info';
+
+function mostrar_aviso(mensaje, tipo = 'info') {
+    // Si el aviso actual es de error y el nuevo no es error, no lo reemplaza
+    if (tipo_aviso_actual === 'error' && tipo !== 'error') {
+        return;
+    }
+    // Si el nuevo es error, se actualiza siempre
+    tipo_aviso_actual = tipo;
     const aviso = $("#toast");
     aviso.textContent = mensaje;
-    aviso.classList.add("show");
+    aviso.className = 'toast show';
+    aviso.classList.add(`toast-${tipo}`);
     clearTimeout(window.temporizador_aviso);
-    window.temporizador_aviso = setTimeout(() => aviso.classList.remove("show"), 1800);
+    window.temporizador_aviso = setTimeout(() => {
+        aviso.classList.remove("show");
+        tipo_aviso_actual = 'info';
+    }, 3000);
 }
 
 function configurar_pestanas_segun_nivel(nivel) {
@@ -98,15 +110,15 @@ function activar_pestana(id_pestana) {
         cargar_viajes();
     }
 
-    if (id_pestana === 'vendidos') renderizar_ventas($("#filtro_vendedor").value);
-    if (id_pestana === 'pasajeros') renderizar_pasajeros();
+    if (id_pestana === 'vendidos') cargar_ventas();
+    if (id_pestana === 'pasajeros') cargar_pasajeros();
     if (id_pestana === 'admin') cargar_datos_admin();
     if (id_pestana === 'terminales') cargar_datos_terminales();
 }
 
 async function ingresar_con_codigo() {
     const codigo = $("#codigo_acceso").value.trim();
-    if (!codigo) { mostrar_aviso("Ingrese el código"); return; }
+    if (!codigo) { mostrar_aviso("Ingrese el código", 'error'); return; }
     try {
         const respuesta = await fetch("index.php", {
             method: "POST",
@@ -123,12 +135,13 @@ async function ingresar_con_codigo() {
             $("#nombre_usuario_actual").textContent = usuario_actual.nombre_usuario;
             $("#nivel_usuario_actual").textContent = usuario_actual.nivel;
             configurar_pestanas_segun_nivel(usuario_actual.nivel);
+            mostrar_aviso("Bienvenido", 'exito');
         } else {
-            mostrar_aviso(datos.error || "Código incorrecto");
+            mostrar_aviso(datos.error || "Código incorrecto", 'error');
         }
     } catch (error) {
         console.error("Error en autenticación:", error);
-        mostrar_aviso("Error de comunicación");
+        mostrar_aviso("Error de comunicación", 'error');
     }
 }
 
@@ -173,7 +186,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 localStorage.removeItem('token_sesion');
                 localStorage.removeItem('usuario_actual');
-                mostrar_aviso('Sesión expirada, ingrese nuevamente');
+                mostrar_aviso('Sesión expirada, ingrese nuevamente', 'error');
             }
         } catch (e) {
             console.error('Error al validar sesión', e);
@@ -186,6 +199,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 $("#boton_ingresar").addEventListener("click", ingresar_con_codigo);
 $("#codigo_acceso").addEventListener("keypress", (e) => { if (e.key === "Enter") ingresar_con_codigo(); });
 $("#boton_salir").addEventListener("click", salir);
+
+// ============================================================
+// ====== FUNCIONES ADMINISTRACIÓN (se mantienen originales) ===
+// ============================================================
 
 async function cargar_datos_admin() {
     // Cargar usuarios
@@ -260,10 +277,10 @@ async function cargar_datos_admin() {
                     });
                     const datos_cierre = await respuesta_cierre.json();
                     if (datos_cierre.exito) {
-                        mostrar_aviso("Sesión cerrada correctamente");
+                        mostrar_aviso("Sesión cerrada correctamente", 'exito');
                         cargar_datos_admin();
                     } else {
-                        mostrar_aviso(datos_cierre.error || "No se pudo cerrar la sesión");
+                        mostrar_aviso(datos_cierre.error || "No se pudo cerrar la sesión", 'error');
                     }
                 }
             });
@@ -408,11 +425,11 @@ async function guardar_edicion_usuario(nombre_usuario, fila) {
 
     if (nivel === 'terminal') {
         if (!datos.dueno) {
-            mostrar_aviso("Debe seleccionar un dueño");
+            mostrar_aviso("Debe seleccionar un dueño", 'error');
             return;
         }
         if (!datos.banco_nombre || !datos.banco_cuenta) {
-            mostrar_aviso("Banco y cuenta son obligatorios para terminales");
+            mostrar_aviso("Banco y cuenta son obligatorios para terminales", 'error');
             return;
         }
     }
@@ -424,10 +441,10 @@ async function guardar_edicion_usuario(nombre_usuario, fila) {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Usuario actualizado correctamente");
+        mostrar_aviso("Usuario actualizado correctamente", 'exito');
         cargar_datos_admin();
     } else {
-        mostrar_aviso(resultado.error || "Error al actualizar");
+        mostrar_aviso(resultado.error || "Error al actualizar", 'error');
     }
 }
 
@@ -440,10 +457,10 @@ async function eliminar_usuario_confirmado(nombre_usuario) {
     });
     const datos = await respuesta.json();
     if (datos.exito) {
-        mostrar_aviso("Usuario eliminado correctamente");
+        mostrar_aviso("Usuario eliminado correctamente", 'exito');
         cargar_datos_admin();
     } else {
-        mostrar_aviso(datos.error || "Error al eliminar");
+        mostrar_aviso(datos.error || "Error al eliminar", 'error');
     }
 }
 
@@ -474,11 +491,11 @@ $("#boton_agregar_usuario").addEventListener("click", async () => {
         select_dueno.appendChild(opcion);
       });
     } else {
-      mostrar_aviso("No se pudieron cargar los dueños");
+      mostrar_aviso("No se pudieron cargar los dueños", 'error');
     }
   } catch (e) {
     console.error("Error al cargar dueños", e);
-    mostrar_aviso("Error al cargar dueños");
+    mostrar_aviso("Error al cargar dueños", 'error');
   }
   $("#formulario_nuevo_usuario").classList.remove("hidden");
 });
@@ -503,16 +520,16 @@ $("#boton_guardar_usuario").addEventListener("click", async () => {
   };
 
   if (!datos_usuario.nombre_usuario || !datos_usuario.codigo_acceso) {
-    mostrar_aviso("Nombre de usuario y código de acceso son obligatorios");
+    mostrar_aviso("Nombre de usuario y código de acceso son obligatorios", 'error');
     return;
   }
   if (nivel === "terminal") {
     if (!datos_usuario.dueno) {
-      mostrar_aviso("Debe seleccionar un dueño");
+      mostrar_aviso("Debe seleccionar un dueño", 'error');
       return;
     }
     if (!datos_usuario.banco_nombre || !datos_usuario.banco_cuenta) {
-      mostrar_aviso("Banco y cuenta son obligatorios para terminales");
+      mostrar_aviso("Banco y cuenta son obligatorios para terminales", 'error');
       return;
     }
   }
@@ -524,96 +541,19 @@ $("#boton_guardar_usuario").addEventListener("click", async () => {
   });
   const datos = await respuesta.json();
   if (datos.exito) {
-    mostrar_aviso("Usuario agregado correctamente");
+    mostrar_aviso("Usuario agregado correctamente", 'exito');
     $("#formulario_nuevo_usuario").classList.add("hidden");
     ["nuevo_nombre_usuario","nuevo_contrasena","nuevo_nombre_real","nuevo_email","nuevo_codigo_acceso","nuevo_dueno_select","nuevo_banco_nombre","nuevo_banco_cuenta"].forEach(id => $("#"+id).value="");
     cargar_datos_admin();
   } else {
-    mostrar_aviso(datos.error || "Error al agregar usuario");
+    mostrar_aviso(datos.error || "Error al agregar usuario", 'error');
   }
 });
-/*async function cargar_datos_terminales() {
-    if (!usuario_actual || usuario_actual.nivel !== 'dueno') return;
 
-    // Obtener terminales del dueño actual
-    let respuesta = await fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "dueno/listar_terminales", nombre_dueno: usuario_actual.nombre_usuario })
-    });
-    let datos = await respuesta.json();
-    if (!datos.exito) {
-        mostrar_aviso(datos.error || "Error al cargar terminales");
-        return;
-    }
+// ============================================================
+// ====== FUNCIONES PUNTOS DE VENTA (dueño) ===================
+// ============================================================
 
-    const terminales = datos.terminales;
-    const cuerpo_tabla = $("#tabla_terminales_dueno");
-    cuerpo_tabla.innerHTML = "";
-    terminales.forEach(terminal => {
-        const fila = document.createElement("tr");
-        fila.innerHTML = `
-            <td>${terminal.nombre_usuario}</td>
-            <td>${terminal.nombre_real || "—"}</td>
-            <td>${terminal.email || "—"}</td>
-            <td>${terminal.codigo_acceso || "—"}</td>
-            <td>${terminal.efectivo || "0"}</td>
-            <td>${terminal.bancarizado || "0"}</td>
-            <td>${terminal.banco.nombre || "—"}</td>
-            <td>${terminal.banco.cuenta || "—"}</td>
-            <td>${terminal.pasajes || "0"}</td>
-        `;
-        cuerpo_tabla.appendChild(fila);
-    });
-
-    // Obtener sesiones de esas terminales
-    const nombres_terminales = terminales.map(t => t.nombre_usuario);
-    respuesta = await fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "dueno/listar_sesiones_terminales", terminales: JSON.stringify(nombres_terminales) })
-    });
-    datos = await respuesta.json();
-    if (datos.exito) {
-        const cuerpo_sesiones = $("#tabla_sesiones_terminales");
-        cuerpo_sesiones.innerHTML = "";
-        datos.sesiones.forEach(sesion => {
-            const fila = document.createElement("tr");
-            const es_sesion_actual = usuario_actual && usuario_actual.token_sesion === sesion.token;
-            fila.innerHTML = `
-                <td>${sesion.token}</td>
-                <td>${sesion.usuario}</td>
-                <td>${sesion.creado_en}</td>
-                <td>${es_sesion_actual ? '<span class="badge">Actual</span>' : '<button class="btn danger btn_cerrar_sesion" data-token="' + sesion.token + '">Salir</button>'}</td>
-            `;
-            cuerpo_sesiones.appendChild(fila);
-        });
-
-        cuerpo_sesiones.querySelectorAll('.btn_cerrar_sesion').forEach(boton => {
-            boton.addEventListener('click', async (evento) => {
-                evento.preventDefault();
-                const token = boton.dataset.token;
-                if (token) {
-                    const respuesta_cierre = await fetch("index.php", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                        body: new URLSearchParams({ accion: "sesiones/cerrar", token })
-                    });
-                    const datos_cierre = await respuesta_cierre.json();
-                    if (datos_cierre.exito) {
-                        mostrar_aviso("Sesión cerrada correctamente");
-                        cargar_datos_terminales();
-                    } else {
-                        mostrar_aviso(datos_cierre.error || "No se pudo cerrar la sesión");
-                    }
-                }
-            });
-        });
-    }
-}*/
-
-
-// ====== Funciones para puntos de venta (dueño) ======
 async function cargar_datos_terminales() {
     if (!usuario_actual || usuario_actual.nivel !== 'dueno') return;
 
@@ -625,7 +565,7 @@ async function cargar_datos_terminales() {
     });
     let datos = await respuesta.json();
     if (!datos.exito) {
-        mostrar_aviso(datos.error || "Error al cargar terminales");
+        mostrar_aviso(datos.error || "Error al cargar terminales", 'error');
         return;
     }
 
@@ -695,10 +635,10 @@ async function cargar_datos_terminales() {
                     });
                     const datos_cierre = await respuesta_cierre.json();
                     if (datos_cierre.exito) {
-                        mostrar_aviso("Sesión cerrada correctamente");
+                        mostrar_aviso("Sesión cerrada correctamente", 'exito');
                         cargar_datos_terminales();
                     } else {
-                        mostrar_aviso(datos_cierre.error || "No se pudo cerrar la sesión");
+                        mostrar_aviso(datos_cierre.error || "No se pudo cerrar la sesión", 'error');
                     }
                 }
             });
@@ -729,11 +669,11 @@ $("#boton_guardar_terminal").addEventListener("click", async () => {
     };
 
     if (!datos_terminal.nombre_usuario || !datos_terminal.codigo_acceso) {
-        mostrar_aviso("Nombre de usuario y código de acceso son obligatorios");
+        mostrar_aviso("Nombre de usuario y código de acceso son obligatorios", 'error');
         return;
     }
     if (!datos_terminal.banco_nombre || !datos_terminal.banco_cuenta) {
-        mostrar_aviso("Banco y cuenta son obligatorios");
+        mostrar_aviso("Banco y cuenta son obligatorios", 'error');
         return;
     }
 
@@ -744,13 +684,13 @@ $("#boton_guardar_terminal").addEventListener("click", async () => {
     });
     const datos = await respuesta.json();
     if (datos.exito) {
-        mostrar_aviso("Punto de venta agregado correctamente");
+        mostrar_aviso("Punto de venta agregado correctamente", 'exito');
         $("#formulario_nueva_terminal").classList.add("hidden");
         // Limpiar campos
         ["nuevo_terminal_nombre_usuario","nuevo_terminal_contrasena","nuevo_terminal_nombre_real","nuevo_terminal_email","nuevo_terminal_codigo_acceso","nuevo_terminal_banco_nombre","nuevo_terminal_banco_cuenta"].forEach(id => $("#"+id).value="");
         cargar_datos_terminales();
     } else {
-        mostrar_aviso(datos.error || "Error al agregar punto de venta");
+        mostrar_aviso(datos.error || "Error al agregar punto de venta", 'error');
     }
 });
 
@@ -828,7 +768,7 @@ async function guardar_edicion_terminal(nombre_usuario, fila) {
     };
 
     if (!datos.banco_nombre || !datos.banco_cuenta) {
-        mostrar_aviso("Banco y cuenta son obligatorios");
+        mostrar_aviso("Banco y cuenta son obligatorios", 'error');
         return;
     }
 
@@ -839,10 +779,10 @@ async function guardar_edicion_terminal(nombre_usuario, fila) {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Punto de venta actualizado correctamente");
+        mostrar_aviso("Punto de venta actualizado correctamente", 'exito');
         cargar_datos_terminales();
     } else {
-        mostrar_aviso(resultado.error || "Error al actualizar");
+        mostrar_aviso(resultado.error || "Error al actualizar", 'error');
     }
 }
 
@@ -855,12 +795,16 @@ async function eliminar_terminal_confirmado(nombre_usuario) {
     });
     const datos = await respuesta.json();
     if (datos.exito) {
-        mostrar_aviso("Punto de venta eliminado correctamente");
+        mostrar_aviso("Punto de venta eliminado correctamente", 'exito');
         cargar_datos_terminales();
     } else {
-        mostrar_aviso(datos.error || "Error al eliminar");
+        mostrar_aviso(datos.error || "Error al eliminar", 'error');
     }
 }
+
+// ============================================================
+// ====== FUNCIONES EMPRESAS / MICROS =========================
+// ============================================================
 
 async function cargar_datos_micros() {
     // Limpiar selects
@@ -1001,6 +945,7 @@ async function cargar_vehiculos_de_empresa(nombre_empresa) {
         console.error(e);
     }
 }
+
 function actualizar_foto_vehiculo(ruta, es_editor = false) {
     if (es_editor) {
         const img = $("#foto_vehiculo_editor_img");
@@ -1032,7 +977,6 @@ function actualizar_foto_vehiculo(ruta, es_editor = false) {
         }
     }
 }
-
 
 function mostrar_croquis_vehiculo(vehiculo) {
     const contenedor = $("#croquis_pisos_micros");
@@ -1087,76 +1031,6 @@ function mostrar_croquis_vehiculo(vehiculo) {
     }
 }
 
-/*function iniciar_edicion_vehiculo() {
-    if (!vehiculo_seleccionado_micros) {
-        mostrar_aviso("Seleccione un vehículo primero");
-        return;
-    }
-
-    // Llenar el formulario con los datos actuales
-    $("#editar_vehiculo_patente").value = vehiculo_seleccionado_micros.nombre_vehiculo;
-    $("#editar_vehiculo_nombre_real").value = vehiculo_seleccionado_micros.nombre;
-    $("#editar_vehiculo_asientos").value = vehiculo_seleccionado_micros.asientos;
-
-    // Mostrar formulario y ocultar croquis
-    $("#area_croquis_estatico_micros").classList.add("hidden");
-    $("#panel_edicion_vehiculo_micros").classList.remove("hidden");
-}
-*//*
-function cancelar_edicion_vehiculo() {
-    // Ocultar formulario y volver a mostrar el croquis
-    $("#panel_edicion_vehiculo_micros").classList.add("hidden");
-    $("#area_croquis_estatico_micros").classList.remove("hidden");
-}
-
-async function guardar_edicion_vehiculo() {
-    if (!vehiculo_seleccionado_micros) {
-        mostrar_aviso("No hay vehículo seleccionado");
-        return;
-    }
-
-    const nombre_empresa = $("#selector_empresa_micros").value;
-    if (!nombre_empresa) {
-        mostrar_aviso("Seleccione una empresa");
-        return;
-    }
-
-    const nombre_real = $("#editar_vehiculo_nombre_real").value.trim();
-    const asientos = $("#editar_vehiculo_asientos").value;
-
-    if (!nombre_real) {
-        mostrar_aviso("El nombre visible no puede estar vacío");
-        return;
-    }
-    if (!asientos || parseInt(asientos) <= 0) {
-        mostrar_aviso("La cantidad de asientos debe ser mayor que cero");
-        return;
-    }
-
-    const datos = {
-        accion: "vehiculos/actualizar",
-        nombre_empresa: nombre_empresa,
-        nombre_vehiculo: vehiculo_seleccionado_micros.nombre_vehiculo,
-        nombre_real: nombre_real,
-        asientos: asientos
-    };
-
-    const respuesta = await fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(datos)
-    });
-    const resultado = await respuesta.json();
-    if (resultado.exito) {
-        mostrar_aviso("Vehículo actualizado correctamente");
-        cancelar_edicion_vehiculo();
-        // Recargar la lista para reflejar cambios
-        await cargar_vehiculos_de_empresa(nombre_empresa);
-    } else {
-        mostrar_aviso(resultado.error || "Error al actualizar");
-    }
-}
-*/
 // Botón agregar empresa
 $("#boton_agregar_empresa_micros").addEventListener("click", () => {
     $("#formulario_nueva_empresa").classList.remove("hidden");
@@ -1169,7 +1043,7 @@ $("#boton_cancelar_empresa").addEventListener("click", () => {
 $("#boton_guardar_empresa").addEventListener("click", async () => {
     const nombre_dueno = usuario_actual.nivel === 'admin' ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
     if (!nombre_dueno) {
-        mostrar_aviso("Seleccione un dueño");
+        mostrar_aviso("Seleccione un dueño", 'error');
         return;
     }
     const datos = {
@@ -1179,7 +1053,7 @@ $("#boton_guardar_empresa").addEventListener("click", async () => {
         nombre_real: $("#nueva_empresa_nombre_real").value.trim()
     };
     if (!datos.nombre_empresa) {
-        mostrar_aviso("Nombre de empresa obligatorio");
+        mostrar_aviso("Nombre de empresa obligatorio", 'error');
         return;
     }
     const respuesta = await fetch("index.php", {
@@ -1189,17 +1063,17 @@ $("#boton_guardar_empresa").addEventListener("click", async () => {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Empresa agregada");
+        mostrar_aviso("Empresa agregada", 'exito');
         $("#formulario_nueva_empresa").classList.add("hidden");
         $("#nueva_empresa_nombre").value = "";
         $("#nueva_empresa_nombre_real").value = "";
         await cargar_empresas_de_dueno(nombre_dueno);
     } else {
-        mostrar_aviso(resultado.error || "Error al agregar empresa");
+        mostrar_aviso(resultado.error || "Error al agregar empresa", 'error');
     }
 });
 
-// Botón agregar vehículo (similar)
+// Botón agregar vehículo
 $("#boton_agregar_vehiculo_micros").addEventListener("click", () => {
     $("#formulario_nuevo_vehiculo").classList.remove("hidden");
 });
@@ -1211,7 +1085,7 @@ $("#boton_cancelar_vehiculo").addEventListener("click", () => {
 $("#boton_guardar_vehiculo").addEventListener("click", async () => {
     const nombre_empresa = $("#selector_empresa_micros").value;
     if (!nombre_empresa) {
-        mostrar_aviso("Seleccione una empresa");
+        mostrar_aviso("Seleccione una empresa", 'error');
         return;
     }
     const datos = {
@@ -1221,7 +1095,7 @@ $("#boton_guardar_vehiculo").addEventListener("click", async () => {
         nombre_real: $("#nuevo_vehiculo_nombre_real").value.trim()
     };
     if (!datos.nombre_vehiculo) {
-        mostrar_aviso("Patente obligatoria");
+        mostrar_aviso("Patente obligatoria", 'error');
         return;
     }
     const respuesta = await fetch("index.php", {
@@ -1231,7 +1105,7 @@ $("#boton_guardar_vehiculo").addEventListener("click", async () => {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Vehículo agregado. Configure los asientos.");
+        mostrar_aviso("Vehículo agregado. Configure los asientos.", 'exito');
         $("#formulario_nuevo_vehiculo").classList.add("hidden");
         await cargar_vehiculos_de_empresa(nombre_empresa);
         // Seleccionar el vehículo recién agregado y abrir editor
@@ -1246,7 +1120,7 @@ $("#boton_guardar_vehiculo").addEventListener("click", async () => {
             }
         }, 300);
     } else {
-        mostrar_aviso(resultado.error || "Error al agregar vehículo");
+        mostrar_aviso(resultado.error || "Error al agregar vehículo", 'error');
     }
 });
 
@@ -1258,8 +1132,9 @@ $("#boton_reiniciar_asientos").addEventListener("click", () => {
     document.querySelectorAll('.cuadricula-editor').forEach((cuadricula, idx) => {
         renderizar_cuadricula_editor(cuadricula.parentElement, idx);
     });
-    mostrar_aviso("Asientos reiniciados");
+    mostrar_aviso("Asientos reiniciados", 'info');
 });
+
 $("#boton_subir_foto").addEventListener("click", () => {
     $("#input_foto_vehiculo").click();
 });
@@ -1274,7 +1149,7 @@ $("#input_foto_vehiculo").addEventListener("change", async (e) => {
     const nombre_empresa = $("#selector_empresa_micros").value;
     const nombre_vehiculo = vehiculo_seleccionado_micros?.nombre_vehiculo;
     if (!nombre_vehiculo) {
-        mostrar_aviso("Seleccione un vehículo primero");
+        mostrar_aviso("Seleccione un vehículo primero", 'error');
         return;
     }
     const formData = new FormData();
@@ -1296,18 +1171,18 @@ $("#input_foto_vehiculo").addEventListener("change", async (e) => {
         // Actualizar vistas
         actualizar_foto_vehiculo(resultado.foto, false);
         actualizar_foto_vehiculo(resultado.foto, true);
-        mostrar_aviso("Foto actualizada");
+        mostrar_aviso("Foto actualizada", 'exito');
     } else {
-        mostrar_aviso(resultado.error || "Error al subir foto");
+        mostrar_aviso(resultado.error || "Error al subir foto", 'error');
     }
 });
-// ===== Editor de configuración de asientos =====
 
+// ===== Editor de configuración de asientos =====
 let editor_pisos_actuales = []; // Arreglo con datos temporales de cada piso
 
 function iniciar_editor_vehiculo() {
     if (!vehiculo_seleccionado_micros) {
-        mostrar_aviso("Seleccione un vehículo primero");
+        mostrar_aviso("Seleccione un vehículo primero", 'error');
         return;
     }
 
@@ -1430,7 +1305,7 @@ function alternar_asiento(celda, idxPiso, fila, columna) {
         celda.classList.add('vacio');
         celda.textContent = '';
     } else {
-        // Agregar asiento con número provisional (podría ser vacío o autogenerado)
+        // Agregar asiento con número provisional
         const nuevoNumero = generar_numero_provisional(piso);
         piso.asientos.push({ fila, columna, numero: nuevoNumero });
         celda.classList.add('asiento');
@@ -1460,22 +1335,6 @@ function generar_numero_provisional(piso) {
     });
     return String(max + 1);
 }
-
-/*function numerar_automaticamente() {
-    let contador = 0;
-    editor_pisos_actuales.forEach(piso => {
-        // Ordenar asientos por fila, columna
-        piso.asientos.sort((a, b) => a.fila - b.fila || a.columna - b.columna);
-        piso.asientos.forEach(a => {
-            contador++;
-            a.numero = String(contador);
-        });
-    });
-    // Redibujar las cuadrículas
-    document.querySelectorAll('.cuadricula-editor').forEach((cuadricula, idx) => {
-        renderizar_cuadricula_editor(cuadricula.parentElement, idx);
-    });
-}*/
 
 async function guardar_configuracion() {
     // Recopilar configuración
@@ -1523,9 +1382,9 @@ async function guardar_configuracion() {
 
         // Salir del editor y mostrar el croquis actualizado
         cancelar_editor();
-        mostrar_aviso("Configuración actualizada");
+        mostrar_aviso("Configuración actualizada", 'exito');
     } else {
-        mostrar_aviso(resultado.error || "Error al guardar configuración");
+        mostrar_aviso(resultado.error || "Error al guardar configuración", 'error');
     }
 }
 
@@ -1538,11 +1397,9 @@ function cancelar_editor() {
     }
 }
 
-
 // Eventos
 $("#boton_modificar_vehiculo_micros").addEventListener("click", iniciar_editor_vehiculo);
 $("#editor_num_pisos").addEventListener("change", generar_editor_pisos);
-//$("#boton_numerar_automatico").addEventListener("click", numerar_automaticamente);
 $("#boton_guardar_configuracion").addEventListener("click", guardar_configuracion);
 $("#boton_cancelar_configuracion").addEventListener("click", cancelar_editor);
 
@@ -1550,7 +1407,7 @@ $("#boton_editar_empresa_micros").addEventListener("click", () => {
     const nombre_empresa = $("#selector_empresa_micros").value;
     const nombre_dueno = usuario_actual.nivel === 'admin' ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
     if (!nombre_empresa) {
-        mostrar_aviso("Seleccione una empresa");
+        mostrar_aviso("Seleccione una empresa", 'error');
         return;
     }
     // Obtener nombre visible actual
@@ -1566,11 +1423,11 @@ $("#boton_guardar_edicion_empresa").addEventListener("click", async () => {
     const nuevo_nombre = $("#editar_empresa_nombre").value.trim();
 
     if (!nombre_empresa) {
-        mostrar_aviso("Seleccione una empresa");
+        mostrar_aviso("Seleccione una empresa", 'error');
         return;
     }
     if (!nuevo_nombre) {
-        mostrar_aviso("El nombre no puede estar vacío");
+        mostrar_aviso("El nombre no puede estar vacío", 'error');
         return;
     }
 
@@ -1581,11 +1438,11 @@ $("#boton_guardar_edicion_empresa").addEventListener("click", async () => {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Empresa actualizada");
+        mostrar_aviso("Empresa actualizada", 'exito');
         $("#formulario_editar_empresa").classList.add("hidden");
         await cargar_empresas_de_dueno(nombre_dueno);
     } else {
-        mostrar_aviso(resultado.error || "Error al editar");
+        mostrar_aviso(resultado.error || "Error al editar", 'error');
     }
 });
 
@@ -1597,7 +1454,7 @@ $("#boton_eliminar_empresa_micros").addEventListener("click", async () => {
     const nombre_empresa = $("#selector_empresa_micros").value;
     const nombre_dueno = usuario_actual.nivel === 'admin' ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
     if (!nombre_empresa) {
-        mostrar_aviso("Seleccione una empresa");
+        mostrar_aviso("Seleccione una empresa", 'error');
         return;
     }
     if (!confirm(`¿Eliminar la empresa "${nombre_empresa}" y todos sus vehículos?`)) return;
@@ -1608,18 +1465,18 @@ $("#boton_eliminar_empresa_micros").addEventListener("click", async () => {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Empresa eliminada");
+        mostrar_aviso("Empresa eliminada", 'exito');
         await cargar_empresas_de_dueno(nombre_dueno);
     } else {
-        mostrar_aviso(resultado.error || "Error al eliminar");
+        mostrar_aviso(resultado.error || "Error al eliminar", 'error');
     }
 });
+
 $("#boton_eliminar_vehiculo_micros").addEventListener("click", async () => {
-  //  alert ("hola");
     const nombre_empresa = $("#selector_empresa_micros").value;
     const nombre_vehiculo = $("#selector_vehiculo_micros").value;
     if (!nombre_vehiculo) {
-        mostrar_aviso("Seleccione un vehículo");
+        mostrar_aviso("Seleccione un vehículo", 'error');
         return;
     }
     if (!confirm(`¿Eliminar el vehículo "${nombre_vehiculo}"?`)) return;
@@ -1630,13 +1487,16 @@ $("#boton_eliminar_vehiculo_micros").addEventListener("click", async () => {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Vehículo eliminado");
+        mostrar_aviso("Vehículo eliminado", 'exito');
         await cargar_vehiculos_de_empresa(nombre_empresa);
     } else {
-        mostrar_aviso(resultado.error || "Error al eliminar");
+        mostrar_aviso(resultado.error || "Error al eliminar", 'error');
     }
 });
-// ====== Funciones auxiliares ======
+
+// ============================================================
+// ====== FUNCIONES AUXILIARES =================================
+// ============================================================
 function obtener_nombre_dueno_actual() {
     return usuario_actual.nivel === 'admin' ? $("#selector_dueno_viajes").value : usuario_actual.nombre_usuario;
 }
@@ -1717,7 +1577,7 @@ async function listar_viajes(nombre, tipo) {
     if (datos.exito) {
         renderizar_viajes(datos.viajes);
     } else {
-        mostrar_aviso(datos.error || "Error al cargar viajes");
+        mostrar_aviso(datos.error || "Error al cargar viajes", 'error');
     }
 }
 
@@ -1761,19 +1621,18 @@ function ver_detalle_viaje(viaje) {
     if (usuario_actual.nivel === 'terminal') {
         $("#boton_agregar_micro_viaje").style.display = 'none';
         $("#boton_agregar_terminal_viaje").style.display = 'none';
-        $("#seccion_terminales_viaje").style.display = 'none'; // ocultar terminales autorizadas
+        $("#seccion_terminales_viaje").style.display = 'none';
     } else {
         $("#boton_agregar_micro_viaje").style.display = '';
         $("#boton_agregar_terminal_viaje").style.display = '';
-        $("#seccion_terminales_viaje").style.display = ''; // mostrar terminales
+        $("#seccion_terminales_viaje").style.display = '';
     }
 
     renderizar_micros_viaje(viaje.micros);
-    // Solo renderizar terminales si no es terminal
     if (usuario_actual.nivel !== 'terminal') {
         renderizar_terminales_viaje(viaje.terminales_autorizadas);
     } else {
-        $("#lista_terminales_viaje").innerHTML = ''; // limpiar por si acaso
+        $("#lista_terminales_viaje").innerHTML = '';
     }
 }
 
@@ -1803,11 +1662,12 @@ function renderizar_micros_viaje(micros) {
         if (btnQuitar) btnQuitar.addEventListener('click', () => eliminar_micro(micro.nombre_micro));
     });
 }
+
 function editar_monto_micro(nombre_micro, monto_actual) {
     const nuevo_monto = prompt("Nuevo monto del pasaje:", monto_actual);
     if (nuevo_monto === null) return;
     if (nuevo_monto.trim() === '' || isNaN(parseFloat(nuevo_monto)) || parseFloat(nuevo_monto) < 0) {
-        mostrar_aviso("Monto inválido");
+        mostrar_aviso("Monto inválido", 'error');
         return;
     }
 
@@ -1826,10 +1686,10 @@ function editar_monto_micro(nombre_micro, monto_actual) {
     .then(resp => resp.json())
     .then(resultado => {
         if (resultado.exito) {
-            mostrar_aviso("Monto actualizado");
+            mostrar_aviso("Monto actualizado", 'exito');
             actualizar_detalle_viaje_actual();
         } else {
-            mostrar_aviso(resultado.error || "Error al actualizar monto");
+            mostrar_aviso(resultado.error || "Error al actualizar monto", 'error');
         }
     });
 }
@@ -1837,10 +1697,9 @@ function editar_monto_micro(nombre_micro, monto_actual) {
 async function seleccionar_micro_viaje(nombre_micro) {
     micro_seleccionado = nombre_micro;
 
-    // Obtener dueño correcto según nivel
     let nombre_dueno;
     if (usuario_actual.nivel === 'terminal') {
-        nombre_dueno = viaje_seleccionado.dueno; // viene de formatear_viaje
+        nombre_dueno = viaje_seleccionado.dueno;
     } else {
         nombre_dueno = obtener_nombre_dueno_actual();
     }
@@ -1861,7 +1720,7 @@ async function seleccionar_micro_viaje(nombre_micro) {
         micro_seleccionado = nombre_micro;
         iniciar_sync_asientos();
     } else {
-        mostrar_aviso(datos.error || "Error al obtener micro");
+        mostrar_aviso(datos.error || "Error al obtener micro", 'error');
     }
 }
 
@@ -1876,13 +1735,8 @@ function iniciar_sync_asientos() {
     detener_sync_asientos();
     if (!viaje_seleccionado || !micro_seleccionado) return;
 
-    // Guardar referencia
-    microSyncActual = micro_seleccionado;
-
-    // Polling inmediato
+    microSyncActual = micro_seleccionado; // aseguramos valor
     solicitar_estado_asientos();
-
-    // Intervalo de respaldo cada 10 segundos
     intervaloSyncAsientos = setInterval(solicitar_estado_asientos, 10000);
 }
 
@@ -1895,7 +1749,8 @@ function detener_sync_asientos() {
 }
 
 async function solicitar_estado_asientos() {
-    if (!microSyncActual || !viaje_seleccionado) return;
+    const nombre_micro_actual = microSyncActual || micro_seleccionado; // fallback
+    if (!nombre_micro_actual || !viaje_seleccionado) return;
 
     let nombre_dueno = obtener_dueno_viaje_seleccionado();
     const respuesta = await fetch("index.php", {
@@ -1904,7 +1759,7 @@ async function solicitar_estado_asientos() {
         body: new URLSearchParams({
             accion: "viajes/estado_asientos",
             nombre_viaje: viaje_seleccionado.nombre_viaje,
-            nombre_micro: microSyncActual,
+            nombre_micro: nombre_micro_actual,
             nombre_dueno
         })
     });
@@ -1936,69 +1791,93 @@ function actualizar_colores_asientos(estados) {
             seat.dataset.seleccionado_por = estadoObj.seleccionado_por || '';
         }
     });
+    mostrar_boton_confirmar_venta();
 }
 
-function seleccionar_asiento_pasaje(fila, columna) {
-    if (!microSyncActual || !viaje_seleccionado) return;
+async function seleccionar_asiento_pasaje(fila, columna) {
+    if (!micro_seleccionado || !viaje_seleccionado) return; // usar micro_seleccionado en lugar de microSyncActual
 
     const nombre_dueno = obtener_dueno_viaje_seleccionado();
     const nombre_terminal = usuario_actual.nombre_usuario;
+    const nombre_micro = micro_seleccionado; // guardar localmente
 
-    fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            accion: "viajes/seleccionar_asiento",
-            nombre_viaje: viaje_seleccionado.nombre_viaje,
-            nombre_micro: microSyncActual,
-            fila,
-            columna,
-            nombre_dueno,
-            nombre_terminal
-        })
-    })
-    .then(resp => resp.json())
-    .then(resultado => {
+    detener_sync_asientos(); // detener polling para evitar interferencias
+
+    try {
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/seleccionar_asiento",
+                nombre_viaje: viaje_seleccionado.nombre_viaje,
+                nombre_micro: nombre_micro,
+                fila,
+                columna,
+                nombre_dueno,
+                nombre_terminal
+            })
+        });
+        const resultado = await respuesta.json();
         if (resultado.exito) {
-            mostrar_aviso("Asiento seleccionado");
-            solicitar_estado_asientos();
+            await solicitar_estado_asientos(); // actualizar estados
+            mostrar_aviso("Asiento seleccionado", 'exito');
         } else {
-            mostrar_aviso(resultado.error || "No se pudo seleccionar");
+            await solicitar_estado_asientos();
+            mostrar_aviso(resultado.error || "No se pudo seleccionar", 'error');
         }
-    });
+    } catch (error) {
+        console.error("Error en selección:", error);
+        mostrar_aviso("Error de comunicación", 'error');
+    } finally {
+        // Reanudar polling solo si seguimos en el mismo micro
+        if (viaje_seleccionado && micro_seleccionado) {
+            iniciar_sync_asientos();
+        }
+    }
 }
-function deseleccionar_asiento_pasaje(fila, columna) {
-    if (!microSyncActual || !viaje_seleccionado) return;
+
+async function deseleccionar_asiento_pasaje(fila, columna) {
+    if (!micro_seleccionado || !viaje_seleccionado) return;
 
     const nombre_dueno = obtener_dueno_viaje_seleccionado();
     const nombre_terminal = usuario_actual.nombre_usuario;
+    const nombre_micro = micro_seleccionado;
 
-    fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            accion: "viajes/deseleccionar_asiento",
-            nombre_viaje: viaje_seleccionado.nombre_viaje,
-            nombre_micro: microSyncActual,
-            fila,
-            columna,
-            nombre_dueno,
-            nombre_terminal
-        })
-    })
-    .then(resp => resp.json())
-    .then(resultado => {
+    detener_sync_asientos();
+
+    try {
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/deseleccionar_asiento",
+                nombre_viaje: viaje_seleccionado.nombre_viaje,
+                nombre_micro: nombre_micro,
+                fila,
+                columna,
+                nombre_dueno,
+                nombre_terminal
+            })
+        });
+        const resultado = await respuesta.json();
         if (resultado.exito) {
-            mostrar_aviso("Asiento liberado");
-            solicitar_estado_asientos();
+            await solicitar_estado_asientos();
+            mostrar_aviso("Asiento liberado", 'exito');
         } else {
-            mostrar_aviso(resultado.error || "No se pudo liberar");
+            await solicitar_estado_asientos();
+            mostrar_aviso(resultado.error || "No se pudo liberar", 'error');
         }
-    });
+    } catch (error) {
+        console.error("Error en deselección:", error);
+        mostrar_aviso("Error de comunicación", 'error');
+    } finally {
+        if (viaje_seleccionado && micro_seleccionado) {
+            iniciar_sync_asientos();
+        }
+    }
 }
+
 function mostrar_info_asiento(asiento) {
-   // alert("kk");
-   //console.log("Entró a mostrar_info_asiento");
     const panel = $("#info_asiento_viaje");
     let html = `
         <div class="section-title">Información de asiento</div>
@@ -2061,7 +1940,6 @@ function renderizar_pasaje_micro(micro) {
                         seat.dataset.columna = asiento.columna;
                         seat.dataset.numero = asiento.numero;
                         seat.dataset.estado = asiento.estado;
-                        // No se asigna addEventListener aquí
                         filaDiv.appendChild(seat);
                     } else {
                         const empty = document.createElement('div');
@@ -2082,11 +1960,9 @@ function renderizar_pasaje_micro(micro) {
             const fila = seat.dataset.fila;
             const columna = seat.dataset.columna;
 
-            // Buscar asiento en estados actuales (más recientes)
             const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
             if (!asiento) return;
 
-            // Mostrar información actualizada
             mostrar_info_asiento(asiento);
 
             if (usuario_actual.nivel === 'terminal') {
@@ -2101,10 +1977,8 @@ function renderizar_pasaje_micro(micro) {
         contenedorCroquis.innerHTML = '<p>No hay configuración de asientos.</p>';
     }
 
-    // Mostrar panel de pasaje
     $("#pasaje_micro_viaje").classList.remove("hidden");
 
-    // Iniciar sincronización de estados
     micro_seleccionado = micro.nombre_micro;
     iniciar_sync_asientos();
 }
@@ -2144,7 +2018,7 @@ $("#boton_guardar_viaje").addEventListener("click", async () => {
         destino: $("#nuevo_viaje_destino").value
     };
     if (!datos.nombre_viaje) {
-        mostrar_aviso("El nombre del viaje es obligatorio");
+        mostrar_aviso("El nombre del viaje es obligatorio", 'error');
         return;
     }
     const respuesta = await fetch("index.php", {
@@ -2154,11 +2028,11 @@ $("#boton_guardar_viaje").addEventListener("click", async () => {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Viaje creado");
+        mostrar_aviso("Viaje creado", 'exito');
         $("#formulario_nuevo_viaje").classList.add("hidden");
-        await cargar_viajes(); // Recargar lista principal
+        await cargar_viajes();
     } else {
-        mostrar_aviso(resultado.error || "Error al crear viaje");
+        mostrar_aviso(resultado.error || "Error al crear viaje", 'error');
     }
 });
 
@@ -2176,11 +2050,11 @@ async function eliminar_viaje(nombre_viaje) {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Viaje eliminado");
+        mostrar_aviso("Viaje eliminado", 'exito');
         $("#detalle_viaje").classList.add("hidden");
-        await cargar_viajes(); // Recargar lista principal
+        await cargar_viajes();
     } else {
-        mostrar_aviso(resultado.error || "Error al eliminar");
+        mostrar_aviso(resultado.error || "Error al eliminar", 'error');
     }
 }
 
@@ -2233,11 +2107,11 @@ $("#boton_confirmar_micro").addEventListener("click", async () => {
     const nombre_dueno = obtener_nombre_dueno_actual();
 
     if (!nombre_empresa || !nombre_vehiculo) {
-        mostrar_aviso("Seleccione empresa y vehículo");
+        mostrar_aviso("Seleccione empresa y vehículo", 'error');
         return;
     }
     if (monto === '' || isNaN(parseFloat(monto)) || parseFloat(monto) < 0) {
-        mostrar_aviso("Ingrese un monto válido");
+        mostrar_aviso("Ingrese un monto válido", 'error');
         return;
     }
 
@@ -2255,12 +2129,12 @@ $("#boton_confirmar_micro").addEventListener("click", async () => {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Micro agregado");
+        mostrar_aviso("Micro agregado", 'exito');
         $("#formulario_agregar_micro").classList.add("hidden");
         $("#monto_micro_viaje").value = "";
         await actualizar_detalle_viaje_actual();
     } else {
-        mostrar_aviso(resultado.error || "Error al agregar micro");
+        mostrar_aviso(resultado.error || "Error al agregar micro", 'error');
     }
 });
 
@@ -2283,10 +2157,10 @@ async function eliminar_micro(nombre_micro) {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Micro eliminado");
-        await actualizar_detalle_viaje_actual(); // Actualizar detalle
+        mostrar_aviso("Micro eliminado", 'exito');
+        await actualizar_detalle_viaje_actual();
     } else {
-        mostrar_aviso(resultado.error || "Error al eliminar micro");
+        mostrar_aviso(resultado.error || "Error al eliminar micro", 'error');
     }
 }
 
@@ -2316,7 +2190,7 @@ $("#boton_confirmar_terminal").addEventListener("click", async () => {
     const nombre_terminal = $("#selector_terminal_autorizada").value;
     const nombre_dueno = obtener_nombre_dueno_actual();
     if (!nombre_terminal) {
-        mostrar_aviso("Seleccione un punto de venta");
+        mostrar_aviso("Seleccione un punto de venta", 'error');
         return;
     }
     const respuesta = await fetch("index.php", {
@@ -2331,11 +2205,11 @@ $("#boton_confirmar_terminal").addEventListener("click", async () => {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Punto de venta autorizado");
+        mostrar_aviso("Punto de venta autorizado", 'exito');
         $("#formulario_agregar_terminal").classList.add("hidden");
-        await actualizar_detalle_viaje_actual(); // Actualizar detalle
+        await actualizar_detalle_viaje_actual();
     } else {
-        mostrar_aviso(resultado.error || "Error al autorizar punto de venta");
+        mostrar_aviso(resultado.error || "Error al autorizar punto de venta", 'error');
     }
 });
 
@@ -2357,10 +2231,10 @@ async function eliminar_terminal_autorizada(nombre_terminal) {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
-        mostrar_aviso("Punto de venta eliminado");
-        await actualizar_detalle_viaje_actual(); // Actualizar detalle
+        mostrar_aviso("Punto de venta eliminado", 'exito');
+        await actualizar_detalle_viaje_actual();
     } else {
-        mostrar_aviso(resultado.error || "Error al eliminar punto de venta");
+        mostrar_aviso(resultado.error || "Error al eliminar punto de venta", 'error');
     }
 }
 
@@ -2368,8 +2242,8 @@ async function eliminar_terminal_autorizada(nombre_terminal) {
 async function actualizar_detalle_viaje_actual() {
     if (!viaje_seleccionado) return;
 
-    const nombre_viaje_actual = viaje_seleccionado.nombre_viaje; // guardar antes de ocultar
-    ocultar_detalle_viaje(); // ahora sí se puede limpiar
+    const nombre_viaje_actual = viaje_seleccionado.nombre_viaje;
+    ocultar_detalle_viaje();
 
     let nombre_dueno = obtener_nombre_dueno_actual();
     let tipo = usuario_actual.nivel === 'terminal' ? 'terminal' : 'dueno';
@@ -2389,186 +2263,633 @@ async function actualizar_detalle_viaje_actual() {
         }
     }
 }
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ============================================================
+// ====== NUEVAS FUNCIONES PARA CONFIRMACIÓN DE VENTA ==========
+// ============================================================
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+function mostrar_boton_confirmar_venta() {
+    const contenedor = $("#contenedor_boton_confirmar_venta");
+    if (!contenedor) return;
+    if (usuario_actual && usuario_actual.nivel === 'terminal' && tiene_asientos_seleccionados_propios()) {
+        contenedor.classList.remove("hidden");
+    } else {
+        contenedor.classList.add("hidden");
+    }
+}
+
+function tiene_asientos_seleccionados_propios() {
+    return estados_asientos_actuales.some(a => a.estado === 'seleccionado' && a.seleccionado_por === usuario_actual.nombre_usuario);
+}
+
+$("#boton_confirmar_venta").addEventListener("click", abrir_modal_confirmacion_venta);
+$("#cerrar_modal_venta").addEventListener("click", () => $("#modal_confirmar_venta").classList.add("hidden"));
+$("#cancelar_venta_modal").addEventListener("click", () => $("#modal_confirmar_venta").classList.add("hidden"));
+
+function abrir_modal_confirmacion_venta() {
+    if (!microSyncActual || !viaje_seleccionado) return;
+
+    const asientos_seleccionados = estados_asientos_actuales.filter(a => a.estado === 'seleccionado' && a.seleccionado_por === usuario_actual.nombre_usuario);
+    if (asientos_seleccionados.length === 0) {
+        mostrar_aviso("No tiene asientos seleccionados", 'error');
+        return;
+    }
+
+    const micro = viaje_seleccionado.micros.find(m => m.nombre_micro === microSyncActual);
+    const monto = micro ? parseFloat(micro.monto) : 0;
+    const total = monto * asientos_seleccionados.length;
+
+    // Ocultar info de asiento y mostrar formulario
+    $("#info_asiento_viaje").classList.add("hidden");
+    $("#formulario_confirmacion_venta").classList.remove("hidden");
+
+    const formulario = $("#formulario_confirmacion_venta");
+    formulario.innerHTML = `
+        <h4>Confirmar venta</h4>
+        <div id="resumen_venta">
+        <p><strong>Asientos seleccionados:</strong> ${asientos_seleccionados.map(a => `F${a.fila}C${a.columna}`).join(', ')}</p>
+        <p><strong>Monto por asiento:</strong> $${monto.toFixed(2)}</p>
+        <p><strong>Total a pagar:</strong> $${total.toFixed(2)}</p>
+        </div>
+        <div class="form-grid" style="margin-top:15px;">
+            <div class="field">
+                <label>Método de pago</label>
+                <select id="metodo_pago">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                </select>
+            </div>
+            <div class="field" id="campo_cuotas">
+                <label>Cantidad de cuotas (1-3)</label>
+                <select id="cuotas_venta">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                </select>
+            </div>
+            <div class="field" id="campo_pago_inicial">
+                <label>Cuotas pagadas ahora</label>
+                <select id="pago_inicial">
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                </select>
+            </div>
+        </div>
+        <div id="datos_comprador" style="margin-top:15px;">
+            <h4>Comprador</h4>
+            <div class="form-grid">
+                <div class="field"><label>DNI</label><input id="comprador_dni"></div>
+                <div class="field"><label>Nombre</label><input id="comprador_nombre"></div>
+                <div class="field"><label>Email</label><input id="comprador_email"></div>
+                <div class="field"><label>Celular</label><input id="comprador_celular"></div>
+                <div class="field"><label>Emergencia</label><input id="comprador_emergencia"></div>
+            </div>
+            <button class="btn small" id="usar_pasajero_como_comprador">Usar primer pasajero</button>
+        </div>
+        <div id="pasajeros_venta" style="margin-top:20px;"></div>
+        <div class="actions" style="margin-top:20px;">
+            <button class="btn primary" id="confirmar_venta">Confirmar</button>
+            <button class="btn" id="cancelar_venta_modal">Cancelar</button>
+        </div>
+    `;
+
+    // Establecer valores por defecto
+    $("#metodo_pago").value = 'efectivo';
+    $("#cuotas_venta").value = '1';
+    $("#pago_inicial").value = '1';
+    actualizar_visibilidad_cuotas();
+
+    $("#comprador_dni").value = '';
+    $("#comprador_nombre").value = '';
+    $("#comprador_email").value = '';
+    $("#comprador_celular").value = '';
+    $("#comprador_emergencia").value = '';
+
+    generar_formularios_pasajeros(asientos_seleccionados);
+
+    // Eventos para los nuevos elementos
+    $("#metodo_pago").addEventListener("change", actualizar_visibilidad_cuotas);
+    $("#cuotas_venta").addEventListener("change", function() {
+        const cuotas = parseInt(this.value);
+        const selectPago = $("#pago_inicial");
+        selectPago.innerHTML = '';
+        for (let i = 0; i <= cuotas; i++) {
+            const opcion = document.createElement('option');
+            opcion.value = i;
+            opcion.textContent = i;
+            selectPago.appendChild(opcion);
+        }
+    });
+    $("#cuotas_venta").dispatchEvent(new Event('change'));
+
+    $("#usar_pasajero_como_comprador").addEventListener("click", () => {
+        const primerDni = document.querySelector('.pasajero_dni').value;
+        const primerNombre = document.querySelector('.pasajero_nombre').value;
+        const primerEmail = document.querySelector('.pasajero_email').value;
+        const primerCelular = document.querySelector('.pasajero_celular').value;
+        const primerEmergencia = document.querySelector('.pasajero_emergencia').value;
+        if (primerDni) {
+            $("#comprador_dni").value = primerDni;
+            $("#comprador_nombre").value = primerNombre;
+            $("#comprador_email").value = primerEmail;
+            $("#comprador_celular").value = primerCelular;
+            $("#comprador_emergencia").value = primerEmergencia;
+        } else {
+            mostrar_aviso("Complete al menos el DNI del primer pasajero", 'error');
+        }
+    });
+
+    $("#confirmar_venta").addEventListener("click", confirmar_venta_modal);
+    $("#cancelar_venta_modal").addEventListener("click", () => {
+        $("#formulario_confirmacion_venta").classList.add("hidden");
+        $("#info_asiento_viaje").classList.remove("hidden");
+    });
+}
 
 
-// Inicialización de la interfaz: ocultar aplicación y mostrar login
-$("#aplicacion").classList.add("hidden");
-$("#pantalla_login").classList.remove("hidden");
 
-// --- Funciones de construcción de asientos y manejo de ventas/pasajeros (adaptadas) ---
+function actualizar_visibilidad_cuotas() {
+    const metodo = $("#metodo_pago").value;
+    if (metodo === 'transferencia') {
+        $("#campo_cuotas").style.display = 'none';
+        $("#campo_pago_inicial").style.display = 'none';
+        $("#cuotas_venta").value = '1';
+        $("#pago_inicial").value = '1';
+    } else {
+        $("#campo_cuotas").style.display = '';
+        $("#campo_pago_inicial").style.display = '';
+    }
+}
+
+$("#metodo_pago").addEventListener("change", actualizar_visibilidad_cuotas);
+$("#cuotas_venta").addEventListener("change", function() {
+    const cuotas = parseInt(this.value);
+    const selectPago = $("#pago_inicial");
+    selectPago.innerHTML = '';
+    for (let i = 0; i <= cuotas; i++) {
+        const opcion = document.createElement('option');
+        opcion.value = i;
+        opcion.textContent = i;
+        selectPago.appendChild(opcion);
+    }
+});
+$("#cuotas_venta").dispatchEvent(new Event('change'));
+
+function generar_formularios_pasajeros(asientos) {
+    const contenedor = $("#pasajeros_venta");
+    contenedor.innerHTML = '<h4>Pasajeros por asiento</h4>';
+    asientos.forEach((asiento, index) => {
+        const div = document.createElement('div');
+        div.className = 'panel';
+        div.style.marginTop = '10px';
+        div.innerHTML = `
+            <h5>Asiento ${asiento.numero} (F${asiento.fila}, C${asiento.columna})</h5>
+            <div class="form-grid">
+                <div class="field"><label>DNI *</label><input class="pasajero_dni" data-index="${index}" value=""></div>
+                <div class="field"><label>Nombre *</label><input class="pasajero_nombre" data-index="${index}" value=""></div>
+                <div class="field"><label>Email</label><input class="pasajero_email" data-index="${index}" value=""></div>
+                <div class="field"><label>Celular</label><input class="pasajero_celular" data-index="${index}" value=""></div>
+                <div class="field"><label>Emergencia</label><input class="pasajero_emergencia" data-index="${index}" value=""></div>
+            </div>
+        `;
+        contenedor.appendChild(div);
+    });
+}
+
+$("#usar_pasajero_como_comprador").addEventListener("click", () => {
+    const primerDni = document.querySelector('.pasajero_dni').value;
+    const primerNombre = document.querySelector('.pasajero_nombre').value;
+    const primerEmail = document.querySelector('.pasajero_email').value;
+    const primerCelular = document.querySelector('.pasajero_celular').value;
+    const primerEmergencia = document.querySelector('.pasajero_emergencia').value;
+    if (primerDni) {
+        $("#comprador_dni").value = primerDni;
+        $("#comprador_nombre").value = primerNombre;
+        $("#comprador_email").value = primerEmail;
+        $("#comprador_celular").value = primerCelular;
+        $("#comprador_emergencia").value = primerEmergencia;
+    } else {
+        mostrar_aviso("Complete al menos el DNI del primer pasajero", 'error');
+    }
+});
+
+$("#confirmar_venta").addEventListener("click", confirmar_venta_modal);
+
+async function confirmar_venta_modal() {
+    const metodo_pago = $("#metodo_pago").value;
+    const cuotas = parseInt($("#cuotas_venta").value);
+    const pago_inicial = parseInt($("#pago_inicial").value);
+    const comprador_dni = $("#comprador_dni").value.trim();
+
+    if (!comprador_dni) {
+        mostrar_aviso("Ingrese DNI del comprador", 'error');
+        return;
+    }
+
+    const pasajeros = [];
+    const dniInputs = document.querySelectorAll('.pasajero_dni');
+    for (let i = 0; i < dniInputs.length; i++) {
+        const dni = dniInputs[i].value.trim();
+        const nombre = document.querySelector(`.pasajero_nombre[data-index="${i}"]`).value.trim();
+        if (!dni || !nombre) {
+            mostrar_aviso(`Complete DNI y nombre del pasajero ${i+1}`, 'error');
+            return;
+        }
+        pasajeros.push({
+            dni,
+            nombre,
+            email: document.querySelector(`.pasajero_email[data-index="${i}"]`).value.trim(),
+            celular: document.querySelector(`.pasajero_celular[data-index="${i}"]`).value.trim(),
+            celular_emergencia: document.querySelector(`.pasajero_emergencia[data-index="${i}"]`).value.trim(),
+        });
+    }
+
+    const datos = {
+        accion: "ventas/confirmar",
+        nombre_terminal: usuario_actual.nombre_usuario,
+        metodo_pago,
+        cuotas,
+        pago_inicial,
+        comprador_dni,
+        pasajeros: JSON.stringify(pasajeros)
+    };
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(datos)
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Venta confirmada correctamente", 'exito');
+        $("#modal_confirmar_venta").classList.add("hidden");
+        await solicitar_estado_asientos();
+        await actualizar_detalle_viaje_actual();
+    } else {
+        mostrar_aviso(resultado.error || "Error al confirmar venta", 'error');
+    }
+}
+
+// ============================================================
+// ====== PANEL VENDIDOS (REEMPLAZO) ===========================
+// ============================================================
+
+let ventas_actuales = [];
+
+async function cargar_ventas() {
+    if (!usuario_actual) return;
+
+    let tipo, nombre;
+    if (usuario_actual.nivel === 'dueno') {
+        tipo = 'dueno';
+        nombre = usuario_actual.nombre_usuario;
+    } else if (usuario_actual.nivel === 'terminal') {
+        tipo = 'terminal';
+        nombre = usuario_actual.nombre_usuario;
+    } else {
+        // admin: se necesita seleccionar dueño, por ahora no implementado
+        mostrar_aviso("Seleccione un dueño para ver ventas (no implementado)", 'info');
+        return;
+    }
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "ventas/listar", tipo, nombre })
+    });
+    const datos = await respuesta.json();
+    if (datos.exito) {
+        llenar_filtro_viajes(datos.ventas);
+        llenar_filtro_vendedores(datos.ventas);
+        ventas_actuales = datos.ventas;
+        renderizar_ventas();
+    } else {
+        mostrar_aviso(datos.error || "Error al cargar ventas", 'error');
+    }
+}
+
+function llenar_filtro_viajes(ventas) {
+    const select = $("#selector_viaje_vendido");
+    select.innerHTML = '<option value="todos">Todos</option>';
+    const viajesUnicos = [...new Set(ventas.map(v => v.viaje))];
+    viajesUnicos.forEach(viaje => {
+        const opcion = document.createElement('option');
+        opcion.value = viaje;
+        opcion.textContent = viaje;
+        select.appendChild(opcion);
+    });
+    select.onchange = () => renderizar_ventas();
+}
+
+function llenar_filtro_vendedores(ventas) {
+    const select = $("#filtro_vendedor");
+    select.innerHTML = '<option value="Todos">Todos</option>';
+    const vendedoresUnicos = [...new Set(ventas.map(v => v.terminal))];
+    vendedoresUnicos.forEach(vendedor => {
+        const opcion = document.createElement('option');
+        opcion.value = vendedor;
+        opcion.textContent = vendedor;
+        select.appendChild(opcion);
+    });
+    select.onchange = () => renderizar_ventas();
+}
+
+function renderizar_ventas() {
+    const filtroViaje = $("#selector_viaje_vendido").value;
+    const filtroVendedor = $("#filtro_vendedor").value;
+    let ventas_filtradas = ventas_actuales;
+    if (filtroViaje !== 'todos') {
+        ventas_filtradas = ventas_filtradas.filter(v => v.viaje === filtroViaje);
+    }
+    if (filtroVendedor !== 'Todos') {
+        ventas_filtradas = ventas_filtradas.filter(v => v.terminal === filtroVendedor);
+    }
+    const lista = $("#lista_ventas");
+    lista.innerHTML = '';
+    if (ventas_filtradas.length === 0) {
+        lista.innerHTML = '<p style="color:#888; margin:20px;">No hay ventas registradas para los filtros seleccionados.</p>';
+        return;
+    }
+    ventas_filtradas.forEach(venta => {
+        const tarjeta = document.createElement('div');
+        tarjeta.className = 'sale-card';
+        tarjeta.innerHTML = `
+            <div class="sale-header"><div class="sale-id">Venta ${venta.id_venta}</div><span class="badge">${venta.terminal}</span></div>
+            <div class="sale-grid">
+                <div class="sale-metric"><span>Cantidad de asientos</span><b>${venta.cantidad_asientos}</b></div>
+                <div class="sale-metric"><span>Monto total</span><b>$${venta.total}</b></div>
+                <div class="sale-metric"><span>Fecha</span><b>${venta.fecha}</b></div>
+            </div>
+            <div class="actions">
+                <button class="btn ver_detalle_venta" data-id="${venta.id_venta}">Ver detalle</button>
+                <button class="btn danger cancelar_venta" data-id="${venta.id_venta}">Cancelar venta</button>
+            </div>`;
+        lista.appendChild(tarjeta);
+        tarjeta.querySelector('.ver_detalle_venta').addEventListener('click', () => ver_detalle_venta(venta.id_venta));
+        tarjeta.querySelector('.cancelar_venta').addEventListener('click', () => cancelar_venta(venta.id_venta));
+    });
+}
+
+async function ver_detalle_venta(id_venta) {
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "ventas/obtener", id_venta })
+    });
+    const datos = await respuesta.json();
+    if (datos.exito) {
+        const venta = datos.venta;
+        // Mostrar en un alert simple por ahora
+        alert(`Detalle de venta ${venta.id_venta}\nTotal: $${venta.total}\nMétodo: ${venta.metodo_pago}\nCuotas: ${venta.cuotas}\nPagado: $${venta.pagado}\nPasajeros: ${venta.asientos.length}`);
+    } else {
+        mostrar_aviso(datos.error || "Error al obtener detalle", 'error');
+    }
+}
+
+async function cancelar_venta(id_venta) {
+    if (!confirm(`¿Cancelar venta ${id_venta}?`)) return;
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "ventas/cancelar", id_venta })
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Venta cancelada", 'exito');
+        cargar_ventas();
+    } else {
+        mostrar_aviso(resultado.error || "Error al cancelar", 'error');
+    }
+}
+
+// ============================================================
+// ====== PANEL PASAJEROS (REEMPLAZO) ==========================
+// ============================================================
+
+let pasajeros_actuales = [];
+let pasajero_seleccionado_dni = null;
+
+async function cargar_pasajeros() {
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "pasajeros/listar" })
+    });
+    const datos = await respuesta.json();
+    if (datos.exito) {
+        pasajeros_actuales = datos.pasajeros;
+        renderizar_tabla_pasajeros(pasajeros_actuales);
+    } else {
+        mostrar_aviso(datos.error || "Error al cargar pasajeros", 'error');
+    }
+}
+
+function renderizar_tabla_pasajeros(pasajeros) {
+    const tabla = $("#tabla_pasajeros");
+    tabla.innerHTML = '';
+    pasajeros.forEach(pasajero => {
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${pasajero.nombre}</td>
+            <td>${pasajero.dni}</td>
+            <td>${pasajero.email || '—'}</td>
+            <td>${pasajero.celular || '—'}</td>
+            <td>${pasajero.celular_emergencia || '—'}</td>
+            <td><button class="btn editar_pasajero" data-dni="${pasajero.dni}">Editar</button></td>
+        `;
+        tabla.appendChild(fila);
+        fila.querySelector('.editar_pasajero').addEventListener('click', () => cargar_detalle_pasajero(pasajero.dni));
+    });
+}
+
+$("#buscar_pasajero").addEventListener('input', function() {
+    const termino = this.value.trim().toLowerCase();
+    if (termino === '') {
+        renderizar_tabla_pasajeros(pasajeros_actuales);
+    } else {
+        const filtrados = pasajeros_actuales.filter(p => 
+            p.nombre.toLowerCase().includes(termino) || p.dni.includes(termino)
+        );
+        renderizar_tabla_pasajeros(filtrados);
+    }
+});
+
+async function cargar_detalle_pasajero(dni) {
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "pasajeros/obtener", dni })
+    });
+    const datos = await respuesta.json();
+    if (datos.exito) {
+        pasajero_seleccionado_dni = dni;
+        const p = datos.pasajero;
+        $("#pasajero_nombre").value = p.nombre;
+        $("#pasajero_dni").value = p.dni;
+        $("#pasajero_email").value = p.email || '';
+        $("#pasajero_celular").value = p.celular || '';
+        $("#pasajero_emergencia").value = p.celular_emergencia || '';
+        const contenedor = $("#pasajes_pasajero");
+        contenedor.innerHTML = '';
+        if (p.ventas && p.ventas.length > 0) {
+            p.ventas.forEach(venta => {
+                const div = document.createElement('div');
+                div.className = 'sale-card';
+                div.innerHTML = `<strong>${venta.viaje}</strong><br><span class="small">Venta ${venta.id_venta} · ${venta.fecha} · Total: $${venta.total}</span>`;
+                contenedor.appendChild(div);
+            });
+        } else {
+            contenedor.innerHTML = '<p>Sin pasajes registrados</p>';
+        }
+        $("#detalle_pasajero").classList.remove("hidden");
+    } else {
+        mostrar_aviso(datos.error || "Pasajero no encontrado", 'error');
+    }
+}
+
+$("#boton_guardar_pasajero").addEventListener('click', async () => {
+    if (!pasajero_seleccionado_dni) {
+        mostrar_aviso("Seleccione un pasajero", 'error');
+        return;
+    }
+    const datos = {
+        accion: "pasajeros/actualizar",
+        dni: pasajero_seleccionado_dni,
+        nombre: $("#pasajero_nombre").value.trim(),
+        email: $("#pasajero_email").value.trim(),
+        celular: $("#pasajero_celular").value.trim(),
+        celular_emergencia: $("#pasajero_emergencia").value.trim(),
+    };
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(datos)
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        mostrar_aviso("Pasajero actualizado", 'exito');
+        cargar_pasajeros();
+    } else {
+        mostrar_aviso(resultado.error || "Error al actualizar", 'error');
+    }
+});
+
+// ============================================================
+// ====== FUNCIONES DE CONSTRUCCIÓN DE ASIENTOS (EXISTENTE) ====
+// ============================================================
 
 function construir_asientos(contenedor_id, interactivo = false) {
-  const contenedor = $("#" + contenedor_id);
-  if (!contenedor) return;
-  contenedor.innerHTML = "";
-  for (let fila = 0; fila < 11; fila++) {
-    const fila_div = document.createElement("div");
-    fila_div.className = "seat-row";
-    for (let columna = 0; columna < 5; columna++) {
-      if (columna === 2) {
-        const pasillo = document.createElement("div");
-        pasillo.className = "aisle";
-        fila_div.appendChild(pasillo);
-        continue;
-      }
-      const numero = fila * 4 + (columna < 2 ? columna + 1 : columna - 1);
-      const asiento = document.createElement("button");
-      asiento.className = "seat";
-      asiento.textContent = String(numero).padStart(2, "0");
-      asiento.dataset.asiento = numero;
-      if (interactivo) {
-        if ([4, 11, 22, 31, 42, 7].includes(numero)) asiento.classList.add("sold");
-        else if ([9, 18].includes(numero)) asiento.classList.add("selected");
-        asiento.addEventListener("click", () => seleccionar_asiento(asiento));
-      }
-      fila_div.appendChild(asiento);
+    const contenedor = $("#" + contenedor_id);
+    if (!contenedor) return;
+    contenedor.innerHTML = "";
+    for (let fila = 0; fila < 11; fila++) {
+        const fila_div = document.createElement("div");
+        fila_div.className = "seat-row";
+        for (let columna = 0; columna < 5; columna++) {
+            if (columna === 2) {
+                const pasillo = document.createElement("div");
+                pasillo.className = "aisle";
+                fila_div.appendChild(pasillo);
+                continue;
+            }
+            const numero = fila * 4 + (columna < 2 ? columna + 1 : columna - 1);
+            const asiento = document.createElement("button");
+            asiento.className = "seat";
+            asiento.textContent = String(numero).padStart(2, "0");
+            asiento.dataset.asiento = numero;
+            if (interactivo) {
+                if ([4, 11, 22, 31, 42, 7].includes(numero)) asiento.classList.add("sold");
+                else if ([9, 18].includes(numero)) asiento.classList.add("selected");
+                asiento.addEventListener("click", () => seleccionar_asiento(asiento));
+            }
+            fila_div.appendChild(asiento);
+        }
+        contenedor.appendChild(fila_div);
     }
-    contenedor.appendChild(fila_div);
-  }
 }
 
 function estado_asiento(asiento) {
-  if (asiento.classList.contains("sold")) return "VENDIDO";
-  if (asiento.classList.contains("selected")) return "SELECCIONADO";
-  return "LIBRE";
+    if (asiento.classList.contains("sold")) return "VENDIDO";
+    if (asiento.classList.contains("selected")) return "SELECCIONADO";
+    return "LIBRE";
 }
 
 let asiento_actual = null;
 
 function seleccionar_asiento(asiento) {
-  asiento_actual = asiento;
-  const numero = asiento.dataset.asiento;
-  const estado = estado_asiento(asiento);
-  let contenido = `<div class="detail-line"><span>Número de asiento:</span><strong>${numero}</strong></div>
-                  <div class="detail-line"><span>Estado:</span><strong class="status ${estado.toLowerCase()}">${estado}</strong></div>`;
-  if (estado === "LIBRE") {
-    contenido += `<div class="actions"><button class="btn primary" id="boton_vender">Vender</button></div>
-                 <div id="formulario_venta" class="sale-form hidden">
-                   <h3>Nueva venta</h3>
-                   <button class="btn" data-placeholder>Agregar otro asiento</button>
-                   <div class="form-grid" style="margin-top:12px">
-                     <div class="field"><label>Cantidad de cuotas</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
-                     <div class="field"><label>Modo de pago</label><select><option>Efectivo</option><option>Transferencia</option></select></div>
-                   </div>
-                   <div class="actions"><button class="btn primary" data-placeholder>Confirmar venta</button></div>
-                 </div>`;
-  } else if (estado === "VENDIDO") {
-    contenido += `<div class="actions"><button class="btn" id="boton_ver_venta">Ver venta</button></div>`;
-  }
-  $("#detalle_asiento").innerHTML = contenido;
-  $("#boton_vender")?.addEventListener("click", () => $("#formulario_venta").classList.remove("hidden"));
-  $("#boton_ver_venta")?.addEventListener("click", () => mostrar_detalle_venta(numero));
-  vincular_placeholders($("#detalle_asiento"));
+    asiento_actual = asiento;
+    const numero = asiento.dataset.asiento;
+    const estado = estado_asiento(asiento);
+    let contenido = `<div class="detail-line"><span>Número de asiento:</span><strong>${numero}</strong></div>
+                    <div class="detail-line"><span>Estado:</span><strong class="status ${estado.toLowerCase()}">${estado}</strong></div>`;
+    if (estado === "LIBRE") {
+        contenido += `<div class="actions"><button class="btn primary" id="boton_vender">Vender</button></div>
+                     <div id="formulario_venta" class="sale-form hidden">
+                       <h3>Nueva venta</h3>
+                       <button class="btn" data-placeholder>Agregar otro asiento</button>
+                       <div class="form-grid" style="margin-top:12px">
+                         <div class="field"><label>Cantidad de cuotas</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+                         <div class="field"><label>Modo de pago</label><select><option>Efectivo</option><option>Transferencia</option></select></div>
+                       </div>
+                       <div class="actions"><button class="btn primary" data-placeholder>Confirmar venta</button></div>
+                     </div>`;
+    } else if (estado === "VENDIDO") {
+        contenido += `<div class="actions"><button class="btn" id="boton_ver_venta">Ver venta</button></div>`;
+    }
+    $("#detalle_asiento").innerHTML = contenido;
+    $("#boton_vender")?.addEventListener("click", () => $("#formulario_venta").classList.remove("hidden"));
+    $("#boton_ver_venta")?.addEventListener("click", () => mostrar_detalle_venta(numero));
+    vincular_placeholders($("#detalle_asiento"));
 }
 
 function mostrar_detalle_venta(numero) {
-  $("#detalle_asiento").innerHTML = `<div class="detail-box" style="padding:0;border:0">
-    <h3>Venta #00012${numero}</h3>
-    <div class="detail-line"><span>Número de pasajes:</span><strong>2</strong></div>
-    <div class="detail-line"><span>Monto total:</span><strong>$120.000</strong></div>
-    <div class="detail-line"><span>Cuotas:</span><strong>3</strong></div>
-    <div class="detail-line"><span>Cantidad abonada:</span><strong>$80.000</strong></div>
-    <div class="detail-line"><span>Cantidad adeudada:</span><strong>$40.000</strong></div>
-    <h3 style="margin-top:15px">Pasajero 1</h3>
-    <div class="small">Nombre: Juan Pérez<br>DNI: 12.345.678<br>Email: juan@email.com<br>Celular personal: 2983-555555<br>Celular emergencias: 2983-444444</div>
-    <h3 style="margin-top:15px">Pasajero 2</h3>
-    <div class="small">Nombre: María López<br>DNI: 23.456.789<br>Email: opcional<br>Celular personal: 2983-666666<br>Celular emergencias: 2983-777777</div>
-    <div class="actions"><button class="btn" data-placeholder>Imprimir pasajes</button></div>
-  </div>`;
-  vincular_placeholders($("#detalle_asiento"));
+    $("#detalle_asiento").innerHTML = `<div class="detail-box" style="padding:0;border:0">
+      <h3>Venta #00012${numero}</h3>
+      <div class="detail-line"><span>Número de pasajes:</span><strong>2</strong></div>
+      <div class="detail-line"><span>Monto total:</span><strong>$120.000</strong></div>
+      <div class="detail-line"><span>Cuotas:</span><strong>3</strong></div>
+      <div class="detail-line"><span>Cantidad abonada:</span><strong>$80.000</strong></div>
+      <div class="detail-line"><span>Cantidad adeudada:</span><strong>$40.000</strong></div>
+      <h3 style="margin-top:15px">Pasajero 1</h3>
+      <div class="small">Nombre: Juan Pérez<br>DNI: 12.345.678<br>Email: juan@email.com<br>Celular personal: 2983-555555<br>Celular emergencias: 2983-444444</div>
+      <h3 style="margin-top:15px">Pasajero 2</h3>
+      <div class="small">Nombre: María López<br>DNI: 23.456.789<br>Email: opcional<br>Celular personal: 2983-666666<br>Celular emergencias: 2983-777777</div>
+      <div class="actions"><button class="btn" data-placeholder>Imprimir pasajes</button></div>
+    </div>`;
+    vincular_placeholders($("#detalle_asiento"));
 }
 
 function actualizar_contadores_asientos() {
-  const asientos = $$(".seat");
-  let vendidos = 0, seleccionados = 0, libres = 0;
-  asientos.forEach(asiento => {
-    const estado = estado_asiento(asiento);
-    if (estado === "VENDIDO") vendidos++;
-    else if (estado === "SELECCIONADO") seleccionados++;
-    else libres++;
-  });
-  $("#contador_vendidos").textContent = vendidos;
-  $("#contador_seleccionados").textContent = seleccionados;
-  $("#contador_disponibles").textContent = libres;
-}
-
-// Datos de ejemplo de ventas
-const lista_ventas_ejemplo = [
-  { id: "000121", asientos: 2, total: "$120.000", cuotas: 3, abonado: "$80.000", deuda: "$40.000", vendedor: "Secretaria" },
-  { id: "000122", asientos: 1, total: "$60.000", cuotas: 1, abonado: "$60.000", deuda: "$0", vendedor: "Gaspar" },
-  { id: "000123", asientos: 3, total: "$180.000", cuotas: 3, abonado: "$60.000", deuda: "$120.000", vendedor: "Secretaria" },
-  { id: "000124", asientos: 2, total: "$120.000", cuotas: 2, abonado: "$120.000", deuda: "$0", vendedor: "Gaspar" }
-];
-
-function renderizar_ventas(filtro = "Todos") {
-  const lista = $("#lista_ventas");
-  if (!lista) return;
-  lista.innerHTML = "";
-  lista_ventas_ejemplo.filter(venta => filtro === "Todos" || venta.vendedor === filtro).forEach(venta => {
-    const tarjeta = document.createElement("div");
-    tarjeta.className = "sale-card";
-    tarjeta.dataset.vendedor = venta.vendedor;
-    tarjeta.innerHTML = `<div class="sale-header"><div class="sale-id">Venta #${venta.id}</div><span class="badge">${venta.vendedor}</span></div>
-      <div class="sale-grid">
-       <div class="sale-metric"><span>Cantidad de asientos</span><b>${venta.asientos}</b></div>
-       <div class="sale-metric"><span>Monto total</span><b>${venta.total}</b></div>
-       <div class="sale-metric"><span>Cuotas</span><b>${venta.cuotas}</b></div>
-       <div class="sale-metric"><span>Cantidad abonada</span><b>${venta.abonado}</b></div>
-       <div class="sale-metric"><span>Cantidad adeudada</span><b>${venta.deuda}</b></div>
-      </div>
-      <div class="actions"><button class="btn" data-placeholder>Ver más detalles</button><button class="btn danger" data-placeholder>Cancelar venta</button></div>`;
-    lista.appendChild(tarjeta);
-  });
-  vincular_placeholders(lista);
-}
-
-// Datos de ejemplo de pasajeros
-const lista_pasajeros_ejemplo = [
-  { nombre: "Juan Pérez", dni: "12345678", email: "juan@email.com", celular: "2983-555555", emergencia: "2983-444444", asiento: "17" },
-  { nombre: "María López", dni: "23456789", email: "", celular: "2983-666666", emergencia: "2983-777777", asiento: "18" },
-  { nombre: "Carlos Gómez", dni: "34567890", email: "carlos@email.com", celular: "2983-888888", emergencia: "2983-999999", asiento: "25" },
-  { nombre: "Ana Fernández", dni: "45678901", email: "ana@email.com", celular: "2983-111111", emergencia: "2983-222222", asiento: "26" }
-];
-
-function renderizar_pasajeros() {
-  const tabla = $("#tabla_pasajeros");
-  if (!tabla) return;
-  tabla.innerHTML = lista_pasajeros_ejemplo.map((pasajero, indice) => `<tr>
-   <td>${pasajero.nombre}</td><td>${pasajero.dni}</td><td>${pasajero.email || "—"}</td><td>${pasajero.celular}</td><td>${pasajero.emergencia}</td>
-   <td><button class="btn" onclick="mostrar_pasajero(${indice})">Editar</button></td></tr>`).join("");
-}
-
-function mostrar_pasajero(indice) {
-  const pasajero = lista_pasajeros_ejemplo[indice];
-  $("#detalle_pasajero").classList.add("visible");
-  $("#pasajero_nombre").value = pasajero.nombre;
-  $("#pasajero_dni").value = pasajero.dni;
-  $("#pasajero_email").value = pasajero.email;
-  $("#pasajero_celular").value = pasajero.celular;
-  $("#pasajero_emergencia").value = pasajero.emergencia;
-  $("#pasajes_pasajero").innerHTML = `<div class="sale-card"><strong>Leon XIV en Lujan</strong><br><span class="small">Asiento ${pasajero.asiento} · XX/XX/XXXX · <span class="badge paid">Vendido</span></span></div>`;
+    const asientos = $$(".seat");
+    let vendidos = 0, seleccionados = 0, libres = 0;
+    asientos.forEach(asiento => {
+        const estado = estado_asiento(asiento);
+        if (estado === "VENDIDO") vendidos++;
+        else if (estado === "SELECCIONADO") seleccionados++;
+        else libres++;
+    });
+    $("#contador_vendidos").textContent = vendidos;
+    $("#contador_seleccionados").textContent = seleccionados;
+    $("#contador_disponibles").textContent = libres;
 }
 
 function vincular_placeholders(raiz = document) {
-  raiz.querySelectorAll("[data-placeholder]").forEach(boton => {
-    if (!boton.dataset.vinculado) {
-      boton.dataset.vinculado = "1";
-      boton.addEventListener("click", evento => {
-        evento.preventDefault();
-        mostrar_aviso("Función en desarrollo");
-      });
-    }
-  });
+    raiz.querySelectorAll("[data-placeholder]").forEach(boton => {
+        if (!boton.dataset.vinculado) {
+            boton.dataset.vinculado = "1";
+            boton.addEventListener("click", evento => {
+                evento.preventDefault();
+                mostrar_aviso("Función en desarrollo", 'info');
+            });
+        }
+    });
 }
 
-// Eventos de pestañas de filtros
-$("#filtro_vendedor").addEventListener("change", e => renderizar_ventas(e.target.value));
-/*$("#selector_terminal").addEventListener("change", e => {
-  const ventas_por_terminal = { Secretaria: 37, Gaspar: 24 };
-  $("#ventas_terminal").textContent = ventas_por_terminal[e.target.value] || 0;
-});*/
+// ============================================================
+// ====== INICIALIZACIÓN FINAL =================================
+// ============================================================
+
+$("#aplicacion").classList.add("hidden");
+$("#pantalla_login").classList.remove("hidden");

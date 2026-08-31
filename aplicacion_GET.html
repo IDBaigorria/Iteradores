@@ -317,15 +317,20 @@
         </div>
         <div id="lista_micros_viaje"></div>
 
-        <!-- Pasaje del micro seleccionado (único bloque, sin duplicados) -->
-      <div id="pasaje_micro_viaje" class="panel hidden" style="margin-top:15px;">
-          <h4>Pasaje del micro</h4>
-          <div id="foto_micro_viaje" style="margin-bottom:10px;"></div>
-          <div class="pasaje-layout">
-              <div id="croquis_pasaje_micro"></div>
-              <div id="info_asiento_viaje" class="panel hidden" style="padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
-          </div>
-      </div>
+        <!-- Pasaje del micro seleccionado -->
+        <div id="pasaje_micro_viaje" class="panel hidden" style="margin-top:15px;">
+            <h4>Pasaje del micro</h4>
+            <div id="foto_micro_viaje" style="margin-bottom:10px;"></div>
+            <div class="pasaje-layout">
+                <div id="croquis_pasaje_micro"></div>
+                <div id="info_asiento_viaje" class="panel hidden" style="padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
+                <div id="formulario_confirmacion_venta" class="panel hidden" style="padding:15px; border:1px solid #ddd; border-radius:6px; max-width:500px;"></div>
+            </div>
+            <!-- Botón para confirmar venta (solo terminal) -->
+            <div id="contenedor_boton_confirmar_venta" class="hidden" style="margin-top:15px; text-align:right;">
+                <button class="btn primary" id="boton_confirmar_venta">Confirmar venta</button>
+            </div>
+        </div>
 
         <div id="seccion_terminales_viaje">
           <div class="row" style="margin-top:15px;">
@@ -379,14 +384,13 @@
         <h2>Ventas realizadas</h2>
         <div class="row">
           <label for="selector_viaje_vendido">Viaje:</label>
-          <select id="selector_viaje_vendido"><option>Leon XIV en Lujan</option></select>
+          <select id="selector_viaje_vendido"><option value="todos">Todos</option></select>
           <label for="filtro_vendedor">Vendedor:</label>
-          <select id="filtro_vendedor"><option>Todos</option><option>Secretaria</option><option>Gaspar</option></select>
+          <select id="filtro_vendedor"><option value="Todos">Todos</option></select>
         </div>
       </div>
       <div class="panel">
         <div class="sales-list" id="lista_ventas"></div>
-        <button class="btn" style="margin-top:15px" data-placeholder>Imprimir ventas</button>
       </div>
     </section>
 
@@ -396,22 +400,23 @@
         <h2>Pasajeros / Clientes</h2>
         <div class="customer-layout">
           <div class="table-wrap">
+            <input type="text" id="buscar_pasajero" placeholder="Buscar por nombre o DNI..." style="margin-bottom:10px; width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
             <table class="data-table">
               <thead><tr><th>Nombre</th><th>DNI</th><th>Email</th><th>Celular personal</th><th>Emergencia</th><th>Acción</th></tr></thead>
               <tbody id="tabla_pasajeros"></tbody>
             </table>
           </div>
-          <div id="detalle_pasajero" class="customer-detail">
+          <div id="detalle_pasajero" class="customer-detail hidden">
             <div class="detail-box">
               <h3>Datos del pasajero</h3>
               <div class="form-grid">
                 <div class="field full"><label>Nombre</label><input id="pasajero_nombre"></div>
-                <div class="field"><label>DNI</label><input id="pasajero_dni"></div>
+                <div class="field"><label>DNI (no editable)</label><input id="pasajero_dni" disabled></div>
                 <div class="field"><label>Email (opcional)</label><input id="pasajero_email"></div>
                 <div class="field"><label>Celular personal</label><input id="pasajero_celular"></div>
                 <div class="field"><label>Celular emergencias</label><input id="pasajero_emergencia"></div>
               </div>
-              <button class="btn primary" style="margin-top:12px" data-placeholder>Guardar</button>
+              <button class="btn primary" style="margin-top:12px" id="boton_guardar_pasajero">Guardar cambios</button>
               <h3 style="margin-top:20px">Pasajes vendidos</h3>
               <div id="pasajes_pasajero"></div>
             </div>
@@ -420,6 +425,61 @@
       </div>
     </section>
   </main>
+
+  <!-- Modal para confirmar venta -->
+  <div id="modal_confirmar_venta" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Confirmar venta</h3>
+        <button class="btn" id="cerrar_modal_venta">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="resumen_venta"></div>
+        <div class="form-grid" style="margin-top:15px;">
+          <div class="field">
+            <label>Método de pago</label>
+            <select id="metodo_pago">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+            </select>
+          </div>
+          <div class="field" id="campo_cuotas">
+            <label>Cantidad de cuotas (1-3)</label>
+            <select id="cuotas_venta">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>
+          </div>
+          <div class="field" id="campo_pago_inicial">
+            <label>Cuotas pagadas ahora</label>
+            <select id="pago_inicial">
+              <option value="0">0</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>
+          </div>
+        </div>
+        <div id="datos_comprador" style="margin-top:15px;">
+          <h4>Comprador</h4>
+          <div class="form-grid">
+            <div class="field"><label>DNI</label><input id="comprador_dni"></div>
+            <div class="field"><label>Nombre</label><input id="comprador_nombre"></div>
+            <div class="field"><label>Email</label><input id="comprador_email"></div>
+            <div class="field"><label>Celular</label><input id="comprador_celular"></div>
+            <div class="field"><label>Emergencia</label><input id="comprador_emergencia"></div>
+          </div>
+          <button class="btn small" id="usar_pasajero_como_comprador">Usar primer pasajero</button>
+        </div>
+        <div id="pasajeros_venta" style="margin-top:20px;"></div>
+        <div class="actions" style="margin-top:20px;">
+          <button class="btn primary" id="confirmar_venta">Confirmar</button>
+          <button class="btn" id="cancelar_venta_modal">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="footer-note">Prototipo visual — datos ficticios — funciones administrativas en desarrollo.</div>
 </div>

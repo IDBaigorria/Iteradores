@@ -425,6 +425,109 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     responder_json(['exito' => false, 'error' => 'Subacción de viajes no válida']);
             }
             break;
+        case 'ventas':
+            switch ($subaccion) {
+                case 'confirmar':
+                    $nombre_terminal = $post['nombre_terminal'] ?? '';
+                    $metodo_pago = $post['metodo_pago'] ?? 'efectivo';
+                    $cuotas = (int)($post['cuotas'] ?? 1);
+                    $pago_inicial = (int)($post['pago_inicial'] ?? 0);
+                    $comprador_dni = $post['comprador_dni'] ?? '';
+                    $pasajeros_json = $post['pasajeros'] ?? '[]';
+                    $pasajeros_por_asiento = json_decode($pasajeros_json, true);
+                    if (!is_array($pasajeros_por_asiento)) $pasajeros_por_asiento = [];
+
+                    if (empty($nombre_terminal)) {
+                        responder_json(['exito' => false, 'error' => 'Terminal no especificada']);
+                    }
+                    $resultado = confirmar_venta_actual($nombre_terminal, $metodo_pago, $cuotas, $pago_inicial, $comprador_dni, $pasajeros_por_asiento);
+                    responder_json($resultado);
+                    break;
+
+                case 'listar':
+                    $tipo = $post['tipo'] ?? 'dueno';
+                    $nombre = $post['nombre'] ?? '';
+                    if (empty($nombre)) {
+                        responder_json(['exito' => false, 'error' => 'Nombre no especificado']);
+                    }
+                    if ($tipo === 'dueno') {
+                        $ventas = listar_ventas_por_dueno($nombre);
+                    } else {
+                        $ventas = listar_ventas_por_terminal($nombre);
+                    }
+                    responder_json(['exito' => true, 'ventas' => $ventas]);
+                    break;
+
+                case 'obtener':
+                    $id_venta = $post['id_venta'] ?? '';
+                    if (empty($id_venta)) {
+                        responder_json(['exito' => false, 'error' => 'ID de venta no especificado']);
+                    }
+                    $venta = obtener_venta_por_id($id_venta);
+                    if ($venta) {
+                        responder_json(['exito' => true, 'venta' => $venta]);
+                    } else {
+                        responder_json(['exito' => false, 'error' => 'Venta no encontrada']);
+                    }
+                    break;
+
+                case 'cancelar':
+                    $id_venta = $post['id_venta'] ?? '';
+                    if (empty($id_venta)) {
+                        responder_json(['exito' => false, 'error' => 'ID de venta no especificado']);
+                    }
+                    $resultado = cancelar_venta($id_venta);
+                    responder_json($resultado);
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de ventas no válida']);
+            }
+            break;
+
+        case 'pasajeros':
+            switch ($subaccion) {
+                case 'listar':
+                    responder_json(['exito' => true, 'pasajeros' => listar_pasajeros()]);
+                    break;
+
+                case 'buscar':
+                    $termino = $post['termino'] ?? '';
+                    responder_json(['exito' => true, 'pasajeros' => buscar_pasajeros($termino)]);
+                    break;
+
+                case 'obtener':
+                    $dni = $post['dni'] ?? '';
+                    if (empty($dni)) {
+                        responder_json(['exito' => false, 'error' => 'DNI no especificado']);
+                    }
+                    $pasajero = obtener_pasajero_por_dni($dni);
+                    if ($pasajero) {
+                        responder_json(['exito' => true, 'pasajero' => $pasajero]);
+                    } else {
+                        responder_json(['exito' => false, 'error' => 'Pasajero no encontrado']);
+                    }
+                    break;
+
+                case 'actualizar':
+                    $dni = $post['dni'] ?? '';
+                    if (empty($dni)) {
+                        responder_json(['exito' => false, 'error' => 'DNI no especificado']);
+                    }
+                    $datos = [
+                        'nombre' => $post['nombre'] ?? '',
+                        'email' => $post['email'] ?? '',
+                        'celular' => $post['celular'] ?? '',
+                        'celular_emergencia' => $post['celular_emergencia'] ?? '',
+                    ];
+                    $resultado = actualizar_pasajero($dni, $datos);
+                    responder_json($resultado);
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de pasajeros no válida']);
+            }
+            break;
         default:
             responder_json(['exito' => false, 'error' => 'Módulo no reconocido']);
     }

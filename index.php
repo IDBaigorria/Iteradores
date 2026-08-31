@@ -80,7 +80,15 @@ require_once __DIR__ . '/Aplicacion/Autenticacion/Autenticacion.php';
 require_once __DIR__ . '/Aplicacion/Empresas/Empresa.php';
 require_once __DIR__ . '/Aplicacion/Vehiculos/Vehiculo.php';
 require_once __DIR__ . '/Aplicacion/Viajes/Viaje.php';
+require_once __DIR__ . '/Aplicacion/Ventas/Venta.php';
+require_once __DIR__ . '/Aplicacion/Pasajeros/Pasajero.php';
 require_once __DIR__ . '/Aplicacion/Enrutador.php';
+// ==== Bloque temporal para pruebas de árbol ====
+if (isset($_GET['probar_arbol'])) {
+    require_once __DIR__ . '/miscelaneas/Arbol.php';
+    require_once __DIR__ . '/miscelaneas/pruebas_arbol.php';
+    exit;
+}
 
 // Crear usuario administrador si no existe
 if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
