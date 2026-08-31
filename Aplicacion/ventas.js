@@ -4,6 +4,7 @@
  */
 
 let ventas_actuales = [];
+let ultima_venta_id = null; // añadido
 
 // Mostrar botón "Vender" si hay asientos seleccionados propios
 function mostrar_boton_confirmar_venta() {
@@ -286,6 +287,7 @@ async function confirmar_venta_modal() {
         const resultado = await respuesta.json();
         if (resultado.exito) {
             mostrar_aviso("Venta confirmada correctamente", 'exito');
+            ultima_venta_id = resultado.id_venta;
         } else {
             mostrar_aviso(resultado.error || "Error al confirmar venta", 'error');
         }
@@ -299,7 +301,25 @@ async function confirmar_venta_modal() {
         await solicitar_estado_asientos();
         mostrar_boton_confirmar_venta();
         await actualizar_detalle_viaje_actual();
+        if (ultima_venta_id) {
+            mostrar_opciones_impresion(ultima_venta_id);
+        }
     }
+}
+
+function mostrar_opciones_impresion(id_venta) {
+    const contenedor = $("#opciones_impresion");
+    if (!contenedor) return;
+    contenedor.classList.remove("hidden");
+    $("#btn_imprimir_pasajes").onclick = () => {
+        window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id_venta}`, '_blank');
+    };
+    $("#btn_imprimir_cupon").onclick = () => {
+        window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${id_venta}`, '_blank');
+    };
+    $("#btn_cerrar_opciones").onclick = () => {
+        contenedor.classList.add("hidden");
+    };
 }
 
 // ====== Panel Vendidos ======

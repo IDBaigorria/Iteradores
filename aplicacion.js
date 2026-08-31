@@ -48,6 +48,7 @@ let estados_asientos_actuales = [];
 let venta_form_abierto = false;
 let tipo_aviso_actual = 'info';
 let operacion_asiento_en_curso = false;
+//let ultima_venta_id = null;
 
 // Función de avisos con tipos visuales
 function mostrar_aviso(mensaje, tipo = 'info') {

@@ -495,6 +495,21 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
         }
     }
     $datos['asientos'] = $asientos;
+    // Datos adicionales del viaje y micro
+    $nodo_viaje = $nodo_venta->adyacente('viaje');
+    if ($nodo_viaje) {
+        $datos['viaje_visible'] = $nodo_viaje->adyacente('nombre') ? $nodo_viaje->adyacente('nombre')->dato() : $nodo_viaje->dato();
+        $datos['fecha'] = $nodo_viaje->adyacente('fecha') ? $nodo_viaje->adyacente('fecha')->dato() : '';
+        $datos['hora'] = $nodo_viaje->adyacente('hora') ? $nodo_viaje->adyacente('hora')->dato() : '';
+        $datos['origen'] = $nodo_viaje->adyacente('origen') ? $nodo_viaje->adyacente('origen')->dato() : '';
+        $datos['destino'] = $nodo_viaje->adyacente('destino') ? $nodo_viaje->adyacente('destino')->dato() : '';
+    }
+
+    $nodo_micro = $nodo_venta->adyacente('micro');
+    if ($nodo_micro) {
+        $datos['empresa'] = $nodo_micro->adyacente('empresa') ? $nodo_micro->adyacente('empresa')->dato() : '';
+        $datos['patente'] = $nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '';
+    }
     return $datos;
 }
 

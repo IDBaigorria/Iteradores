@@ -105,6 +105,13 @@ if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
     Controlador::guardar($nombre_app);
 }
 
+// Manejo de impresión
+if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
+    require_once __DIR__ . '/Aplicacion/Impresion/Impresion.php';
+    generar_impresion($_GET['tipo'] ?? '', $_GET['id_venta'] ?? '');
+    exit;
+}
+
 // Enrutar según método
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     header('Content-Type: application/json; charset=utf-8');
