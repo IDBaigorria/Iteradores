@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.16)
+ * ## Estructura de nodos actual (v1.5piloto.19)
  *
  * ### Nodos raíz especiales
  *
@@ -72,6 +72,11 @@
  * | `celular`           | Nodo con dato string: celular personal.               |
  * | `celular_emergencia`| Nodo con dato string: celular de emergencia.          |
  * | `fecha_nacimiento`  | Nodo con dato string: fecha de nacimiento (YYYY-MM-DD). |
+ * | `ficha_salud`       | Nodo contenedor con dato vacío (opcional).            |
+ * |                     | ├─ `enfermedades` → Nodo raíz de lista (contenedor).   |
+ * |                     | ├─ `medicamentos` → Nodo raíz de lista (contenedor).   |
+ * |                     | └─ `impedimentos` → Nodo raíz de lista (contenedor).   |
+ * Cada raíz almacena sus ítems como hijos en árbol (hmi/hd). Cada nodo hoja tiene dato string con el texto del ítem.
  *
  * ### Nodo Empresa
  *
@@ -238,7 +243,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.16
+ * @version   1.5piloto.19
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

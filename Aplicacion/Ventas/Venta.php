@@ -103,6 +103,7 @@ function actualizar_contadores_micro(Nodo $nodo_micro): void {
     $nodo_micro->adyacente('vendidos')?->_dato((string)$vendidos);
 }
 
+
 /**
  * Confirma la venta actual de una terminal, creando una venta persistente.
  *
@@ -115,6 +116,8 @@ function actualizar_contadores_micro(Nodo $nodo_micro): void {
  * @param string $comprador_email Email del comprador (opcional).
  * @param string $comprador_celular Celular del comprador.
  * @param array  $pasajeros_por_asiento Array de pasajeros por asiento.
+ * @param string|null $fecha_hora Fecha y hora en formato "DD/MM/YYYY HH:MM". Si es null se usará la fecha/hora actual del servidor.
+ * @param string|null $fecha_pago Fecha y hora del último pago en mismo formato. Si es null se usará $fecha_hora.
  * @return array Resultado con éxito o error.
  */
 function confirmar_venta_actual(
@@ -126,7 +129,9 @@ function confirmar_venta_actual(
     string $comprador_nombre,
     string $comprador_email,
     string $comprador_celular,
-    array $pasajeros_por_asiento
+    array $pasajeros_por_asiento,
+    ?string $fecha_hora = null,
+    ?string $fecha_pago = null
 ): array {
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
@@ -230,7 +235,19 @@ function confirmar_venta_actual(
     $nodo_venta->_adyacente_en($nodo_terminal, 'terminal');
     $nodo_venta->_adyacente_en($nodo_viaje, 'viaje');
     $nodo_venta->_adyacente_en($nodo_micro, 'micro');
-    $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)time()), 'fecha_hora');
+
+    // Usar fecha enviada desde frontend si está disponible; si no, usar fecha actual del servidor
+    if ($fecha_hora === null || trim($fecha_hora) === '') {
+        $fecha_hora = date('d/m/Y H:i');
+    }
+    $nodo_venta->_adyacente_en(Nodo::crear_con_dato($fecha_hora), 'fecha_hora');
+
+    // Fecha de último pago: si no se envía, se usa la misma que fecha_hora
+    if ($fecha_pago === null || trim($fecha_pago) === '') {
+        $fecha_pago = $fecha_hora;
+    }
+    $nodo_venta->_adyacente_en(Nodo::crear_con_dato($fecha_pago), 'fecha_ultimo_pago');
+
     $nodo_venta->_adyacente_en(Nodo::crear_con_dato($metodo_pago), 'metodo_pago');
     $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)$total), 'total');
     $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)$cuotas), 'cuotas');
@@ -398,20 +415,16 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
     $nombre_viaje = $nodo_viaje ? $nodo_viaje->dato() : '';
     $nombre_micro = $nodo_micro ? ($nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '') : '';
     $total = $nodo_total ? $nodo_total->dato() : '0';
+
     $fecha = '';
     if ($nodo_fecha) {
         $valor_fecha = $nodo_fecha->dato();
+        // Si es numérico, es un timestamp antiguo; lo convertimos con la zona horaria configurada.
         if (is_numeric($valor_fecha)) {
-            // Es un timestamp Unix: restar 3 horas para Argentina y formatear
-            $fecha = date('d/m/Y H:i', (int)$valor_fecha - 3 * 3600);
+            $fecha = date('d/m/Y H:i', (int)$valor_fecha);
         } else {
-            // Intentar convertir texto a timestamp
-            $timestamp = strtotime($valor_fecha);
-            if ($timestamp !== false) {
-                $fecha = date('d/m/Y H:i', $timestamp - 3 * 3600);
-            } else {
-                $fecha = 'Fecha no disponible';
-            }
+            // Ya es una cadena formateada desde el frontend, se devuelve tal cual.
+            $fecha = $valor_fecha;
         }
     }
 
@@ -467,12 +480,17 @@ function obtener_venta_por_id(string $id_venta): ?array {
  * Formatea una venta con todos sus detalles.
  */
 function formatear_venta_completa(Nodo $nodo_venta): array {
+    // 'fecha' aquí es la fecha de venta (timestamp formateado o string según corresponda)
     $datos = formatear_venta_resumida($nodo_venta);
     $datos['metodo_pago'] = $nodo_venta->adyacente('metodo_pago') ? $nodo_venta->adyacente('metodo_pago')->dato() : '';
     $datos['cuotas'] = $nodo_venta->adyacente('cuotas') ? $nodo_venta->adyacente('cuotas')->dato() : '1';
     $datos['pagado'] = $nodo_venta->adyacente('pagado') ? $nodo_venta->adyacente('pagado')->dato() : '0';
     $datos['cuotas_restantes'] = $nodo_venta->adyacente('cuotas_restantes') ? $nodo_venta->adyacente('cuotas_restantes')->dato() : '0';
 
+    // Fecha de último pago
+    $datos['fecha_pago'] = $nodo_venta->adyacente('fecha_ultimo_pago') ? $nodo_venta->adyacente('fecha_ultimo_pago')->dato() : '';
+
+    // Comprador
     $nodo_comprador = $nodo_venta->adyacente('comprador');
     if ($nodo_comprador) {
         $datos['comprador'] = [
@@ -485,6 +503,7 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
         ];
     }
 
+    // Asientos
     $asientos = [];
     $cabeza_asientos = $nodo_venta->adyacente('asientos');
     if ($cabeza_asientos) {
@@ -514,16 +533,18 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
         }
     }
     $datos['asientos'] = $asientos;
-    // Datos adicionales del viaje y micro
+
+    // Datos del viaje: se usa un campo separado para la fecha del viaje
     $nodo_viaje = $nodo_venta->adyacente('viaje');
     if ($nodo_viaje) {
         $datos['viaje_visible'] = $nodo_viaje->adyacente('nombre') ? $nodo_viaje->adyacente('nombre')->dato() : $nodo_viaje->dato();
-        $datos['fecha'] = $nodo_viaje->adyacente('fecha') ? $nodo_viaje->adyacente('fecha')->dato() : '';
+        $datos['fecha_viaje'] = $nodo_viaje->adyacente('fecha') ? $nodo_viaje->adyacente('fecha')->dato() : '';
         $datos['hora'] = $nodo_viaje->adyacente('hora') ? $nodo_viaje->adyacente('hora')->dato() : '';
         $datos['origen'] = $nodo_viaje->adyacente('origen') ? $nodo_viaje->adyacente('origen')->dato() : '';
         $datos['destino'] = $nodo_viaje->adyacente('destino') ? $nodo_viaje->adyacente('destino')->dato() : '';
     }
 
+    // Datos del micro
     $nodo_micro = $nodo_venta->adyacente('micro');
     if ($nodo_micro) {
         $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
@@ -531,6 +552,7 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
         $datos['empresa'] = $nodo_micro->adyacente('empresa') ? $nodo_micro->adyacente('empresa')->dato() : '';
         $datos['patente'] = $nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '';
     }
+
     return $datos;
 }
 

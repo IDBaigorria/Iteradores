@@ -178,14 +178,16 @@ function imprimir_pasajes(array $venta): void {
 
 function imprimir_cupon(array $venta): void {
     $codigo_venta = $venta['id_venta'] ?? '';
-    $nombre_viaje = $venta['nombre_viaje_visible'] ?? $venta['viaje'] ?? '';
+    // Usar nombre visible del viaje si está disponible, si no el identificador
+    $nombre_viaje = $venta['viaje_visible'] ?? $venta['viaje'] ?? '';
     $metodo_pago = $venta['metodo_pago'] ?? '';
     $total = $venta['total'] ?? '0';
     $pagado = $venta['pagado'] ?? '0';
     $cuotas_restantes = $venta['cuotas_restantes'] ?? '0';
     $pendiente = number_format((float)$total - (float)$pagado, 2, '.', '');
-    $fecha_venta = $venta['fecha'] ?? ''; // viene de formatear_venta_completa
-    $fecha_pago = date('d/m/Y H:i');
+    // Ahora $venta['fecha'] es la fecha de venta (ya formateada)
+    $fecha_venta = $venta['fecha'] ?? '';
+    $fecha_pago = $venta['fecha_pago'] ?? '';
     $logo_ruta = './Aplicacion/LogoPeque.png';
 
     echo '<!DOCTYPE html>';
@@ -297,8 +299,9 @@ function imprimir_cupon(array $venta): void {
     echo '<div class="seccion">';
     echo '<h3>Datos de la venta</h3>';
     echo '<div class="fila"><strong>Cod. de Venta:</strong> <span>' . htmlspecialchars($codigo_venta) . '</span></div>';
-    echo $fecha_venta;
-    echo '<div class="fila"><strong>Fecha de venta:</strong> <span>' . htmlspecialchars($fecha_venta) . '</span></div>';
+    if (!empty($fecha_venta)) {
+        echo '<div class="fila"><strong>Fecha de venta:</strong> <span>' . htmlspecialchars($fecha_venta) . '</span></div>';
+    }
     if (!empty($venta['comprador'])) {
         echo '<div class="fila"><strong>Comprador:</strong> <span>' . htmlspecialchars($venta['comprador']['nombre']) . '</span></div>';
         echo '<div class="fila"><strong>DNI:</strong> <span>' . htmlspecialchars($venta['comprador']['dni']) . '</span></div>';
@@ -310,7 +313,7 @@ function imprimir_cupon(array $venta): void {
     echo '<h3>Datos del pago</h3>';
     echo '<div class="fila"><strong>Fecha de pago:</strong> <span>' . htmlspecialchars($fecha_pago) . '</span></div>';
     echo '<div class="fila"><strong>Método de pago:</strong> <span>' . htmlspecialchars($metodo_pago) . '</span></div>';
-    echo '<div class="fila"><strong>Cantidad:</strong> <span>$' . htmlspecialchars(number_format((float)$pagado, 2, '.', '')) . '</span></div>'; // pago actual
+    echo '<div class="fila"><strong>Cantidad:</strong> <span>$' . htmlspecialchars(number_format((float)$pagado, 2, '.', '')) . '</span></div>';
     echo '<div class="fila"><strong>Total:</strong> <span>$' . htmlspecialchars(number_format((float)$total, 2, '.', '')) . '</span></div>';
     echo '<div class="fila"><strong>Total abonado:</strong> <span>$' . htmlspecialchars(number_format((float)$pagado, 2, '.', '')) . '</span></div>';
     echo '<div class="fila"><strong>Pendiente:</strong> <span>$' . htmlspecialchars($pendiente) . '</span></div>';

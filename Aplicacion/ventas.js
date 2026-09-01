@@ -298,15 +298,9 @@ function agregarInputSalud(contenedor, tipo, index) {
 }
 
 // Confirmar la venta
+// Confirmar la venta
 async function confirmar_venta_modal() {
-    // Forzar actualización de todos los inputs de fecha
-    document.querySelectorAll('input[type="date"]').forEach(input => {
-        input.blur();
-        input.dispatchEvent(new Event('change'));
-    });
-    if (document.activeElement && document.activeElement.blur) {
-        document.activeElement.blur();
-    }
+    // Ya no se fuerzan eventos de blur/change; se lee directamente el valor
 
     // Obtener datos del comprador
     const comprador_dni = $("#comprador_dni").value.trim();
@@ -335,7 +329,7 @@ async function confirmar_venta_modal() {
         return;
     }
 
-    // Recopilar pasajeros (usando IDs únicos)
+    // Recopilar pasajeros
     const pasajeros = [];
     const cantidadPasajeros = document.querySelectorAll('[id^="pasajero_dni_"]').length;
 
@@ -346,10 +340,13 @@ async function confirmar_venta_modal() {
         const celular = document.getElementById(`pasajero_celular_${i}`).value.trim();
         const celular_emergencia = document.getElementById(`pasajero_emergencia_${i}`).value.trim();
         const fechaInput = document.getElementById(`pasajero_fecha_nacimiento_${i}`);
-        let fecha_nacimiento = document.getElementById(`pasajero_fecha_nacimiento_${i}`).value;
-        if (!fecha_nacimiento) {
-            const fechaInput = document.getElementById(`pasajero_fecha_nacimiento_${i}`);
-            if (fechaInput && fechaInput.valueAsDate) {
+
+        let fecha_nacimiento = '';
+        if (fechaInput) {
+            // Intentar obtener el valor directamente
+            fecha_nacimiento = fechaInput.value;
+            // Si está vacío, intentar con valueAsDate
+            if (!fecha_nacimiento && fechaInput.valueAsDate) {
                 const d = fechaInput.valueAsDate;
                 const year = d.getFullYear();
                 const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -389,7 +386,9 @@ async function confirmar_venta_modal() {
         });
     }
 
-    // Crear objeto de datos para enviar
+    const fecha_actual = formatear_fecha_hora_actual();
+    console.log('fecha_hora a enviar:', fecha_actual);
+
     const datos = {
         accion: "ventas/confirmar",
         nombre_terminal: usuario_actual.nombre_usuario,
@@ -400,7 +399,8 @@ async function confirmar_venta_modal() {
         comprador_nombre,
         comprador_email,
         comprador_celular,
-        pasajeros: JSON.stringify(pasajeros)
+        pasajeros: JSON.stringify(pasajeros),
+        fecha_hora: fecha_actual   // <-- usar la constante
     };
 
     try {
@@ -570,4 +570,14 @@ async function cancelar_venta(id_venta) {
     } else {
         mostrar_aviso(resultado.error || "Error al cancelar", 'error');
     }
+}
+
+function formatear_fecha_hora_actual() {
+    const ahora = new Date();
+    const dia = String(ahora.getDate()).padStart(2, '0');
+    const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+    const anio = ahora.getFullYear();
+    const horas = String(ahora.getHours()).padStart(2, '0');
+    const minutos = String(ahora.getMinutes()).padStart(2, '0');
+    return `${dia}/${mes}/${anio} ${horas}:${minutos}`;
 }

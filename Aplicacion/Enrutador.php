@@ -440,9 +440,14 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $pasajeros_por_asiento = json_decode($pasajeros_json, true);
                     if (!is_array($pasajeros_por_asiento)) $pasajeros_por_asiento = [];
 
+                    // Leer fechas enviadas desde frontend
+                    $fecha_hora = $post['fecha_hora'] ?? '';
+                    $fecha_pago = $post['fecha_pago'] ?? '';
+
                     if (empty($nombre_terminal)) {
                         responder_json(['exito' => false, 'error' => 'Terminal no especificada']);
                     }
+
                     $resultado = confirmar_venta_actual(
                         $nombre_terminal,
                         $metodo_pago,
@@ -452,24 +457,12 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         $comprador_nombre,
                         $comprador_email,
                         $comprador_celular,
-                        $pasajeros_por_asiento
+                        $pasajeros_por_asiento,
+                        $fecha_hora,   // string
+                        $fecha_pago    // string
                     );
                     responder_json($resultado);
                     break;
-                case 'listar':
-                    $tipo = $post['tipo'] ?? 'dueno';
-                    $nombre = $post['nombre'] ?? '';
-                    if (empty($nombre)) {
-                        responder_json(['exito' => false, 'error' => 'Nombre no especificado']);
-                    }
-                    if ($tipo === 'dueno') {
-                        $ventas = listar_ventas_por_dueno($nombre);
-                    } else {
-                        $ventas = listar_ventas_por_terminal($nombre);
-                    }
-                    responder_json(['exito' => true, 'ventas' => $ventas]);
-                    break;
-
                 case 'obtener':
                     $id_venta = $post['id_venta'] ?? '';
                     if (empty($id_venta)) {
