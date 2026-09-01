@@ -104,6 +104,12 @@ function abrir_modal_confirmacion_venta() {
 
     generar_formularios_pasajeros(asientos_seleccionados);
 
+    // Asegurar que el select de método de pago esté habilitado
+    $("#metodo_pago").disabled = false;
+    // Resetear cualquier estado previo
+    venta_form_abierto = true;
+    $("#contenedor_boton_confirmar_venta").classList.add("hidden");
+
     // Eventos para los nuevos elementos
     $("#metodo_pago").addEventListener("change", actualizar_visibilidad_cuotas);
     $("#cuotas_venta").addEventListener("change", function() {
@@ -180,22 +186,124 @@ function generar_formularios_pasajeros(asientos) {
                 <div class="field"><label>Celular *</label><input id="pasajero_celular_${index}" value=""></div>
                 <div class="field"><label>Celular Emergencia *</label><input id="pasajero_emergencia_${index}" value=""></div>
                 <div class="field"><label>Fecha de nacimiento *</label><input type="date" id="pasajero_fecha_nacimiento_${index}" value=""></div>
-                <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
-                    <label style="margin:0;">¿Padece algún problema de salud?</label>
-                    <button type="button" class="btn" id="btn_ficha_salud_${index}" data-index="${index}">Anexar ficha de salud</button>
+            </div>
+            <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
+                <label style="margin:0;">¿Padece algún problema de salud?</label>
+                <button type="button" class="btn" id="btn_ficha_salud_${index}" data-index="${index}">Anexar ficha de salud</button>
+            </div>
+            <div id="ficha_salud_${index}" style="display:none; margin-top:10px;">
+                <h5>Datos de salud</h5>
+                <div>
+                    <label>¿Padece alguna enfermedad crónica o tiene secuelas de alguna que ha tenido?</label>
+                    <input type="checkbox" class="check_enfermedad" data-index="${index}">
+                    <div class="enfermedades_container" data-index="${index}" style="display:none;"></div>
+                </div>
+                <div>
+                    <label>¿Está medicado en tratamiento médico o psiquiátrico?</label>
+                    <input type="checkbox" class="check_medicamento" data-index="${index}">
+                    <div class="medicamentos_container" data-index="${index}" style="display:none;"></div>
+                </div>
+                <div>
+                    <label>¿Posee algún impedimento físico?</label>
+                    <input type="checkbox" class="check_impedimento" data-index="${index}">
+                    <div class="impedimentos_container" data-index="${index}" style="display:none;"></div>
                 </div>
             </div>
         `;
         contenedor.appendChild(div);
+
+        // Listener para marcar fecha completada al cambiar
+        const fechaInput = div.querySelector(`#pasajero_fecha_nacimiento_${index}`);
+        if (fechaInput) {
+            fechaInput.addEventListener('change', function() {
+                this.dataset.completado = 'true';
+            });
+        }
     });
+
+    // Eventos para fichas de salud
+    document.querySelectorAll('[id^="btn_ficha_salud_"]').forEach(boton => {
+        boton.addEventListener('click', () => {
+            const index = boton.dataset.index;
+            const contenedorFicha = document.getElementById(`ficha_salud_${index}`);
+            contenedorFicha.style.display = contenedorFicha.style.display === 'none' ? 'block' : 'none';
+        });
+    });
+
+    document.querySelectorAll('.check_enfermedad').forEach(check => {
+        check.addEventListener('change', function() {
+            const index = this.dataset.index;
+            const contenedor = document.querySelector(`.enfermedades_container[data-index="${index}"]`);
+            contenedor.style.display = this.checked ? 'block' : 'none';
+            if (this.checked) agregarInputSalud(contenedor, 'enfermedad', index);
+        });
+    });
+
+    document.querySelectorAll('.check_medicamento').forEach(check => {
+        check.addEventListener('change', function() {
+            const index = this.dataset.index;
+            const contenedor = document.querySelector(`.medicamentos_container[data-index="${index}"]`);
+            contenedor.style.display = this.checked ? 'block' : 'none';
+            if (this.checked) agregarInputSalud(contenedor, 'medicamento', index);
+        });
+    });
+
+    document.querySelectorAll('.check_impedimento').forEach(check => {
+        check.addEventListener('change', function() {
+            const index = this.dataset.index;
+            const contenedor = document.querySelector(`.impedimentos_container[data-index="${index}"]`);
+            contenedor.style.display = this.checked ? 'block' : 'none';
+            if (this.checked) agregarInputSalud(contenedor, 'impedimento', index);
+        });
+    });
+}
+
+function agregarInputSalud(contenedor, tipo, index) {
+    const div = document.createElement('div');
+    div.className = 'input_salud';
+    div.style.marginBottom = '5px';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = `salud_${tipo}`;
+    input.dataset.index = index;
+    input.placeholder = tipo === 'enfermedad' ? '¿Cuál?' : (tipo === 'medicamento' ? 'Nombre del medicamento' : '¿Cuál?');
+
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'btn small';
+    boton.textContent = 'Agregar otra';
+    boton.dataset.index = index;
+    boton.dataset.tipo = tipo;
+
+    let esAgregar = true;
+
+    boton.addEventListener('click', () => {
+        if (esAgregar) {
+            // Agregar un nuevo ítem
+            agregarInputSalud(contenedor, tipo, index);
+            // Cambiar a modo quitar
+            boton.textContent = 'Quitar';
+            boton.className = 'btn small danger';
+            esAgregar = false;
+        } else {
+            // Quitar este ítem
+            div.remove();
+        }
+    });
+
+    div.appendChild(input);
+    div.appendChild(boton);
+    contenedor.appendChild(div);
 }
 
 // Confirmar la venta
 async function confirmar_venta_modal() {
-    // Forzar blur en todos los inputs de fecha para actualizar su valor
-    document.querySelectorAll('input[type="date"]').forEach(input => input.blur());
-    await new Promise(resolve => setTimeout(resolve, 100));
-    // Forzar pérdida de foco para actualizar valores de inputs
+    // Forzar actualización de todos los inputs de fecha
+    document.querySelectorAll('input[type="date"]').forEach(input => {
+        input.blur();
+        input.dispatchEvent(new Event('change'));
+    });
     if (document.activeElement && document.activeElement.blur) {
         document.activeElement.blur();
     }
@@ -232,14 +340,24 @@ async function confirmar_venta_modal() {
     const cantidadPasajeros = document.querySelectorAll('[id^="pasajero_dni_"]').length;
 
     for (let i = 0; i < cantidadPasajeros; i++) {
-        const dni = $(`#pasajero_dni_${i}`).value.trim();
-        const nombre = $(`#pasajero_nombre_${i}`).value.trim();
-        const email = $(`#pasajero_email_${i}`).value.trim();
-        const celular = $(`#pasajero_celular_${i}`).value.trim();
-        const celular_emergencia = $(`#pasajero_emergencia_${i}`).value.trim();
-        const fecha_nacimiento = $(`#pasajero_fecha_nacimiento_${i}`).value.trim();
+        const dni = document.getElementById(`pasajero_dni_${i}`).value.trim();
+        const nombre = document.getElementById(`pasajero_nombre_${i}`).value.trim();
+        const email = document.getElementById(`pasajero_email_${i}`).value.trim();
+        const celular = document.getElementById(`pasajero_celular_${i}`).value.trim();
+        const celular_emergencia = document.getElementById(`pasajero_emergencia_${i}`).value.trim();
+        const fechaInput = document.getElementById(`pasajero_fecha_nacimiento_${i}`);
+        let fecha_nacimiento = document.getElementById(`pasajero_fecha_nacimiento_${i}`).value;
+        if (!fecha_nacimiento) {
+            const fechaInput = document.getElementById(`pasajero_fecha_nacimiento_${i}`);
+            if (fechaInput && fechaInput.valueAsDate) {
+                const d = fechaInput.valueAsDate;
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                fecha_nacimiento = `${year}-${month}-${day}`;
+            }
+        }
 
-        // Validación campo por campo con mensajes específicos
         if (!dni) {
             mostrar_aviso(`Complete el DNI del pasajero ${i+1}`, 'error');
             return;

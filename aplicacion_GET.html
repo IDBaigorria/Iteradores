@@ -395,32 +395,26 @@
     </section>
 
     <!-- Sección Pasajeros -->
+    <!-- Sección Pasajeros -->
     <section id="pasajeros" class="tab-content hidden">
       <div class="panel">
         <h2>Pasajeros / Clientes</h2>
-        <div class="customer-layout">
-          <div class="table-wrap">
-            <input type="text" id="buscar_pasajero" placeholder="Buscar por nombre o DNI..." style="margin-bottom:10px; width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-            <table class="data-table">
-              <thead><tr><th>Nombre</th><th>DNI</th><th>Email</th><th>Celular personal</th><th>Emergencia</th><th>Acción</th></tr></thead>
-              <tbody id="tabla_pasajeros"></tbody>
-            </table>
-          </div>
-          <div id="detalle_pasajero" class="customer-detail hidden">
-            <div class="detail-box">
-              <h3>Datos del pasajero</h3>
-              <div class="form-grid">
-                <div class="field full"><label>Nombre</label><input id="pasajero_nombre"></div>
-                <div class="field"><label>DNI (no editable)</label><input id="pasajero_dni" disabled></div>
-                <div class="field"><label>Email (opcional)</label><input id="pasajero_email"></div>
-                <div class="field"><label>Celular personal</label><input id="pasajero_celular"></div>
-                <div class="field"><label>Celular emergencias</label><input id="pasajero_emergencia"></div>
-              </div>
-              <button class="btn primary" style="margin-top:12px" id="boton_guardar_pasajero">Guardar cambios</button>
-              <h3 style="margin-top:20px">Pasajes vendidos</h3>
-              <div id="pasajes_pasajero"></div>
-            </div>
-          </div>
+        <div class="table-wrap" style="width: 100%;">
+          <input type="text" id="buscar_pasajero" placeholder="Buscar por nombre o DNI..." style="margin-bottom:10px; width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+          <table class="data-table" style="width: 100%;">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>DNI</th>
+                <th>Email</th>
+                <th>Celular personal</th>
+                <th>Emergencia</th>
+                <th>Ficha</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla_pasajeros"></tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -492,13 +486,22 @@
         <button class="btn" id="btn_cerrar_opciones">Cerrar</button>
     </div>
 </div>
-
-<script src="aplicacion.js?v=1.5piloto.17"></script>
-<script src="Aplicacion/admin.js"></script>
-<script src="Aplicacion/terminales.js"></script>
-<script src="Aplicacion/micros.js"></script>
-<script src="Aplicacion/viajes.js"></script>
-<script src="Aplicacion/ventas.js"></script>
-<script src="Aplicacion/pasajeros.js"></script>
+<!-- Modal genérico -->
+<div id="modal_generico" class="modal hidden">
+  <div class="modal-content modal-grande">
+    <div class="modal-header">
+      <h3 id="modal_generico_titulo"></h3>
+      <button class="btn" id="cerrar_modal_generico">✕</button>
+    </div>
+    <div class="modal-body" id="modal_generico_contenido"></div>
+  </div>
+</div>
+<script src="aplicacion.js?v=1.5piloto.320"></script>
+<script src="Aplicacion/admin.js?v=1.5piloto.320"></script>
+<script src="Aplicacion/terminales.js?v=1.5piloto.320"></script>
+<script src="Aplicacion/micros.js?v=1.5piloto.320"></script>
+<script src="Aplicacion/viajes.js?v=1.5piloto.320"></script>
+<script src="Aplicacion/ventas.js?v=1.5piloto.320"></script>
+<script src="Aplicacion/pasajeros.js?v=1.5piloto.320"></script>
 </body>
 </html>

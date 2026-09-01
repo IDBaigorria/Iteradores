@@ -268,6 +268,10 @@ function confirmar_venta_actual(
         if (!$nodo_pasajero) {
             return ['exito' => false, 'error' => 'No se pudo crear el pasajero para el asiento ' . ($indice_asiento + 1)];
         }
+        // Guardar ficha de salud si viene
+        if (isset($datos_pasajero['salud']) && is_array($datos_pasajero['salud'])) {
+            guardar_ficha_salud($dni_pasajero, $datos_pasajero['salud']);
+        }
 
         // Cambiar estado del asiento real a vendido
         $estado = $asiento_real->adyacente('estado');
@@ -394,7 +398,22 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
     $nombre_viaje = $nodo_viaje ? $nodo_viaje->dato() : '';
     $nombre_micro = $nodo_micro ? ($nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '') : '';
     $total = $nodo_total ? $nodo_total->dato() : '0';
-    $fecha = $nodo_fecha ? date('Y-m-d H:i:s', (int)$nodo_fecha->dato()) : '';
+    $fecha = '';
+    if ($nodo_fecha) {
+        $valor_fecha = $nodo_fecha->dato();
+        if (is_numeric($valor_fecha)) {
+            // Es un timestamp Unix: restar 3 horas para Argentina y formatear
+            $fecha = date('d/m/Y H:i', (int)$valor_fecha - 3 * 3600);
+        } else {
+            // Intentar convertir texto a timestamp
+            $timestamp = strtotime($valor_fecha);
+            if ($timestamp !== false) {
+                $fecha = date('d/m/Y H:i', $timestamp - 3 * 3600);
+            } else {
+                $fecha = 'Fecha no disponible';
+            }
+        }
+    }
 
     $cantidad_asientos = 0;
     $cabeza_asientos = $nodo_venta->adyacente('asientos');

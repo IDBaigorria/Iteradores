@@ -217,3 +217,37 @@ $("#boton_salir").addEventListener("click", salir);
 // Ocultar aplicación y mostrar login al inicio
 $("#aplicacion").classList.add("hidden");
 $("#pantalla_login").classList.remove("hidden");
+
+// ============================================================
+// ====== FUNCIONES GLOBALES PARA MODALES =====================
+// ============================================================
+
+function abrir_modal_generico(titulo, contenido_html) {
+    const tituloEl = document.getElementById('modal_generico_titulo');
+    const contenidoEl = document.getElementById('modal_generico_contenido');
+    const modalEl = document.getElementById('modal_generico');
+
+    if (!tituloEl || !contenidoEl || !modalEl) return;
+
+    tituloEl.textContent = titulo;
+    contenidoEl.innerHTML = contenido_html;
+    modalEl.classList.remove('hidden');
+    modalEl.style.display = 'flex'; // Asegura que se muestre centrado
+}
+
+function cerrar_modal_generico() {
+    const modalEl = document.getElementById('modal_generico');
+    if (modalEl) {
+        modalEl.classList.add('hidden');
+        modalEl.style.display = 'none';
+    }
+    const contenidoEl = document.getElementById('modal_generico_contenido');
+    if (contenidoEl) contenidoEl.innerHTML = '';
+}
+
+$("#cerrar_modal_generico").addEventListener("click", cerrar_modal_generico);
+$("#modal_generico").addEventListener("click", function(e) {
+    if (e.target === this) {
+        cerrar_modal_generico();
+    }
+});

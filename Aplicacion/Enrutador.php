@@ -535,7 +535,17 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = actualizar_pasajero($dni, $datos);
                     responder_json($resultado);
                     break;
-
+                case 'guardar_ficha':
+                    $dni = $post['dni'] ?? '';
+                    $ficha_json = $post['ficha'] ?? '[]';
+                    $ficha = json_decode($ficha_json, true);
+                    if (!is_array($ficha)) $ficha = ['enfermedades' => [], 'medicamentos' => [], 'impedimentos' => []];
+                    if (empty($dni)) {
+                        responder_json(['exito' => false, 'error' => 'DNI no especificado']);
+                    }
+                    guardar_ficha_salud($dni, $ficha);
+                    responder_json(['exito' => true]);
+                    break;
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de pasajeros no válida']);
             }

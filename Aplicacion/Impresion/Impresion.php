@@ -297,6 +297,7 @@ function imprimir_cupon(array $venta): void {
     echo '<div class="seccion">';
     echo '<h3>Datos de la venta</h3>';
     echo '<div class="fila"><strong>Cod. de Venta:</strong> <span>' . htmlspecialchars($codigo_venta) . '</span></div>';
+    echo $fecha_venta;
     echo '<div class="fila"><strong>Fecha de venta:</strong> <span>' . htmlspecialchars($fecha_venta) . '</span></div>';
     if (!empty($venta['comprador'])) {
         echo '<div class="fila"><strong>Comprador:</strong> <span>' . htmlspecialchars($venta['comprador']['nombre']) . '</span></div>';
@@ -309,8 +310,9 @@ function imprimir_cupon(array $venta): void {
     echo '<h3>Datos del pago</h3>';
     echo '<div class="fila"><strong>Fecha de pago:</strong> <span>' . htmlspecialchars($fecha_pago) . '</span></div>';
     echo '<div class="fila"><strong>Método de pago:</strong> <span>' . htmlspecialchars($metodo_pago) . '</span></div>';
+    echo '<div class="fila"><strong>Cantidad:</strong> <span>$' . htmlspecialchars(number_format((float)$pagado, 2, '.', '')) . '</span></div>'; // pago actual
     echo '<div class="fila"><strong>Total:</strong> <span>$' . htmlspecialchars(number_format((float)$total, 2, '.', '')) . '</span></div>';
-    echo '<div class="fila"><strong>Abonado:</strong> <span>$' . htmlspecialchars(number_format((float)$pagado, 2, '.', '')) . '</span></div>';
+    echo '<div class="fila"><strong>Total abonado:</strong> <span>$' . htmlspecialchars(number_format((float)$pagado, 2, '.', '')) . '</span></div>';
     echo '<div class="fila"><strong>Pendiente:</strong> <span>$' . htmlspecialchars($pendiente) . '</span></div>';
     echo '<div class="fila"><strong>Cuotas restantes:</strong> <span>' . htmlspecialchars($cuotas_restantes) . '</span></div>';
     echo '</div>';
