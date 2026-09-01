@@ -481,6 +481,7 @@ function obtener_configuracion_piso_con_estado($nodo_piso): ?array {
             $columna = $actual->adyacente('columna');
             $estado = $actual->adyacente('estado');
             $seleccionado_por = $actual->adyacente('seleccionado_por');
+            $reservado_por = $actual->adyacente('reservado_por');
 
             $asiento_info = [
                 'fila' => $fila ? $fila->dato() : '',
@@ -488,6 +489,7 @@ function obtener_configuracion_piso_con_estado($nodo_piso): ?array {
                 'numero' => $actual->dato(),
                 'estado' => $estado ? $estado->dato() : 'libre',
                 'seleccionado_por' => $seleccionado_por ? $seleccionado_por->dato() : null,
+                'reservado_por' => $reservado_por ? $reservado_por->dato() : null,
                 'pasajero' => null,
                 'venta' => null
             ];
@@ -521,6 +523,137 @@ function obtener_configuracion_piso_con_estado($nodo_piso): ?array {
         'columnas' => $columnas,
         'asientos' => $asientos
     ];
+}
+/**
+ * Reserva un asiento para el equipo (dueño). El asiento pasa a estado "reservado"
+ * y no puede ser seleccionado por terminales.
+ *
+ * @param string $nombre_viaje   Identificador del viaje.
+ * @param string $nombre_micro   Identificador del micro.
+ * @param string $fila           Fila del asiento.
+ * @param string $columna        Columna del asiento.
+ * @param string $nombre_dueno   Nombre del dueño que realiza la reserva.
+ * @return array Resultado con éxito o error.
+ */
+function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) return ['exito' => false, 'error' => 'No hay micros'];
+
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
+
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) return ['exito' => false, 'error' => 'No existe copia del vehículo'];
+
+    // Buscar asiento
+    $nodo_asiento = null;
+    $nodo_asientos = $nodo_copia->adyacente('asientos');
+    if ($nodo_asientos) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$piso) continue;
+            $cabeza = $piso->adyacente('asientos');
+            if (!$cabeza) continue;
+            $actual = $cabeza->adyacente('primer');
+            while ($actual && $actual->id() !== $cabeza->id()) {
+                $f = $actual->adyacente('fila');
+                $c = $actual->adyacente('columna');
+                if ($f && $c && $f->dato() === $fila && $c->dato() === $columna) {
+                    $nodo_asiento = $actual;
+                    break 2;
+                }
+                $actual = $actual->adyacente('siguiente');
+            }
+        }
+    }
+
+    if (!$nodo_asiento) return ['exito' => false, 'error' => 'Asiento no encontrado'];
+
+    $estado = $nodo_asiento->adyacente('estado');
+    if ($estado && $estado->dato() !== 'libre') {
+        return ['exito' => false, 'error' => 'El asiento no está libre para reservar'];
+    }
+
+    // Actualizar estado a reservado
+    if ($estado) $estado->_dato('reservado');
+    else $nodo_asiento->_adyacente_en(Nodo::crear_con_dato('reservado'), 'estado');
+
+    // Eliminar cualquier enlace de seleccionado_por (por si acaso)
+    $nodo_asiento->eliminar_adyacente('seleccionado_por');
+
+    // Guardar quien reserva (nombre del dueño)
+    $reservado_por = $nodo_asiento->adyacente('reservado_por');
+    if ($reservado_por) $reservado_por->_dato($nombre_dueno);
+    else $nodo_asiento->_adyacente_en(Nodo::crear_con_dato($nombre_dueno), 'reservado_por');
+
+    // Actualizar contadores del micro y viaje
+    actualizar_contadores_micro($nodo_micro);
+    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+    return ['exito' => true];
+}
+function liberar_reserva_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno): array {
+    // Similar a reservar, pero cambia estado a 'libre' y elimina 'reservado_por'
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) return ['exito' => false, 'error' => 'No hay micros'];
+
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
+
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) return ['exito' => false, 'error' => 'No existe copia del vehículo'];
+
+    // Buscar asiento
+    $nodo_asiento = null;
+    $nodo_asientos = $nodo_copia->adyacente('asientos');
+    if ($nodo_asientos) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$piso) continue;
+            $cabeza = $piso->adyacente('asientos');
+            if (!$cabeza) continue;
+            $actual = $cabeza->adyacente('primer');
+            while ($actual && $actual->id() !== $cabeza->id()) {
+                $f = $actual->adyacente('fila');
+                $c = $actual->adyacente('columna');
+                if ($f && $c && $f->dato() === $fila && $c->dato() === $columna) {
+                    $nodo_asiento = $actual;
+                    break 2;
+                }
+                $actual = $actual->adyacente('siguiente');
+            }
+        }
+    }
+
+    if (!$nodo_asiento) return ['exito' => false, 'error' => 'Asiento no encontrado'];
+
+    $estado = $nodo_asiento->adyacente('estado');
+    if (!$estado || $estado->dato() !== 'reservado') {
+        return ['exito' => false, 'error' => 'El asiento no está reservado'];
+    }
+
+    // Liberar
+    $estado->_dato('libre');
+    $nodo_asiento->eliminar_adyacente('reservado_por');
+
+    actualizar_contadores_micro($nodo_micro);
+    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+    return ['exito' => true];
 }
 
 function obtener_estados_asientos_micro(string $nombre_viaje, string $nombre_micro, string $nombre_dueno): array {
@@ -614,8 +747,17 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
     if (!$nodo_asiento_encontrado) return ['exito' => false, 'error' => 'Asiento no encontrado'];
 
     $estado = $nodo_asiento_encontrado->adyacente('estado');
-    if ($estado && $estado->dato() !== 'libre') {
-        return ['exito' => false, 'error' => 'El asiento ya no está libre'];
+    if ($estado) {
+        $estado_actual = $estado->dato();
+        if ($estado_actual === 'reservado') {
+            return ['exito' => false, 'error' => 'Asiento reservado para el equipo'];
+        } elseif ($estado_actual === 'vendido') {
+            return ['exito' => false, 'error' => 'El asiento ya está vendido'];
+        } elseif ($estado_actual === 'no disponible') {
+            return ['exito' => false, 'error' => 'El asiento no está disponible'];
+        } elseif ($estado_actual === 'seleccionado') {
+            return ['exito' => false, 'error' => 'El asiento ya está seleccionado por otra terminal'];
+        }
     }
 
     // Actualizar estado y seleccionado_por

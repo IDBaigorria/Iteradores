@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.19)
+ * ## Estructura de nodos actual (v1.5piloto.20)
  *
  * ### Nodos raíz especiales
  *
@@ -125,8 +125,9 @@
  *   | `fila`             | Nodo con dato string numérico (posición en la cuadrícula). |
  *   | `columna`          | Nodo con dato string numérico (posición en la cuadrícula). |
  *   | `siguiente`        | Nodo asiento siguiente en la lista circular, o la cabeza si es el último. |
- *   | `estado`           | Nodo con dato string: `"libre"`, `"seleccionado"`, `"vendido"` o `"no disponible"`. |
+ *   | `estado`           | Nodo con dato string: `"libre"`, `"seleccionado"`, `"reservado"`, `"vendido"` o `"no disponible"`. |
  *   | `seleccionado_por` | Enlace directo al **nodo usuario** de la terminal que seleccionó el asiento. Solo existe si `estado` es `"seleccionado"`. |
+ *   | `reservado_por`    | Enlace directo al **nodo usuario** del dueño que reservó el asiento para el equipo. Solo existe si `estado` es `"reservado"`. |
  *   | `pasajero`         | Enlace directo al **nodo pasajero** asociado (si `estado` es `"vendido"` o `"no disponible"`). |
  *   | `venta`            | Enlace directo al nodo **venta persistente** (si `estado` es `"vendido"`). |
  *
@@ -138,8 +139,8 @@
  *   |--------------------------|-------------------------------------------------------|
  *   | `dueno`                  | Nodo con dato string: nombre del dueño.               |
  *   | `nombre`                 | Nodo con dato string: nombre visible del viaje.      |
- *   | `fecha`                  | Nodo con dato string: fecha (YYYY-MM-DD).            |
- *   | `hora`                   | Nodo con dato string: hora (HH:MM).                  |
+ *   | `fecha`                  | Nodo con dato string: fecha (YYYY-MM-DD) o `"a confirmar"` si aún no está definida. |
+ *   | `hora`                   | Nodo con dato string: hora (HH:MM) o `"a confirmar"` si aún no está definida. |
  *   | `origen`                 | Nodo con dato string: lugar de partida.              |
  *   | `destino`                | Nodo con dato string: destino.                       |
  *   | `ocupacion`              | Nodo con dato string numérico: total asientos ocupados. |
@@ -172,7 +173,7 @@
  * - Dato: patente original.
  * - Enlaces: `nombre`, `foto`, `asientos` (con pisos y lista circular de asientos).
  * - Es independiente del vehículo original; cualquier cambio posterior en el original no afecta a la copia.
- * - Sus asientos poseen `estado`, `seleccionado_por`, `pasajero` y `venta` (según corresponda).
+ * - Sus asientos poseen `estado`, `seleccionado_por`, `reservado_por`, `pasajero` y `venta` (según corresponda).
  *
  * ### Nodo Venta Actual (temporal, colgando del nodo usuario terminal)
  *
@@ -204,7 +205,8 @@
  *   | `terminal`        | Enlace al nodo usuario de la terminal que realizó la venta.       |
  *   | `viaje`           | Enlace al nodo viaje.                                             |
  *   | `micro`           | Enlace al nodo micro (copia).                                     |
- *   | `fecha_hora`      | Nodo con dato string: timestamp Unix (segundos).                  |
+ *   | `fecha_hora`      | Nodo con dato string: fecha y hora de la venta en formato `"DD/MM/YYYY HH:MM"`. |
+ *   | `fecha_ultimo_pago` | Nodo con dato string: fecha y hora del último pago en el mismo formato. Si no hay pagos adicionales, es igual a `fecha_hora`. |
  *   | `metodo_pago`     | Nodo con dato string: `"efectivo"` o `"transferencia"`.           |
  *   | `total`           | Nodo con dato string numérico: monto total de la venta.           |
  *   | `cuotas`          | Nodo con dato string numérico: cantidad de cuotas elegida (1-3).  |
@@ -243,7 +245,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.19
+ * @version   1.5piloto.20
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

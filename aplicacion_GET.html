@@ -297,8 +297,26 @@
         <h3>Nuevo viaje</h3>
         <div class="form-grid">
           <div class="field"><label>Nombre de viaje *</label><input id="nuevo_viaje_nombre"></div>
-          <div class="field"><label>Fecha</label><input type="date" id="nuevo_viaje_fecha"></div>
-          <div class="field"><label>Hora</label><input type="time" id="nuevo_viaje_hora"></div>
+            <div class="field">
+              <label>Estado de fecha</label>
+              <select id="nuevo_viaje_fecha_estado">
+                <option value="confirmada" selected>Fecha confirmada</option>
+                <option value="a_confirmar">Fecha a confirmar</option>
+              </select>
+            </div>
+            <div class="field" id="campo_nuevo_viaje_fecha">
+              <label>Fecha</label><input type="date" id="nuevo_viaje_fecha">
+            </div>
+            <div class="field">
+              <label>Estado de hora</label>
+              <select id="nuevo_viaje_hora_estado">
+                <option value="confirmada" selected>Hora confirmada</option>
+                <option value="a_confirmar">Hora a confirmar</option>
+              </select>
+            </div>
+            <div class="field" id="campo_nuevo_viaje_hora">
+              <label>Hora</label><input type="time" id="nuevo_viaje_hora">
+            </div>
           <div class="field"><label>Origen</label><input id="nuevo_viaje_origen"></div>
           <div class="field"><label>Destino</label><input id="nuevo_viaje_destino"></div>
         </div>

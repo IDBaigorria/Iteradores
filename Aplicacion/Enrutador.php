@@ -421,6 +421,31 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = deseleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal);
                     responder_json($resultado);
                     break;
+                case 'reservar_asiento':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $fila = $post['fila'] ?? '';
+                    $columna = $post['columna'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = reservar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                case 'liberar_reserva_asiento':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $fila = $post['fila'] ?? '';
+                    $columna = $post['columna'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = liberar_reserva_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de viajes no válida']);
             }
@@ -484,7 +509,19 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = cancelar_venta($id_venta);
                     responder_json($resultado);
                     break;
-
+                case 'listar':
+                    $tipo = $post['tipo'] ?? 'dueno';
+                    $nombre = $post['nombre'] ?? '';
+                    if (empty($nombre)) {
+                        responder_json(['exito' => false, 'error' => 'Nombre no especificado']);
+                    }
+                    if ($tipo === 'dueno') {
+                        $ventas = listar_ventas_por_dueno($nombre);
+                    } else {
+                        $ventas = listar_ventas_por_terminal($nombre);
+                    }
+                    responder_json(['exito' => true, 'ventas' => $ventas]);
+                    break;
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de ventas no válida']);
             }
