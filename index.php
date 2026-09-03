@@ -83,6 +83,7 @@ require_once __DIR__ . '/Aplicacion/Viajes/Viaje.php';
 require_once __DIR__ . '/Aplicacion/Ventas/Venta.php';
 require_once __DIR__ . '/Aplicacion/Pasajeros/Pasajero.php';
 require_once __DIR__ . '/Aplicacion/Enrutador.php';
+
 // ==== Bloque temporal para pruebas de árbol ====
 if (isset($_GET['probar_arbol'])) {
     require_once __DIR__ . '/miscelaneas/Arbol.php';
@@ -103,12 +104,15 @@ if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
     $nodo_admin->_adyacente_en(Nodo::crear_con_dato(Conf::CODIGO_ADMIN), 'codigo_acceso');
     $raiz_usuarios->_adyacente_en($nodo_admin, Conf::NOMBRE_ADMIN);
     Controlador::guardar($nombre_app);
+    Controlador::establecer_metodo('JSON');
+    Controlador::guardar($nombre_app);
 }
 
 // Manejo de impresión
 if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
     require_once __DIR__ . '/Aplicacion/Impresion/Impresion.php';
-    generar_impresion($_GET['tipo'] ?? '', $_GET['id_venta'] ?? '');
+    $dni_filtro = $_GET['dni'] ?? '';
+    generar_impresion($_GET['tipo'] ?? '', $_GET['id_venta'] ?? '', $dni_filtro);
     exit;
 }
 

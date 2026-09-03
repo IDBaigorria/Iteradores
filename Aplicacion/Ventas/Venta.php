@@ -37,19 +37,17 @@ function obtener_contenedor_ventas_dueno(string $nombre_dueno) {
 /**
  * Crea un nodo pasajero si no existe, basado en DNI.
  */
-function obtener_o_crear_pasajero(string $dni, array $datos_pasajero): ?Nodo {
+function obtener_o_crear_pasajero(string $nombre_dueno, string $dni, array $datos_pasajero): ?Nodo {
     $dni = trim($dni);
     if (empty($dni)) return null;
 
-    $raiz_pasajeros = Nodo::nodo_por_id('pasajeros');
-    if (!$raiz_pasajeros) {
-        $raiz_pasajeros = Nodo::crear_con_id('pasajeros');
-    }
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+    if (!$contenedor) return null;
 
-    $nodo_pasajero = $raiz_pasajeros->adyacente($dni);
+    $nodo_pasajero = $contenedor->adyacente($dni);
     if (!$nodo_pasajero) {
         $nodo_pasajero = Nodo::crear_con_dato($dni);
-        $raiz_pasajeros->_adyacente_en($nodo_pasajero, $dni);
+        $contenedor->_adyacente_en($nodo_pasajero, $dni);
     }
 
     // Actualizar datos si se proporcionan
@@ -261,7 +259,7 @@ function confirmar_venta_actual(
         'celular' => $comprador_celular,
     ];
     if (!empty($comprador_dni)) {
-        $nodo_comprador = obtener_o_crear_pasajero($comprador_dni, $comprador_datos);
+        $nodo_comprador = obtener_o_crear_pasajero($nombre_dueno, $comprador_dni, $comprador_datos);
         if ($nodo_comprador) $nodo_venta->_adyacente_en($nodo_comprador, 'comprador');
     }
 
@@ -281,13 +279,13 @@ function confirmar_venta_actual(
             return ['exito' => false, 'error' => 'Faltan datos obligatorios del pasajero ' . ($indice_asiento + 1)];
         }
 
-        $nodo_pasajero = obtener_o_crear_pasajero($dni_pasajero, $datos_pasajero);
+        $nodo_pasajero = obtener_o_crear_pasajero($nombre_dueno, $dni_pasajero, $datos_pasajero);
         if (!$nodo_pasajero) {
             return ['exito' => false, 'error' => 'No se pudo crear el pasajero para el asiento ' . ($indice_asiento + 1)];
         }
         // Guardar ficha de salud si viene
         if (isset($datos_pasajero['salud']) && is_array($datos_pasajero['salud'])) {
-            guardar_ficha_salud($dni_pasajero, $datos_pasajero['salud']);
+            guardar_ficha_salud($nombre_dueno, $dni_pasajero, $datos_pasajero['salud']);
         }
 
         // Cambiar estado del asiento real a vendido

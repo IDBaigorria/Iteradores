@@ -6,8 +6,7 @@
  * @since     1.5piloto.16
  */
 
-function generar_impresion(string $tipo, string $id_venta): void {
-    // Obtener datos completos de la venta
+function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = ''): void {
     $venta = obtener_venta_por_id($id_venta);
     if (!$venta) {
         echo "Venta no encontrada";
@@ -15,16 +14,15 @@ function generar_impresion(string $tipo, string $id_venta): void {
     }
 
     if ($tipo === 'pasajes') {
-        imprimir_pasajes($venta);
+        imprimir_pasajes($venta, $dni_filtro);
     } elseif ($tipo === 'cupon') {
         imprimir_cupon($venta);
     } else {
         echo "Tipo de impresión no válido";
     }
 }
-
-function imprimir_pasajes(array $venta): void {
-    // Datos generales
+function imprimir_pasajes(array $venta, string $dni_filtro = ''): void {
+        // Datos generales
     $nombre_viaje = $venta['nombre_viaje_visible'] ?? $venta['viaje'] ?? '';
     $fecha = $venta['fecha'] ?? '';
     $hora = $venta['hora'] ?? '';
@@ -144,6 +142,10 @@ function imprimir_pasajes(array $venta): void {
 
     foreach ($venta['asientos'] as $asiento) {
         $pasajero = $asiento['pasajero'] ?? null;
+        // Si hay filtro por DNI, saltar asientos que no correspondan
+        if ($dni_filtro !== '' && (!$pasajero || $pasajero['dni'] !== $dni_filtro)) {
+            continue;
+        }
         echo '<div class="pasaje">';
         echo '<div class="logo-col"><img src="' . htmlspecialchars($logo_ruta) . '" alt="Logo"></div>';
         echo '<div class="datos-col">';

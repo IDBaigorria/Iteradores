@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.20)
+ * ## Estructura de nodos actual (v1.5piloto.22)
  *
  * ### Nodos raíz especiales
  *
@@ -19,9 +19,8 @@
  *   Contiene las sesiones activas. Cada enlace saliente tiene como nombre el
  *   **token de sesión** (string) y apunta al nodo de sesión.
  *
- * - `"pasajeros"` (nodo especial)
- *   Contiene a todos los pasajeros registrados. Cada enlace saliente tiene como
- *   nombre el **DNI** (string) y apunta al nodo del pasajero.
+ * Ya no existe un nodo especial `"pasajeros"`. Los pasajeros ahora se almacenan
+ * en un contenedor `pasajeros` que cuelga del nodo usuario dueño (ver Nodo Usuario).
  *
  * ### Nodo Usuario (dato del nodo: nombre de usuario)
  *
@@ -48,14 +47,15 @@
  * |                 | └─ Enlaces salientes con nombre de cada empresa apuntando a su nodo empresa.           |
  * | `viajes`        | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
  * |                 | └─ Enlaces salientes con nombre de cada viaje apuntando a su nodo viaje.               |
+ * | `pasajeros`     | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
+ * |                 | └─ Enlaces salientes con nombre = **DNI** del pasajero apuntando a su nodo pasajero.   |
  * | `ventas`        | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
  * |                 | └─ Enlaces salientes: utiliza árbol (hmi/hd) para almacenar las ventas. El primer hijo es `hmi`, los siguientes hermanos se acceden con `hd`. |
  * | `venta_actual`  | Enlace a un nodo venta actual (solo para `terminal`). Si no existe venta activa, el enlace no existe. |
  *
  * **Observaciones:**
  * - Los enlaces `efectivo`, `banco`, `dueno` y `venta_actual` solo existen en nodos de nivel `terminal`.
- * - El enlace `terminales` solo existe en nodos de nivel `dueno`.
- * - Los enlaces `empresas`, `viajes` y `ventas` solo existen en nodos de nivel `dueno`.
+ * - Los enlaces `terminales`, `empresas`, `viajes`, `pasajeros` y `ventas` solo existen en nodos de nivel `dueno`.
  * - `contrasena`, `nombre_real` y `email` pueden no existir si no se proporcionaron.
  * - El monto en `efectivo` y en `banco` es automático (inicial `"0"`) y no se solicita al crear el usuario.
  * - El dato del nodo usuario es el nombre de usuario, lo que facilita la obtención
@@ -63,7 +63,8 @@
  *
  * ### Nodo Pasajero (dato del nodo: DNI)
  *
- * Almacenado en el contenedor raíz `"pasajeros"`. Cada enlace saliente tiene como nombre el DNI.
+ * Los pasajeros cuelgan del contenedor `pasajeros` del nodo usuario dueño.
+ * Cada enlace saliente del contenedor tiene como nombre el DNI (string) y apunta al nodo pasajero.
  *
  * | Enlace              | Nodo destino y dato esperado                          |
  * |---------------------|-------------------------------------------------------|
@@ -245,7 +246,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.20
+ * @version   1.5piloto.22
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

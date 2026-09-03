@@ -601,3 +601,6 @@ h3 { margin: 0 0 12px; font-size: 17px; }
 .seat-reservado {
     cursor: not-allowed;
 }
+.btn emoji {
+    font-size: 1.2em;
+}

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administrador de Viajes - Pquia. del Carmen Tres Arroyos</title>
-<link rel="stylesheet" href="estilos.css">
+<link rel="stylesheet" href="estilos.css?v=1.5piloto.23240">
 </head>
 <body>
 <!-- Pantalla de login (código de acceso) -->
@@ -412,12 +412,18 @@
       </div>
     </section>
 
-    <!-- Sección Pasajeros -->
+
     <!-- Sección Pasajeros -->
     <section id="pasajeros" class="tab-content hidden">
       <div class="panel">
         <h2>Pasajeros / Clientes</h2>
         <div class="table-wrap" style="width: 100%;">
+          <div class="panel" id="panel_selector_dueno_pasajeros" style="display:none;">
+              <div class="row">
+                  <label for="selector_dueno_pasajeros">Dueño:</label>
+                  <select id="selector_dueno_pasajeros"></select>
+              </div>
+          </div>
           <input type="text" id="buscar_pasajero" placeholder="Buscar por nombre o DNI..." style="margin-bottom:10px; width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
           <table class="data-table" style="width: 100%;">
             <thead>
@@ -427,7 +433,8 @@
                 <th>Email</th>
                 <th>Celular personal</th>
                 <th>Emergencia</th>
-                <th>Ficha</th>
+                <th>Ficha salud</th>
+                <th>Pasajes</th>
                 <th>Acción</th>
               </tr>
             </thead>
@@ -514,12 +521,12 @@
     <div class="modal-body" id="modal_generico_contenido"></div>
   </div>
 </div>
-<script src="aplicacion.js?v=1.5piloto.3240"></script>
-<script src="Aplicacion/admin.js?v=1.5piloto.3420"></script>
-<script src="Aplicacion/terminales.js?v=1.5piloto.3420"></script>
-<script src="Aplicacion/micros.js?v=1.5piloto.3240"></script>
-<script src="Aplicacion/viajes.js?v=1.5piloto.3240"></script>
-<script src="Aplicacion/ventas.js?v=1.5piloto.3240"></script>
-<script src="Aplicacion/pasajeros.js?v=1.5piloto.3240"></script>
+<script src="aplicacion.js?v=1.5piloto.23240"></script>
+<script src="Aplicacion/admin.js?v=1.5piloto.32420"></script>
+<script src="Aplicacion/terminales.js?v=1.5piloto.23420"></script>
+<script src="Aplicacion/micros.js?v=1.5piloto.32240"></script>
+<script src="Aplicacion/viajes.js?v=1.5piloto.32240"></script>
+<script src="Aplicacion/ventas.js?v=1.5piloto.32240"></script>
+<script src="Aplicacion/pasajeros.js?v=1.5piloto.23240"></script>
 </body>
 </html>

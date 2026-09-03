@@ -7,6 +7,9 @@
  * @version   1.5piloto.4
  */
 
+use Iteradores\Nodos\Nodo;
+use Iteradores\Controlador\Controlador;
+use Iteradores\Configuracion\Conf;
 /**
  * Envía una respuesta JSON y termina la ejecución.
  *
@@ -38,6 +41,13 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $codigo = $post['codigo'] ?? '';
                     $usuario = autenticar_por_codigo($codigo);
                     if ($usuario) {
+                        // Si es terminal, incluir el nombre del dueño
+                        if ($usuario['nivel'] === 'terminal') {
+                            $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+                            $nodo_usuario = $raiz_usuarios ? $raiz_usuarios->adyacente($usuario['nombre_usuario']) : null;
+                            $nodo_dueno = $nodo_usuario ? $nodo_usuario->adyacente('dueno') : null;
+                            $usuario['dueno'] = $nodo_dueno ? $nodo_dueno->dato() : '';
+                        }
                         responder_json(['exito' => true, 'usuario' => $usuario]);
                     } else {
                         responder_json(['exito' => false, 'error' => 'Código incorrecto']);
@@ -166,11 +176,16 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : $nombre_usuario,
                         'nivel' => $nodo_nivel ? $nodo_nivel->dato() : 'terminal',
                     ];
+                    // Si es terminal, incluir dueño
+                    if ($usuario['nivel'] === 'terminal') {
+                        $nodo_dueno = $nodo_usuario->adyacente('dueno');
+                        $usuario['dueno'] = $nodo_dueno ? $nodo_dueno->dato() : '';
+                    }
                     responder_json(['exito' => true, 'usuario' => $usuario]);
                 } else {
                     responder_json(['exito' => false, 'error' => 'Sesión no válida']);
                 }
-            } else {
+            }else {
                 responder_json(['exito' => false, 'error' => 'Subacción de sesiones no válida']);
             }
             break;
@@ -530,20 +545,29 @@ function enrutar_peticion_post(string $accion, array $post): void {
         case 'pasajeros':
             switch ($subaccion) {
                 case 'listar':
-                    responder_json(['exito' => true, 'pasajeros' => listar_pasajeros()]);
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    responder_json(['exito' => true, 'pasajeros' => listar_pasajeros($nombre_dueno)]);
                     break;
 
                 case 'buscar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
                     $termino = $post['termino'] ?? '';
-                    responder_json(['exito' => true, 'pasajeros' => buscar_pasajeros($termino)]);
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    responder_json(['exito' => true, 'pasajeros' => buscar_pasajeros($nombre_dueno, $termino)]);
                     break;
 
                 case 'obtener':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
                     $dni = $post['dni'] ?? '';
-                    if (empty($dni)) {
-                        responder_json(['exito' => false, 'error' => 'DNI no especificado']);
+                    if (empty($nombre_dueno) || empty($dni)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
                     }
-                    $pasajero = obtener_pasajero_por_dni($dni);
+                    $pasajero = obtener_pasajero_por_dni($nombre_dueno, $dni);
                     if ($pasajero) {
                         responder_json(['exito' => true, 'pasajero' => $pasajero]);
                     } else {
@@ -552,9 +576,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     break;
 
                 case 'actualizar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
                     $dni = $post['dni'] ?? '';
-                    if (empty($dni)) {
-                        responder_json(['exito' => false, 'error' => 'DNI no especificado']);
+                    if (empty($nombre_dueno) || empty($dni)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
                     }
                     $datos = [
                         'nombre' => $post['nombre'] ?? '',
@@ -562,19 +587,30 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         'celular' => $post['celular'] ?? '',
                         'celular_emergencia' => $post['celular_emergencia'] ?? '',
                     ];
-                    $resultado = actualizar_pasajero($dni, $datos);
+                    $resultado = actualizar_pasajero($nombre_dueno, $dni, $datos);
                     responder_json($resultado);
                     break;
+
                 case 'guardar_ficha':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
                     $dni = $post['dni'] ?? '';
                     $ficha_json = $post['ficha'] ?? '[]';
                     $ficha = json_decode($ficha_json, true);
                     if (!is_array($ficha)) $ficha = ['enfermedades' => [], 'medicamentos' => [], 'impedimentos' => []];
-                    if (empty($dni)) {
-                        responder_json(['exito' => false, 'error' => 'DNI no especificado']);
+                    if (empty($nombre_dueno) || empty($dni)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
                     }
-                    guardar_ficha_salud($dni, $ficha);
+                    guardar_ficha_salud($nombre_dueno, $dni, $ficha);
                     responder_json(['exito' => true]);
+                    break;
+                case 'eliminar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $dni = $post['dni'] ?? '';
+                    if (empty($nombre_dueno) || empty($dni)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
+                    }
+                    $resultado = eliminar_pasajero($nombre_dueno, $dni);
+                    responder_json($resultado);
                     break;
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de pasajeros no válida']);
