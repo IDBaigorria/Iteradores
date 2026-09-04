@@ -297,7 +297,8 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
         $es_comprador = true;
     }
 
-    $asientos_pasajero = [];
+    $asientos_pasajero = [];     // Asientos del pasajero consultado
+    $pasajes_venta = [];         // Todos los pasajes de la venta (asiento, nombre, dni)
     $cabeza_asientos = $nodo_venta->adyacente('asientos');
     if ($cabeza_asientos) {
         $actual = $cabeza_asientos->adyacente('primer');
@@ -305,12 +306,24 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
         while ($actual && $seguridad < 100) {
             $nodo_pasajero = $actual->adyacente('pasajero');
             $nodo_asiento_real = $actual->adyacente('asiento');
-            if ($nodo_pasajero && $nodo_pasajero->dato() === $dni) {
-                $es_pasajero = true;
-                if ($nodo_asiento_real) {
-                    $asientos_pasajero[] = $nodo_asiento_real->dato(); // número de asiento
+
+            if ($nodo_asiento_real && $nodo_pasajero) {
+                $numero_asiento = $nodo_asiento_real->dato();
+                $nombre_pasajero = $nodo_pasajero->adyacente('nombre') ? $nodo_pasajero->adyacente('nombre')->dato() : '';
+                $dni_pasajero = $nodo_pasajero->dato();
+
+                $pasajes_venta[] = [
+                    'asiento' => $numero_asiento,
+                    'nombre' => $nombre_pasajero,
+                    'dni' => $dni_pasajero,
+                ];
+
+                if ($dni_pasajero === $dni) {
+                    $es_pasajero = true;
+                    $asientos_pasajero[] = $numero_asiento;
                 }
             }
+
             $actual = $actual->adyacente('siguiente');
             $seguridad++;
         }
@@ -323,63 +336,57 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
     // Datos de compra
     $id_venta = $nodo_venta->dato();
     $nodo_terminal = $nodo_venta->adyacente('terminal');
-    $nodo_total = $nodo_venta->adyacente('total');
-    $nodo_pagado = $nodo_venta->adyacente('pagado');
-    $nodo_cuotas_restantes = $nodo_venta->adyacente('cuotas_restantes');
-    $nodo_metodo_pago = $nodo_venta->adyacente('metodo_pago');
     $nodo_fecha = $nodo_venta->adyacente('fecha_hora');
+    $nodo_cuotas_restantes = $nodo_venta->adyacente('cuotas_restantes');
 
-    $total = $nodo_total ? $nodo_total->dato() : '0';
-    $pagado = $nodo_pagado ? $nodo_pagado->dato() : '0';
+    // Nombre visible de la terminal
+    $terminal_nombre = '';
+    if ($nodo_terminal) {
+        $terminal_nombre = $nodo_terminal->adyacente('nombre_real') ? $nodo_terminal->adyacente('nombre_real')->dato() : $nodo_terminal->dato();
+    }
+
     $cuotas_restantes = $nodo_cuotas_restantes ? $nodo_cuotas_restantes->dato() : '0';
     $estado_pago = ((int)$cuotas_restantes > 0) ? 'Cuotas pendientes' : 'Pagado';
 
     $compra = [
         'id_venta' => $id_venta,
-        'terminal' => $nodo_terminal ? $nodo_terminal->dato() : '',
+        'terminal_nombre' => $terminal_nombre,
         'fecha' => $nodo_fecha ? $nodo_fecha->dato() : '',
-        'total' => $total,
-        'pagado' => $pagado,
-        'cuotas_restantes' => $cuotas_restantes,
-        'metodo_pago' => $nodo_metodo_pago ? $nodo_metodo_pago->dato() : '',
         'estado_pago' => $estado_pago,
     ];
 
-    // Datos del pasaje (solo si es pasajero)
-    $pasaje = null;
-    if ($es_pasajero) {
-        $nodo_viaje = $nodo_venta->adyacente('viaje');
-        $nodo_micro = $nodo_venta->adyacente('micro');
-
-        $origen = $nodo_viaje && $nodo_viaje->adyacente('origen') ? $nodo_viaje->adyacente('origen')->dato() : '';
-        $destino = $nodo_viaje && $nodo_viaje->adyacente('destino') ? $nodo_viaje->adyacente('destino')->dato() : '';
-        $fecha_viaje = $nodo_viaje && $nodo_viaje->adyacente('fecha') ? $nodo_viaje->adyacente('fecha')->dato() : '';
-        $hora = $nodo_viaje && $nodo_viaje->adyacente('hora') ? $nodo_viaje->adyacente('hora')->dato() : '';
-        $micro_nombre_visible = '';
-        if ($nodo_micro) {
-            $copia = $nodo_micro->adyacente('vehiculo_copia');
-            if ($copia && $copia->adyacente('nombre')) {
-                $micro_nombre_visible = $copia->adyacente('nombre')->dato();
-            } else {
-                $micro_nombre_visible = $nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '';
-            }
+    // Datos del viaje (para modal individual)
+    $nodo_viaje = $nodo_venta->adyacente('viaje');
+    $nodo_micro = $nodo_venta->adyacente('micro');
+    $origen = $nodo_viaje && $nodo_viaje->adyacente('origen') ? $nodo_viaje->adyacente('origen')->dato() : '';
+    $destino = $nodo_viaje && $nodo_viaje->adyacente('destino') ? $nodo_viaje->adyacente('destino')->dato() : '';
+    $fecha_viaje = $nodo_viaje && $nodo_viaje->adyacente('fecha') ? $nodo_viaje->adyacente('fecha')->dato() : '';
+    $hora = $nodo_viaje && $nodo_viaje->adyacente('hora') ? $nodo_viaje->adyacente('hora')->dato() : '';
+    $micro_nombre_visible = '';
+    if ($nodo_micro) {
+        $copia = $nodo_micro->adyacente('vehiculo_copia');
+        if ($copia && $copia->adyacente('nombre')) {
+            $micro_nombre_visible = $copia->adyacente('nombre')->dato();
+        } else {
+            $micro_nombre_visible = $nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '';
         }
-
-        $pasaje = [
-            'origen' => $origen,
-            'destino' => $destino,
-            'fecha' => $fecha_viaje,
-            'hora' => $hora,
-            'micro_nombre_visible' => $micro_nombre_visible,
-            'asientos' => $asientos_pasajero,
-        ];
     }
+
+    $pasaje = [
+        'origen' => $origen,
+        'destino' => $destino,
+        'fecha' => $fecha_viaje,
+        'hora' => $hora,
+        'micro_nombre_visible' => $micro_nombre_visible,
+        'asientos' => $asientos_pasajero,
+    ];
 
     return [
         'es_comprador' => $es_comprador,
         'es_pasajero' => $es_pasajero,
         'compra' => $compra,
         'pasaje' => $pasaje,
+        'pasajes_venta' => $pasajes_venta,
     ];
 }
 /**
