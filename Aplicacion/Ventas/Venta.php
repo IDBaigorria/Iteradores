@@ -51,7 +51,7 @@ function obtener_o_crear_pasajero(string $nombre_dueno, string $dni, array $dato
     }
 
     // Actualizar datos si se proporcionan
-    $campos = ['nombre', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento'];
+    $campos = ['nombre', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento', 'localidad', 'direccion'];
     foreach ($campos as $campo) {
         if (isset($datos_pasajero[$campo]) && $datos_pasajero[$campo] !== '') {
             $nodo_campo = $nodo_pasajero->adyacente($campo);
@@ -59,7 +59,6 @@ function obtener_o_crear_pasajero(string $nombre_dueno, string $dni, array $dato
             else $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato($datos_pasajero[$campo]), $campo);
         }
     }
-
     return $nodo_pasajero;
 }
 
@@ -277,6 +276,10 @@ function confirmar_venta_actual(
 
         if (empty($dni_pasajero) || empty($fecha_nacimiento_pasajero) || empty($datos_pasajero['celular']) || empty($datos_pasajero['celular_emergencia'])) {
             return ['exito' => false, 'error' => 'Faltan datos obligatorios del pasajero ' . ($indice_asiento + 1)];
+        }
+
+        if (empty($datos_pasajero['localidad']) || empty($datos_pasajero['direccion'])) {
+            return ['exito' => false, 'error' => 'Faltan datos obligatorios del pasajero ' . ($indice_asiento + 1) . ': localidad y dirección'];
         }
 
         $nodo_pasajero = obtener_o_crear_pasajero($nombre_dueno, $dni_pasajero, $datos_pasajero);
@@ -647,3 +650,4 @@ function cancelar_venta(string $id_venta): array {
 
     return ['exito' => false, 'error' => 'Venta no encontrada'];
 }
+

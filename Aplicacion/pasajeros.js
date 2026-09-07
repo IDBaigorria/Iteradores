@@ -1,18 +1,12 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.34
+ * @version 1.5piloto.25
  */
 
 let pasajeros_actuales = [];
 let pasajero_seleccionado_dni = null;
-let dueno_pasajeros_seleccionado = '';  // Para admin, guarda el dueño elegido
+let dueno_pasajeros_seleccionado = '';
 
-/**
- * Devuelve el nombre del dueño actual para las peticiones de pasajeros.
- * - Si es admin: usa el selector `selector_dueno_pasajeros` (si existe y tiene valor).
- * - Si es dueño: usa su propio nombre de usuario.
- * - Si es terminal: usa el dueño asociado.
- */
 function obtener_nombre_dueno_pasajeros() {
     if (usuario_actual.nivel === 'admin') {
         const select = document.getElementById('selector_dueno_pasajeros');
@@ -30,16 +24,13 @@ function obtener_nombre_dueno_pasajeros() {
 
 async function cargar_pasajeros() {
     const panelSelector = document.getElementById('panel_selector_dueno_pasajeros');
-
     if (usuario_actual.nivel === 'admin') {
-        // Mostrar panel y cargar dueños
         if (panelSelector) panelSelector.style.display = 'block';
         const select = document.getElementById('selector_dueno_pasajeros');
         if (select && select.options.length === 0) {
             await cargar_duenos_en_select_pasajeros();
         }
     } else {
-        // Ocultar panel para dueño y terminal
         if (panelSelector) panelSelector.style.display = 'none';
     }
 
@@ -86,7 +77,6 @@ async function cargar_duenos_en_select_pasajeros() {
             cargar_pasajeros();
         };
 
-        // Seleccionar el primer dueño por defecto
         if (select.options.length > 1) {
             select.selectedIndex = 1;
             dueno_pasajeros_seleccionado = select.value;
@@ -114,6 +104,7 @@ async function eliminar_pasajero(dni) {
         mostrar_aviso(resultado.error || "Error al eliminar", 'error');
     }
 }
+
 async function ver_pasajes_pasajero(dni) {
     const nombre_dueno = obtener_nombre_dueno_pasajeros();
     if (!nombre_dueno) {
@@ -316,18 +307,8 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
     });
 }
 
-function ver_compra_desde_pasajero(id_venta) {
-    // TODO: implementar
-    mostrar_aviso('Función en desarrollo', 'info');
-}
 
-
-/**
- * Placeholder para ver la compra completa desde el modal de pasajes.
- * Se implementará en una próxima versión.
- */
 function ver_compra_desde_pasajero(id_venta) {
-    // TODO: implementar apertura de detalle de venta
     mostrar_aviso('Función en desarrollo', 'info');
 }
 
@@ -336,10 +317,12 @@ function renderizar_tabla_pasajeros(pasajeros) {
     tabla.innerHTML = '';
     pasajeros.forEach(pasajero => {
         const tieneFicha = pasajero.ficha_salud !== null && pasajero.ficha_salud !== undefined;
+        const direccionCompleta = [pasajero.direccion, pasajero.localidad].filter(v => v).join(', ') || '—';
         const fila = document.createElement('tr');
         fila.innerHTML = `
             <td>${pasajero.nombre}</td>
             <td>${pasajero.dni}</td>
+            <td>${direccionCompleta}</td>
             <td>${pasajero.email || '—'}</td>
             <td>${pasajero.celular || '—'}</td>
             <td>${pasajero.celular_emergencia || '—'}</td>
@@ -360,7 +343,6 @@ function renderizar_tabla_pasajeros(pasajeros) {
         `;
         tabla.appendChild(fila);
 
-        // Listener para botón ficha (columna Ficha salud)
         const botonFicha = fila.querySelector('.ver-ficha, .anexar-ficha');
         if (botonFicha) {
             botonFicha.addEventListener('click', async function() {
@@ -380,7 +362,6 @@ function renderizar_tabla_pasajeros(pasajeros) {
             });
         }
 
-        // Listener para botón "Ver pasajes"
         const botonVerPasajes = fila.querySelector('.ver_pasajes_pasajero');
         if (botonVerPasajes) {
             botonVerPasajes.addEventListener('click', function() {
@@ -388,7 +369,6 @@ function renderizar_tabla_pasajeros(pasajeros) {
             });
         }
 
-        // Listener para botón editar
         const botonEditar = fila.querySelector('.editar_pasajero');
         if (botonEditar) {
             botonEditar.addEventListener('click', function() {
@@ -396,7 +376,6 @@ function renderizar_tabla_pasajeros(pasajeros) {
             });
         }
 
-        // Listener para botón eliminar
         const botonEliminar = fila.querySelector('.eliminar_pasajero');
         if (botonEliminar) {
             botonEliminar.addEventListener('click', function() {
@@ -436,6 +415,8 @@ async function cargar_detalle_pasajero(dni) {
                 <div class="field"><label>Email (opcional)</label><input id="pasajero_email_modal" value="${p.email || ''}"></div>
                 <div class="field"><label>Celular personal</label><input id="pasajero_celular_modal" value="${p.celular || ''}"></div>
                 <div class="field"><label>Celular emergencias</label><input id="pasajero_emergencia_modal" value="${p.celular_emergencia || ''}"></div>
+                <div class="field"><label>Dirección</label><input id="pasajero_direccion_modal" value="${p.direccion || ''}"></div>
+                <div class="field"><label>Localidad</label><input id="pasajero_localidad_modal" value="${p.localidad || ''}"></div>
             </div>
             <button class="btn primary" style="margin-top:12px" id="boton_guardar_pasajero_modal">Guardar cambios</button>
         `;
@@ -452,6 +433,8 @@ async function cargar_detalle_pasajero(dni) {
                 email: document.getElementById('pasajero_email_modal').value.trim(),
                 celular: document.getElementById('pasajero_celular_modal').value.trim(),
                 celular_emergencia: document.getElementById('pasajero_emergencia_modal').value.trim(),
+                direccion: document.getElementById('pasajero_direccion_modal').value.trim(),
+                localidad: document.getElementById('pasajero_localidad_modal').value.trim()
             };
             const respuesta = await fetch("index.php", {
                 method: "POST",
@@ -474,11 +457,29 @@ async function cargar_detalle_pasajero(dni) {
 
 function mostrar_ficha_salud_edicion(dni, fichaSalud) {
     if (!fichaSalud) {
-        fichaSalud = { enfermedades: [], medicamentos: [], impedimentos: [] };
+        fichaSalud = { enfermedades: [], medicamentos: [], impedimentos: [], alergias: [], grupo_sanguineo: '', obra_social: '', observaciones: '' };
     }
+
+    const opcionesGrupo = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'Desconocido'];
+    const grupoActual = fichaSalud.grupo_sanguineo || 'Desconocido';
 
     const contenidoHTML = `
         <h3>Datos de salud</h3>
+        <div class="seccion-salud">
+            <label>Grupo sanguíneo</label>
+            <select id="grupo_sanguineo">
+                ${opcionesGrupo.map(op => `<option value="${op}" ${op === grupoActual ? 'selected' : ''}>${op}</option>`).join('')}
+            </select>
+        </div>
+        <div class="seccion-salud">
+            <label>Obra social</label>
+            <input type="text" id="obra_social" value="${fichaSalud.obra_social || ''}">
+        </div>
+        <div class="seccion-salud">
+            <label>Observaciones</label>
+            <textarea id="observaciones" rows="3">${fichaSalud.observaciones || ''}</textarea>
+        </div>
+
         <div class="seccion-salud">
             <label>¿Padece alguna enfermedad crónica o tiene secuelas de alguna que ha tenido?</label>
             <input type="checkbox" class="check_enfermedad" ${fichaSalud.enfermedades.length ? 'checked' : ''}>
@@ -494,7 +495,15 @@ function mostrar_ficha_salud_edicion(dni, fichaSalud) {
             <input type="checkbox" class="check_impedimento" ${fichaSalud.impedimentos.length ? 'checked' : ''}>
             <div class="impedimentos_container" style="${fichaSalud.impedimentos.length ? '' : 'display:none;'}"></div>
         </div>
-        <button class="btn primary" id="guardar_ficha_salud">Guardar ficha</button>
+        <div class="seccion-salud">
+            <label>¿Tiene algún tipo de alergia?</label>
+            <input type="checkbox" class="check_alergia" ${fichaSalud.alergias.length ? 'checked' : ''}>
+            <div class="alergias_container" style="${fichaSalud.alergias.length ? '' : 'display:none;'}"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top:15px;">
+            <button class="btn primary" id="guardar_ficha_salud">Guardar ficha</button>
+            ${(usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno') ? `<button class="btn" id="imprimir_ficha_salud">Imprimir ficha</button>` : ''}
+        </div>
     `;
 
     abrir_modal_generico('Ficha de salud', contenidoHTML);
@@ -512,12 +521,15 @@ function mostrar_ficha_salud_edicion(dni, fichaSalud) {
     cargarItemsEnContenedor(contenedor.querySelector('.enfermedades_container'), 'enfermedad', dni, fichaSalud.enfermedades);
     cargarItemsEnContenedor(contenedor.querySelector('.medicamentos_container'), 'medicamento', dni, fichaSalud.medicamentos);
     cargarItemsEnContenedor(contenedor.querySelector('.impedimentos_container'), 'impedimento', dni, fichaSalud.impedimentos);
+    cargarItemsEnContenedor(contenedor.querySelector('.alergias_container'), 'alergia', dni, fichaSalud.alergias);
 
-    contenedor.querySelectorAll('.check_enfermedad, .check_medicamento, .check_impedimento').forEach(check => {
+    // Eventos para checkboxes
+    contenedor.querySelectorAll('.check_enfermedad, .check_medicamento, .check_impedimento, .check_alergia').forEach(check => {
         check.addEventListener('change', function() {
             const tipo = this.classList.contains('check_enfermedad') ? 'enfermedad' :
-                          this.classList.contains('check_medicamento') ? 'medicamento' : 'impedimento';
-            const cont = contenedor.querySelector(`.${tipo === 'enfermedad' ? 'enfermedades' : tipo === 'medicamento' ? 'medicamentos' : 'impedimentos'}_container`);
+                          this.classList.contains('check_medicamento') ? 'medicamento' :
+                          this.classList.contains('check_impedimento') ? 'impedimento' : 'alergia';
+            const cont = contenedor.querySelector(`.${tipo === 'enfermedad' ? 'enfermedades' : tipo === 'medicamento' ? 'medicamentos' : tipo === 'impedimento' ? 'impedimentos' : 'alergias'}_container`);
             if (cont) {
                 cont.style.display = this.checked ? 'block' : 'none';
                 if (this.checked && cont.children.length === 0) {
@@ -527,16 +539,22 @@ function mostrar_ficha_salud_edicion(dni, fichaSalud) {
         });
     });
 
+    // Botón guardar
     contenedor.querySelector('#guardar_ficha_salud').addEventListener('click', async () => {
         const nombre_dueno = obtener_nombre_dueno_pasajeros();
         const ficha = {
             enfermedades: [],
             medicamentos: [],
-            impedimentos: []
+            impedimentos: [],
+            alergias: [],
+            grupo_sanguineo: contenedor.querySelector('#grupo_sanguineo').value,
+            obra_social: contenedor.querySelector('#obra_social').value.trim(),
+            observaciones: contenedor.querySelector('#observaciones').value.trim()
         };
         contenedor.querySelectorAll('.salud_enfermedad').forEach(input => ficha.enfermedades.push(input.value.trim()));
         contenedor.querySelectorAll('.salud_medicamento').forEach(input => ficha.medicamentos.push(input.value.trim()));
         contenedor.querySelectorAll('.salud_impedimento').forEach(input => ficha.impedimentos.push(input.value.trim()));
+        contenedor.querySelectorAll('.salud_alergia').forEach(input => ficha.alergias.push(input.value.trim()));
 
         const respuesta = await fetch("index.php", {
             method: "POST",
@@ -557,6 +575,15 @@ function mostrar_ficha_salud_edicion(dni, fichaSalud) {
             mostrar_aviso(resultado.error || "Error al guardar ficha", 'error');
         }
     });
+
+    // Botón imprimir (si existe)
+    const botonImprimir = contenedor.querySelector('#imprimir_ficha_salud');
+    if (botonImprimir) {
+        botonImprimir.addEventListener('click', () => {
+            const nombre_dueno = obtener_nombre_dueno_pasajeros();
+            window.open(`index.php?imprimir=1&tipo=ficha_salud&id_venta=${nombre_dueno}&dni=${dni}`, '_blank');
+        });
+    }
 }
 
 function agregarInputSalud(contenedor, tipo, index, valorInicial = '', esUltimo = true) {

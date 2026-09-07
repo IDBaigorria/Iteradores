@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.21
+ * @version   1.5piloto.25
  */
 
 use Iteradores\Nodos\Nodo;
@@ -18,9 +18,6 @@ include_once("./Aplicacion/Ventas/Venta.php");
 
 /**
  * Obtiene el contenedor de pasajeros de un dueño, creándolo si no existe.
- *
- * @param string $nombre_dueno Nombre del usuario dueño.
- * @return Nodo|null Nodo contenedor o null si no se encuentra al dueño.
  */
 function obtener_contenedor_pasajeros_dueno(string $nombre_dueno): ?Nodo {
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
@@ -37,13 +34,10 @@ function obtener_contenedor_pasajeros_dueno(string $nombre_dueno): ?Nodo {
     return $contenedor;
 }
 
-
 /**
- * Obtiene el nodo raíz de pasajeros (ahora del dueño por defecto).
- * Se mantiene el nombre por compatibilidad.
+ * Obtiene el nodo raíz de pasajeros (por compatibilidad).
  */
 function obtener_raiz_pasajeros(): ?Nodo {
-    // En esta versión solo hay un dueño; se puede generalizar después.
     return obtener_contenedor_pasajeros_dueno('Parroquia_del_Carmen');
 }
 
@@ -91,6 +85,7 @@ function buscar_pasajeros(string $nombre_dueno, string $termino): array {
 
 /**
  * Formatea los datos de un pasajero.
+ * Incluye localidad, dirección y ficha de salud ampliada.
  */
 function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
     $datos = [
@@ -100,6 +95,8 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
         'celular' => $nodo_pasajero->adyacente('celular') ? $nodo_pasajero->adyacente('celular')->dato() : '',
         'celular_emergencia' => $nodo_pasajero->adyacente('celular_emergencia') ? $nodo_pasajero->adyacente('celular_emergencia')->dato() : '',
         'fecha_nacimiento' => $nodo_pasajero->adyacente('fecha_nacimiento') ? $nodo_pasajero->adyacente('fecha_nacimiento')->dato() : '',
+        'localidad' => $nodo_pasajero->adyacente('localidad') ? $nodo_pasajero->adyacente('localidad')->dato() : '',
+        'direccion' => $nodo_pasajero->adyacente('direccion') ? $nodo_pasajero->adyacente('direccion')->dato() : '',
     ];
 
     // Ficha de salud
@@ -107,7 +104,14 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
     $datos['ficha_salud'] = null;
     if ($ficha) {
         $ficha_salud = [];
-        foreach (['enfermedades', 'medicamentos', 'impedimentos'] as $cat) {
+
+        // Campo grupo sanguíneo (string)
+        $ficha_salud['grupo_sanguineo'] = $ficha->adyacente('grupo_sanguineo') ? $ficha->adyacente('grupo_sanguineo')->dato() : '';
+        $ficha_salud['obra_social'] = $ficha->adyacente('obra_social') ? $ficha->adyacente('obra_social')->dato() : '';
+        $ficha_salud['observaciones'] = $ficha->adyacente('observaciones') ? $ficha->adyacente('observaciones')->dato() : '';
+
+        // Listas existentes y nueva alergias
+        foreach (['enfermedades', 'medicamentos', 'impedimentos', 'alergias'] as $cat) {
             $raiz_cat = $ficha->adyacente($cat);
             $items = [];
             if ($raiz_cat) {
@@ -119,6 +123,7 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
             }
             $ficha_salud[$cat] = $items;
         }
+
         $datos['ficha_salud'] = $ficha_salud;
     }
 
@@ -152,7 +157,6 @@ function obtener_pasajero_por_dni(string $nombre_dueno, string $dni): ?array {
             while ($actual) {
                 $venta_formateada = formatear_venta_para_pasajero($actual, $dni);
                 if ($venta_formateada) {
-                    // Agregar rol para compatibilidad con frontend actual
                     if ($venta_formateada['es_comprador'] && $venta_formateada['es_pasajero']) {
                         $venta_formateada['rol'] = 'ambos';
                     } elseif ($venta_formateada['es_comprador']) {
@@ -181,7 +185,7 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
     $nodo_pasajero = $contenedor->adyacente($dni);
     if (!$nodo_pasajero) return ['exito' => false, 'error' => 'Pasajero no encontrado'];
 
-    $campos = ['nombre', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento'];
+    $campos = ['nombre', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento', 'localidad', 'direccion'];
     foreach ($campos as $campo) {
         if (isset($datos[$campo])) {
             $valor = trim($datos[$campo]);
@@ -201,6 +205,7 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
 
 /**
  * Guarda la ficha de salud de un pasajero.
+ * Incluye grupo sanguíneo, alergias, obra social y observaciones.
  */
 function guardar_ficha_salud(string $nombre_dueno, string $dni, array $salud): void {
     $nodo_pasajero = obtener_pasajero_nodo_por_dni($nombre_dueno, $dni);
@@ -212,7 +217,23 @@ function guardar_ficha_salud(string $nombre_dueno, string $dni, array $salud): v
         $nodo_pasajero->_adyacente_en($ficha, 'ficha_salud');
     }
 
-    $categorias = ['enfermedades', 'medicamentos', 'impedimentos'];
+    // Guardar campos simples
+    $campos_simples = ['grupo_sanguineo', 'obra_social', 'observaciones'];
+    foreach ($campos_simples as $campo) {
+        if (isset($salud[$campo])) {
+            $valor = trim($salud[$campo]);
+            $nodo_campo = $ficha->adyacente($campo);
+            if ($nodo_campo) {
+                if ($valor === '') $ficha->eliminar_adyacente($campo);
+                else $nodo_campo->_dato($valor);
+            } else {
+                if ($valor !== '') $ficha->_adyacente_en(Nodo::crear_con_dato($valor), $campo);
+            }
+        }
+    }
+
+    // Listas (incluyendo alergias)
+    $categorias = ['enfermedades', 'medicamentos', 'impedimentos', 'alergias'];
     foreach ($categorias as $cat) {
         $raiz = $ficha->adyacente($cat);
         if (!$raiz) {
@@ -220,6 +241,7 @@ function guardar_ficha_salud(string $nombre_dueno, string $dni, array $salud): v
             $ficha->_adyacente_en($raiz, $cat);
         }
 
+        // Limpiar lista actual
         while ($hijo = hmi($raiz)) {
             eliminar_hmi($raiz);
         }
@@ -237,10 +259,6 @@ function guardar_ficha_salud(string $nombre_dueno, string $dni, array $salud): v
 
 /**
  * Verifica si un pasajero tiene pasajes comprados en los viajes de un dueño.
- *
- * @param string $nombre_dueno Nombre del dueño.
- * @param string $dni DNI del pasajero.
- * @return bool True si tiene al menos un pasaje, false en caso contrario.
  */
 function pasajero_tiene_pasajes(string $nombre_dueno, string $dni): bool {
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
@@ -254,13 +272,11 @@ function pasajero_tiene_pasajes(string $nombre_dueno, string $dni): bool {
 
     $actual = hmi($contenedor_ventas);
     while ($actual) {
-        // Verificar comprador
         $comprador = $actual->adyacente('comprador');
         if ($comprador && $comprador->dato() === $dni) {
             return true;
         }
 
-        // Verificar pasajero en asientos
         $cabeza_asientos = $actual->adyacente('asientos');
         if ($cabeza_asientos) {
             $asiento_venta = $cabeza_asientos->adyacente('primer');
@@ -280,25 +296,21 @@ function pasajero_tiene_pasajes(string $nombre_dueno, string $dni): bool {
 
     return false;
 }
+
 /**
  * Formatea los datos de una venta para el modal de pasajes de un pasajero.
- *
- * @param Nodo $nodo_venta Nodo de la venta persistente.
- * @param string $dni DNI del pasajero a evaluar.
- * @return array|null Datos estructurados o null si no hay relación.
  */
 function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
     $es_comprador = false;
     $es_pasajero = false;
 
-    // Determinar rol
     $comprador = $nodo_venta->adyacente('comprador');
     if ($comprador && $comprador->dato() === $dni) {
         $es_comprador = true;
     }
 
-    $asientos_pasajero = [];     // Asientos del pasajero consultado
-    $pasajes_venta = [];         // Todos los pasajes de la venta (asiento, nombre, dni)
+    $asientos_pasajero = [];
+    $pasajes_venta = [];
     $cabeza_asientos = $nodo_venta->adyacente('asientos');
     if ($cabeza_asientos) {
         $actual = $cabeza_asientos->adyacente('primer');
@@ -330,16 +342,14 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
     }
 
     if (!$es_comprador && !$es_pasajero) {
-        return null; // sin relación
+        return null;
     }
 
-    // Datos de compra
     $id_venta = $nodo_venta->dato();
     $nodo_terminal = $nodo_venta->adyacente('terminal');
     $nodo_fecha = $nodo_venta->adyacente('fecha_hora');
     $nodo_cuotas_restantes = $nodo_venta->adyacente('cuotas_restantes');
 
-    // Nombre visible de la terminal
     $terminal_nombre = '';
     if ($nodo_terminal) {
         $terminal_nombre = $nodo_terminal->adyacente('nombre_real') ? $nodo_terminal->adyacente('nombre_real')->dato() : $nodo_terminal->dato();
@@ -355,7 +365,6 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
         'estado_pago' => $estado_pago,
     ];
 
-    // Datos del viaje (para modal individual)
     $nodo_viaje = $nodo_venta->adyacente('viaje');
     $nodo_micro = $nodo_venta->adyacente('micro');
     $origen = $nodo_viaje && $nodo_viaje->adyacente('origen') ? $nodo_viaje->adyacente('origen')->dato() : '';
@@ -389,13 +398,9 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
         'pasajes_venta' => $pasajes_venta,
     ];
 }
+
 /**
  * Elimina un pasajero si no tiene pasajes comprados.
- * Si tiene referencias huérfanas, al menos se quita del listado.
- *
- * @param string $nombre_dueno Nombre del dueño.
- * @param string $dni DNI del pasajero.
- * @return array Resultado con éxito o error.
  */
 function eliminar_pasajero(string $nombre_dueno, string $dni): array {
     $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
@@ -404,15 +409,11 @@ function eliminar_pasajero(string $nombre_dueno, string $dni): array {
     $nodo_pasajero = $contenedor->adyacente($dni);
     if (!$nodo_pasajero) return ['exito' => false, 'error' => 'Pasajero no encontrado'];
 
-    // Verificar si tiene pasajes comprados en los viajes del dueño
     if (pasajero_tiene_pasajes($nombre_dueno, $dni)) {
         return ['exito' => false, 'error' => 'No se puede eliminar: el pasajero tiene pasajes comprados.'];
     }
 
-    // Eliminar el enlace del contenedor (esto lo quita de la lista)
     $contenedor->eliminar_adyacente($dni);
-
-    // Intentar eliminar el nodo; si falla por referencias huérfanas, no es crítico
     Nodo::eliminar($nodo_pasajero);
 
     Controlador::guardar(Conf::NOMBRE_APP);
