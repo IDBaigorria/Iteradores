@@ -457,7 +457,16 @@ async function cargar_detalle_pasajero(dni) {
 
 function mostrar_ficha_salud_edicion(dni, fichaSalud) {
     if (!fichaSalud) {
-        fichaSalud = { enfermedades: [], medicamentos: [], impedimentos: [], alergias: [], grupo_sanguineo: '', obra_social: '', observaciones: '' };
+        fichaSalud = {
+            grupo_sanguineo: '',
+            obra_social: '',
+            alergias: '',
+            enfermedades: '',
+            medicamentos: '',
+            impedimentos: '',
+            regimenes_comida: '',
+            observaciones: ''
+        };
     }
 
     const opcionesGrupo = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'Desconocido'];
@@ -472,33 +481,37 @@ function mostrar_ficha_salud_edicion(dni, fichaSalud) {
             </select>
         </div>
         <div class="seccion-salud">
-            <label>Obra social</label>
+            <label>Obra social o prepaga (incluya num de emergencias si corresponde)</label>
             <input type="text" id="obra_social" value="${fichaSalud.obra_social || ''}">
         </div>
         <div class="seccion-salud">
-            <label>Observaciones</label>
-            <textarea id="observaciones" rows="3">${fichaSalud.observaciones || ''}</textarea>
+            <label>¿Tiene algún tipo de alergia?</label>
+            <input type="checkbox" id="check_alergia" ${fichaSalud.alergias ? 'checked' : ''}>
+            <input type="text" id="alergias" value="${fichaSalud.alergias || ''}" placeholder="Detalle" style="${fichaSalud.alergias ? '' : 'display:none;'}">
         </div>
-
         <div class="seccion-salud">
             <label>¿Padece alguna enfermedad crónica o tiene secuelas de alguna que ha tenido?</label>
-            <input type="checkbox" class="check_enfermedad" ${fichaSalud.enfermedades.length ? 'checked' : ''}>
-            <div class="enfermedades_container" style="${fichaSalud.enfermedades.length ? '' : 'display:none;'}"></div>
+            <input type="checkbox" id="check_enfermedad" ${fichaSalud.enfermedades ? 'checked' : ''}>
+            <input type="text" id="enfermedades" value="${fichaSalud.enfermedades || ''}" placeholder="Detalle" style="${fichaSalud.enfermedades ? '' : 'display:none;'}">
         </div>
         <div class="seccion-salud">
-            <label>¿Está medicado en tratamiento médico o psiquiátrico?</label>
-            <input type="checkbox" class="check_medicamento" ${fichaSalud.medicamentos.length ? 'checked' : ''}>
-            <div class="medicamentos_container" style="${fichaSalud.medicamentos.length ? '' : 'display:none;'}"></div>
+            <label>¿Está tomando algún medicamento? ¿Cual/es? ¿En qué horarios?</label>
+            <input type="checkbox" id="check_medicamento" ${fichaSalud.medicamentos ? 'checked' : ''}>
+            <input type="text" id="medicamentos" value="${fichaSalud.medicamentos || ''}" placeholder="Detalle" style="${fichaSalud.medicamentos ? '' : 'display:none;'}">
         </div>
         <div class="seccion-salud">
             <label>¿Posee algún impedimento físico?</label>
-            <input type="checkbox" class="check_impedimento" ${fichaSalud.impedimentos.length ? 'checked' : ''}>
-            <div class="impedimentos_container" style="${fichaSalud.impedimentos.length ? '' : 'display:none;'}"></div>
+            <input type="checkbox" id="check_impedimento" ${fichaSalud.impedimentos ? 'checked' : ''}>
+            <input type="text" id="impedimentos" value="${fichaSalud.impedimentos || ''}" placeholder="Detalle" style="${fichaSalud.impedimentos ? '' : 'display:none;'}">
         </div>
         <div class="seccion-salud">
-            <label>¿Tiene algún tipo de alergia?</label>
-            <input type="checkbox" class="check_alergia" ${fichaSalud.alergias.length ? 'checked' : ''}>
-            <div class="alergias_container" style="${fichaSalud.alergias.length ? '' : 'display:none;'}"></div>
+            <label>¿Sigue algún regimen especial de comida?</label>
+            <input type="checkbox" id="check_regimen_comida" ${fichaSalud.regimenes_comida ? 'checked' : ''}>
+            <input type="text" id="regimenes_comida" value="${fichaSalud.regimenes_comida || ''}" placeholder="Detalle" style="${fichaSalud.regimenes_comida ? '' : 'display:none;'}">
+        </div>
+        <div class="seccion-salud">
+            <label>Algún otro dato que considere importante:</label>
+            <textarea id="observaciones" rows="3">${fichaSalud.observaciones || ''}</textarea>
         </div>
         <div style="display: flex; justify-content: space-between; margin-top:15px;">
             <button class="btn primary" id="guardar_ficha_salud">Guardar ficha</button>
@@ -511,50 +524,38 @@ function mostrar_ficha_salud_edicion(dni, fichaSalud) {
     const contenedor = document.getElementById('modal_generico_contenido');
     if (!contenedor) return;
 
-    function cargarItemsEnContenedor(contenedor, tipo, dni, items) {
-        items.forEach((item, idx) => {
-            const esUltimo = idx === items.length - 1;
-            agregarInputSalud(contenedor, tipo, dni, item, esUltimo);
-        });
-    }
-
-    cargarItemsEnContenedor(contenedor.querySelector('.enfermedades_container'), 'enfermedad', dni, fichaSalud.enfermedades);
-    cargarItemsEnContenedor(contenedor.querySelector('.medicamentos_container'), 'medicamento', dni, fichaSalud.medicamentos);
-    cargarItemsEnContenedor(contenedor.querySelector('.impedimentos_container'), 'impedimento', dni, fichaSalud.impedimentos);
-    cargarItemsEnContenedor(contenedor.querySelector('.alergias_container'), 'alergia', dni, fichaSalud.alergias);
-
-    // Eventos para checkboxes
-    contenedor.querySelectorAll('.check_enfermedad, .check_medicamento, .check_impedimento, .check_alergia').forEach(check => {
-        check.addEventListener('change', function() {
-            const tipo = this.classList.contains('check_enfermedad') ? 'enfermedad' :
-                          this.classList.contains('check_medicamento') ? 'medicamento' :
-                          this.classList.contains('check_impedimento') ? 'impedimento' : 'alergia';
-            const cont = contenedor.querySelector(`.${tipo === 'enfermedad' ? 'enfermedades' : tipo === 'medicamento' ? 'medicamentos' : tipo === 'impedimento' ? 'impedimentos' : 'alergias'}_container`);
-            if (cont) {
-                cont.style.display = this.checked ? 'block' : 'none';
-                if (this.checked && cont.children.length === 0) {
-                    agregarInputSalud(cont, tipo, dni);
-                }
-            }
-        });
+    // Eventos para mostrar/ocultar inputs según checkbox
+    const pares = [
+        ['check_alergia', 'alergias'],
+        ['check_enfermedad', 'enfermedades'],
+        ['check_medicamento', 'medicamentos'],
+        ['check_impedimento', 'impedimentos'],
+        ['check_regimen_comida', 'regimenes_comida']   // <-- agregar
+    ];
+    pares.forEach(([checkId, inputId]) => {
+        const check = contenedor.querySelector(`#${checkId}`);
+        const input = contenedor.querySelector(`#${inputId}`);
+        if (check && input) {
+            check.addEventListener('change', () => {
+                input.style.display = check.checked ? '' : 'none';
+                if (!check.checked) input.value = '';
+            });
+        }
     });
 
     // Botón guardar
     contenedor.querySelector('#guardar_ficha_salud').addEventListener('click', async () => {
         const nombre_dueno = obtener_nombre_dueno_pasajeros();
         const ficha = {
-            enfermedades: [],
-            medicamentos: [],
-            impedimentos: [],
-            alergias: [],
             grupo_sanguineo: contenedor.querySelector('#grupo_sanguineo').value,
             obra_social: contenedor.querySelector('#obra_social').value.trim(),
+            alergias: contenedor.querySelector('#alergias').value.trim(),
+            enfermedades: contenedor.querySelector('#enfermedades').value.trim(),
+            medicamentos: contenedor.querySelector('#medicamentos').value.trim(),
+            impedimentos: contenedor.querySelector('#impedimentos').value.trim(),
+            regimenes_comida: contenedor.querySelector('#regimenes_comida').value.trim(),
             observaciones: contenedor.querySelector('#observaciones').value.trim()
         };
-        contenedor.querySelectorAll('.salud_enfermedad').forEach(input => ficha.enfermedades.push(input.value.trim()));
-        contenedor.querySelectorAll('.salud_medicamento').forEach(input => ficha.medicamentos.push(input.value.trim()));
-        contenedor.querySelectorAll('.salud_impedimento').forEach(input => ficha.impedimentos.push(input.value.trim()));
-        contenedor.querySelectorAll('.salud_alergia').forEach(input => ficha.alergias.push(input.value.trim()));
 
         const respuesta = await fetch("index.php", {
             method: "POST",
@@ -576,7 +577,7 @@ function mostrar_ficha_salud_edicion(dni, fichaSalud) {
         }
     });
 
-    // Botón imprimir (si existe)
+    // Botón imprimir
     const botonImprimir = contenedor.querySelector('#imprimir_ficha_salud');
     if (botonImprimir) {
         botonImprimir.addEventListener('click', () => {
@@ -585,7 +586,6 @@ function mostrar_ficha_salud_edicion(dni, fichaSalud) {
         });
     }
 }
-
 function agregarInputSalud(contenedor, tipo, index, valorInicial = '', esUltimo = true) {
     const div = document.createElement('div');
     div.className = 'input_salud';

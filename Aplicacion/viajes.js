@@ -139,6 +139,22 @@ function ver_detalle_viaje(viaje) {
         $("#seccion_terminales_viaje").style.display = '';
     }
 
+    // Insertar botón "Opciones avanzadas" para admin y dueño
+    if (usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno') {
+        // Eliminar botón anterior si existe
+        const botonExistente = document.getElementById('boton_opciones_avanzadas');
+        if (botonExistente) botonExistente.remove();
+
+        const botonOpciones = document.createElement('button');
+        botonOpciones.className = 'btn';
+        botonOpciones.textContent = 'Opciones avanzadas';
+        botonOpciones.id = 'boton_opciones_avanzadas';
+        botonOpciones.addEventListener('click', abrir_modal_opciones_avanzadas);
+
+        const tituloDetalle = document.getElementById('detalle_viaje_titulo');
+        tituloDetalle.after(botonOpciones);
+    }
+
     renderizar_micros_viaje(viaje.micros);
     if (usuario_actual.nivel !== 'terminal') {
         renderizar_terminales_viaje(viaje.terminales_autorizadas);
@@ -146,7 +162,97 @@ function ver_detalle_viaje(viaje) {
         $("#lista_terminales_viaje").innerHTML = '';
     }
 }
+async function abrir_modal_opciones_avanzadas() {
+    if (!viaje_seleccionado) return;
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const nombre_viaje = viaje_seleccionado.nombre_viaje;
 
+    // Obtener opciones actuales
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/obtener_opciones_avanzadas",
+            nombre_viaje,
+            nombre_dueno
+        })
+    });
+    const datos = await resp.json();
+    const opciones = datos.exito ? datos.opciones : {
+        mostrar_ficha_medica: '0',
+        restriccion_edad: '0',
+        edad_minima: '18',
+        edad_maxima: '80'
+    };
+
+    const contenido = `
+        <div>
+            <label>
+                <input type="checkbox" id="opcion_mostrar_ficha" ${opciones.mostrar_ficha_medica === '1' ? 'checked' : ''}>
+                Mostrar opción de agregar ficha médica al momento de la venta
+            </label>
+        </div>
+        <div style="margin-top:15px;">
+            <label>
+                <input type="checkbox" id="opcion_restriccion_edad" ${opciones.restriccion_edad === '1' ? 'checked' : ''}>
+                Aplicar restricción de edad
+            </label>
+            <div id="campos_edad" style="margin-left:20px; margin-top:10px; display:${opciones.restriccion_edad === '1' ? 'block' : 'none'};">
+                <div class="field">
+                    <label>Edad mínima:</label>
+                    <input type="number" id="edad_minima" value="${opciones.edad_minima}" min="0" max="120">
+                </div>
+                <div class="field">
+                    <label>Edad máxima:</label>
+                    <input type="number" id="edad_maxima" value="${opciones.edad_maxima}" min="0" max="120">
+                </div>
+            </div>
+        </div>
+        <div class="actions" style="margin-top:15px;">
+            <button class="btn primary" id="guardar_opciones_avanzadas">Guardar</button>
+            <button class="btn" id="cancelar_opciones_avanzadas">Cancelar</button>
+        </div>
+    `;
+
+    abrir_modal_generico('Opciones avanzadas', contenido);
+
+    // Eventos
+    document.getElementById('opcion_restriccion_edad').addEventListener('change', function() {
+        document.getElementById('campos_edad').style.display = this.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('guardar_opciones_avanzadas').addEventListener('click', async () => {
+        const mostrar_ficha = document.getElementById('opcion_mostrar_ficha').checked ? '1' : '0';
+        const restriccion = document.getElementById('opcion_restriccion_edad').checked ? '1' : '0';
+        const edad_min = document.getElementById('edad_minima').value;
+        const edad_max = document.getElementById('edad_maxima').value;
+
+        const resp = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/guardar_opciones_avanzadas",
+                nombre_viaje,
+                nombre_dueno,
+                mostrar_ficha_medica: mostrar_ficha,
+                restriccion_edad: restriccion,
+                edad_minima: edad_min,
+                edad_maxima: edad_max
+            })
+        });
+        const resultado = await resp.json();
+        if (resultado.exito) {
+            mostrar_aviso('Opciones guardadas', 'exito');
+            cerrar_modal_generico();
+            // Actualizar viaje seleccionado para reflejar cambios
+            actualizar_detalle_viaje_actual();
+        } else {
+            mostrar_aviso(resultado.error || 'Error al guardar', 'error');
+        }
+    });
+
+    document.getElementById('cancelar_opciones_avanzadas').addEventListener('click', cerrar_modal_generico);
+}
 function renderizar_micros_viaje(micros) {
     const contenedor = $("#lista_micros_viaje");
     contenedor.innerHTML = '';

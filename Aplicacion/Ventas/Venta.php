@@ -164,6 +164,12 @@ function confirmar_venta_actual(
     $nodo_micro = $nodo_micros->adyacente($nombre_micro);
     if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
 
+    // Obtener opciones avanzadas del viaje
+    $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
+    $restriccion_edad = $opciones['restriccion_edad'] === '1';
+    $edad_min = (int)$opciones['edad_minima'];
+    $edad_max = (int)$opciones['edad_maxima'];
+
     // Validar método de pago y cuotas
     $metodo_pago = strtolower($metodo_pago);
     if (!in_array($metodo_pago, ['efectivo', 'transferencia'])) {
@@ -278,6 +284,18 @@ function confirmar_venta_actual(
             return ['exito' => false, 'error' => 'Faltan datos obligatorios del pasajero ' . ($indice_asiento + 1)];
         }
 
+        if ($restriccion_edad) {
+            $fecha_nac = DateTime::createFromFormat('Y-m-d', $fecha_nacimiento_pasajero);
+            if (!$fecha_nac) {
+                return ['exito' => false, 'error' => 'Fecha de nacimiento inválida del pasajero ' . ($indice_asiento + 1)];
+            }
+            $hoy = new DateTime();
+            $edad = $hoy->diff($fecha_nac)->y;
+            if ($edad < $edad_min || $edad > $edad_max) {
+                return ['exito' => false, 'error' => "El pasajero " . ($indice_asiento + 1) . " no cumple con la restricción de edad ($edad_min-$edad_max años)"];
+            }
+        }
+        
         if (empty($datos_pasajero['localidad']) || empty($datos_pasajero['direccion'])) {
             return ['exito' => false, 'error' => 'Faltan datos obligatorios del pasajero ' . ($indice_asiento + 1) . ': localidad y dirección'];
         }

@@ -118,6 +118,7 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje): array {
     }
     $datos['terminales_autorizadas'] = $terminales;
 
+    $datos['opciones_avanzadas'] = obtener_opciones_avanzadas_viaje($datos['dueno'], $nombre_viaje);
     return $datos;
 }
 
@@ -985,3 +986,99 @@ function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, stri
     Controlador::guardar(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
+
+/**
+ * Obtiene las opciones avanzadas de un viaje.
+ * Si no existen, devuelve valores por defecto.
+ *
+ * @param string $nombre_dueno Nombre del dueño.
+ * @param string $nombre_viaje Identificador del viaje.
+ * @return array Opciones avanzadas con claves: mostrar_ficha_medica, restriccion_edad, edad_minima, edad_maxima.
+ */
+function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje): array {
+    $defaults = [
+        'mostrar_ficha_medica' => '0',
+        'restriccion_edad' => '0',
+        'edad_minima' => '18',
+        'edad_maxima' => '80',
+    ];
+
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return $defaults;
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return $defaults;
+
+    $nodo_opciones = $nodo_viaje->adyacente('opciones_avanzadas');
+    if (!$nodo_opciones) return $defaults;
+
+    $opciones = $defaults;
+    $campo = $nodo_opciones->adyacente('mostrar_ficha_medica');
+    if ($campo) $opciones['mostrar_ficha_medica'] = $campo->dato();
+
+    $campo = $nodo_opciones->adyacente('restriccion_edad');
+    if ($campo) $opciones['restriccion_edad'] = $campo->dato();
+
+    $campo = $nodo_opciones->adyacente('edad_minima');
+    if ($campo) $opciones['edad_minima'] = $campo->dato();
+
+    $campo = $nodo_opciones->adyacente('edad_maxima');
+    if ($campo) $opciones['edad_maxima'] = $campo->dato();
+
+    return $opciones;
+}
+
+/**
+ * Guarda las opciones avanzadas de un viaje.
+ *
+ * @param string $nombre_dueno Nombre del dueño.
+ * @param string $nombre_viaje Identificador del viaje.
+ * @param array $opciones Datos a guardar.
+ * @return array Resultado.
+ */
+function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, array $opciones): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    $nodo_opciones = $nodo_viaje->adyacente('opciones_avanzadas');
+    if (!$nodo_opciones) {
+        $nodo_opciones = Nodo::crear_con_dato('');
+        $nodo_viaje->_adyacente_en($nodo_opciones, 'opciones_avanzadas');
+    }
+
+    // Sanitizar y guardar como strings
+    $mostrar_ficha = ($opciones['mostrar_ficha_medica'] ?? '0') === '1' ? '1' : '0';
+    $restriccion = ($opciones['restriccion_edad'] ?? '0') === '1' ? '1' : '0';
+    $edad_min = (string)($opciones['edad_minima'] ?? '18');
+    $edad_max = (string)($opciones['edad_maxima'] ?? '80');
+
+    // Actualizar o crear cada campo
+    _actualizar_o_crear_campo($nodo_opciones, 'mostrar_ficha_medica', $mostrar_ficha);
+    _actualizar_o_crear_campo($nodo_opciones, 'restriccion_edad', $restriccion);
+    _actualizar_o_crear_campo($nodo_opciones, 'edad_minima', $edad_min);
+    _actualizar_o_crear_campo($nodo_opciones, 'edad_maxima', $edad_max);
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+    return ['exito' => true];
+}
+
+/**
+ * Helper para actualizar o crear un campo simple en un nodo contenedor.
+ *
+ * @param Nodo $nodo_padre Nodo contenedor.
+ * @param string $nombre Nombre del enlace.
+ * @param string $valor Valor a guardar (string).
+ * @return void
+ */
+function _actualizar_o_crear_campo(Nodo $nodo_padre, string $nombre, string $valor): void {
+    $nodo_campo = $nodo_padre->adyacente($nombre);
+    if ($nodo_campo) {
+        $nodo_campo->_dato($valor);
+    } else {
+        $nodo_padre->_adyacente_en(Nodo::crear_con_dato($valor), $nombre);
+    }
+}
+

@@ -85,7 +85,7 @@ function buscar_pasajeros(string $nombre_dueno, string $termino): array {
 
 /**
  * Formatea los datos de un pasajero.
- * Incluye localidad, dirección y ficha de salud ampliada.
+ * Incluye localidad, dirección y ficha de salud simplificada.
  */
 function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
     $datos = [
@@ -99,18 +99,18 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
         'direccion' => $nodo_pasajero->adyacente('direccion') ? $nodo_pasajero->adyacente('direccion')->dato() : '',
     ];
 
-    // Ficha de salud
     $ficha = $nodo_pasajero->adyacente('ficha_salud');
     $datos['ficha_salud'] = null;
     if ($ficha) {
         $ficha_salud = [];
 
-        // Campo grupo sanguíneo (string)
+        // Campos simples
         $ficha_salud['grupo_sanguineo'] = $ficha->adyacente('grupo_sanguineo') ? $ficha->adyacente('grupo_sanguineo')->dato() : '';
         $ficha_salud['obra_social'] = $ficha->adyacente('obra_social') ? $ficha->adyacente('obra_social')->dato() : '';
+        $ficha_salud['regimenes_comida'] = $ficha->adyacente('regimenes_comida') ? $ficha->adyacente('regimenes_comida')->dato() : '';
         $ficha_salud['observaciones'] = $ficha->adyacente('observaciones') ? $ficha->adyacente('observaciones')->dato() : '';
 
-        // Listas existentes y nueva alergias
+        // Categorías que antes eran listas, ahora string
         foreach (['enfermedades', 'medicamentos', 'impedimentos', 'alergias'] as $cat) {
             $raiz_cat = $ficha->adyacente($cat);
             $items = [];
@@ -120,8 +120,16 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
                     $items[] = $actual_item->dato();
                     $actual_item = hd($actual_item);
                 }
+                if (!empty($items)) {
+                    // Si había lista, la concatenamos en un string
+                    $ficha_salud[$cat] = implode('; ', $items);
+                } else {
+                    // Si no tiene hijos, puede que ya sea string en el dato del nodo
+                    $ficha_salud[$cat] = $raiz_cat->dato() ?? '';
+                }
+            } else {
+                $ficha_salud[$cat] = '';
             }
-            $ficha_salud[$cat] = $items;
         }
 
         $datos['ficha_salud'] = $ficha_salud;
@@ -130,6 +138,64 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
     return $datos;
 }
 
+/**
+ * Guarda la ficha de salud de un pasajero.
+ * Ahora todos los campos son strings simples (excepto grupo sanguíneo que también es string).
+ * Las antiguas listas se convierten a string si se recibe un array.
+ */
+function guardar_ficha_salud(string $nombre_dueno, string $dni, array $salud): void {
+    $nodo_pasajero = obtener_pasajero_nodo_por_dni($nombre_dueno, $dni);
+    if (!$nodo_pasajero) return;
+
+    $ficha = $nodo_pasajero->adyacente('ficha_salud');
+    if (!$ficha) {
+        $ficha = Nodo::crear_con_dato('');
+        $nodo_pasajero->_adyacente_en($ficha, 'ficha_salud');
+    }
+
+    // Campos simples
+    $campos_simples = ['grupo_sanguineo', 'obra_social', 'regimenes_comida', 'observaciones'];
+    foreach ($campos_simples as $campo) {
+        if (isset($salud[$campo])) {
+            $valor = trim($salud[$campo]);
+            $nodo_campo = $ficha->adyacente($campo);
+            if ($nodo_campo) {
+                if ($valor === '') $ficha->eliminar_adyacente($campo);
+                else $nodo_campo->_dato($valor);
+            } else {
+                if ($valor !== '') $ficha->_adyacente_en(Nodo::crear_con_dato($valor), $campo);
+            }
+        }
+    }
+
+    // Categorías de lista convertidas a string
+    $categorias = ['enfermedades', 'medicamentos', 'impedimentos', 'alergias'];
+    foreach ($categorias as $cat) {
+        $raiz = $ficha->adyacente($cat);
+        if (!$raiz) {
+            $raiz = Nodo::crear_con_dato('');
+            $ficha->_adyacente_en($raiz, $cat);
+        }
+
+        // Limpiar posibles hijos antiguos
+        while ($hijo = hmi($raiz)) {
+            eliminar_hmi($raiz);
+        }
+
+        // Obtener valor (string o array)
+        $valor = '';
+        if (isset($salud[$cat])) {
+            if (is_array($salud[$cat])) {
+                $valor = implode('; ', array_map('trim', $salud[$cat]));
+            } else {
+                $valor = trim($salud[$cat]);
+            }
+        }
+        $raiz->_dato($valor);
+    }
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+}
 /**
  * Obtiene un pasajero por DNI con sus ventas.
  */
@@ -201,60 +267,6 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
 
     Controlador::guardar(Conf::NOMBRE_APP);
     return ['exito' => true];
-}
-
-/**
- * Guarda la ficha de salud de un pasajero.
- * Incluye grupo sanguíneo, alergias, obra social y observaciones.
- */
-function guardar_ficha_salud(string $nombre_dueno, string $dni, array $salud): void {
-    $nodo_pasajero = obtener_pasajero_nodo_por_dni($nombre_dueno, $dni);
-    if (!$nodo_pasajero) return;
-
-    $ficha = $nodo_pasajero->adyacente('ficha_salud');
-    if (!$ficha) {
-        $ficha = Nodo::crear_con_dato('');
-        $nodo_pasajero->_adyacente_en($ficha, 'ficha_salud');
-    }
-
-    // Guardar campos simples
-    $campos_simples = ['grupo_sanguineo', 'obra_social', 'observaciones'];
-    foreach ($campos_simples as $campo) {
-        if (isset($salud[$campo])) {
-            $valor = trim($salud[$campo]);
-            $nodo_campo = $ficha->adyacente($campo);
-            if ($nodo_campo) {
-                if ($valor === '') $ficha->eliminar_adyacente($campo);
-                else $nodo_campo->_dato($valor);
-            } else {
-                if ($valor !== '') $ficha->_adyacente_en(Nodo::crear_con_dato($valor), $campo);
-            }
-        }
-    }
-
-    // Listas (incluyendo alergias)
-    $categorias = ['enfermedades', 'medicamentos', 'impedimentos', 'alergias'];
-    foreach ($categorias as $cat) {
-        $raiz = $ficha->adyacente($cat);
-        if (!$raiz) {
-            $raiz = Nodo::crear_con_dato('');
-            $ficha->_adyacente_en($raiz, $cat);
-        }
-
-        // Limpiar lista actual
-        while ($hijo = hmi($raiz)) {
-            eliminar_hmi($raiz);
-        }
-
-        $items = $salud[$cat] ?? [];
-        $items = array_reverse($items);
-        foreach ($items as $item) {
-            $nodo_item = Nodo::crear_con_dato($item);
-            _hmi($raiz, $nodo_item);
-        }
-    }
-
-    Controlador::guardar(Conf::NOMBRE_APP);
 }
 
 /**

@@ -163,11 +163,18 @@ function actualizar_visibilidad_cuotas() {
 function generar_formularios_pasajeros(asientos) {
     const contenedor = $("#pasajeros_venta");
     contenedor.innerHTML = '<h4>Pasajeros por asiento</h4>';
+
+    // Obtener opción de mostrar ficha médica desde opciones avanzadas del viaje
+    const opciones = viaje_seleccionado?.opciones_avanzadas;
+    const mostrarFichaMedica = opciones && opciones.mostrar_ficha_medica === '1';
+
     asientos.forEach((asiento, index) => {
         const div = document.createElement('div');
         div.className = 'panel';
         div.style.marginTop = '10px';
-        div.innerHTML = `
+
+        // Construir HTML base del pasajero
+        let html = `
             <h5>Asiento ${asiento.numero} (F${asiento.fila}, C${asiento.columna})</h5>
             <div class="form-grid">
                 <div class="field"><label>DNI *</label><input id="pasajero_dni_${index}" value=""></div>
@@ -179,57 +186,70 @@ function generar_formularios_pasajeros(asientos) {
                 <div class="field"><label>Dirección *</label><input id="pasajero_direccion_${index}" value=""></div>
                 <div class="field"><label>Localidad *</label><input id="pasajero_localidad_${index}" value=""></div>
             </div>
-            <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
-                <label style="margin:0;">¿Padece algún problema de salud?</label>
-                <button type="button" class="btn" id="btn_ficha_salud_${index}" data-index="${index}">Anexar ficha de salud</button>
-            </div>
-            <div id="ficha_salud_${index}" style="display:none; margin-top:10px;">
-                <h5>Datos de salud</h5>
-                <div class="seccion-salud">
-                    <label>Grupo sanguíneo</label>
-                    <select id="pasajero_grupo_sanguineo_${index}">
-                        <option value="">Seleccione...</option>
-                        <option value="O+">O+</option>
-                        <option value="O-">O-</option>
-                        <option value="A+">A+</option>
-                        <option value="A-">A-</option>
-                        <option value="B+">B+</option>
-                        <option value="B-">B-</option>
-                        <option value="AB+">AB+</option>
-                        <option value="AB-">AB-</option>
-                        <option value="Desconocido" selected>Desconocido</option>
-                    </select>
-                </div>
-                <div class="seccion-salud">
-                    <label>Obra social</label>
-                    <input type="text" id="pasajero_obra_social_${index}" value="">
-                </div>
-                <div class="seccion-salud">
-                    <label>Observaciones</label>
-                    <textarea id="pasajero_observaciones_${index}" rows="2"></textarea>
-                </div>
-                <div>
-                    <label>¿Padece alguna enfermedad crónica o tiene secuelas de alguna que ha tenido?</label>
-                    <input type="checkbox" class="check_enfermedad" data-index="${index}">
-                    <div class="enfermedades_container" data-index="${index}" style="display:none;"></div>
-                </div>
-                <div>
-                    <label>¿Está medicado en tratamiento médico o psiquiátrico?</label>
-                    <input type="checkbox" class="check_medicamento" data-index="${index}">
-                    <div class="medicamentos_container" data-index="${index}" style="display:none;"></div>
-                </div>
-                <div>
-                    <label>¿Posee algún impedimento físico?</label>
-                    <input type="checkbox" class="check_impedimento" data-index="${index}">
-                    <div class="impedimentos_container" data-index="${index}" style="display:none;"></div>
-                </div>
-                <div>
-                    <label>¿Tiene algún tipo de alergia?</label>
-                    <input type="checkbox" class="check_alergia" data-index="${index}">
-                    <div class="alergias_container" data-index="${index}" style="display:none;"></div>
-                </div>
-            </div>
         `;
+
+        // Agregar sección de ficha médica solo si está habilitada
+        if (mostrarFichaMedica) {
+            html += `
+                <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
+                    <label style="margin:0;">¿Padece algún problema de salud?</label>
+                    <button type="button" class="btn" id="btn_ficha_salud_${index}" data-index="${index}">Anexar ficha de salud</button>
+                </div>
+                <div id="ficha_salud_${index}" style="display:none; margin-top:10px;">
+                    <h5>Datos de salud</h5>
+                    <div class="seccion-salud">
+                        <label>Grupo sanguíneo</label>
+                        <select id="pasajero_grupo_sanguineo_${index}">
+                            <option value="">Seleccione...</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                            <option value="Desconocido" selected>Desconocido</option>
+                        </select>
+                    </div>
+                    <div class="seccion-salud">
+                        <label>Obra social o prepaga (incluya numero de emergencias si corresponde)</label>
+                        <input type="text" id="pasajero_obra_social_${index}" value="">
+                    </div>
+                    <div class="seccion-salud">
+                        <label>¿Tiene algún tipo de alergia?</label>
+                        <input type="checkbox" class="check_alergia" data-index="${index}">
+                        <input type="text" id="pasajero_alergias_${index}" placeholder="Detalle" style="display:none;">
+                    </div>
+                    <div class="seccion-salud">
+                        <label>¿Padece alguna enfermedad crónica o tiene secuelas de alguna que ha tenido?</label>
+                        <input type="checkbox" class="check_enfermedad" data-index="${index}">
+                        <input type="text" id="pasajero_enfermedades_${index}" placeholder="Detalle" style="display:none;">
+                    </div>
+                    <div class="seccion-salud">
+                        <label>¿Está tomando algún medicamento? ¿Cual/es? ¿En qué horarios?</label>
+                        <input type="checkbox" class="check_medicamento" data-index="${index}">
+                        <input type="text" id="pasajero_medicamentos_${index}" placeholder="Detalle" style="display:none;">
+                    </div>
+                    <div class="seccion-salud">
+                        <label>¿Posee algún impedimento físico?</label>
+                        <input type="checkbox" class="check_impedimento" data-index="${index}">
+                        <input type="text" id="pasajero_impedimentos_${index}" placeholder="Detalle" style="display:none;">
+                    </div>
+                    <div class="seccion-salud">
+                        <label>¿Sigue algún regimen especial de comida?</label>
+                        <input type="checkbox" class="check_regimen_comida" data-index="${index}">
+                        <input type="text" id="pasajero_regimenes_comida_${index}" placeholder="Detalle" style="display:none;">
+                    </div>
+                    <div class="seccion-salud">
+                        <label>Algún otro dato que considere importante:</label>
+                        <textarea id="pasajero_observaciones_${index}" rows="2"></textarea>
+                    </div>
+                </div>
+            `;
+        }
+
+        div.innerHTML = html;
         contenedor.appendChild(div);
 
         // Listener para marcar fecha completada al cambiar
@@ -241,7 +261,7 @@ function generar_formularios_pasajeros(asientos) {
         }
     });
 
-    // Eventos para mostrar/ocultar ficha de salud
+    // Eventos para mostrar/ocultar ficha de salud (solo si existen)
     document.querySelectorAll('[id^="btn_ficha_salud_"]').forEach(boton => {
         boton.addEventListener('click', () => {
             const index = boton.dataset.index;
@@ -250,40 +270,25 @@ function generar_formularios_pasajeros(asientos) {
         });
     });
 
-    // Configurar eventos para cada checkbox de listas
-    document.querySelectorAll('.check_enfermedad').forEach(check => {
-        check.addEventListener('change', function() {
-            const index = this.dataset.index;
-            const contenedor = document.querySelector(`.enfermedades_container[data-index="${index}"]`);
-            contenedor.style.display = this.checked ? 'block' : 'none';
-            if (this.checked && contenedor.children.length === 0) agregarInputSalud(contenedor, 'enfermedad', index);
-        });
-    });
+    // Eventos para mostrar/ocultar inputs según checkbox
+    const checkboxes = [
+        ['check_alergia', 'alergias'],
+        ['check_enfermedad', 'enfermedades'],
+        ['check_medicamento', 'medicamentos'],
+        ['check_impedimento', 'impedimentos'],
+        ['check_regimen_comida', 'regimenes_comida']
+    ];
 
-    document.querySelectorAll('.check_medicamento').forEach(check => {
-        check.addEventListener('change', function() {
-            const index = this.dataset.index;
-            const contenedor = document.querySelector(`.medicamentos_container[data-index="${index}"]`);
-            contenedor.style.display = this.checked ? 'block' : 'none';
-            if (this.checked && contenedor.children.length === 0) agregarInputSalud(contenedor, 'medicamento', index);
-        });
-    });
-
-    document.querySelectorAll('.check_impedimento').forEach(check => {
-        check.addEventListener('change', function() {
-            const index = this.dataset.index;
-            const contenedor = document.querySelector(`.impedimentos_container[data-index="${index}"]`);
-            contenedor.style.display = this.checked ? 'block' : 'none';
-            if (this.checked && contenedor.children.length === 0) agregarInputSalud(contenedor, 'impedimento', index);
-        });
-    });
-
-    document.querySelectorAll('.check_alergia').forEach(check => {
-        check.addEventListener('change', function() {
-            const index = this.dataset.index;
-            const contenedor = document.querySelector(`.alergias_container[data-index="${index}"]`);
-            contenedor.style.display = this.checked ? 'block' : 'none';
-            if (this.checked && contenedor.children.length === 0) agregarInputSalud(contenedor, 'alergia', index);
+    checkboxes.forEach(([checkClass, campo]) => {
+        document.querySelectorAll(`.${checkClass}`).forEach(check => {
+            check.addEventListener('change', function() {
+                const index = this.dataset.index;
+                const input = document.getElementById(`pasajero_${campo}_${index}`);
+                if (input) {
+                    input.style.display = this.checked ? '' : 'none';
+                    if (!this.checked) input.value = '';
+                }
+            });
         });
     });
 }
@@ -376,7 +381,6 @@ async function confirmar_venta_modal() {
             }
         }
 
-        // Validaciones
         if (!dni) {
             mostrar_aviso(`Complete el DNI del pasajero ${i+1}`, 'error');
             return;
@@ -402,24 +406,7 @@ async function confirmar_venta_modal() {
             return;
         }
 
-        // Recopilar ficha de salud si se ha expandido
-        const salud = {
-            grupo_sanguineo: document.getElementById(`pasajero_grupo_sanguineo_${i}`).value || '',
-            obra_social: document.getElementById(`pasajero_obra_social_${i}`).value.trim(),
-            observaciones: document.getElementById(`pasajero_observaciones_${i}`).value.trim(),
-            enfermedades: [],
-            medicamentos: [],
-            impedimentos: [],
-            alergias: []
-        };
-
-        // Obtener listas de enfermedades, medicamentos, impedimentos, alergias
-        document.querySelectorAll(`.enfermedades_container[data-index="${i}"] .salud_enfermedad`).forEach(input => salud.enfermedades.push(input.value.trim()));
-        document.querySelectorAll(`.medicamentos_container[data-index="${i}"] .salud_medicamento`).forEach(input => salud.medicamentos.push(input.value.trim()));
-        document.querySelectorAll(`.impedimentos_container[data-index="${i}"] .salud_impedimento`).forEach(input => salud.impedimentos.push(input.value.trim()));
-        document.querySelectorAll(`.alergias_container[data-index="${i}"] .salud_alergia`).forEach(input => salud.alergias.push(input.value.trim()));
-
-        pasajeros.push({
+        const pasajeroData = {
             dni,
             nombre,
             email,
@@ -427,13 +414,28 @@ async function confirmar_venta_modal() {
             celular_emergencia,
             fecha_nacimiento,
             direccion,
-            localidad,
-            salud
-        });
+            localidad
+        };
+
+        // Incluir ficha de salud solo si existe el contenedor
+        const fichaSaludDiv = document.getElementById(`ficha_salud_${i}`);
+        if (fichaSaludDiv) {
+            pasajeroData.salud = {
+                grupo_sanguineo: document.getElementById(`pasajero_grupo_sanguineo_${i}`)?.value || '',
+                obra_social: document.getElementById(`pasajero_obra_social_${i}`)?.value.trim() || '',
+                alergias: document.getElementById(`pasajero_alergias_${i}`)?.value.trim() || '',
+                enfermedades: document.getElementById(`pasajero_enfermedades_${i}`)?.value.trim() || '',
+                medicamentos: document.getElementById(`pasajero_medicamentos_${i}`)?.value.trim() || '',
+                impedimentos: document.getElementById(`pasajero_impedimentos_${i}`)?.value.trim() || '',
+                regimenes_comida: document.getElementById(`pasajero_regimenes_comida_${i}`)?.value.trim() || '',
+                observaciones: document.getElementById(`pasajero_observaciones_${i}`)?.value.trim() || ''
+            };
+        }
+
+        pasajeros.push(pasajeroData);
     }
 
     const fecha_actual = formatear_fecha_hora_actual();
-    console.log('fecha_hora a enviar:', fecha_actual);
 
     const datos = {
         accion: "ventas/confirmar",
@@ -456,28 +458,33 @@ async function confirmar_venta_modal() {
             body: new URLSearchParams(datos)
         });
         const resultado = await respuesta.json();
+
         if (resultado.exito) {
             mostrar_aviso("Venta confirmada correctamente", 'exito');
             ultima_venta_id = resultado.id_venta;
+
+            // Cerrar formulario y limpiar
+            $("#formulario_confirmacion_venta").classList.add("hidden");
+            $("#info_asiento_viaje").classList.remove("hidden");
+            venta_form_abierto = false;
+            await solicitar_estado_asientos();
+            mostrar_boton_confirmar_venta();
+            await actualizar_detalle_viaje_actual();
+
+            if (ultima_venta_id) {
+                mostrar_opciones_impresion(ultima_venta_id);
+            }
         } else {
+            // Mostrar error sin cerrar formulario
             mostrar_aviso(resultado.error || "Error al confirmar venta", 'error');
+            // El formulario permanece abierto para que el usuario corrija o cancele manualmente
         }
     } catch (error) {
         console.error("Error:", error);
         mostrar_aviso("Error de comunicación", 'error');
-    } finally {
-        $("#formulario_confirmacion_venta").classList.add("hidden");
-        $("#info_asiento_viaje").classList.remove("hidden");
-        venta_form_abierto = false;
-        await solicitar_estado_asientos();
-        mostrar_boton_confirmar_venta();
-        await actualizar_detalle_viaje_actual();
-        if (ultima_venta_id) {
-            mostrar_opciones_impresion(ultima_venta_id);
-        }
+        // Tampoco se cierra el formulario en caso de error de red
     }
 }
-
 function mostrar_opciones_impresion(id_venta) {
     const contenedor = $("#opciones_impresion");
     if (!contenedor) return;

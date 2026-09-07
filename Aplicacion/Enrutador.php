@@ -461,6 +461,30 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = liberar_reserva_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno);
                     responder_json($resultado);
                     break;
+                case 'obtener_opciones_avanzadas':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
+                    responder_json(['exito' => true, 'opciones' => $opciones]);
+                    break;
+                case 'guardar_opciones_avanzadas':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $opciones = [
+                        'mostrar_ficha_medica' => $post['mostrar_ficha_medica'] ?? '0',
+                        'restriccion_edad' => $post['restriccion_edad'] ?? '0',
+                        'edad_minima' => $post['edad_minima'] ?? '18',
+                        'edad_maxima' => $post['edad_maxima'] ?? '80',
+                    ];
+                    if (empty($nombre_viaje) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones);
+                    responder_json($resultado);
+                    break;
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de viajes no válida']);
             }
