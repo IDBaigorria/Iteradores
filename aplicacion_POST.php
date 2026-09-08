@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.22)
+ * ## Estructura de nodos actual (v1.5piloto.26)
  *
  * ### Nodos raíz especiales
  *
@@ -73,11 +73,20 @@
  * | `celular`           | Nodo con dato string: celular personal.               |
  * | `celular_emergencia`| Nodo con dato string: celular de emergencia.          |
  * | `fecha_nacimiento`  | Nodo con dato string: fecha de nacimiento (YYYY-MM-DD). |
+ * | `localidad`         | Nodo con dato string: localidad del pasajero.         |
+ * | `direccion`         | Nodo con dato string: dirección del pasajero.         |
  * | `ficha_salud`       | Nodo contenedor con dato vacío (opcional).            |
- * |                     | ├─ `enfermedades` → Nodo raíz de lista (contenedor).   |
- * |                     | ├─ `medicamentos` → Nodo raíz de lista (contenedor).   |
- * |                     | └─ `impedimentos` → Nodo raíz de lista (contenedor).   |
- * Cada raíz almacena sus ítems como hijos en árbol (hmi/hd). Cada nodo hoja tiene dato string con el texto del ítem.
+ * |                     | Contiene los siguientes enlaces directos a nodos con dato string: |
+ * |                     | ├─ `grupo_sanguineo` → string (ej. "O+", "Desconocido"). |
+ * |                     | ├─ `obra_social` → string (texto libre).              |
+ * |                     | ├─ `alergias` → string (texto libre).                 |
+ * |                     | ├─ `enfermedades` → string (texto libre).             |
+ * |                     | ├─ `medicamentos` → string (texto libre).             |
+ * |                     | ├─ `impedimentos` → string (texto libre).             |
+ * |                     | ├─ `regimenes_comida` → string (texto libre).         |
+ * |                     | └─ `observaciones` → string (texto libre).            |
+ *
+ * **Nota:** A partir de la versión 1.5piloto.26, los campos que antes se almacenaban como listas enlazadas (`enfermedades`, `medicamentos`, `impedimentos`, `alergias`) ahora se guardan como un único string. Si existieran datos antiguos con listas, al leerlos se concatenan con `"; "` y se devuelven como string.
  *
  * ### Nodo Empresa
  *
@@ -152,6 +161,11 @@
  *   |                          | └─ Enlaces salientes con nombre único (`micro_1`, `micro_2`, etc.) apuntando a nodos micro. |
  *   | `terminales_autorizadas` | Nodo contenedor con dato vacío.                       |
  *   |                          | └─ Enlaces salientes con nombre de terminal apuntando a nodos terminal (dato = nombre). |
+ *   | `opciones_avanzadas`     | Nodo contenedor con dato vacío (opcional).            |
+ *   |                          | ├─ `mostrar_ficha_medica` → string: `"1"` si se debe mostrar la opción de ficha médica en la venta, `"0"` en caso contrario. |
+ *   |                          | ├─ `restriccion_edad` → string: `"1"` si se aplica restricción de edad, `"0"` en caso contrario. |
+ *   |                          | ├─ `edad_minima` → string numérico: edad mínima permitida (default `"18"`). |
+ *   |                          | └─ `edad_maxima` → string numérico: edad máxima permitida (default `"80"`). |
  *
  * ### Nodo Micro (dentro de `micros` de un viaje)
  *
@@ -246,7 +260,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.22
+ * @version   1.5piloto.26
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

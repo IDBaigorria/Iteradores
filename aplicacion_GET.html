@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administrador de Viajes - Pquia. del Carmen Tres Arroyos</title>
-<link rel="stylesheet" href="estilos.css?v=1.5piloto.23241011">
+<link rel="stylesheet" href="estilos.css?v=1.5piloto.26">
 </head>
 <body>
 <!-- Pantalla de login (código de acceso) -->
@@ -293,39 +293,6 @@
         <div id="lista_viajes"></div>
       </div>
 
-      <div id="formulario_nuevo_viaje" class="panel hidden">
-        <h3>Nuevo viaje</h3>
-        <div class="form-grid">
-          <div class="field"><label>Nombre de viaje *</label><input id="nuevo_viaje_nombre"></div>
-            <div class="field">
-              <label>Estado de fecha</label>
-              <select id="nuevo_viaje_fecha_estado">
-                <option value="confirmada" selected>Fecha confirmada</option>
-                <option value="a_confirmar">Fecha a confirmar</option>
-              </select>
-            </div>
-            <div class="field" id="campo_nuevo_viaje_fecha">
-              <label>Fecha</label><input type="date" id="nuevo_viaje_fecha">
-            </div>
-            <div class="field">
-              <label>Estado de hora</label>
-              <select id="nuevo_viaje_hora_estado">
-                <option value="confirmada" selected>Hora confirmada</option>
-                <option value="a_confirmar">Hora a confirmar</option>
-              </select>
-            </div>
-            <div class="field" id="campo_nuevo_viaje_hora">
-              <label>Hora</label><input type="time" id="nuevo_viaje_hora">
-            </div>
-          <div class="field"><label>Origen</label><input id="nuevo_viaje_origen"></div>
-          <div class="field"><label>Destino</label><input id="nuevo_viaje_destino"></div>
-        </div>
-        <div class="actions" style="margin-top:12px;">
-          <button class="btn primary" id="boton_guardar_viaje">Guardar</button>
-          <button class="btn" id="boton_cancelar_viaje">Cancelar</button>
-        </div>
-      </div>
-
       <!-- Detalle del viaje -->
       <div id="detalle_viaje" class="panel hidden">
         <h3 id="detalle_viaje_titulo"></h3>
@@ -521,12 +488,15 @@
     <div class="modal-body" id="modal_generico_contenido"></div>
   </div>
 </div>
-<script src="aplicacion.js?v=1.5piloto.23241011"></script>
-<script src="Aplicacion/admin.js?v=1.5piloto.32421011"></script>
-<script src="Aplicacion/terminales.js?v=1.5piloto.23421011"></script>
-<script src="Aplicacion/micros.js?v=1.5piloto.32241011"></script>
-<script src="Aplicacion/viajes.js?v=1.5piloto.32241011"></script>
-<script src="Aplicacion/ventas.js?v=1.5piloto.32241011"></script>
-<script src="Aplicacion/pasajeros.js?v=1.5piloto.23241011"></script>
+<script src="aplicacion.js?v=1.5piloto.26"></script>
+<script src="Aplicacion/admin.js?v=1.5piloto.26"></script>
+<script src="Aplicacion/terminales.js?v=1.5piloto.26"></script>
+<script src="Aplicacion/micros.js?v=1.5piloto.26"></script>
+<script src="Aplicacion/viajes/viajes-nucleo.js?v=1.5piloto.26a"></script>
+<script src="Aplicacion/viajes/viajes-micros.js?v=1.5piloto.26a"></script>
+<script src="Aplicacion/viajes/viajes-asientos.js?v=1.5piloto.26a"></script>
+<script src="Aplicacion/viajes/viajes-opciones.js?v=1.5piloto.26a"></script>
+<script src="Aplicacion/ventas.js?v=1.5piloto.26"></script>
+<script src="Aplicacion/pasajeros.js?v=1.5piloto.26"></script>
 </body>
 </html>

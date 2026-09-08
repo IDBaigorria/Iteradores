@@ -561,6 +561,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     responder_json(['exito' => true, 'ventas' => $ventas]);
                     break;
+                case 'guardar':
+                    $resultado = guardar_viaje_completo($post);
+                    responder_json($resultado);
+                    break;
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de ventas no válida']);
             }
