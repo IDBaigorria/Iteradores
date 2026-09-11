@@ -331,20 +331,18 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     responder_json(['exito' => true, 'viajes' => $viajes]);
                     break;
 
-                case 'agregar':
-                    $resultado = agregar_viaje($post);
-                    responder_json($resultado);
-                    break;
-
-                case 'editar':
-                    $nombre_viaje = $post['nombre_viaje'] ?? '';
-                    $resultado = editar_viaje($nombre_viaje, $post);
+                case 'guardar':
+                    // Alta o edición unificada, incluyendo opciones avanzadas
+                    $resultado = guardar_viaje_completo($post);
                     responder_json($resultado);
                     break;
 
                 case 'eliminar':
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
                     $resultado = eliminar_viaje($nombre_viaje, $nombre_dueno);
                     responder_json($resultado);
                     break;
@@ -363,6 +361,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_micro = $post['nombre_micro'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
                     $resultado = eliminar_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno);
                     responder_json($resultado);
                     break;
@@ -371,6 +372,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_terminal = $post['nombre_terminal'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_terminal) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
                     $resultado = agregar_terminal_autorizada($nombre_viaje, $nombre_terminal, $nombre_dueno);
                     responder_json($resultado);
                     break;
@@ -379,9 +383,13 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_terminal = $post['nombre_terminal'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_terminal) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
                     $resultado = eliminar_terminal_autorizada($nombre_viaje, $nombre_terminal, $nombre_dueno);
                     responder_json($resultado);
                     break;
+
                 case 'obtener_micro':
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_micro = $post['nombre_micro'] ?? '';
@@ -392,14 +400,19 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = obtener_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno);
                     responder_json($resultado);
                     break;
+
                 case 'actualizar_monto_micro':
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_micro = $post['nombre_micro'] ?? '';
                     $monto = $post['monto'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
                     $resultado = actualizar_monto_micro($nombre_viaje, $nombre_micro, $monto, $nombre_dueno);
                     responder_json($resultado);
                     break;
+
                 case 'estado_asientos':
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_micro = $post['nombre_micro'] ?? '';
@@ -410,6 +423,7 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = obtener_estados_asientos_micro($nombre_viaje, $nombre_micro, $nombre_dueno);
                     responder_json($resultado);
                     break;
+
                 case 'seleccionar_asiento':
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_micro = $post['nombre_micro'] ?? '';
@@ -423,6 +437,7 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = seleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal);
                     responder_json($resultado);
                     break;
+
                 case 'deseleccionar_asiento':
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_micro = $post['nombre_micro'] ?? '';
@@ -436,6 +451,7 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = deseleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal);
                     responder_json($resultado);
                     break;
+
                 case 'reservar_asiento':
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_micro = $post['nombre_micro'] ?? '';
@@ -461,6 +477,7 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = liberar_reserva_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno);
                     responder_json($resultado);
                     break;
+
                 case 'obtener_opciones_avanzadas':
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
@@ -470,6 +487,7 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
                     responder_json(['exito' => true, 'opciones' => $opciones]);
                     break;
+
                 case 'guardar_opciones_avanzadas':
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
@@ -485,6 +503,7 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones);
                     responder_json($resultado);
                     break;
+
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de viajes no válida']);
             }

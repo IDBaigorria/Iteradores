@@ -243,6 +243,20 @@ function cerrar_modal_generico() {
     }
     const contenidoEl = document.getElementById('modal_generico_contenido');
     if (contenidoEl) contenidoEl.innerHTML = '';
+    
+    // Limpiar estado de viajes
+    if (typeof detener_sync_asientos === 'function') {
+        detener_sync_asientos();
+    }
+    if (typeof venta_form_abierto !== 'undefined') {
+        venta_form_abierto = false;
+    }
+    if (typeof operacion_asiento_en_curso !== 'undefined') {
+        operacion_asiento_en_curso = false;
+    }
+    if (typeof micro_seleccionado !== 'undefined') {
+        micro_seleccionado = null;
+    }
 }
 
 $("#cerrar_modal_generico").addEventListener("click", cerrar_modal_generico);

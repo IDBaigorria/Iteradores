@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administrador de Viajes - Pquia. del Carmen Tres Arroyos</title>
-<link rel="stylesheet" href="estilos.css?v=1.5piloto.26">
+<link rel="stylesheet" href="estilos.css?v=1.5piloto.27a">
 </head>
 <body>
 <!-- Pantalla de login (código de acceso) -->
@@ -292,75 +292,6 @@
         </div>
         <div id="lista_viajes"></div>
       </div>
-
-      <!-- Detalle del viaje -->
-      <div id="detalle_viaje" class="panel hidden">
-        <h3 id="detalle_viaje_titulo"></h3>
-        <div class="row">
-          <label>Micros:</label>
-          <button class="btn" id="boton_agregar_micro_viaje">Agregar micro</button>
-        </div>
-        <div id="lista_micros_viaje"></div>
-
-        <!-- Pasaje del micro seleccionado -->
-        <div id="pasaje_micro_viaje" class="panel hidden" style="margin-top:15px;">
-            <h4>Pasaje del micro</h4>
-            <div id="foto_micro_viaje" style="margin-bottom:10px;"></div>
-            <div class="pasaje-layout" style="display:flex; flex-wrap:wrap; justify-content:center; gap:15px; align-items:flex-start; max-width:1200px; margin:0 auto;">
-                <div id="croquis_pasaje_micro" style="flex:1 1 300px; min-width:300px; display:flex; flex-direction:column; align-items:center;"></div>
-                <div class="columna-derecha" style="flex:1 1 250px; min-width:250px; display:flex; flex-direction:column; gap:10px;">
-                    <div id="info_asiento_viaje" class="panel hidden" style="padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
-                    <div id="contenedor_boton_confirmar_venta" class="hidden" style="text-align:left;">
-                        <button class="btn primary" id="boton_confirmar_venta">Vender</button>
-                    </div>
-                    <div id="formulario_confirmacion_venta" class="panel hidden" style="padding:15px; border:1px solid #ddd; border-radius:6px;"></div>
-                </div>
-            </div>
-        </div>
-        <div id="seccion_terminales_viaje">
-          <div class="row" style="margin-top:15px;">
-            <label>Terminales autorizadas:</label>
-            <button class="btn" id="boton_agregar_terminal_viaje">Agregar punto de venta</button>
-          </div>
-          <div id="lista_terminales_viaje"></div>
-        </div>
-      </div>
-
-      <!-- Formulario agregar micro -->
-      <div id="formulario_agregar_micro" class="panel hidden">
-        <h3>Agregar micro</h3>
-        <div class="form-grid">
-          <div class="field">
-            <label>Empresa</label>
-            <select id="selector_empresa_micro_viaje"></select>
-          </div>
-          <div class="field">
-            <label>Vehículo</label>
-            <select id="selector_vehiculo_micro_viaje"></select>
-          </div>
-          <div class="field">
-              <label>Monto del pasaje *</label>
-              <input type="number" id="monto_micro_viaje" min="0" step="0.01" placeholder="0.00">
-          </div>
-        </div>
-        <div class="actions" style="margin-top:12px;">
-          <button class="btn primary" id="boton_confirmar_micro">Confirmar</button>
-          <button class="btn" id="boton_cancelar_micro">Cancelar</button>
-        </div>
-      </div>
-
-      <!-- Formulario agregar terminal autorizada -->
-      <div id="formulario_agregar_terminal" class="panel hidden">
-        <h3>Agregar punto de venta autorizado</h3>
-        <div class="field">
-          <label>Terminal</label>
-          <select id="selector_terminal_autorizada"></select>
-        </div>
-        <div class="actions" style="margin-top:12px;">
-          <button class="btn primary" id="boton_confirmar_terminal">Confirmar</button>
-          <button class="btn" id="boton_cancelar_terminal_viaje">Cancelar</button>
-        </div>
-      </div>
     </section>
 
     <!-- Sección Vendidos -->
@@ -378,7 +309,6 @@
         <div class="sales-list" id="lista_ventas"></div>
       </div>
     </section>
-
 
     <!-- Sección Pasajeros -->
     <section id="pasajeros" class="tab-content hidden">
@@ -412,65 +342,11 @@
     </section>
   </main>
 
-  <!-- Modal para confirmar venta -->
-  <div id="modal_confirmar_venta" class="modal hidden">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Confirmar venta</h3>
-        <button class="btn" id="cerrar_modal_venta">✕</button>
-      </div>
-      <div class="modal-body">
-        <div id="resumen_venta"></div>
-        <div class="form-grid" style="margin-top:15px;">
-          <div class="field">
-            <label>Método de pago</label>
-            <select id="metodo_pago">
-              <option value="efectivo">Efectivo</option>
-              <option value="transferencia">Transferencia</option>
-            </select>
-          </div>
-          <div class="field" id="campo_cuotas">
-            <label>Cantidad de cuotas (1-3)</label>
-            <select id="cuotas_venta">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-            </select>
-          </div>
-          <div class="field" id="campo_pago_inicial">
-            <label>Cuotas pagadas ahora</label>
-            <select id="pago_inicial">
-              <option value="0">0</option>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-            </select>
-          </div>
-        </div>
-        <div id="datos_comprador" style="margin-top:15px;">
-            <h4>Comprador</h4>
-            <div class="form-grid">
-                <div class="field"><label>DNI *</label><input id="comprador_dni"></div>
-                <div class="field"><label>Nombre *</label><input id="comprador_nombre"></div>
-                <div class="field"><label>Email</label><input id="comprador_email"></div>
-                <div class="field"><label>Celular *</label><input id="comprador_celular"></div>
-            </div>
-            <button class="btn small" id="usar_pasajero_como_comprador">Usar primer pasajero</button>
-        </div>
-        <div id="pasajeros_venta" style="margin-top:20px;"></div>
-        <div class="actions" style="margin-top:20px;">
-          <button class="btn primary" id="confirmar_venta">Confirmar</button>
-          <button class="btn" id="cancelar_venta_modal">Cancelar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div class="footer-note"> Algunas funciones están en desarrollo. Soporte Téctico: 2983694010 (Ignacio)</div>
 </div>
 
 <div id="toast" class="toast"></div>
-<div id="opciones_impresion" class="hidden" style="position:fixed; bottom:20px; right:20px; background:white; border:1px solid #ccc; padding:15px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.2); z-index:1000;">
+<div id="opciones_impresion" class="hidden" style="position:fixed; bottom:70px; right:20px; background:white; border:1px solid #ccc; padding:15px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.2); z-index:1500;">
     <strong>Venta exitosa</strong>
     <div style="margin-top:10px;">
         <button class="btn primary" id="btn_imprimir_pasajes">Imprimir pasajes</button>
@@ -488,15 +364,15 @@
     <div class="modal-body" id="modal_generico_contenido"></div>
   </div>
 </div>
-<script src="aplicacion.js?v=1.5piloto.26"></script>
-<script src="Aplicacion/admin.js?v=1.5piloto.26"></script>
-<script src="Aplicacion/terminales.js?v=1.5piloto.26"></script>
-<script src="Aplicacion/micros.js?v=1.5piloto.26"></script>
-<script src="Aplicacion/viajes/viajes-nucleo.js?v=1.5piloto.26a"></script>
-<script src="Aplicacion/viajes/viajes-micros.js?v=1.5piloto.26a"></script>
-<script src="Aplicacion/viajes/viajes-asientos.js?v=1.5piloto.26a"></script>
-<script src="Aplicacion/viajes/viajes-opciones.js?v=1.5piloto.26a"></script>
-<script src="Aplicacion/ventas.js?v=1.5piloto.26"></script>
-<script src="Aplicacion/pasajeros.js?v=1.5piloto.26"></script>
+<script src="aplicacion.js?v=1.5piloto.27a"></script>
+<script src="Aplicacion/admin.js?v=1.5piloto.27a"></script>
+<script src="Aplicacion/terminales.js?v=1.5piloto.27a"></script>
+<script src="Aplicacion/micros.js?v=1.5piloto.27a"></script>
+<script src="Aplicacion/viajes/viajes-nucleo.js?v=1.5piloto.27c"></script>
+<script src="Aplicacion/viajes/viajes-micros.js?v=1.5piloto.27c"></script>
+<script src="Aplicacion/viajes/viajes-asientos.js?v=1.5piloto.27b"></script>
+<script src="Aplicacion/viajes/viajes-opciones.js?v=1.5piloto.27b"></script>
+<script src="Aplicacion/ventas.js?v=1.5piloto.27a"></script>
+<script src="Aplicacion/pasajeros.js?v=1.5piloto.27a"></script>
 </body>
 </html>

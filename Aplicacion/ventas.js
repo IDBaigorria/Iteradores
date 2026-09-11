@@ -22,7 +22,13 @@ function tiene_asientos_seleccionados_propios() {
 }
 
 // Evento del botón "Vender"
-$("#boton_confirmar_venta").addEventListener("click", abrir_modal_confirmacion_venta);
+// Evento del botón "Vender" (se asigna dinámicamente al abrir el modal de detalle)
+// No usar listener global; el listener se asigna en ver_detalle_viaje
+/*document.addEventListener('click', function(event) {
+    if (event.target && event.target.id === 'boton_confirmar_venta') {
+        abrir_modal_confirmacion_venta();
+    }
+});*/
 
 // Abrir formulario de venta
 function abrir_modal_confirmacion_venta() {

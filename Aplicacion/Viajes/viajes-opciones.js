@@ -1,13 +1,12 @@
 /***
  * Modal de alta/edición de viaje y opciones avanzadas.
- * @version 1.5piloto.26
+ * @version 1.5piloto.27
  */
 
 async function abrir_modal_viaje(modo, viaje = null) {
     const esAlta = modo === 'alta';
     const nombre_dueno = obtener_nombre_dueno_actual();
 
-    // Valores por defecto
     let datos = {
         nombre_viaje: '',
         nombre: '',
@@ -129,13 +128,40 @@ async function abrir_modal_viaje(modo, viaje = null) {
         if (resultado.exito) {
             mostrar_aviso(esAlta ? 'Viaje creado' : 'Viaje actualizado', 'exito');
             cerrar_modal_generico();
-            await cargar_viajes();
+            if (!esAlta && viaje_seleccionado) {
+                // Recargar detalle si estábamos en detalle
+                await cargar_viajes(); // actualiza lista
+                const viajeActualizado = (await obtener_viajes_actualizados()).find(v => v.nombre_viaje === viaje_seleccionado.nombre_viaje);
+                if (viajeActualizado) {
+                    ver_detalle_viaje(viajeActualizado);
+                }
+            } else {
+                await cargar_viajes();
+            }
         } else {
             mostrar_aviso(resultado.error || 'Error al guardar viaje', 'error');
         }
     });
 
-    document.getElementById('cancelar_modal_viaje').addEventListener('click', cerrar_modal_generico);
+    document.getElementById('cancelar_modal_viaje').addEventListener('click', () => {
+        cerrar_modal_generico();
+        // Si estábamos en detalle, no hacemos nada; el modal de detalle quedó atrás
+    });
+}
+
+// Función auxiliar para obtener lista de viajes actualizados
+async function obtener_viajes_actualizados() {
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const tipo = usuario_actual.nivel === 'terminal' ? 'terminal' : 'dueno';
+    const accion = tipo === 'dueno' ? 'viajes/listar_por_dueno' : 'viajes/listar_por_terminal';
+    const param = tipo === 'dueno' ? { nombre_dueno } : { nombre_terminal: usuario_actual.nombre_usuario };
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion, ...param })
+    });
+    const datos = await respuesta.json();
+    return datos.exito ? datos.viajes : [];
 }
 
 // Evento botón "Agregar viaje"

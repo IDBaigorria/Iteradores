@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.26
+ * @version   1.5piloto.27
  */
 
 use Iteradores\Nodos\Nodo;
@@ -62,7 +62,6 @@ function clonar_vehiculo($nodo_vehiculo_original) {
                     if ($fila) $nodo_asiento_copia->_adyacente_en(Nodo::crear_con_dato($fila->dato()), 'fila');
                     if ($columna) $nodo_asiento_copia->_adyacente_en(Nodo::crear_con_dato($columna->dato()), 'columna');
 
-                    // Inicializar estado libre
                     $nodo_asiento_copia->_adyacente_en(Nodo::crear_con_dato('libre'), 'estado');
 
                     if ($anterior_copia) {
@@ -124,13 +123,14 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
     }
 
     $nodo_micro = Nodo::crear_con_dato('');
-    $nodo_micro->_adyacente_en(Nodo::crear_con_dato($nombre_empresa), 'empresa');
-    $nodo_micro->_adyacente_en(Nodo::crear_con_dato($nombre_vehiculo), 'patente');
+    $nodo_micro->_adyacente_en($nodo_empresa, 'empresa');
     $nodo_micro->_adyacente_en($nodo_copia, 'vehiculo_copia');
     $nodo_micro->_adyacente_en(Nodo::crear_con_dato($monto), 'monto');
     $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), 'ocupacion');
     $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), 'seleccionados');
     $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), 'vendidos');
+    $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), 'reservados');
+    $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), 'disponibles');
     $nodo_micro->_adyacente_en($nodo_viaje, 'viaje');
 
     $nodo_micros = $nodo_viaje->adyacente('micros');
@@ -144,6 +144,7 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
     $nombre_micro = 'micro_' . $indice;
     $nodo_micros->_adyacente_en($nodo_micro, $nombre_micro);
 
+    actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
     Controlador::guardar(Conf::NOMBRE_APP);
@@ -216,11 +217,13 @@ function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, stri
     if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
 
     $empresa = $nodo_micro->adyacente('empresa') ? $nodo_micro->adyacente('empresa')->dato() : '';
-    $patente = $nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '';
+    $nodo_copia_tmp = $nodo_micro->adyacente('vehiculo_copia');
+    $patente = $nodo_copia_tmp ? $nodo_copia_tmp->dato() : ($nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '');    
     $monto = $nodo_micro->adyacente('monto') ? $nodo_micro->adyacente('monto')->dato() : '0';
     $ocupacion = $nodo_micro->adyacente('ocupacion') ? $nodo_micro->adyacente('ocupacion')->dato() : '0';
     $seleccionados = $nodo_micro->adyacente('seleccionados') ? $nodo_micro->adyacente('seleccionados')->dato() : '0';
     $vendidos = $nodo_micro->adyacente('vendidos') ? $nodo_micro->adyacente('vendidos')->dato() : '0';
+    $reservados = $nodo_micro->adyacente('reservados') ? $nodo_micro->adyacente('reservados')->dato() : '0';
 
     $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
     if (!$nodo_copia) return ['exito' => false, 'error' => 'No existe copia del vehículo'];
@@ -252,6 +255,7 @@ function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, stri
             'ocupacion' => $ocupacion,
             'seleccionados' => $seleccionados,
             'vendidos' => $vendidos,
+            'reservados' => $reservados,
             'nombre' => $nombre,
             'foto' => $foto,
             'configuracion' => $configuracion
@@ -260,7 +264,7 @@ function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, stri
 }
 
 /**
- * Actualiza los contadores totales del viaje (ocupación, disponibles, seleccionados, vendidos).
+ * Actualiza los contadores totales del viaje (ocupación, disponibles, seleccionados, vendidos, reservados).
  */
 function actualizar_contadores_viaje(string $nombre_viaje, string $nombre_dueno): void {
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
@@ -272,6 +276,7 @@ function actualizar_contadores_viaje(string $nombre_viaje, string $nombre_dueno)
     $total_ocupacion = 0;
     $total_seleccionados = 0;
     $total_vendidos = 0;
+    $total_reservados = 0;
     $total_disponibles = 0;
 
     $nodo_micros = $nodo_viaje->adyacente('micros');
@@ -281,13 +286,71 @@ function actualizar_contadores_viaje(string $nombre_viaje, string $nombre_dueno)
             $total_ocupacion += (int)($nodo_micro->adyacente('ocupacion') ? $nodo_micro->adyacente('ocupacion')->dato() : 0);
             $total_seleccionados += (int)($nodo_micro->adyacente('seleccionados') ? $nodo_micro->adyacente('seleccionados')->dato() : 0);
             $total_vendidos += (int)($nodo_micro->adyacente('vendidos') ? $nodo_micro->adyacente('vendidos')->dato() : 0);
+            $total_reservados += (int)($nodo_micro->adyacente('reservados') ? $nodo_micro->adyacente('reservados')->dato() : 0);
         }
     }
 
-    $total_disponibles = $total_ocupacion - $total_vendidos - $total_seleccionados;
+    $total_disponibles = $total_ocupacion - $total_vendidos - $total_seleccionados - $total_reservados;
 
-    $nodo_viaje->adyacente('ocupacion')->_dato((string)$total_ocupacion);
-    $nodo_viaje->adyacente('seleccionados')->_dato((string)$total_seleccionados);
-    $nodo_viaje->adyacente('vendidos')->_dato((string)$total_vendidos);
-    $nodo_viaje->adyacente('disponibles')->_dato((string)$total_disponibles);
+    $nodo_viaje->adyacente('ocupacion')?->_dato((string)$total_ocupacion);
+    $nodo_viaje->adyacente('seleccionados')?->_dato((string)$total_seleccionados);
+    $nodo_viaje->adyacente('vendidos')?->_dato((string)$total_vendidos);
+    $nodo_viaje->adyacente('reservados')?->_dato((string)$total_reservados);
+    $nodo_viaje->adyacente('disponibles')?->_dato((string)$total_disponibles);
+}
+
+/**
+ * Actualiza los contadores de un micro (ocupación, seleccionados, vendidos, reservados).
+ */
+function actualizar_contadores_micro(Nodo $nodo_micro): void {
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) return;
+    
+    // Asegurar que existan los nodos de contadores
+    foreach (['ocupacion', 'seleccionados', 'vendidos', 'reservados', 'disponibles'] as $campo) {
+        if (!$nodo_micro->adyacente($campo)) {
+            $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), $campo);
+        }
+    }
+
+    $total = 0;
+    $seleccionados = 0;
+    $vendidos = 0;
+    $reservados = 0;
+
+    $nodo_asientos = $nodo_copia->adyacente('asientos');
+    if ($nodo_asientos) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$piso) continue;
+            $cabeza = $piso->adyacente('asientos');
+            if (!$cabeza) continue;
+            $actual = $cabeza->adyacente('primer');
+            $contador_seguridad = 0;
+            while ($actual && $actual->id() !== $cabeza->id() && $contador_seguridad < 1000) {
+                $estado = $actual->adyacente('estado');
+                if ($estado) {
+                    $estado_str = $estado->dato();
+                    if ($estado_str === 'seleccionado') {
+                        $seleccionados++;
+                    } elseif ($estado_str === 'vendido' || $estado_str === 'no disponible') {
+                        $vendidos++;
+                    } elseif ($estado_str === 'reservado') {
+                        $reservados++;
+                    }
+                    $total++;
+                }
+                $actual = $actual->adyacente('siguiente');
+                $contador_seguridad++;
+            }
+        }
+    }
+
+    $disponibles = $total - $vendidos - $reservados;
+
+    $nodo_micro->adyacente('ocupacion')?->_dato((string)$total);
+    $nodo_micro->adyacente('seleccionados')?->_dato((string)$seleccionados);
+    $nodo_micro->adyacente('vendidos')?->_dato((string)$vendidos);
+    $nodo_micro->adyacente('reservados')?->_dato((string)$reservados);
+    $nodo_micro->adyacente('disponibles')?->_dato((string)$disponibles);
 }

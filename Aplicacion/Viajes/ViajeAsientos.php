@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.26
+ * @version   1.5piloto.27
  */
 
 use Iteradores\Nodos\Nodo;
@@ -97,7 +97,6 @@ function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, stri
     $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
     if (!$nodo_copia) return ['exito' => false, 'error' => 'No existe copia del vehículo'];
 
-    // Buscar asiento
     $nodo_asiento = null;
     $nodo_asientos = $nodo_copia->adyacente('asientos');
     if ($nodo_asientos) {
@@ -270,7 +269,6 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
     $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
     if (!$nodo_copia) return ['exito' => false, 'error' => 'No existe copia del vehículo'];
 
-    // Buscar asiento
     $nodo_asiento_encontrado = null;
     $nodo_asientos = $nodo_copia->adyacente('asientos');
     if ($nodo_asientos) {
@@ -315,7 +313,6 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
     if ($sel_por) $sel_por->_dato($nombre_terminal);
     else $nodo_asiento_encontrado->_adyacente_en($nodo_terminal, 'seleccionado_por');
 
-    // Obtener o crear venta actual de la terminal
     $venta_actual = $nodo_terminal->adyacente('venta_actual');
     if (!$venta_actual) {
         $venta_actual = Nodo::crear_con_dato('');

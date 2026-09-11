@@ -1,6 +1,6 @@
 /***
  * Micros y terminales dentro de viajes.
- * @version 1.5piloto.26
+ * @version 1.5piloto.27
  */
 
 function renderizar_micros_viaje(micros) {
@@ -9,12 +9,16 @@ function renderizar_micros_viaje(micros) {
     micros.forEach(micro => {
         const div = document.createElement('div');
         div.className = 'micro-item';
+        const textoBoton = (micro_seleccionado === micro.nombre_micro && !document.getElementById('pasaje_micro_viaje')?.classList.contains('hidden')) ? 'Ocultar pasaje' : 'Ver pasaje';
         div.innerHTML = `
-            <span>${micro.empresa} - ${micro.patente}</span>
-            <span>Ocupación: ${micro.ocupacion}</span>
+            <span>${micro.nombre_empresa || micro.empresa} - ${micro.nombre_vehiculo || micro.patente}</span>
+            <span>Capacidad: ${micro.ocupacion}</span>
             <span>Vendidos: ${micro.vendidos}</span>
+            ${usuario_actual.nivel === 'terminal' ? `<span>Vendidos aquí: ${micro.vendidos_aqui ?? '0'}</span>` : ''}
+            <span>Disponibles: ${micro.disponibles ?? '0'}</span>
+            ${usuario_actual.nivel !== 'terminal' ? `<span>Reservados para el equipo: ${micro.reservados ?? '0'}</span>` : ''}
             <span>Monto: $${micro.monto ?? '0'}</span>
-            <button class="btn btn-ver-pasaje" data-micro="${micro.nombre_micro}">Ver pasaje</button>
+            <button class="btn btn-ver-pasaje" data-micro="${micro.nombre_micro}">${textoBoton}</button>
             ${usuario_actual.nivel !== 'terminal' ? `
                 <button class="btn btn-editar-monto" data-micro="${micro.nombre_micro}" data-monto="${micro.monto ?? '0'}">Editar monto</button>
                 <button class="btn btn-eliminar-micro" data-micro="${micro.nombre_micro}">Quitar</button>
@@ -61,7 +65,56 @@ function editar_monto_micro(nombre_micro, monto_actual) {
     });
 }
 
+/**
+ * Cierra el panel del pasaje de micro y resetea el estado.
+ */
+function cerrar_pasaje_micro() {
+    detener_sync_asientos();
+    micro_seleccionado = null;
+
+    const panel = document.getElementById('pasaje_micro_viaje');
+    if (panel) panel.classList.add('hidden');
+
+    const croquis = document.getElementById('croquis_pasaje_micro');
+    if (croquis) croquis.innerHTML = '';
+
+    const foto = document.getElementById('foto_micro_viaje');
+    if (foto) foto.innerHTML = '';
+
+    const info = document.getElementById('info_asiento_viaje');
+    if (info) {
+        info.innerHTML = '';
+        info.classList.add('hidden');
+    }
+
+    venta_form_abierto = false;
+    const formulario = document.getElementById('formulario_confirmacion_venta');
+    if (formulario) formulario.classList.add('hidden');
+
+    const contenedorBoton = document.getElementById('contenedor_boton_confirmar_venta');
+    if (contenedorBoton) contenedorBoton.classList.add('hidden');
+
+    actualizar_textos_botones_pasaje();
+}
+
+/**
+ * Actualiza el texto de todos los botones de micro según el micro activo.
+ */
+function actualizar_textos_botones_pasaje() {
+    document.querySelectorAll('.btn-ver-pasaje').forEach(btn => {
+        const nombre = btn.dataset.micro;
+        const panelVisible = !document.getElementById('pasaje_micro_viaje')?.classList.contains('hidden');
+        btn.textContent = (nombre === micro_seleccionado && panelVisible) ? 'Ocultar pasaje' : 'Ver pasaje';
+    });
+}
+
 async function seleccionar_micro_viaje(nombre_micro) {
+    // Si ya está abierto ese micro y el panel visible, ocultamos
+    if (micro_seleccionado === nombre_micro && !document.getElementById('pasaje_micro_viaje').classList.contains('hidden')) {
+        cerrar_pasaje_micro();
+        return;
+    }
+
     micro_seleccionado = nombre_micro;
 
     let nombre_dueno;
@@ -86,6 +139,7 @@ async function seleccionar_micro_viaje(nombre_micro) {
         renderizar_pasaje_micro(datos.micro);
         micro_seleccionado = nombre_micro;
         iniciar_sync_asientos();
+        actualizar_textos_botones_pasaje();
     } else {
         mostrar_aviso(datos.error || "Error al obtener micro", 'error');
     }
@@ -150,8 +204,8 @@ async function eliminar_terminal_autorizada(nombre_terminal) {
     }
 }
 
-// Eventos para agregar micro
-$("#boton_agregar_micro_viaje").addEventListener("click", async () => {
+// Funciones para abrir formularios y confirmar (llamadas desde viajes-nucleo.js)
+async function abrir_formulario_agregar_micro() {
     $("#formulario_agregar_micro").classList.remove("hidden");
     const nombre_dueno = obtener_nombre_dueno_actual();
     const selectEmpresa = $("#selector_empresa_micro_viaje");
@@ -190,9 +244,9 @@ $("#boton_agregar_micro_viaje").addEventListener("click", async () => {
             }
         };
     }
-});
+}
 
-$("#boton_confirmar_micro").addEventListener("click", async () => {
+async function confirmar_agregar_micro() {
     const nombre_empresa = $("#selector_empresa_micro_viaje").value;
     const nombre_vehiculo = $("#selector_vehiculo_micro_viaje").value;
     const monto = $("#monto_micro_viaje").value.trim();
@@ -228,14 +282,9 @@ $("#boton_confirmar_micro").addEventListener("click", async () => {
     } else {
         mostrar_aviso(resultado.error || "Error al agregar micro", 'error');
     }
-});
+}
 
-$("#boton_cancelar_micro").addEventListener("click", () => {
-    $("#formulario_agregar_micro").classList.add("hidden");
-});
-
-// Eventos para agregar terminal
-$("#boton_agregar_terminal_viaje").addEventListener("click", async () => {
+async function abrir_formulario_agregar_terminal() {
     $("#formulario_agregar_terminal").classList.remove("hidden");
     const nombre_dueno = obtener_nombre_dueno_actual();
     const selectTerminal = $("#selector_terminal_autorizada");
@@ -254,9 +303,9 @@ $("#boton_agregar_terminal_viaje").addEventListener("click", async () => {
             selectTerminal.appendChild(opcion);
         });
     }
-});
+}
 
-$("#boton_confirmar_terminal").addEventListener("click", async () => {
+async function confirmar_agregar_terminal() {
     const nombre_terminal = $("#selector_terminal_autorizada").value;
     const nombre_dueno = obtener_nombre_dueno_actual();
     if (!nombre_terminal) {
@@ -281,8 +330,4 @@ $("#boton_confirmar_terminal").addEventListener("click", async () => {
     } else {
         mostrar_aviso(resultado.error || "Error al autorizar punto de venta", 'error');
     }
-});
-
-$("#boton_cancelar_terminal_viaje").addEventListener("click", () => {
-    $("#formulario_agregar_terminal").classList.add("hidden");
-});
+}

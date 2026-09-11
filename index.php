@@ -90,7 +90,32 @@ if (isset($_GET['probar_arbol'])) {
     require_once __DIR__ . '/miscelaneas/pruebas_arbol.php';
     exit;
 }
-
+// ==== Bloque temporal para migración de micros (versión 1.5piloto.27) ====
+if (isset($_GET['migrar_micros'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_micros.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_micros_empresa();
+    echo "Migración completada.\n";
+    echo "Dueños procesados: {$res['duenos_procesados']}\n";
+    echo "Micros procesados: {$res['micros_procesados']}\n";
+    echo "Micros migrados:   {$res['micros_migrados']}\n";
+    echo "Sin cambios:       {$res['micros_sin_cambio']}\n";
+    echo "Sin empresa:       {$res['micros_sin_empresa']}\n";
+    echo "Sin match:         {$res['micros_sin_match']}\n";
+    exit;
+}
+// ==== Bloque temporal para migración de patente en micros (v1.5piloto.27) ====
+if (isset($_GET['migrar_micros_patente'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_micros_patente.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_micros_patente();
+    echo "Migración de patente completada.\n";
+    echo "Micros procesados:  {$res['micros_procesados']}\n";
+    echo "Micros limpiados:   {$res['micros_limpiados']}\n";
+    echo "Sin enlace previo:  {$res['micros_sin_enlace']}\n";
+    echo "Sin copia:          {$res['micros_sin_copia']}\n";
+    exit;
+}
 // Crear usuario administrador si no existe
 if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');

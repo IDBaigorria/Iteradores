@@ -5,8 +5,9 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.16
+ * @version   1.5piloto.27
  */
+
 
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -59,47 +60,9 @@ function obtener_o_crear_pasajero(string $nombre_dueno, string $dni, array $dato
             else $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato($datos_pasajero[$campo]), $campo);
         }
     }
+
     return $nodo_pasajero;
 }
-
-/**
- * Actualiza los contadores de un micro (ocupación, seleccionados, vendidos) basado en los estados reales de sus asientos.
- */
-function actualizar_contadores_micro(Nodo $nodo_micro): void {
-    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
-    if (!$nodo_copia) return;
-
-    $total = 0;
-    $seleccionados = 0;
-    $vendidos = 0;
-    $nodo_asientos = $nodo_copia->adyacente('asientos');
-    if ($nodo_asientos) {
-        for ($i = 1; $i <= 2; $i++) {
-            $piso = $nodo_asientos->adyacente("piso_$i");
-            if (!$piso) continue;
-            $cabeza = $piso->adyacente('asientos');
-            if (!$cabeza) continue;
-            $actual = $cabeza->adyacente('primer');
-            $contador_seguridad = 0;
-            while ($actual && $actual->id() !== $cabeza->id() && $contador_seguridad < 1000) {
-                $estado = $actual->adyacente('estado');
-                if ($estado) {
-                    $estado_str = $estado->dato();
-                    if ($estado_str === 'seleccionado') $seleccionados++;
-                    elseif ($estado_str === 'vendido' || $estado_str === 'no disponible') $vendidos++;
-                    $total++;
-                }
-                $actual = $actual->adyacente('siguiente');
-                $contador_seguridad++;
-            }
-        }
-    }
-
-    $nodo_micro->adyacente('ocupacion')?->_dato((string)$total);
-    $nodo_micro->adyacente('seleccionados')?->_dato((string)$seleccionados);
-    $nodo_micro->adyacente('vendidos')?->_dato((string)$vendidos);
-}
-
 
 /**
  * Confirma la venta actual de una terminal, creando una venta persistente.

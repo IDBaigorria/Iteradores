@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.26
+ * @version 1.5piloto.27
  */
 
 function obtener_dueno_viaje_seleccionado() {

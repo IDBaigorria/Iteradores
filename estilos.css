@@ -340,8 +340,9 @@ h3 { margin: 0 0 12px; font-size: 17px; color: var(--primary-dark); }
     border-radius: 7px;
     box-shadow: 0 5px 20px rgba(0,0,0,.2);
     display: none;
-    z-index: 50;
+    z-index: 2000; 
 }
+
 .toast.show { display: block; }
 .toast-exito { background: #4CAF50; color: white; }
 .toast-error { background: #f44336; color: white; }

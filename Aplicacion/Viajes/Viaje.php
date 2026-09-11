@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.26
+ * @version   1.5piloto.27
  */
 
 use Iteradores\Nodos\Nodo;
@@ -63,10 +63,13 @@ function listar_viajes_de_terminal(string $nombre_terminal): array {
     if (!$nodo_dueno) return [];
 
     $nombre_dueno = $nodo_dueno->dato();
-    $viajes_dueno = listar_viajes_de_dueno($nombre_dueno);
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return [];
 
     $viajes_autorizados = [];
-    foreach ($viajes_dueno as $viaje) {
+    $adyacentes = (array) $nodo_viajes->adyacentes();
+    foreach ($adyacentes as $nombre_viaje => $nodo_viaje) {
+        $viaje = formatear_viaje($nombre_viaje, $nodo_viaje, $nombre_terminal); 
         if (in_array($nombre_terminal, $viaje['terminales_autorizadas'])) {
             $viajes_autorizados[] = $viaje;
         }
@@ -76,8 +79,9 @@ function listar_viajes_de_terminal(string $nombre_terminal): array {
 
 /**
  * Formatea los datos de un viaje, incluyendo micros, terminales y opciones.
+ * Si se pasa $nombre_terminal, se calcula 'vendidos_aqui' por micro para esa terminal.
  */
-function formatear_viaje(string $nombre_viaje, $nodo_viaje): array {
+function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_terminal = null): array {
     $datos = [];
     $datos['nombre_viaje'] = $nombre_viaje;
     $datos['dueno'] = $nodo_viaje->adyacente('dueno') ? $nodo_viaje->adyacente('dueno')->dato() : '';
@@ -90,6 +94,57 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje): array {
     $datos['disponibles'] = $nodo_viaje->adyacente('disponibles') ? $nodo_viaje->adyacente('disponibles')->dato() : '0';
     $datos['seleccionados'] = $nodo_viaje->adyacente('seleccionados') ? $nodo_viaje->adyacente('seleccionados')->dato() : '0';
     $datos['vendidos'] = $nodo_viaje->adyacente('vendidos') ? $nodo_viaje->adyacente('vendidos')->dato() : '0';
+    $datos['reservados'] = $nodo_viaje->adyacente('reservados') ? $nodo_viaje->adyacente('reservados')->dato() : '0';
+
+    // Determinar si el viaje está activo
+    $fecha = $datos['fecha'];
+    if ($fecha === 'a confirmar' || $fecha === '') {
+        $datos['activo'] = '1';
+    } else {
+        $hoy = date('Y-m-d');
+        $datos['activo'] = (strtotime($fecha) >= strtotime($hoy)) ? '1' : '0';
+    }
+
+    // Verificar si tiene ventas
+    $datos['tiene_ventas'] = viaje_tiene_ventas($datos['dueno'], $nombre_viaje) ? '1' : '0';
+
+    // Calcular ventas por micro de la terminal actual (si corresponde)
+    $vendidos_por_micro = [];
+    if ($nombre_terminal !== null) {
+        $contenedor_ventas = obtener_contenedor_ventas_dueno($datos['dueno']);
+        if ($contenedor_ventas) {
+            $venta_iter = hmi($contenedor_ventas);
+            while ($venta_iter) {
+                $nodo_terminal_venta = $venta_iter->adyacente('terminal');
+                $nodo_micro_venta = $venta_iter->adyacente('micro');
+                $nodo_viaje_venta = $venta_iter->adyacente('viaje');
+
+                if ($nodo_terminal_venta && $nodo_terminal_venta->dato() === $nombre_terminal
+                    && $nodo_viaje_venta && $nodo_viaje_venta->dato() === $nombre_viaje
+                    && $nodo_micro_venta) {
+                    $micro_id = $nodo_micro_venta->id();
+                    $cabeza = $venta_iter->adyacente('asientos');
+                    $cantidad = 0;
+                    if ($cabeza) {
+                        $asiento = $cabeza->adyacente('primer');
+                        $seg = 0;
+                        while ($asiento && $seg < 100) {
+                            $cantidad++;
+                            $asiento = $asiento->adyacente('siguiente');
+                            $seg++;
+                        }
+                    }
+                    $vendidos_por_micro[$micro_id] = ($vendidos_por_micro[$micro_id] ?? 0) + $cantidad;
+                }
+                $venta_iter = hd($venta_iter);
+            }
+        }
+    }
+
+    // Pre-cargar el contenedor de empresas del dueño (para resolver nombres visibles)
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    $nodo_dueno_iter = $raiz_usuarios ? $raiz_usuarios->adyacente($datos['dueno']) : null;
+    $nodo_empresas = $nodo_dueno_iter ? $nodo_dueno_iter->adyacente('empresas') : null;
 
     // Micros
     $micros = [];
@@ -97,14 +152,53 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje): array {
     if ($nodo_micros) {
         $adyacentes_micros = (array) $nodo_micros->adyacentes();
         foreach ($adyacentes_micros as $nombre_micro => $nodo_micro) {
+            // Identificador de empresa: puede venir como nodo enlazado (micros nuevos)
+            // o como nodo suelto cuyo dato es el string (micros viejos).
+            $identificador_empresa = '';
+            $nodo_empresa_enlazada = $nodo_micro->adyacente('empresa');
+            if ($nodo_empresa_enlazada) {
+                $identificador_empresa = $nodo_empresa_enlazada->dato();
+            }
+
+            // Nombre visible: buscar siempre la empresa real en el contenedor del dueño
+            // usando el identificador. Esto funciona para micros nuevos y viejos.
+            $nombre_empresa = $identificador_empresa;
+            if ($identificador_empresa !== '' && $nodo_empresas) {
+                $nodo_empresa_real = $nodo_empresas->adyacente($identificador_empresa);
+                if ($nodo_empresa_real && $nodo_empresa_real->adyacente('nombre')) {
+                    $nombre_empresa = $nodo_empresa_real->adyacente('nombre')->dato();
+                }
+            }
+
+            // Patente: preferentemente desde vehiculo_copia (config nueva), fallback al enlace viejo
+            $patente = '';
+            $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+            if ($nodo_copia) {
+                $patente = $nodo_copia->dato();
+            } else {
+                $nodo_patente = $nodo_micro->adyacente('patente');
+                if ($nodo_patente) $patente = $nodo_patente->dato();
+            }
+
+            // Nombre visible del vehículo (desde la copia clonada)
+            $nombre_vehiculo = $patente;
+            if ($nodo_copia && $nodo_copia->adyacente('nombre')) {
+                $nombre_vehiculo = $nodo_copia->adyacente('nombre')->dato();
+            }
+
             $micros[] = [
                 'nombre_micro' => $nombre_micro,
-                'empresa' => $nodo_micro->adyacente('empresa') ? $nodo_micro->adyacente('empresa')->dato() : '',
-                'patente' => $nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '',
+                'empresa' => $identificador_empresa,
+                'patente' => $patente,
+                'nombre_empresa' => $nombre_empresa,
+                'nombre_vehiculo' => $nombre_vehiculo,
                 'monto' => $nodo_micro->adyacente('monto') ? $nodo_micro->adyacente('monto')->dato() : '0',
                 'ocupacion' => $nodo_micro->adyacente('ocupacion') ? $nodo_micro->adyacente('ocupacion')->dato() : '0',
                 'seleccionados' => $nodo_micro->adyacente('seleccionados') ? $nodo_micro->adyacente('seleccionados')->dato() : '0',
                 'vendidos' => $nodo_micro->adyacente('vendidos') ? $nodo_micro->adyacente('vendidos')->dato() : '0',
+                'reservados' => $nodo_micro->adyacente('reservados') ? $nodo_micro->adyacente('reservados')->dato() : '0',
+                'disponibles' => $nodo_micro->adyacente('disponibles') ? $nodo_micro->adyacente('disponibles')->dato() : '0',
+                'vendidos_aqui' => ($nombre_terminal !== null) ? (string)($vendidos_por_micro[$nodo_micro->id()] ?? 0) : null,
             ];
         }
     }
@@ -115,8 +209,8 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje): array {
     $nodo_terminales = $nodo_viaje->adyacente('terminales_autorizadas');
     if ($nodo_terminales) {
         $adyacentes_terminales = (array) $nodo_terminales->adyacentes();
-        foreach ($adyacentes_terminales as $nombre_terminal => $nodo_terminal) {
-            $terminales[] = $nombre_terminal;
+        foreach ($adyacentes_terminales as $nombre_terminal_iter => $nodo_terminal) {
+            $terminales[] = $nombre_terminal_iter;
         }
     }
     $datos['terminales_autorizadas'] = $terminales;
@@ -124,6 +218,30 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje): array {
     // Opciones avanzadas (definida en ViajeOpciones.php)
     $datos['opciones_avanzadas'] = obtener_opciones_avanzadas_viaje($datos['dueno'], $nombre_viaje);
     return $datos;
+}
+
+/**
+ * Verifica si un viaje tiene ventas registradas.
+ */
+function viaje_tiene_ventas(string $nombre_dueno, string $nombre_viaje): bool {
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_usuarios) return false;
+
+    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    if (!$nodo_dueno) return false;
+
+    $contenedor_ventas = $nodo_dueno->adyacente('ventas');
+    if (!$contenedor_ventas) return false;
+
+    $actual = hmi($contenedor_ventas);
+    while ($actual) {
+        $nodo_viaje_venta = $actual->adyacente('viaje');
+        if ($nodo_viaje_venta && $nodo_viaje_venta->dato() === $nombre_viaje) {
+            return true;
+        }
+        $actual = hd($actual);
+    }
+    return false;
 }
 
 /**
@@ -154,6 +272,7 @@ function agregar_viaje(array $datos): array {
     $nodo_viaje->_adyacente_en(Nodo::crear_con_dato('0'), 'disponibles');
     $nodo_viaje->_adyacente_en(Nodo::crear_con_dato('0'), 'seleccionados');
     $nodo_viaje->_adyacente_en(Nodo::crear_con_dato('0'), 'vendidos');
+    $nodo_viaje->_adyacente_en(Nodo::crear_con_dato('0'), 'reservados');
     $nodo_viaje->_adyacente_en(Nodo::crear_con_dato(''), 'micros');
     $nodo_viaje->_adyacente_en(Nodo::crear_con_dato(''), 'terminales_autorizadas');
 
@@ -195,6 +314,11 @@ function eliminar_viaje(string $nombre_viaje, string $nombre_dueno): array {
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
     if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
 
+    // Verificar si tiene ventas
+    if (viaje_tiene_ventas($nombre_dueno, $nombre_viaje)) {
+        return ['exito' => false, 'error' => 'No se pueden eliminar viajes con ventas ya realizadas'];
+    }
+
     // TODO: eliminar nodos huérfanos
     $nodo_viajes->eliminar_adyacente($nombre_viaje);
     Controlador::guardar(Conf::NOMBRE_APP);
@@ -228,6 +352,7 @@ function guardar_viaje_completo(array $datos): array {
         $nodo_viaje->_adyacente_en(Nodo::crear_con_dato('0'), 'disponibles');
         $nodo_viaje->_adyacente_en(Nodo::crear_con_dato('0'), 'seleccionados');
         $nodo_viaje->_adyacente_en(Nodo::crear_con_dato('0'), 'vendidos');
+        $nodo_viaje->_adyacente_en(Nodo::crear_con_dato('0'), 'reservados');
         $nodo_viaje->_adyacente_en(Nodo::crear_con_dato(''), 'micros');
         $nodo_viaje->_adyacente_en(Nodo::crear_con_dato(''), 'terminales_autorizadas');
         $nodo_viajes->_adyacente_en($nodo_viaje, $nombre_viaje);

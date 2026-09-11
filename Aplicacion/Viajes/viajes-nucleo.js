@@ -1,6 +1,6 @@
 /***
- * Núcleo de viajes: carga, listado, detalle y eliminación.
- * @version 1.5piloto.26
+ * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
+ * @version 1.5piloto.27
  */
 
 function obtener_nombre_dueno_actual() {
@@ -59,17 +59,11 @@ async function cargar_duenos_en_select_viajes() {
 }
 
 function ocultar_detalle_viaje() {
-    $("#detalle_viaje").classList.add("hidden");
-    $("#formulario_agregar_micro").classList.add("hidden");
-    $("#formulario_agregar_terminal").classList.add("hidden");
+    // Detener sincronización si hay
+    detener_sync_asientos();
+    // Ya no ocultamos panel fijo, pero limpiamos variables
     viaje_seleccionado = null;
     micro_seleccionado = null;
-    $("#croquis_pasaje_micro").innerHTML = '';
-    $("#foto_micro_viaje").innerHTML = '';
-    $("#pasaje_micro_viaje").classList.add("hidden");
-    $("#info_asiento_viaje").classList.add("hidden");
-    $("#info_asiento_viaje").innerHTML = '';
-    detener_sync_asientos();
 }
 
 async function listar_viajes(nombre, tipo) {
@@ -94,6 +88,9 @@ function renderizar_viajes(viajes) {
     viajes.forEach(viaje => {
         const div = document.createElement('div');
         div.className = 'viaje-card';
+        if (viaje.activo === '0') {
+            div.classList.add('viaje-inactivo');
+        }
         div.innerHTML = `
             <div class="viaje-info">
                 <strong>${viaje.nombre}</strong>
@@ -101,67 +98,169 @@ function renderizar_viajes(viajes) {
                 <span>${viaje.origen} → ${viaje.destino}</span>
             </div>
             <div class="viaje-stats">
-                <span>Ocupación: ${viaje.ocupacion}</span>
+                <span>Capacidad total: ${viaje.ocupacion}</span>
+                ${usuario_actual.nivel === 'dueno' ? `<span>Reservado para el equipo: ${viaje.reservados}</span>` : ''}
                 <span>Disponibles: ${viaje.disponibles}</span>
                 <span>Seleccionados: ${viaje.seleccionados}</span>
                 <span>Vendidos: ${viaje.vendidos}</span>
             </div>
             <button class="btn btn-detalle-viaje" data-viaje="${viaje.nombre_viaje}">Ver detalle</button>
             ${usuario_actual.nivel !== 'terminal' ? `
-                <button class="btn btn-editar-viaje" data-viaje="${viaje.nombre_viaje}">Editar viaje</button>
-                <button class="btn btn-eliminar-viaje" data-viaje="${viaje.nombre_viaje}">Eliminar</button>
+                <button class="btn btn-editar-viaje ${viaje.activo === '0' ? 'btn-disabled' : ''}" data-viaje="${viaje.nombre_viaje}" ${viaje.activo === '0' ? 'disabled' : ''}>Editar viaje</button>
+                <button class="btn btn-eliminar-viaje ${viaje.tiene_ventas === '1' ? 'btn-disabled' : ''}" data-viaje="${viaje.nombre_viaje}">Eliminar</button>
             ` : ''}
         `;
         lista.appendChild(div);
 
         div.querySelector('.btn-detalle-viaje').addEventListener('click', () => ver_detalle_viaje(viaje));
         const btnEditar = div.querySelector('.btn-editar-viaje');
-        if (btnEditar) btnEditar.addEventListener('click', () => abrir_modal_viaje('editar', viaje));
+        if (btnEditar && viaje.activo !== '0') {
+            btnEditar.addEventListener('click', () => abrir_modal_viaje('editar', viaje));
+        }
         const btnEliminar = div.querySelector('.btn-eliminar-viaje');
-        if (btnEliminar) btnEliminar.addEventListener('click', () => eliminar_viaje(viaje.nombre_viaje));
+        if (btnEliminar) {
+            btnEliminar.addEventListener('click', () => {
+                if (viaje.tiene_ventas === '1') {
+                    mostrar_aviso("No se pueden eliminar viajes con ventas ya realizadas", 'error');
+                    return;
+                }
+                eliminar_viaje(viaje.nombre_viaje);
+            });
+        }
     });
 }
 
-function ver_detalle_viaje(viaje) {
-    ocultar_detalle_viaje();
-
+async function ver_detalle_viaje(viaje) {
+    detener_sync_asientos();
     viaje_seleccionado = viaje;
-    $("#detalle_viaje_titulo").textContent = viaje.nombre;
-    $("#detalle_viaje").classList.remove('hidden');
+    micro_seleccionado = null;
+    venta_form_abierto = false;
+    operacion_asiento_en_curso = false;
 
-    if (usuario_actual.nivel === 'terminal') {
-        $("#boton_agregar_micro_viaje").style.display = 'none';
-        $("#boton_agregar_terminal_viaje").style.display = 'none';
-        $("#seccion_terminales_viaje").style.display = 'none';
-    } else {
-        $("#boton_agregar_micro_viaje").style.display = '';
-        $("#boton_agregar_terminal_viaje").style.display = '';
-        $("#seccion_terminales_viaje").style.display = '';
+    // Obtener datos frescos del viaje para asegurar que todos los micros estén presentes
+    try {
+        const nombre_dueno = obtener_nombre_dueno_actual();
+        const tipo = usuario_actual.nivel === 'terminal' ? 'terminal' : 'dueno';
+        const accion = tipo === 'dueno' ? 'viajes/listar_por_dueno' : 'viajes/listar_por_terminal';
+        const param = tipo === 'dueno' ? { nombre_dueno } : { nombre_terminal: usuario_actual.nombre_usuario };
+
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ accion, ...param })
+        });
+        const datos = await respuesta.json();
+        if (datos.exito) {
+            const viajeActualizado = datos.viajes.find(v => v.nombre_viaje === viaje.nombre_viaje);
+            if (viajeActualizado) {
+                viaje = viajeActualizado;
+                viaje_seleccionado = viaje;
+            }
+        }
+    } catch (error) {
+        console.error("Error al refrescar datos del viaje:", error);
     }
 
-    // Insertar botón "Editar viaje" para admin y dueño
-    if (usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno') {
-        const botonExistente = document.getElementById('boton_editar_viaje');
-        if (botonExistente) botonExistente.remove();
+    const html = `
+        <h3>${viaje.nombre}</h3>
+        ${usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno' ? `
+            <div style="margin-bottom:15px;">
+                <button class="btn" id="modal_btn_editar_viaje" ${viaje.activo === '0' ? 'disabled' : ''}>Editar viaje</button>
+            </div>
+        ` : ''}
+        <div class="row">
+            <label>Micros:</label>
+            ${usuario_actual.nivel !== 'terminal' ? `<button class="btn" id="boton_agregar_micro_viaje">Agregar micro</button>` : ''}
+        </div>
+        <div id="lista_micros_viaje"></div>
 
-        const botonEditar = document.createElement('button');
-        botonEditar.className = 'btn';
-        botonEditar.textContent = 'Editar viaje';
-        botonEditar.id = 'boton_editar_viaje';
-        botonEditar.addEventListener('click', () => abrir_modal_viaje('editar', viaje_seleccionado));
+        <div id="pasaje_micro_viaje" class="panel hidden" style="margin-top:15px;">
+            <h4>Pasaje del micro</h4>
+            <div id="foto_micro_viaje" style="margin-bottom:10px;"></div>
+            <div class="pasaje-layout" style="display:flex; flex-wrap:wrap; justify-content:center; gap:15px; align-items:flex-start; max-width:1200px; margin:0 auto;">
+                <div id="croquis_pasaje_micro" style="flex:1 1 300px; min-width:300px; display:flex; flex-direction:column; align-items:center;"></div>
+                <div class="columna-derecha" style="flex:1 1 250px; min-width:250px; display:flex; flex-direction:column; gap:10px;">
+                    <div id="info_asiento_viaje" class="panel hidden" style="padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
+                    <div id="contenedor_boton_confirmar_venta" class="hidden" style="text-align:left;">
+                        <button class="btn primary" id="boton_confirmar_venta">Vender</button>
+                    </div>
+                    <div id="formulario_confirmacion_venta" class="panel hidden" style="padding:15px; border:1px solid #ddd; border-radius:6px;"></div>
+                </div>
+            </div>
+        </div>
 
-        const tituloDetalle = document.getElementById('detalle_viaje_titulo');
-        tituloDetalle.after(botonEditar);
+        <div id="seccion_terminales_viaje" style="${usuario_actual.nivel === 'terminal' ? 'display:none;' : ''}">
+            <div class="row" style="margin-top:15px;">
+                <label>Terminales autorizadas:</label>
+                ${usuario_actual.nivel !== 'terminal' ? `<button class="btn" id="boton_agregar_terminal_viaje">Agregar punto de venta</button>` : ''}
+            </div>
+            <div id="lista_terminales_viaje"></div>
+        </div>
+
+        <div id="formulario_agregar_micro" class="panel hidden" style="margin-top:15px;">
+            <h3>Agregar micro</h3>
+            <div class="form-grid">
+                <div class="field">
+                    <label>Empresa</label>
+                    <select id="selector_empresa_micro_viaje"></select>
+                </div>
+                <div class="field">
+                    <label>Vehículo</label>
+                    <select id="selector_vehiculo_micro_viaje"></select>
+                </div>
+                <div class="field">
+                    <label>Monto del pasaje *</label>
+                    <input type="number" id="monto_micro_viaje" min="0" step="0.01" placeholder="0.00">
+                </div>
+            </div>
+            <div class="actions" style="margin-top:12px;">
+                <button class="btn primary" id="boton_confirmar_micro">Confirmar</button>
+                <button class="btn" id="boton_cancelar_micro">Cancelar</button>
+            </div>
+        </div>
+
+        <div id="formulario_agregar_terminal" class="panel hidden" style="margin-top:15px;">
+            <h3>Agregar punto de venta autorizado</h3>
+            <div class="field">
+                <label>Terminal</label>
+                <select id="selector_terminal_autorizada"></select>
+            </div>
+            <div class="actions" style="margin-top:12px;">
+                <button class="btn primary" id="boton_confirmar_terminal">Confirmar</button>
+                <button class="btn" id="boton_cancelar_terminal_viaje">Cancelar</button>
+            </div>
+        </div>
+    `;
+
+    abrir_modal_generico('Detalle del viaje', html);
+
+    // Asignar listeners a botones generados
+    const btnEditar = document.getElementById('modal_btn_editar_viaje');
+    if (btnEditar && viaje.activo !== '0') {
+        btnEditar.addEventListener('click', () => abrir_modal_viaje('editar', viaje));
     }
 
+    const btnVender = document.getElementById('boton_confirmar_venta');
+    if (btnVender) {
+        btnVender.addEventListener('click', abrir_modal_confirmacion_venta);
+    }
+
+    document.getElementById('boton_agregar_micro_viaje')?.addEventListener('click', abrir_formulario_agregar_micro);
+    document.getElementById('boton_agregar_terminal_viaje')?.addEventListener('click', abrir_formulario_agregar_terminal);
+    document.getElementById('boton_confirmar_micro')?.addEventListener('click', confirmar_agregar_micro);
+    document.getElementById('boton_cancelar_micro')?.addEventListener('click', () => document.getElementById('formulario_agregar_micro').classList.add('hidden'));
+    document.getElementById('boton_confirmar_terminal')?.addEventListener('click', confirmar_agregar_terminal);
+    document.getElementById('boton_cancelar_terminal_viaje')?.addEventListener('click', () => document.getElementById('formulario_agregar_terminal').classList.add('hidden'));
+
+    // Renderizar contenido
     renderizar_micros_viaje(viaje.micros);
     if (usuario_actual.nivel !== 'terminal') {
         renderizar_terminales_viaje(viaje.terminales_autorizadas);
     } else {
-        $("#lista_terminales_viaje").innerHTML = '';
+        const listaT = document.getElementById('lista_terminales_viaje');
+        if (listaT) listaT.innerHTML = '';
     }
 }
-
 async function eliminar_viaje(nombre_viaje) {
     if (!confirm(`¿Eliminar viaje ${nombre_viaje}?`)) return;
     const nombre_dueno = obtener_nombre_dueno_actual();
@@ -173,7 +272,7 @@ async function eliminar_viaje(nombre_viaje) {
     const resultado = await respuesta.json();
     if (resultado.exito) {
         mostrar_aviso("Viaje eliminado", 'exito');
-        $("#detalle_viaje").classList.add("hidden");
+        cerrar_modal_generico();
         await cargar_viajes();
     } else {
         mostrar_aviso(resultado.error || "Error al eliminar", 'error');
@@ -184,7 +283,9 @@ async function actualizar_detalle_viaje_actual() {
     if (!viaje_seleccionado) return;
 
     const nombre_viaje_actual = viaje_seleccionado.nombre_viaje;
-    ocultar_detalle_viaje();
+    const micro_previo = micro_seleccionado;   // <-- preservar micro seleccionado
+
+    detener_sync_asientos();
 
     let nombre_dueno = obtener_nombre_dueno_actual();
     let tipo = usuario_actual.nivel === 'terminal' ? 'terminal' : 'dueno';
@@ -200,7 +301,16 @@ async function actualizar_detalle_viaje_actual() {
     if (datos.exito) {
         const viajeActualizado = datos.viajes.find(v => v.nombre_viaje === nombre_viaje_actual);
         if (viajeActualizado) {
+            // Re-renderiza el detalle sobre el mismo modal (no se cierra)
             ver_detalle_viaje(viajeActualizado);
+
+            // Si había un micro seleccionado, volver a mostrarlo
+            if (micro_previo) {
+                const microAunExiste = viajeActualizado.micros.some(m => m.nombre_micro === micro_previo);
+                if (microAunExiste) {
+                    await seleccionar_micro_viaje(micro_previo);
+                }
+            }
         }
     }
 }
