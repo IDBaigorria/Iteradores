@@ -653,3 +653,72 @@ h3 { margin: 0 0 12px; font-size: 17px; color: var(--primary-dark); }
     box-shadow: 0 4px 8px rgba(0,0,0,0.18);
     transform: translateY(-2px);
 }
+
+/* Panel de datos del vehículo */
+.panel-datos-vehiculo {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    padding: 15px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel-claro);
+    margin-top: 15px;
+}
+
+.panel-datos-vehiculo .foto-miniatura {
+    width: 120px;
+    height: 120px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+}
+
+.panel-datos-vehiculo .foto-miniatura img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.panel-datos-vehiculo .foto-miniatura span {
+    color: var(--muted);
+    font-size: 12px;
+    font-style: italic;
+}
+
+.panel-datos-vehiculo .datos-vehiculo {
+    flex: 1;
+}
+
+.panel-datos-vehiculo .datos-vehiculo h4 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    color: var(--primary-dark);
+}
+
+.panel-datos-vehiculo .dato-linea {
+    font-size: 14px;
+    margin-bottom: 6px;
+    color: var(--text);
+}
+
+.panel-datos-vehiculo .dato-linea strong {
+    display: inline-block;
+    min-width: 130px;
+    color: var(--primary-dark);
+}
+
+.estado-configurado {
+    color: #28713b;
+    font-weight: 700;
+}
+
+.estado-sin-configurar {
+    color: #a06000;
+    font-weight: 700;
+}

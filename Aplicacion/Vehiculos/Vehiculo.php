@@ -38,6 +38,7 @@ function listar_vehiculos_de_empresa(string $nombre_empresa): array {
 
         $vehiculos = [];
         foreach ($adyacentes as $nombre_vehiculo => $nodo_vehiculo) {
+            $nombre_vehiculo = (string)$nombre_vehiculo;
             $nodo_nombre = $nodo_vehiculo->adyacente('nombre');
             $nodo_asientos = $nodo_vehiculo->adyacente('asientos');
             $asientos = $nodo_asientos ? $nodo_asientos->dato() : '0';

@@ -148,8 +148,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     Controlador::guardar($nombre_app);
     Controlador::establecer_metodo('JSON');
     Controlador::guardar($nombre_app);
-    //Controlador::imprimir_alertas();
-    //Controlador::imprimir_errores();
+    Controlador::imprimir_alertas();
+    Controlador::imprimir_errores();
     exit;
 }
 

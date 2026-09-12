@@ -1,6 +1,6 @@
 /***
  * Funciones de empresas, vehículos y editor de asientos.
- * @version 1.5piloto.15
+ * @version 1.5piloto.28
  */
 
 // Variable global para el editor de asientos
@@ -104,7 +104,7 @@ async function cargar_vehiculos_de_empresa(nombre_empresa) {
             select.innerHTML = '<option value="">Seleccione vehículo...</option>';
             datos.vehiculos.forEach(vehiculo => {
                 const opcion = document.createElement('option');
-                opcion.value = vehiculo.nombre_vehiculo;
+                opcion.value = String(vehiculo.nombre_vehiculo);
                 opcion.textContent = vehiculo.nombre;
                 select.appendChild(opcion);
             });
@@ -113,27 +113,30 @@ async function cargar_vehiculos_de_empresa(nombre_empresa) {
                 select.selectedIndex = 1;
                 vehiculo_seleccionado_micros = datos.vehiculos[0];
                 mostrar_croquis_vehiculo(vehiculo_seleccionado_micros);
-                actualizar_foto_vehiculo(vehiculo_seleccionado_micros.foto, false);
+                mostrar_panel_datos_vehiculo(vehiculo_seleccionado_micros); 
                 $("#panel_croquis_micros").style.display = 'block';
                 $("#area_croquis_estatico_micros").classList.remove("hidden");
                 $("#panel_edicion_vehiculo_micros").classList.add("hidden");
             } else {
                 vehiculo_seleccionado_micros = null;
                 $("#panel_croquis_micros").style.display = 'none';
+                mostrar_panel_datos_vehiculo(null);
             }
 
             select.onchange = async () => {
-                const vehiculo = datos.vehiculos.find(v => v.nombre_vehiculo === select.value);
+                const seleccionado = String(select.value);
+                const vehiculo = datos.vehiculos.find(v => String(v.nombre_vehiculo) === seleccionado);
                 if (vehiculo) {
                     vehiculo_seleccionado_micros = vehiculo;
                     mostrar_croquis_vehiculo(vehiculo);
-                    actualizar_foto_vehiculo(vehiculo.foto, false);
+                    mostrar_panel_datos_vehiculo(vehiculo);
                     $("#panel_croquis_micros").style.display = 'block';
                     $("#area_croquis_estatico_micros").classList.remove("hidden");
                     $("#panel_edicion_vehiculo_micros").classList.add("hidden");
                 } else {
                     vehiculo_seleccionado_micros = null;
                     $("#panel_croquis_micros").style.display = 'none';
+                    mostrar_panel_datos_vehiculo(null);
                 }
             };
         }
@@ -425,7 +428,7 @@ function alternar_asiento(celda, idxPiso, fila, columna) {
         celda.classList.add('vacio');
         celda.textContent = '';
     } else {
-        const nuevoNumero = generar_numero_provisional(piso);
+        const nuevoNumero = generar_numero_provisional(idxPiso);
         piso.asientos.push({ fila, columna, numero: nuevoNumero });
         celda.classList.add('asiento');
         celda.classList.remove('vacio');
@@ -445,16 +448,109 @@ function editar_numero_asiento(celda, idxPiso, fila, columna) {
     }
 }
 
-function generar_numero_provisional(piso) {
+/**
+ * Genera el siguiente número provisional considerando el máximo global
+ * de todos los pisos hasta el actual (inclusive). Esto evita que el piso 2
+ * reinicie en 1 cuando el piso 1 ya tiene asientos numerados.
+ */
+function generar_numero_provisional(idxPiso) {
     let max = 0;
-    piso.asientos.forEach(a => {
-        const num = parseInt(a.numero);
-        if (!isNaN(num) && num > max) max = num;
-    });
+    for (let i = 0; i <= idxPiso; i++) {
+        if (!editor_pisos_actuales[i]) continue;
+        editor_pisos_actuales[i].asientos.forEach(a => {
+            const num = parseInt(a.numero);
+            if (!isNaN(num) && num > max) max = num;
+        });
+    }
     return String(max + 1);
 }
 
+/**
+ * Valida que no haya números de asiento repetidos entre todos los pisos.
+ * Devuelve un arreglo de duplicados detectados.
+ */
+function validar_numeros_asientos() {
+    const vistos = new Map();   // numero -> { piso, fila, columna }
+    const duplicados = [];
+
+    editor_pisos_actuales.forEach((piso, idxPiso) => {
+        piso.asientos.forEach(a => {
+            const numero = String(a.numero).trim();
+            if (numero === '') return;
+            if (vistos.has(numero)) {
+                duplicados.push({
+                    numero,
+                    primero: vistos.get(numero),
+                    segundo: { piso: idxPiso + 1, fila: a.fila, columna: a.columna }
+                });
+            } else {
+                vistos.set(numero, { piso: idxPiso + 1, fila: a.fila, columna: a.columna });
+            }
+        });
+    });
+
+    return duplicados;
+}
+
+/**
+ * Muestra el modal con los números duplicados y ofrece reiniciar la numeración.
+ */
+function mostrar_aviso_numeros_duplicados(duplicados) {
+    let html = '<p>Hay números de asiento repetidos entre pisos. Corregilos antes de guardar:</p>';
+    html += '<ul>';
+    duplicados.forEach(d => {
+        html += `<li>Número <strong>${d.numero}</strong>: piso ${d.primero.piso} (F${d.primero.fila}, C${d.primero.columna}) y piso ${d.segundo.piso} (F${d.segundo.fila}, C${d.segundo.columna})</li>`;
+    });
+    html += '</ul>';
+    html += '<p>Podés corregirlos manualmente (doble clic en cada celda) o reiniciar la numeración para que se reasignen secuencialmente.</p>';
+    html += '<div class="actions" style="margin-top:15px;">';
+    html += '<button class="btn primary" id="btn_reiniciar_numeracion">Reiniciar numeración</button>';
+    html += '<button class="btn" id="btn_cancelar_duplicados">Cancelar</button>';
+    html += '</div>';
+
+    abrir_modal_generico('Números de asiento duplicados', html);
+
+    document.getElementById('btn_reiniciar_numeracion').addEventListener('click', () => {
+        reiniciar_numeracion_asientos();
+        cerrar_modal_generico();
+        mostrar_aviso('Numeración reiniciada. Guardando...', 'info');
+        guardar_configuracion();
+    });
+
+    document.getElementById('btn_cancelar_duplicados').addEventListener('click', cerrar_modal_generico);
+}
+
+/**
+ * Renumera todos los asientos secuencialmente, piso por piso, respetando
+ * el orden de filas y columnas dentro de cada piso.
+ */
+function reiniciar_numeracion_asientos() {
+    let contador = 1;
+    editor_pisos_actuales.forEach((piso) => {
+        // Ordenar por fila y luego por columna para que la numeración sea predecible
+        piso.asientos.sort((a, b) => {
+            if (a.fila !== b.fila) return a.fila - b.fila;
+            return a.columna - b.columna;
+        });
+        piso.asientos.forEach(a => {
+            a.numero = String(contador);
+            contador++;
+        });
+    });
+    // Refrescar la cuadrícula visual del editor
+    document.querySelectorAll('.cuadricula-editor').forEach((cuadricula, idx) => {
+        renderizar_cuadricula_editor(cuadricula.parentElement, idx);
+    });
+}
+
 async function guardar_configuracion() {
+    // Validar números duplicados antes de guardar
+    const duplicados = validar_numeros_asientos();
+    if (duplicados.length > 0) {
+        mostrar_aviso_numeros_duplicados(duplicados);
+        return;
+    }
+
     const numPisos = parseInt($("#editor_num_pisos").value);
     const configuracion = { pisos: [] };
     for (let i = 0; i < numPisos; i++) {
@@ -491,6 +587,7 @@ async function guardar_configuracion() {
             vehiculo_seleccionado_micros.configuracion = configuracion;
             const total_asientos = configuracion.pisos.reduce((total, piso) => total + piso.asientos.length, 0);
             vehiculo_seleccionado_micros.asientos = String(total_asientos);
+            mostrar_panel_datos_vehiculo(vehiculo_seleccionado_micros);
         }
         cancelar_editor();
         mostrar_aviso("Configuración actualizada", 'exito');
@@ -513,6 +610,7 @@ $("#editor_num_pisos").addEventListener("change", generar_editor_pisos);
 $("#boton_guardar_configuracion").addEventListener("click", guardar_configuracion);
 $("#boton_cancelar_configuracion").addEventListener("click", cancelar_editor);
 
+// Botón "Reiniciar asientos": elimina todos los asientos de todos los pisos
 $("#boton_reiniciar_asientos").addEventListener("click", () => {
     editor_pisos_actuales.forEach(piso => {
         piso.asientos = [];
@@ -521,6 +619,12 @@ $("#boton_reiniciar_asientos").addEventListener("click", () => {
         renderizar_cuadricula_editor(cuadricula.parentElement, idx);
     });
     mostrar_aviso("Asientos reiniciados", 'info');
+});
+
+// Botón "Reiniciar numeración de asientos": renumera los asientos existentes
+$("#boton_reiniciar_numeracion").addEventListener("click", () => {
+    reiniciar_numeracion_asientos();
+    mostrar_aviso("Numeración reiniciada", 'info');
 });
 
 // Subir foto
@@ -555,11 +659,68 @@ $("#input_foto_vehiculo").addEventListener("change", async (e) => {
     if (resultado.exito) {
         if (vehiculo_seleccionado_micros) {
             vehiculo_seleccionado_micros.foto = resultado.foto;
+            mostrar_panel_datos_vehiculo(vehiculo_seleccionado_micros);
         }
-        actualizar_foto_vehiculo(resultado.foto, false);
         actualizar_foto_vehiculo(resultado.foto, true);
         mostrar_aviso("Foto actualizada", 'exito');
     } else {
         mostrar_aviso(resultado.error || "Error al subir foto", 'error');
     }
 });
+
+function mostrar_panel_datos_vehiculo(vehiculo) {
+    const panel = $("#panel_datos_vehiculo");
+    if (!vehiculo) {
+        panel.classList.add("hidden");
+        return;
+    }
+
+    // Nombre visible
+    $("#datos_vehiculo_nombre").textContent = vehiculo.nombre || vehiculo.nombre_vehiculo;
+    // Patente
+    $("#datos_vehiculo_patente").textContent = vehiculo.nombre_vehiculo;
+
+    // Estado: configurado si hay al menos un asiento cargado
+    const tiene_config = vehiculo.configuracion
+        && Array.isArray(vehiculo.configuracion.pisos)
+        && vehiculo.configuracion.pisos.some(p => p.asientos && p.asientos.length > 0);
+    const estado_el = $("#datos_vehiculo_estado");
+    if (tiene_config) {
+        estado_el.textContent = "✓ Listo para usar";
+        estado_el.className = "estado-configurado";
+    } else {
+        estado_el.textContent = "⚠ Requiere configuración";
+        estado_el.className = "estado-sin-configurar";
+    }
+
+    // Capacidad total
+    $("#datos_vehiculo_capacidad").textContent = vehiculo.asientos || '0';
+
+    // Asientos por piso (solo si hay más de un piso)
+    const pisos_div = $("#datos_vehiculo_pisos");
+    pisos_div.innerHTML = '';
+    const pisos = vehiculo.configuracion && vehiculo.configuracion.pisos ? vehiculo.configuracion.pisos : [];
+    if (pisos.length > 1) {
+        pisos.forEach((piso, idx) => {
+            const cantidad = piso.asientos ? piso.asientos.length : 0;
+            const div = document.createElement('div');
+            div.className = 'dato-linea';
+            div.innerHTML = `<strong>Piso ${idx + 1}:</strong> <span>${cantidad} asientos</span>`;
+            pisos_div.appendChild(div);
+        });
+    }
+
+    // Foto (miniatura)
+    const img = $("#foto_vehiculo_miniatura");
+    const placeholder = $("#foto_vehiculo_miniatura_placeholder");
+    if (vehiculo.foto) {
+        img.src = vehiculo.foto;
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+    } else {
+        img.style.display = 'none';
+        placeholder.style.display = 'block';
+    }
+
+    panel.classList.remove("hidden");
+}

@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.26)
+ * ## Estructura de nodos actual (v1.5piloto.27)
  *
  * ### Nodos raíz especiales
  *
@@ -153,10 +153,11 @@
  *   | `hora`                   | Nodo con dato string: hora (HH:MM) o `"a confirmar"` si aún no está definida. |
  *   | `origen`                 | Nodo con dato string: lugar de partida.              |
  *   | `destino`                | Nodo con dato string: destino.                       |
- *   | `ocupacion`              | Nodo con dato string numérico: total asientos ocupados. |
- *   | `disponibles`            | Nodo con dato string numérico: total asientos disponibles. |
+ *   | `ocupacion`              | Nodo con dato string numérico: capacidad total de asientos del viaje. |
+ *   | `disponibles`            | Nodo con dato string numérico: total asientos disponibles (capacidad - vendidos - reservados). |
  *   | `seleccionados`          | Nodo con dato string numérico: total asientos seleccionados. |
  *   | `vendidos`               | Nodo con dato string numérico: total asientos vendidos. |
+ *   | `reservados`             | Nodo con dato string numérico: total asientos reservados para el equipo. |
  *   | `micros`                 | Nodo contenedor con dato vacío.                       |
  *   |                          | └─ Enlaces salientes con nombre único (`micro_1`, `micro_2`, etc.) apuntando a nodos micro. |
  *   | `terminales_autorizadas` | Nodo contenedor con dato vacío.                       |
@@ -173,14 +174,28 @@
  * - Enlaces salientes:
  *   | Enlace           | Nodo destino y dato esperado                          |
  *   |------------------|-------------------------------------------------------|
- *   | `empresa`        | Nodo con dato string: identificador de la empresa original. |
- *   | `patente`        | Nodo con dato string: patente del vehículo original.  |
+ *   | `empresa`        | Enlace directo al nodo empresa (dentro del contenedor `empresas` del dueño). El dato del nodo empresa es su identificador. |
+ *   | `patente`        | **Obsoleto desde 1.5piloto.27.** Antes se guardaba un string con la patente. Ahora la patente se obtiene desde `vehiculo_copia->dato()`. Se mantiene solo como respaldo para micros antiguos. |
  *   | `monto`          | Nodo con dato string numérico: precio del pasaje.     |
  *   | `vehiculo_copia` | Enlace al nodo raíz de la copia clonada del vehículo. |
  *   | `viaje`          | Enlace directo al nodo viaje al que pertenece.        |
- *   | `ocupacion`      | Nodo con dato string numérico: asientos ocupados del micro. |
+ *   | `ocupacion`      | Nodo con dato string numérico: capacidad total del micro (cantidad de asientos). |
  *   | `seleccionados`  | Nodo con dato string numérico: asientos seleccionados. |
  *   | `vendidos`       | Nodo con dato string numérico: asientos vendidos.     |
+ *   | `reservados`     | Nodo con dato string numérico: asientos reservados para el equipo. |
+ *   | `disponibles`    | Nodo con dato string numérico: asientos disponibles (capacidad - vendidos - reservados). |
+ *
+ * **Nota (empresa):** A partir de la versión 1.5piloto.27, el enlace `empresa` apunta
+ * al nodo empresa real (no a un string suelto). Antes de esa versión se guardaba un
+ * nodo con el identificador como dato. Se ejecutó una migración para convertir los
+ * micros existentes. `formatear_viaje` mantiene un fallback por si aparecen micros
+ * antiguos: si el nodo enlazado no tiene el enlace `nombre`, se busca la empresa
+ * real en el contenedor del dueño usando el identificador.
+ *
+ * **Nota (patente):** A partir de la versión 1.5piloto.27, el enlace `patente` dejó
+ * de escribirse en micros nuevos. La patente se obtiene siempre desde
+ * `vehiculo_copia->dato()`. Se ejecutó una migración para eliminar los enlaces
+ * redundantes de micros antiguos.
  *
  * ### Nodo Copia Vehículo (clonado para un micro de viaje)
  *
@@ -260,7 +275,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.26
+ * @version   1.5piloto.27
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

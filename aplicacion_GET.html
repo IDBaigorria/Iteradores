@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administrador de Viajes - Pquia. del Carmen Tres Arroyos</title>
-<link rel="stylesheet" href="estilos.css?v=1.5piloto.27a">
+<link rel="stylesheet" href="estilos.css?v=1.5piloto.28">
 </head>
 <body>
 <!-- Pantalla de login (código de acceso) -->
@@ -229,14 +229,27 @@
             <button class="btn" id="boton_cancelar_vehiculo">Cancelar</button>
           </div>
         </div>
+        <div id="panel_datos_vehiculo" class="panel-datos-vehiculo hidden">
+            <div class="foto-miniatura">
+                <img id="foto_vehiculo_miniatura" src="" alt="Foto" style="display:none;">
+                <span id="foto_vehiculo_miniatura_placeholder">Sin foto</span>
+            </div>
+            <div class="datos-vehiculo">
+                <h4 id="datos_vehiculo_nombre"></h4>
+                <div class="dato-linea"><strong>Patente:</strong> <span id="datos_vehiculo_patente"></span></div>
+                <div class="dato-linea"><strong>Estado:</strong> <span id="datos_vehiculo_estado"></span></div>
+                <div class="dato-linea"><strong>Capacidad total:</strong> <span id="datos_vehiculo_capacidad"></span> asientos</div>
+                <div id="datos_vehiculo_pisos"></div>
+            </div>
+        </div>        
       </div>
 
       <div class="panel" id="panel_croquis_micros" style="display:none;">
         <div id="area_croquis_estatico_micros">
           <div class="bus-area">
-            <div class="section-title">Configuración física del vehículo</div>
-            <div id="croquis_pisos_micros"></div>
-            <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
+              <div class="section-title">Configuración física del vehículo</div>
+              <div id="croquis_pisos_micros"></div>
+              <div class="small muted" style="margin-top:10px">Esta vista representa la configuración física del vehículo; no muestra estados de venta.</div>
           </div>
           <div class="foto-vehiculo-grande" style="margin-top:15px;">
             <img id="foto_vehiculo_estatica" src="" alt="Foto del vehículo" style="display:none; max-width:300px; max-height:300px; border-radius:8px; border:1px solid #ccc;">
@@ -327,6 +340,7 @@
               <tr>
                 <th>Nombre</th>
                 <th>DNI</th>
+                <th>Dirección</ht>
                 <th>Email</th>
                 <th>Celular personal</th>
                 <th>Emergencia</th>
@@ -364,15 +378,15 @@
     <div class="modal-body" id="modal_generico_contenido"></div>
   </div>
 </div>
-<script src="aplicacion.js?v=1.5piloto.27a"></script>
-<script src="Aplicacion/admin.js?v=1.5piloto.27a"></script>
-<script src="Aplicacion/terminales.js?v=1.5piloto.27a"></script>
-<script src="Aplicacion/micros.js?v=1.5piloto.27a"></script>
-<script src="Aplicacion/viajes/viajes-nucleo.js?v=1.5piloto.27c"></script>
-<script src="Aplicacion/viajes/viajes-micros.js?v=1.5piloto.27c"></script>
-<script src="Aplicacion/viajes/viajes-asientos.js?v=1.5piloto.27b"></script>
-<script src="Aplicacion/viajes/viajes-opciones.js?v=1.5piloto.27b"></script>
+<script src="aplicacion.js?v=1.5piloto.28"></script>
+<script src="Aplicacion/admin.js?v=1.5piloto.28"></script>
+<script src="Aplicacion/terminales.js?v=1.5piloto.28"></script>
+<script src="Aplicacion/micros.js?v=1.5piloto.28"></script>
+<script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.28"></script>
+<script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.28"></script>
+<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.28"></script>
+<script src="Aplicacion/Viajes/viajes-opciones.js?v=1.5piloto.28"></script>
 <script src="Aplicacion/ventas.js?v=1.5piloto.27a"></script>
-<script src="Aplicacion/pasajeros.js?v=1.5piloto.27a"></script>
+<script src="Aplicacion/pasajeros.js?v=1.5piloto.28"></script>
 </body>
 </html>
