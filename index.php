@@ -116,6 +116,22 @@ if (isset($_GET['migrar_micros_patente'])) {
     echo "Sin copia:          {$res['micros_sin_copia']}\n";
     exit;
 }
+// ==== Bloque temporal para migración de terminales autorizadas (v1.5piloto.31) ====
+// Convierte los enlaces directos al Nodo Usuario terminal en nodos intermedios
+// "TerminalViaje", que cuelgan del contenedor `terminales_autorizadas`.
+// Es idempotente: si un enlace ya apunta a un TerminalViaje, lo saltea.
+if (isset($_GET['migrar_terminales_autorizadas'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_terminales_autorizadas.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_terminales_autorizadas();
+    echo "Migración de terminales autorizadas completada.\n";
+    echo "Dueños procesados:         {$res['duenos_procesados']}\n";
+    echo "Viajes procesados:         {$res['viajes_procesados']}\n";
+    echo "Terminales migradas:       {$res['terminales_migradas']}\n";
+    echo "Terminales sin cambio:     {$res['terminales_sin_cambio']}\n";
+    echo "Terminales sin nodo usuario: {$res['terminales_sin_nodo_usuario']}\n";
+    exit;
+}
 // Crear usuario administrador si no existe
 if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');

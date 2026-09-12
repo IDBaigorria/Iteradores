@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.30)
+ * ## Estructura de nodos actual (v1.5piloto.31)
  *
  * ### Nodos raíz especiales
  *
@@ -163,12 +163,52 @@
  *   | `micros`                 | Nodo contenedor con dato vacío.                       |
  *   |                          | └─ Enlaces salientes con nombre único (`micro_1`, `micro_2`, etc.) apuntando a nodos micro. |
  *   | `terminales_autorizadas` | Nodo contenedor con dato vacío.                       |
- *   |                          | └─ Enlaces salientes con nombre de terminal apuntando a nodos terminal (dato = nombre). |
+ *   |                          | └─ Enlaces salientes con nombre de terminal apuntando a **Nodos TerminalViaje** (nodo intermedio, ver abajo). |
  *   | `opciones_avanzadas`     | Nodo contenedor con dato vacío (opcional).            |
  *   |                          | ├─ `mostrar_ficha_medica` → string: `"1"` si se debe mostrar la opción de ficha médica en la venta, `"0"` en caso contrario. |
  *   |                          | ├─ `restriccion_edad` → string: `"1"` si se aplica restricción de edad, `"0"` en caso contrario. |
  *   |                          | ├─ `edad_minima` → string numérico: edad mínima permitida (default `"18"`). |
  *   |                          | └─ `edad_maxima` → string numérico: edad máxima permitida (default `"80"`). |
+ *
+ * ### Nodo TerminalViaje (intermedio en `terminales_autorizadas` de un viaje)
+ *
+ * A partir de v1.5piloto.31, cada terminal autorizada en un viaje se representa
+ * con un nodo intermedio (dato vacío) que cuelga del contenedor
+ * `terminales_autorizadas`. El nombre del enlace sigue siendo el nombre de usuario
+ * de la terminal. Este nodo almacena las opciones específicas de la combinación
+ * viaje + terminal.
+ *
+ * Estructura:
+ * ```
+ * terminales_autorizadas (contenedor)
+ * └─ nombre_terminal → Nodo TerminalViaje (dato vacío)
+ *    ├─ terminal → Nodo Usuario terminal
+ *    ├─ cambiar_punto_predeterminado → "0" / "1"
+ *    └─ punto_subida_bajada → Nodo parada (de paradas_intermedias del viaje) [opcional]
+ * ```
+ *
+ * - Dato del nodo: vacío.
+ * - Enlaces salientes:
+ *   | Enlace                         | Nodo destino y dato esperado                          |
+ *   |--------------------------------|-------------------------------------------------------|
+ *   | `terminal`                     | Enlace directo al **Nodo Usuario** de la terminal.    |
+ *   | `cambiar_punto_predeterminado` | Nodo con dato string: `"1"` si la terminal cambia el punto de subida/bajada predeterminado del viaje, `"0"` en caso contrario. Default: `"0"`. |
+ *   | `punto_subida_bajada`          | Enlace directo a uno de los nodos parada que cuelgan de `paradas_intermedias` del viaje. Solo existe si `cambiar_punto_predeterminado` es `"1"` y se eligió una parada. |
+ *
+ * **Nota histórica:** Antes de la v1.5piloto.31, el contenedor `terminales_autorizadas`
+ * apuntaba directamente al Nodo Usuario terminal (o, en versiones aún más viejas, a un
+ * nodo suelto cuyo dato era el nombre de la terminal). Se ejecutó la migración
+ * `migrar_terminales_autorizadas` para convertir todos los enlaces al formato actual
+ * con nodo intermedio. `formatear_viaje` lee las claves del contenedor para listar
+ * las terminales; no le importa el tipo de nodo destino.
+ *
+ * **Nota (uso futuro):** La opción `cambiar_punto_predeterminado` se persiste desde
+ * v1.5piloto.31, pero su consumo en la impresión y en el flujo de venta queda para
+ * la v1.5piloto.32.
+ *
+ * **Nota (integridad):** `_guardar_paradas_intermedias` impide eliminar una parada
+ * que esté siendo referenciada por algún TerminalViaje vía `punto_subida_bajada`.
+ * Si se intenta, se devuelve un error indicando la parada y la terminal en conflicto.
  *
  * ### Nodo Micro (dentro de `micros` de un viaje)
  *
@@ -277,7 +317,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.30
+ * @version   1.5piloto.31
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

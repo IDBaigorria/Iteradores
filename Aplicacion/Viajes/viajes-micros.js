@@ -1,6 +1,6 @@
-/***
+/**
  * Micros y terminales dentro de viajes.
- * @version 1.5piloto.27
+ * @version 1.5piloto.31
  */
 
 function renderizar_micros_viaje(micros) {
@@ -170,14 +170,27 @@ async function eliminar_micro(nombre_micro) {
 function renderizar_terminales_viaje(terminales) {
     const contenedor = $("#lista_terminales_viaje");
     contenedor.innerHTML = '';
+
+    // ¿Mostrar botón "Opciones"? Solo dueño/admin, y solo si hay paradas intermedias.
+    const esDuenoOAdmin = usuario_actual.nivel !== 'terminal';
+    const paradas = (viaje_seleccionado && Array.isArray(viaje_seleccionado.paradas_intermedias))
+        ? viaje_seleccionado.paradas_intermedias
+        : [];
+    const mostrarBotonOpciones = esDuenoOAdmin && paradas.length > 0;
+
     terminales.forEach(terminal => {
         const div = document.createElement('div');
         div.className = 'terminal-item';
         div.innerHTML = `
             <span>${terminal}</span>
+            ${mostrarBotonOpciones ? `<button class="btn btn-opciones-terminal" data-terminal="${terminal}">Opciones</button>` : ''}
             ${usuario_actual.nivel !== 'terminal' ? `<button class="btn btn-eliminar-terminal" data-terminal="${terminal}">Quitar</button>` : ''}
         `;
         contenedor.appendChild(div);
+
+        const btnOpciones = div.querySelector('.btn-opciones-terminal');
+        if (btnOpciones) btnOpciones.addEventListener('click', () => abrir_modal_opciones_terminal(terminal));
+
         const btnQuitar = div.querySelector('.btn-eliminar-terminal');
         if (btnQuitar) btnQuitar.addEventListener('click', () => eliminar_terminal_autorizada(terminal));
     });
@@ -330,4 +343,105 @@ async function confirmar_agregar_terminal() {
     } else {
         mostrar_aviso(resultado.error || "Error al autorizar punto de venta", 'error');
     }
+}
+
+/**
+ * Abre el modal de opciones específicas para la combinación viaje + terminal.
+ * Solo aplicable a dueño/admin (el botón no se muestra a terminales).
+ *
+ * @param {string} nombre_terminal Nombre de usuario de la terminal.
+ */
+async function abrir_modal_opciones_terminal(nombre_terminal) {
+    const nombre_dueno = obtener_nombre_dueno_actual();
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/obtener_opciones_terminal",
+            nombre_viaje: viaje_seleccionado.nombre_viaje,
+            nombre_terminal,
+            nombre_dueno
+        })
+    });
+    const datos = await respuesta.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al obtener opciones", 'error');
+        return;
+    }
+
+    const opciones = datos.opciones || { cambiar_punto_predeterminado: '0', punto_subida_bajada: '' };
+    const paradas = (viaje_seleccionado && Array.isArray(viaje_seleccionado.paradas_intermedias))
+        ? viaje_seleccionado.paradas_intermedias
+        : [];
+
+    // Defensivo: no debería llegarse acá sin paradas (el botón no se muestra en ese caso).
+    if (paradas.length === 0) {
+        mostrar_aviso("Este viaje no tiene paradas intermedias configuradas", 'error');
+        return;
+    }
+
+    const cambiar_marcado = opciones.cambiar_punto_predeterminado === '1';
+    const punto_actual = opciones.punto_subida_bajada || '';
+
+    const opciones_html = paradas.map(p => {
+        const sel = (p === punto_actual) ? ' selected' : '';
+        const valor = String(p).replace(/"/g, '&quot;');
+        return `<option value="${valor}"${sel}>${p}</option>`;
+    }).join('');
+
+    const html = `
+        <h3>Opciones para "${nombre_terminal}"</h3>
+        <div class="field">
+            <label><input type="checkbox" id="opciones_terminal_checkbox" ${cambiar_marcado ? 'checked' : ''}> ¿Cambiar punto de subida/bajada predeterminado?</label>
+        </div>
+        <div class="field" id="opciones_terminal_punto_container" style="${cambiar_marcado ? '' : 'display:none;'}">
+            <label>Punto de subida/bajada</label>
+            <select id="opciones_terminal_select_punto">
+                <option value="">Sin selección</option>
+                ${opciones_html}
+            </select>
+        </div>
+        <div class="actions" style="margin-top:15px;">
+            <button class="btn primary" id="opciones_terminal_guardar">Guardar</button>
+            <button class="btn" id="opciones_terminal_cancelar">Cancelar</button>
+        </div>
+    `;
+
+    abrir_modal_generico('Opciones de terminal', html);
+
+    const checkbox = document.getElementById('opciones_terminal_checkbox');
+    const contenedorPunto = document.getElementById('opciones_terminal_punto_container');
+    checkbox.addEventListener('change', () => {
+        contenedorPunto.style.display = checkbox.checked ? '' : 'none';
+    });
+
+    document.getElementById('opciones_terminal_cancelar').addEventListener('click', () => {
+        cerrar_modal_generico();
+    });
+
+    document.getElementById('opciones_terminal_guardar').addEventListener('click', async () => {
+        const cambiar = checkbox.checked ? '1' : '0';
+        const punto = document.getElementById('opciones_terminal_select_punto').value;
+
+        const resp = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/guardar_opciones_terminal",
+                nombre_viaje: viaje_seleccionado.nombre_viaje,
+                nombre_terminal,
+                nombre_dueno,
+                cambiar_punto_predeterminado: cambiar,
+                punto_subida_bajada: punto
+            })
+        });
+        const resultado = await resp.json();
+        if (resultado.exito) {
+            mostrar_aviso("Opciones guardadas", 'exito');
+            cerrar_modal_generico();
+        } else {
+            mostrar_aviso(resultado.error || "Error al guardar opciones", 'error');
+        }
+    });
 }

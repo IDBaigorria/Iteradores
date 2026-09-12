@@ -1,0 +1,57 @@
+/* ===== Ventas: tarjetas, listado, badges de pago ===== */
+/* Los estilos base (panel, field, btn, etc.) están en estilos.css. */
+/* Este archivo crecerá en v1.5piloto.32 (impresión, cupones, etc.). */
+
+.sale-form {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border);
+}
+
+.sales-list { display: grid; gap: 12px; }
+
+.sale-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 15px;
+    background: #fff3b0;
+    box-shadow: 0 1px 4px rgba(60,40,20,.08);
+    transition: box-shadow var(--transition), transform var(--transition);
+}
+.sale-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-1px);
+}
+
+.sale-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.sale-id { font-weight: 700; font-size: 17px; color: var(--primary-dark); }
+
+.sale-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+
+.sale-metric {
+    background: var(--panel-claro);
+    border: 1px solid var(--border);
+    padding: 9px;
+    border-radius: 6px;
+}
+.sale-metric span { display: block; color: var(--muted); font-size: 12px; }
+.sale-metric b { display: block; margin-top: 3px; color: var(--primary-dark); }
+
+.badge.paid { background: #e7f4ea; color: #28713b; }
+.badge.pending { background: #fff2d7; color: #8a6500; }
+
+/* Responsive específico de este archivo */
+@media (max-width: 950px) {
+    .sale-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 650px) {
+    .sale-grid { grid-template-columns: 1fr 1fr; }
+}

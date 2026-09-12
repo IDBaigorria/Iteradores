@@ -503,6 +503,31 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones);
                     responder_json($resultado);
                     break;
+                case 'obtener_opciones_terminal':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_terminal = $post['nombre_terminal'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_terminal) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $opciones = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal);
+                    responder_json(['exito' => true, 'opciones' => $opciones]);
+                    break;
+
+                case 'guardar_opciones_terminal':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_terminal = $post['nombre_terminal'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_terminal) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $opciones = [
+                        'cambiar_punto_predeterminado' => $post['cambiar_punto_predeterminado'] ?? '0',
+                        'punto_subida_bajada' => $post['punto_subida_bajada'] ?? '',
+                    ];
+                    $resultado = guardar_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal, $opciones);
+                    responder_json($resultado);
+                    break;
 
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de viajes no válida']);
