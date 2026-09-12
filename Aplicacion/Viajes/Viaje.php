@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.27
+ * @version   1.5piloto.29
  */
 
 use Iteradores\Nodos\Nodo;
@@ -13,6 +13,7 @@ use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
+include_once("./miscelaneas/Arbol.php");
 
 /**
  * Obtiene el contenedor de viajes de un dueño, creándolo si no existe.
@@ -95,6 +96,20 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
     $datos['seleccionados'] = $nodo_viaje->adyacente('seleccionados') ? $nodo_viaje->adyacente('seleccionados')->dato() : '0';
     $datos['vendidos'] = $nodo_viaje->adyacente('vendidos') ? $nodo_viaje->adyacente('vendidos')->dato() : '0';
     $datos['reservados'] = $nodo_viaje->adyacente('reservados') ? $nodo_viaje->adyacente('reservados')->dato() : '0';
+
+    // Paradas intermedias (lista tipo árbol hmi/hd)
+    $paradas = [];
+    $nodo_paradas = $nodo_viaje->adyacente('paradas_intermedias');
+    if ($nodo_paradas) {
+        $actual_parada = hmi($nodo_paradas);
+        $seg = 0;
+        while ($actual_parada && $seg < 100) {
+            $paradas[] = $actual_parada->dato();
+            $actual_parada = hd($actual_parada);
+            $seg++;
+        }
+    }
+    $datos['paradas_intermedias'] = $paradas;
 
     // Determinar si el viaje está activo
     $fecha = $datos['fecha'];
@@ -245,6 +260,39 @@ function viaje_tiene_ventas(string $nombre_dueno, string $nombre_viaje): bool {
 }
 
 /**
+ * Guarda la lista de paradas intermedias en el nodo viaje.
+ * Reemplaza por completo la lista actual.
+ *
+ * @param Nodo $nodo_viaje Nodo del viaje.
+ * @param array $paradas Lista de strings con las paradas.
+ * @return void
+ */
+function _guardar_paradas_intermedias(Nodo $nodo_viaje, array $paradas): void {
+    $nodo_paradas = $nodo_viaje->adyacente('paradas_intermedias');
+    if (!$nodo_paradas) {
+        $nodo_paradas = Nodo::crear_con_dato('');
+        $nodo_viaje->_adyacente_en($nodo_paradas, 'paradas_intermedias');
+    }
+
+    // Limpiar la lista actual
+    while ($hijo = hmi($nodo_paradas)) {
+        eliminar_hmi($nodo_paradas);
+    }
+
+    // Insertar en orden inverso usando _hmi (que agrega al inicio)
+    $paradas_limpias = [];
+    foreach ($paradas as $parada) {
+        $parada = trim((string)$parada);
+        if ($parada !== '') $paradas_limpias[] = $parada;
+    }
+    $paradas_limpias = array_reverse($paradas_limpias);
+    foreach ($paradas_limpias as $parada) {
+        $nodo_parada = Nodo::crear_con_dato($parada);
+        _hmi($nodo_paradas, $nodo_parada);
+    }
+}
+
+/**
  * Agrega un nuevo viaje.
  */
 function agregar_viaje(array $datos): array {
@@ -276,6 +324,19 @@ function agregar_viaje(array $datos): array {
     $nodo_viaje->_adyacente_en(Nodo::crear_con_dato(''), 'micros');
     $nodo_viaje->_adyacente_en(Nodo::crear_con_dato(''), 'terminales_autorizadas');
 
+    // Guardar paradas intermedias si las hay
+    $paradas = [];
+    if (isset($datos['paradas_intermedias'])) {
+        if (is_array($datos['paradas_intermedias'])) {
+            $paradas = $datos['paradas_intermedias'];
+        } elseif (is_string($datos['paradas_intermedias'])) {
+            $paradas = json_decode($datos['paradas_intermedias'], true) ?: [];
+        }
+    }
+    if (!empty($paradas)) {
+        _guardar_paradas_intermedias($nodo_viaje, $paradas);
+    }
+
     $nodo_viajes->_adyacente_en($nodo_viaje, $nombre_viaje);
     Controlador::guardar(Conf::NOMBRE_APP);
     return ['exito' => true];
@@ -298,6 +359,15 @@ function editar_viaje(string $nombre_viaje, array $datos): array {
             if ($nodo_campo) $nodo_campo->_dato($datos[$campo]);
             else $nodo_viaje->_adyacente_en(Nodo::crear_con_dato($datos[$campo]), $campo);
         }
+    }
+
+    // Guardar paradas intermedias si se enviaron
+    if (isset($datos['paradas_intermedias'])) {
+        $paradas = $datos['paradas_intermedias'];
+        if (is_string($paradas)) {
+            $paradas = json_decode($paradas, true) ?: [];
+        }
+        _guardar_paradas_intermedias($nodo_viaje, is_array($paradas) ? $paradas : []);
     }
 
     Controlador::guardar(Conf::NOMBRE_APP);
@@ -367,6 +437,17 @@ function guardar_viaje_completo(array $datos): array {
             }
         }
     }
+
+    // Guardar paradas intermedias
+    $paradas = [];
+    if (isset($datos['paradas_intermedias'])) {
+        if (is_array($datos['paradas_intermedias'])) {
+            $paradas = $datos['paradas_intermedias'];
+        } elseif (is_string($datos['paradas_intermedias'])) {
+            $paradas = json_decode($datos['paradas_intermedias'], true) ?: [];
+        }
+    }
+    _guardar_paradas_intermedias($nodo_viaje, $paradas);
 
     // Guardar opciones avanzadas
     $opciones = [

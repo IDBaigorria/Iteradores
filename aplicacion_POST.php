@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.27)
+ * ## Estructura de nodos actual (v1.5piloto.30)
  *
  * ### Nodos raíz especiales
  *
@@ -153,6 +153,8 @@
  *   | `hora`                   | Nodo con dato string: hora (HH:MM) o `"a confirmar"` si aún no está definida. |
  *   | `origen`                 | Nodo con dato string: lugar de partida.              |
  *   | `destino`                | Nodo con dato string: destino.                       |
+ *   | `paradas_intermedias`    | Nodo contenedor con dato vacío (opcional). Es la raíz de una lista tipo árbol. |
+ *   |                          | └─ Cada parada es un nodo con dato string, enlazados con `hmi`/`hd`.           |
  *   | `ocupacion`              | Nodo con dato string numérico: capacidad total de asientos del viaje. |
  *   | `disponibles`            | Nodo con dato string numérico: total asientos disponibles (capacidad - vendidos - reservados). |
  *   | `seleccionados`          | Nodo con dato string numérico: total asientos seleccionados. |
@@ -275,7 +277,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.27
+ * @version   1.5piloto.30
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

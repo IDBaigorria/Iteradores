@@ -1,6 +1,6 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.27
+ * @version 1.5piloto.30
  */
 
 function obtener_nombre_dueno_actual() {
@@ -59,9 +59,7 @@ async function cargar_duenos_en_select_viajes() {
 }
 
 function ocultar_detalle_viaje() {
-    // Detener sincronización si hay
     detener_sync_asientos();
-    // Ya no ocultamos panel fijo, pero limpiamos variables
     viaje_seleccionado = null;
     micro_seleccionado = null;
 }
@@ -161,8 +159,52 @@ async function ver_detalle_viaje(viaje) {
         console.error("Error al refrescar datos del viaje:", error);
     }
 
+    // Normalizar paradas intermedias (siempre array)
+    const paradas = Array.isArray(viaje.paradas_intermedias) ? viaje.paradas_intermedias : [];
+    const tieneParadas = paradas.length > 0;
+
+    // Fecha y hora formateadas
+    const fechaTexto = viaje.fecha === 'a confirmar' || viaje.fecha === '' ? 'A confirmar' : viaje.fecha;
+    const horaTexto = viaje.hora === 'a confirmar' || viaje.hora === '' ? 'A confirmar' : viaje.hora;
+    const fechaPendiente = viaje.fecha === 'a confirmar' || viaje.fecha === '';
+    const horaPendiente = viaje.hora === 'a confirmar' || viaje.hora === '';
+
     const html = `
-        <h3>${viaje.nombre}</h3>
+        <h3>${viaje.nombre} <span class="badge-viaje ${viaje.activo === '1' ? 'badge-viaje-activo' : 'badge-viaje-inactivo'}">${viaje.activo === '1' ? 'Activo' : 'Inactivo'}</span></h3>
+
+        <div class="viaje-detalle-datos">
+            <div class="viaje-detalle-seccion">
+                <div class="dato-viaje-linea">
+                    <span class="dato-etiqueta">📅 Fecha:</span>
+                    <span class="${fechaPendiente ? 'dato-pendiente' : ''}">${fechaTexto}</span>
+                </div>
+                <div class="dato-viaje-linea">
+                    <span class="dato-etiqueta">🕐 Hora:</span>
+                    <span class="${horaPendiente ? 'dato-pendiente' : ''}">${horaTexto}</span>
+                </div>
+                <div class="dato-viaje-linea">
+                    <span class="dato-etiqueta">🛣️ Ruta:</span>
+                    <span>${viaje.origen} → ${viaje.destino}</span>
+                </div>
+                ${tieneParadas ? `
+                <div class="dato-viaje-linea">
+                    <span class="dato-etiqueta">🚏 Paradas intermedias:</span>
+                    <span>${paradas.join(' · ')}</span>
+                </div>
+                ` : ''}
+            </div>
+
+            <div class="viaje-detalle-seccion">
+                <div class="viaje-detalle-contadores">
+                    <div class="contador-item"><span>Capacidad total:</span><b>${viaje.ocupacion}</b></div>
+                    <div class="contador-item"><span>Disponibles:</span><b>${viaje.disponibles}</b></div>
+                    <div class="contador-item"><span>Seleccionados:</span><b>${viaje.seleccionados}</b></div>
+                    <div class="contador-item"><span>Vendidos:</span><b>${viaje.vendidos}</b></div>
+                    ${usuario_actual.nivel !== 'terminal' ? `<div class="contador-item"><span>Reservados para el equipo:</span><b>${viaje.reservados}</b></div>` : ''}
+                </div>
+            </div>
+        </div>
+
         ${usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno' ? `
             <div style="margin-bottom:15px;">
                 <button class="btn" id="modal_btn_editar_viaje" ${viaje.activo === '0' ? 'disabled' : ''}>Editar viaje</button>
@@ -261,6 +303,7 @@ async function ver_detalle_viaje(viaje) {
         if (listaT) listaT.innerHTML = '';
     }
 }
+
 async function eliminar_viaje(nombre_viaje) {
     if (!confirm(`¿Eliminar viaje ${nombre_viaje}?`)) return;
     const nombre_dueno = obtener_nombre_dueno_actual();
@@ -283,7 +326,7 @@ async function actualizar_detalle_viaje_actual() {
     if (!viaje_seleccionado) return;
 
     const nombre_viaje_actual = viaje_seleccionado.nombre_viaje;
-    const micro_previo = micro_seleccionado;   // <-- preservar micro seleccionado
+    const micro_previo = micro_seleccionado;
 
     detener_sync_asientos();
 
@@ -301,10 +344,8 @@ async function actualizar_detalle_viaje_actual() {
     if (datos.exito) {
         const viajeActualizado = datos.viajes.find(v => v.nombre_viaje === nombre_viaje_actual);
         if (viajeActualizado) {
-            // Re-renderiza el detalle sobre el mismo modal (no se cierra)
             ver_detalle_viaje(viajeActualizado);
 
-            // Si había un micro seleccionado, volver a mostrarlo
             if (micro_previo) {
                 const microAunExiste = viajeActualizado.micros.some(m => m.nombre_micro === micro_previo);
                 if (microAunExiste) {

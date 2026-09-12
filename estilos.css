@@ -722,3 +722,88 @@ h3 { margin: 0 0 12px; font-size: 17px; color: var(--primary-dark); }
     color: #a06000;
     font-weight: 700;
 }
+/* ===== Bloque de datos del viaje en el modal de detalle ===== */
+.viaje-detalle-datos {
+    background: #fffbe6;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 12px 0 18px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.viaje-detalle-seccion {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dato-viaje-linea {
+    font-size: 14px;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    flex-wrap: wrap;
+}
+
+.dato-viaje-linea .dato-etiqueta {
+    font-weight: 700;
+    color: var(--primary-dark);
+    min-width: 160px;
+    display: inline-block;
+}
+
+.dato-viaje-linea .dato-pendiente {
+    font-style: italic;
+    color: #8a6500;
+}
+
+.viaje-detalle-contadores {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.contador-item {
+    background: var(--panel-claro);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.contador-item span {
+    color: var(--muted);
+}
+
+.contador-item b {
+    color: var(--primary-dark);
+    font-size: 16px;
+    margin-left: 8px;
+}
+
+/* Badge activo/inactivo junto al título */
+.badge-viaje {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    vertical-align: middle;
+    margin-left: 8px;
+}
+
+.badge-viaje-activo {
+    background: #e7f4ea;
+    color: #28713b;
+}
+
+.badge-viaje-inactivo {
+    background: #ececec;
+    color: #666;
+}
