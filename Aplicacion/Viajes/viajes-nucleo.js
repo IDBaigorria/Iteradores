@@ -279,7 +279,9 @@ async function ver_detalle_viaje(viaje) {
     // Asignar listeners a botones generados
     const btnEditar = document.getElementById('modal_btn_editar_viaje');
     if (btnEditar && viaje.activo !== '0') {
-        btnEditar.addEventListener('click', () => abrir_modal_viaje('editar', viaje));
+        btnEditar.addEventListener('click', () => {
+            abrir_modal_viaje('editar', viaje, () => ver_detalle_viaje(viaje));
+        });
     }
 
     const btnVender = document.getElementById('boton_confirmar_venta');

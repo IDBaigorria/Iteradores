@@ -133,16 +133,44 @@ function confirmar_venta_actual(
     $edad_min = (int)$opciones['edad_minima'];
     $edad_max = (int)$opciones['edad_maxima'];
 
+    // Resolver configuración de pago: override del TerminalViaje > viaje > defaults.
+    $opciones_viaje_pago = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
+    $opciones_terminal_pago = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal);
+
+    $resolver = function(string $campo, string $default) use ($opciones_terminal_pago, $opciones_viaje_pago) {
+        // Override del terminal: si está seteado (no vacío), gana.
+        if (isset($opciones_terminal_pago[$campo]) && trim((string)$opciones_terminal_pago[$campo]) !== '') {
+            return (string)$opciones_terminal_pago[$campo];
+        }
+        if (isset($opciones_viaje_pago[$campo]) && trim((string)$opciones_viaje_pago[$campo]) !== '') {
+            return (string)$opciones_viaje_pago[$campo];
+        }
+        return $default;
+    };
+
+    $permite_efectivo = $resolver('permite_efectivo', '1');
+    $cuotas_efectivo_max = (int)$resolver('cuotas_efectivo_max', '3');
+    $permite_transferencia = $resolver('permite_transferencia', '1');
+    $cuotas_transferencia_max = (int)$resolver('cuotas_transferencia_max', '1');
+
     // Validar método de pago y cuotas
     $metodo_pago = strtolower($metodo_pago);
     if (!in_array($metodo_pago, ['efectivo', 'transferencia'])) {
         return ['exito' => false, 'error' => 'Método de pago inválido'];
     }
-    if ($metodo_pago === 'transferencia') {
-        $cuotas = 1;
-    } else {
-        if ($cuotas < 1 || $cuotas > 3) {
-            return ['exito' => false, 'error' => 'Cantidad de cuotas inválida (1-3)'];
+    if ($metodo_pago === 'efectivo') {
+        if ($permite_efectivo !== '1') {
+            return ['exito' => false, 'error' => 'El pago en efectivo no está permitido'];
+        }
+        if ($cuotas < 1 || $cuotas > $cuotas_efectivo_max) {
+            return ['exito' => false, 'error' => "Cantidad de cuotas inválida (1-$cuotas_efectivo_max)"];
+        }
+    } else { // transferencia
+        if ($permite_transferencia !== '1') {
+            return ['exito' => false, 'error' => 'La transferencia no está permitida'];
+        }
+        if ($cuotas < 1 || $cuotas > $cuotas_transferencia_max) {
+            return ['exito' => false, 'error' => "Cantidad de cuotas inválida (1-$cuotas_transferencia_max)"];
         }
     }
 
@@ -179,20 +207,15 @@ function confirmar_venta_actual(
     }
 
     // Calcular cuotas restantes
+    // Regla general: si el monto pagado cubre el total, no quedan cuotas.
+    // Si no lo cubre, quedan cuotas - 1.
     $cuotas_restantes = 0;
-    if ($metodo_pago === 'efectivo') {
-        if ($cuotas == 1) {
-            $cuotas_restantes = 0;
-        } else {
-            if ($monto_pagado < $total) {
-                $cuotas_restantes = $cuotas - 1;
-            } else {
-                $cuotas_restantes = 0;
-            }
-        }
-    } else { // transferencia
+    if ($monto_pagado >= $total) {
         $cuotas_restantes = 0;
+        // Ajustar el monto pagado al total (no se puede cobrar más de lo que vale)
         $monto_pagado = $total;
+    } else {
+        $cuotas_restantes = max(0, $cuotas - 1);
     }
 
     // Crear nodo venta persistente

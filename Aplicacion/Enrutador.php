@@ -524,6 +524,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $opciones = [
                         'cambiar_punto_predeterminado' => $post['cambiar_punto_predeterminado'] ?? '0',
                         'punto_subida_bajada' => $post['punto_subida_bajada'] ?? '',
+                        'permite_efectivo' => $post['permite_efectivo'] ?? '',
+                        'cuotas_efectivo_max' => $post['cuotas_efectivo_max'] ?? '',
+                        'permite_transferencia' => $post['permite_transferencia'] ?? '',
+                        'cuotas_transferencia_max' => $post['cuotas_transferencia_max'] ?? '',
                     ];
                     $resultado = guardar_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal, $opciones);
                     responder_json($resultado);

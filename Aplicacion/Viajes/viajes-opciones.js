@@ -1,9 +1,9 @@
 /***
- * Modal de alta/edición de viaje y opciones avanzadas.
- * @version 1.5piloto.29
+ * Modal de alta/edición de viaje, opciones avanzadas y condiciones de pago.
+ * @version 1.5piloto.32
  */
 
-async function abrir_modal_viaje(modo, viaje = null) {
+async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
     const esAlta = modo === 'alta';
     const nombre_dueno = obtener_nombre_dueno_actual();
 
@@ -18,6 +18,10 @@ async function abrir_modal_viaje(modo, viaje = null) {
         restriccion_edad: '0',
         edad_minima: '18',
         edad_maxima: '80',
+        permite_efectivo: '1',
+        cuotas_efectivo_max: '3',
+        permite_transferencia: '1',
+        cuotas_transferencia_max: '1',
         paradas_intermedias: []
     };
 
@@ -78,6 +82,25 @@ async function abrir_modal_viaje(modo, viaje = null) {
                 <div id="modal_viaje_paradas_lista"></div>
             </div>
         </div>
+
+        <div class="seccion-avanzada" style="margin-top:20px; border-top:1px solid #ccc; padding-top:15px;">
+            <h4>Condiciones de pago</h4>
+            <div>
+                <label><input type="checkbox" id="modal_viaje_permite_efectivo" ${datos.permite_efectivo === '1' ? 'checked' : ''}> Permitir pago en efectivo</label>
+                <div class="field" id="modal_viaje_cuotas_efectivo_container" style="margin-left:20px; margin-top:6px; ${datos.permite_efectivo === '1' ? '' : 'display:none;'}">
+                    <label>Máximo de cuotas (efectivo):</label>
+                    <input type="number" id="modal_viaje_cuotas_efectivo_max" value="${datos.cuotas_efectivo_max}" min="1" max="12" style="max-width:100px;">
+                </div>
+            </div>
+            <div style="margin-top:12px;">
+                <label><input type="checkbox" id="modal_viaje_permite_transferencia" ${datos.permite_transferencia === '1' ? 'checked' : ''}> Permitir transferencia bancaria</label>
+                <div class="field" id="modal_viaje_cuotas_transferencia_container" style="margin-left:20px; margin-top:6px; ${datos.permite_transferencia === '1' ? '' : 'display:none;'}">
+                    <label>Máximo de cuotas (transferencia):</label>
+                    <input type="number" id="modal_viaje_cuotas_transferencia_max" value="${datos.cuotas_transferencia_max}" min="1" max="12" style="max-width:100px;">
+                </div>
+            </div>
+        </div>
+
         <div class="seccion-avanzada" style="margin-top:20px; border-top:1px solid #ccc; padding-top:15px;">
             <h4>Opciones avanzadas</h4>
             <div>
@@ -91,13 +114,14 @@ async function abrir_modal_viaje(modo, viaje = null) {
                 </div>
             </div>
         </div>
+
         <div class="actions" style="margin-top:20px;">
             <button class="btn primary" id="guardar_modal_viaje">Guardar</button>
-            <button class="btn" id="cancelar_modal_viaje">Cancelar</button>
+            <button class="btn" id="cancelar_modal_viaje">${on_volver ? 'Volver' : 'Cancelar'}</button>
         </div>
     `;
 
-    abrir_modal_generico(esAlta ? 'Nuevo viaje' : 'Editar viaje', html);
+    abrir_modal_generico(esAlta ? 'Nuevo viaje' : 'Editar viaje', html, on_volver);
 
     const actualizarVisibilidadFechaHora = () => {
         document.getElementById('campo_modal_viaje_fecha').style.display = document.getElementById('modal_viaje_fecha_estado').value === 'confirmada' ? '' : 'none';
@@ -111,12 +135,19 @@ async function abrir_modal_viaje(modo, viaje = null) {
         document.getElementById('modal_campos_edad').style.display = this.checked ? 'block' : 'none';
     });
 
+    // Condiciones de pago: mostrar/ocultar inputs según checkbox
+    document.getElementById('modal_viaje_permite_efectivo').addEventListener('change', function() {
+        document.getElementById('modal_viaje_cuotas_efectivo_container').style.display = this.checked ? '' : 'none';
+    });
+    document.getElementById('modal_viaje_permite_transferencia').addEventListener('change', function() {
+        document.getElementById('modal_viaje_cuotas_transferencia_container').style.display = this.checked ? '' : 'none';
+    });
+
     // ============ Paradas intermedias ============
     const contenedorParadas = document.getElementById('modal_viaje_paradas_lista');
     const checkboxParadas = document.getElementById('modal_viaje_tiene_paradas');
     const wrapperParadas = document.getElementById('modal_viaje_paradas_container');
 
-    // Precargar paradas si hay
     if (tieneParadas) {
         datos.paradas_intermedias.forEach((parada, idx) => {
             const esUltimo = idx === datos.paradas_intermedias.length - 1;
@@ -131,7 +162,6 @@ async function abrir_modal_viaje(modo, viaje = null) {
                 agregar_input_parada(contenedorParadas, '', true);
             }
         } else {
-            // Borrar todo
             contenedorParadas.innerHTML = '';
             wrapperParadas.style.display = 'none';
         }
@@ -139,7 +169,14 @@ async function abrir_modal_viaje(modo, viaje = null) {
 
     // ============ Guardar ============
     document.getElementById('guardar_modal_viaje').addEventListener('click', async () => {
-        // Recolectar paradas
+        // Validar condiciones de pago
+        const permite_efectivo = document.getElementById('modal_viaje_permite_efectivo').checked ? '1' : '0';
+        const permite_transferencia = document.getElementById('modal_viaje_permite_transferencia').checked ? '1' : '0';
+        if (permite_efectivo === '0' && permite_transferencia === '0') {
+            mostrar_aviso('Debe permitirse al menos un método de pago', 'error');
+            return;
+        }
+
         const paradas = Array.from(document.querySelectorAll('#modal_viaje_paradas_lista .input_parada'))
             .map(i => i.value.trim())
             .filter(v => v !== '');
@@ -157,6 +194,10 @@ async function abrir_modal_viaje(modo, viaje = null) {
             restriccion_edad: document.getElementById('modal_viaje_restriccion_edad').checked ? '1' : '0',
             edad_minima: document.getElementById('modal_edad_minima').value,
             edad_maxima: document.getElementById('modal_edad_maxima').value,
+            permite_efectivo,
+            cuotas_efectivo_max: document.getElementById('modal_viaje_cuotas_efectivo_max').value,
+            permite_transferencia,
+            cuotas_transferencia_max: document.getElementById('modal_viaje_cuotas_transferencia_max').value,
             paradas_intermedias: JSON.stringify(paradas)
         };
 
@@ -173,13 +214,23 @@ async function abrir_modal_viaje(modo, viaje = null) {
         const resultado = await respuesta.json();
         if (resultado.exito) {
             mostrar_aviso(esAlta ? 'Viaje creado' : 'Viaje actualizado', 'exito');
+
+            // Guardar el identificador antes de que cargar_viajes()
+            // limpie viaje_seleccionado.
+            const nombre_viaje_actual = esAlta
+                ? datosGuardar.nombre_viaje
+                : (viaje_seleccionado?.nombre_viaje || datosGuardar.nombre_viaje);
+            const veniaDeDetalle = !esAlta && !!on_volver_modal;
+
             cerrar_modal_generico();
-            if (!esAlta && viaje_seleccionado) {
-                // Recargar detalle si estábamos en detalle
-                await cargar_viajes(); // actualiza lista
-                const viajeActualizado = (await obtener_viajes_actualizados()).find(v => v.nombre_viaje === viaje_seleccionado.nombre_viaje);
+
+            if (veniaDeDetalle) {
+                // Reabrir el detalle con los datos frescos
+                const viajeActualizado = (await obtener_viajes_actualizados()).find(v => v.nombre_viaje === nombre_viaje_actual);
                 if (viajeActualizado) {
                     ver_detalle_viaje(viajeActualizado);
+                } else {
+                    await cargar_viajes();
                 }
             } else {
                 await cargar_viajes();
@@ -190,18 +241,17 @@ async function abrir_modal_viaje(modo, viaje = null) {
     });
 
     document.getElementById('cancelar_modal_viaje').addEventListener('click', () => {
-        cerrar_modal_generico();
-        // Si estábamos en detalle, no hacemos nada; el modal de detalle quedó atrás
+        if (on_volver_modal) {
+            volver_modal_generico();
+        } else {
+            cerrar_modal_generico();
+        }
     });
 }
 
 /**
  * Agrega un input de parada intermedia al contenedor.
  * El botón alterna entre "Agregar otra" y "Quitar".
- *
- * @param {HTMLElement} contenedor Contenedor donde se agrega.
- * @param {string} valorInicial Valor a precargar.
- * @param {boolean} esUltimo Si es el último input, el botón muestra "Agregar otra".
  */
 function agregar_input_parada(contenedor, valorInicial = '', esUltimo = true) {
     const div = document.createElement('div');
@@ -228,7 +278,6 @@ function agregar_input_parada(contenedor, valorInicial = '', esUltimo = true) {
 
     boton.addEventListener('click', () => {
         if (esAgregar) {
-            // Convertir este botón a "Quitar" y crear uno nuevo abajo
             esAgregar = false;
             boton.textContent = 'Quitar';
             boton.className = 'btn small danger';
@@ -242,7 +291,6 @@ function agregar_input_parada(contenedor, valorInicial = '', esUltimo = true) {
     div.appendChild(boton);
     contenedor.appendChild(div);
 
-    // Si es un input nuevo (creado por el usuario), enfocarlo
     if (!esUltimo) return;
     setTimeout(() => input.focus(), 50);
 }

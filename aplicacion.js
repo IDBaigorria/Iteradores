@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.16
+ * @version 1.5piloto.32
  */
 
 // Utilidades
@@ -222,17 +222,59 @@ $("#pantalla_login").classList.remove("hidden");
 // ====== FUNCIONES GLOBALES PARA MODALES =====================
 // ============================================================
 
-function abrir_modal_generico(titulo, contenido_html) {
+/**
+ * Callback actual para el botón "Volver" del modal genérico.
+ * Si es null, el botón se oculta. Solo hay un nivel de callback
+ * (no hay pila) porque en la app los flujos son de a 2 niveles
+ * (modal raíz → sub-modal). Si en el futuro hace falta más
+ * profundidad, se puede convertir en pila sin romper la API.
+ */
+let on_volver_modal = null;
+
+/**
+ * Abre el modal genérico con un contenido.
+ *
+ * @param {string} titulo Título del modal.
+ * @param {string} contenido_html HTML del cuerpo.
+ * @param {Function|null} on_volver Callback opcional. Si se pasa, se
+ *   muestra el botón "Volver" en el header y al pulsarlo se ejecuta
+ *   este callback. Si no se pasa, el botón se oculta.
+ */
+function abrir_modal_generico(titulo, contenido_html, on_volver = null) {
     const tituloEl = document.getElementById('modal_generico_titulo');
     const contenidoEl = document.getElementById('modal_generico_contenido');
     const modalEl = document.getElementById('modal_generico');
+    const botonVolver = document.getElementById('volver_modal_generico');
 
     if (!tituloEl || !contenidoEl || !modalEl) return;
+
+    on_volver_modal = (typeof on_volver === 'function') ? on_volver : null;
 
     tituloEl.textContent = titulo;
     contenidoEl.innerHTML = contenido_html;
     modalEl.classList.remove('hidden');
     modalEl.style.display = 'flex'; // Asegura que se muestre centrado
+
+    if (botonVolver) {
+        if (on_volver_modal) {
+            botonVolver.classList.remove('hidden');
+        } else {
+            botonVolver.classList.add('hidden');
+        }
+    }
+}
+
+/**
+ * Ejecuta el callback de "Volver" si existe. NO cierra el modal:
+ * el callback es responsable de reabrir el modal anterior (por
+ * ejemplo, volviendo a llamar a abrir_modal_generico).
+ */
+function volver_modal_generico() {
+    const cb = on_volver_modal;
+    on_volver_modal = null;
+    if (typeof cb === 'function') {
+        cb();
+    }
 }
 
 function cerrar_modal_generico() {
@@ -243,7 +285,10 @@ function cerrar_modal_generico() {
     }
     const contenidoEl = document.getElementById('modal_generico_contenido');
     if (contenidoEl) contenidoEl.innerHTML = '';
-    
+
+    // Limpiar el callback de volver
+    on_volver_modal = null;
+
     // Limpiar estado de viajes
     if (typeof detener_sync_asientos === 'function') {
         detener_sync_asientos();
@@ -260,6 +305,7 @@ function cerrar_modal_generico() {
 }
 
 $("#cerrar_modal_generico").addEventListener("click", cerrar_modal_generico);
+$("#volver_modal_generico").addEventListener("click", volver_modal_generico);
 $("#modal_generico").addEventListener("click", function(e) {
     if (e.target === this) {
         cerrar_modal_generico();

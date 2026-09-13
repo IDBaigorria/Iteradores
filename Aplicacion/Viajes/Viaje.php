@@ -81,6 +81,11 @@ function listar_viajes_de_terminal(string $nombre_terminal): array {
 /**
  * Formatea los datos de un viaje, incluyendo micros, terminales y opciones.
  * Si se pasa $nombre_terminal, se calcula 'vendidos_aqui' por micro para esa terminal.
+ *
+ * El campo 'reservados' del viaje se calcula siempre sumando los reservados
+ * de cada micro, para no depender de que el nodo persistido del viaje esté
+ * actualizado (viajes creados antes de la v1.5piloto.27 pueden tener el nodo
+ * 'reservados' en "0" o inexistente).
  */
 function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_terminal = null): array {
     $datos = [];
@@ -95,7 +100,8 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
     $datos['disponibles'] = $nodo_viaje->adyacente('disponibles') ? $nodo_viaje->adyacente('disponibles')->dato() : '0';
     $datos['seleccionados'] = $nodo_viaje->adyacente('seleccionados') ? $nodo_viaje->adyacente('seleccionados')->dato() : '0';
     $datos['vendidos'] = $nodo_viaje->adyacente('vendidos') ? $nodo_viaje->adyacente('vendidos')->dato() : '0';
-    $datos['reservados'] = $nodo_viaje->adyacente('reservados') ? $nodo_viaje->adyacente('reservados')->dato() : '0';
+    // 'reservados' se recalcula al final del loop de micros.
+    $datos['reservados'] = '0';
 
     // Paradas intermedias (lista tipo árbol hmi/hd)
     $paradas = [];
@@ -163,6 +169,7 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
 
     // Micros
     $micros = [];
+    $total_reservados_micros = 0;
     $nodo_micros = $nodo_viaje->adyacente('micros');
     if ($nodo_micros) {
         $adyacentes_micros = (array) $nodo_micros->adyacentes();
@@ -201,6 +208,9 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
                 $nombre_vehiculo = $nodo_copia->adyacente('nombre')->dato();
             }
 
+            $reservados_micro = $nodo_micro->adyacente('reservados') ? (int)$nodo_micro->adyacente('reservados')->dato() : 0;
+            $total_reservados_micros += $reservados_micro;
+
             $micros[] = [
                 'nombre_micro' => $nombre_micro,
                 'empresa' => $identificador_empresa,
@@ -211,13 +221,16 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
                 'ocupacion' => $nodo_micro->adyacente('ocupacion') ? $nodo_micro->adyacente('ocupacion')->dato() : '0',
                 'seleccionados' => $nodo_micro->adyacente('seleccionados') ? $nodo_micro->adyacente('seleccionados')->dato() : '0',
                 'vendidos' => $nodo_micro->adyacente('vendidos') ? $nodo_micro->adyacente('vendidos')->dato() : '0',
-                'reservados' => $nodo_micro->adyacente('reservados') ? $nodo_micro->adyacente('reservados')->dato() : '0',
+                'reservados' => (string)$reservados_micro,
                 'disponibles' => $nodo_micro->adyacente('disponibles') ? $nodo_micro->adyacente('disponibles')->dato() : '0',
                 'vendidos_aqui' => ($nombre_terminal !== null) ? (string)($vendidos_por_micro[$nodo_micro->id()] ?? 0) : null,
             ];
         }
     }
     $datos['micros'] = $micros;
+
+    // Reservados del viaje: siempre la suma de los reservados de cada micro.
+    $datos['reservados'] = (string)$total_reservados_micros;
 
     // Terminales autorizadas
     // NOTA v1.5piloto.31: las claves del contenedor siguen siendo los nombres de las terminales,
@@ -540,18 +553,28 @@ function eliminar_terminal_autorizada(string $nombre_viaje, string $nombre_termi
 /**
  * Obtiene las opciones configuradas para la combinación viaje + terminal.
  *
- * A partir de v1.5piloto.31. Devuelve un array con valores por defecto si
- * no existe el nodo intermedio o no tiene las opciones seteadas.
+ * A partir de v1.5piloto.31 incluye las opciones de punto de subida/bajada.
+ * A partir de v1.5piloto.32 incluye las condiciones de pago (override).
+ *
+ * Los campos de condiciones de pago devuelven cadena vacía si no están
+ * configurados en el nodo intermedio, para distinguir "sin override" de
+ * "override en 0". El frontend usa esa cadena vacía para saber que debe
+ * usar la configuración del viaje.
  *
  * @param string $nombre_dueno     Nombre de usuario del dueño.
  * @param string $nombre_viaje     Identificador del viaje.
  * @param string $nombre_terminal  Nombre de usuario de la terminal.
- * @return array Claves: cambiar_punto_predeterminado ('0'/'1'), punto_subida_bajada (string).
+ * @return array
  */
 function obtener_opciones_terminal_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal): array {
     $defaults = [
         'cambiar_punto_predeterminado' => '0',
         'punto_subida_bajada' => '',
+        // Condiciones de pago: vacío = sin override (usar config del viaje)
+        'permite_efectivo' => '',
+        'cuotas_efectivo_max' => '',
+        'permite_transferencia' => '',
+        'cuotas_transferencia_max' => '',
     ];
 
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
@@ -574,21 +597,32 @@ function obtener_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
     $nodo_punto = $nodo_terminal_viaje->adyacente('punto_subida_bajada');
     if ($nodo_punto) $opciones['punto_subida_bajada'] = $nodo_punto->dato();
 
+    $campos_pago = [
+        'permite_efectivo',
+        'cuotas_efectivo_max',
+        'permite_transferencia',
+        'cuotas_transferencia_max',
+    ];
+    foreach ($campos_pago as $campo) {
+        $nodo_campo = $nodo_terminal_viaje->adyacente($campo);
+        if ($nodo_campo) $opciones[$campo] = $nodo_campo->dato();
+    }
+
     return $opciones;
 }
 
 /**
  * Guarda las opciones configuradas para la combinación viaje + terminal.
  *
- * A partir de v1.5piloto.31.
+ * A partir de v1.5piloto.32 acepta los 4 campos de condiciones de pago.
+ * La convención es:
+ * - Si `permite_efectivo`, `permite_transferencia`, `cuotas_efectivo_max` y
+ *   `cuotas_transferencia_max` vienen todos vacíos, se eliminan los 4 enlaces
+ *   del nodo intermedio (sin override).
+ * - Si vienen con valor, se escriben los 4 en el nodo intermedio.
  *
- * Reglas:
- * - `cambiar_punto_predeterminado` se sanitiza a "0" o "1".
- * - Si es "1" y `punto_subida_bajada` trae un nombre, se busca la parada
- *   existente en `paradas_intermedias` del viaje y se enlaza a ese nodo
- *   (nunca se crea un nodo nuevo para la parada).
- * - Si es "0" o `punto_subida_bajada` viene vacío, se elimina el enlace
- *   `punto_subida_bajada` si existía.
+ * Se permite que el terminal deshabilite un método con `permite_X = "0"`.
+ * No se permite deshabilitar ambos: en ese caso se devuelve error.
  *
  * @param string $nombre_dueno     Nombre de usuario del dueño.
  * @param string $nombre_viaje     Identificador del viaje.
@@ -611,18 +645,16 @@ function guardar_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
         return ['exito' => false, 'error' => 'La terminal no está autorizada en este viaje'];
     }
 
-    // Sanitizar entrada
+    // === Punto de subida/bajada ===
     $cambiar = ($opciones['cambiar_punto_predeterminado'] ?? '0') === '1' ? '1' : '0';
     $punto = trim((string)($opciones['punto_subida_bajada'] ?? ''));
 
-    // Actualizar cambiar_punto_predeterminado
     $nodo_cambiar = $nodo_terminal_viaje->adyacente('cambiar_punto_predeterminado');
     if ($nodo_cambiar) $nodo_cambiar->_dato($cambiar);
     else $nodo_terminal_viaje->_adyacente_en(Nodo::crear_con_dato($cambiar), 'cambiar_punto_predeterminado');
 
-    // Gestionar punto_subida_bajada
     if ($cambiar === '1' && $punto !== '') {
-        // Buscar el nodo parada existente en paradas_intermedias
+        // Buscar el nodo parada existente
         $nodo_parada_encontrado = null;
         $nodo_paradas = $nodo_viaje->adyacente('paradas_intermedias');
         if ($nodo_paradas) {
@@ -637,12 +669,9 @@ function guardar_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
                 $seg++;
             }
         }
-
         if (!$nodo_parada_encontrado) {
             return ['exito' => false, 'error' => 'La parada seleccionada no existe en el viaje'];
         }
-
-        // Enlazar o reemplazar el enlace apuntando al nodo parada
         $nodo_punto = $nodo_terminal_viaje->adyacente('punto_subida_bajada');
         if ($nodo_punto) {
             $nodo_terminal_viaje->_adyacente_en($nodo_parada_encontrado, 'punto_subida_bajada', true);
@@ -650,14 +679,45 @@ function guardar_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
             $nodo_terminal_viaje->_adyacente_en($nodo_parada_encontrado, 'punto_subida_bajada');
         }
     } else {
-        // Cambiar es '0' o el punto está vacío: eliminar enlace si existe
         $nodo_terminal_viaje->eliminar_adyacente('punto_subida_bajada');
+    }
+
+    // === Condiciones de pago (override) ===
+    $campos_pago = ['permite_efectivo', 'cuotas_efectivo_max', 'permite_transferencia', 'cuotas_transferencia_max'];
+    $todos_vacios = true;
+    foreach ($campos_pago as $campo) {
+        if (isset($opciones[$campo]) && trim((string)$opciones[$campo]) !== '') {
+            $todos_vacios = false;
+            break;
+        }
+    }
+
+    if ($todos_vacios) {
+        // Sin override: eliminar los 4 enlaces si existían
+        foreach ($campos_pago as $campo) {
+            $nodo_terminal_viaje->eliminar_adyacente($campo);
+        }
+    } else {
+        // Hay override. Sanitizar y validar.
+        $permite_efectivo = ($opciones['permite_efectivo'] ?? '1') === '1' ? '1' : '0';
+        $permite_transferencia = ($opciones['permite_transferencia'] ?? '1') === '1' ? '1' : '0';
+
+        if ($permite_efectivo === '0' && $permite_transferencia === '0') {
+            return ['exito' => false, 'error' => 'Debe permitirse al menos un método de pago'];
+        }
+
+        $cuotas_efectivo_max = _clipear_cuotas($opciones['cuotas_efectivo_max'] ?? '3');
+        $cuotas_transferencia_max = _clipear_cuotas($opciones['cuotas_transferencia_max'] ?? '1');
+
+        _actualizar_o_crear_campo($nodo_terminal_viaje, 'permite_efectivo', $permite_efectivo);
+        _actualizar_o_crear_campo($nodo_terminal_viaje, 'cuotas_efectivo_max', $cuotas_efectivo_max);
+        _actualizar_o_crear_campo($nodo_terminal_viaje, 'permite_transferencia', $permite_transferencia);
+        _actualizar_o_crear_campo($nodo_terminal_viaje, 'cuotas_transferencia_max', $cuotas_transferencia_max);
     }
 
     Controlador::guardar(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
-
 /**
  * Guarda un viaje (alta o edición) junto con sus opciones avanzadas.
  */
@@ -715,12 +775,16 @@ function guardar_viaje_completo(array $datos): array {
         return $resultado_paradas;
     }
 
-    // Guardar opciones avanzadas
+    // Guardar opciones avanzadas y condiciones de pago
     $opciones = [
         'mostrar_ficha_medica' => $datos['mostrar_ficha_medica'] ?? '0',
         'restriccion_edad' => $datos['restriccion_edad'] ?? '0',
         'edad_minima' => $datos['edad_minima'] ?? '18',
         'edad_maxima' => $datos['edad_maxima'] ?? '80',
+        'permite_efectivo' => $datos['permite_efectivo'] ?? '1',
+        'cuotas_efectivo_max' => $datos['cuotas_efectivo_max'] ?? '3',
+        'permite_transferencia' => $datos['permite_transferencia'] ?? '1',
+        'cuotas_transferencia_max' => $datos['cuotas_transferencia_max'] ?? '1',
     ];
     $resultado_opciones = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones);
     if (!$resultado_opciones['exito']) {

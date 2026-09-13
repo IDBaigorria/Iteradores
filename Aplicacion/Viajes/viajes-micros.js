@@ -1,6 +1,6 @@
 /**
  * Micros y terminales dentro de viajes.
- * @version 1.5piloto.31
+ * @version 1.5piloto.32
  */
 
 function renderizar_micros_viaje(micros) {
@@ -109,7 +109,6 @@ function actualizar_textos_botones_pasaje() {
 }
 
 async function seleccionar_micro_viaje(nombre_micro) {
-    // Si ya está abierto ese micro y el panel visible, ocultamos
     if (micro_seleccionado === nombre_micro && !document.getElementById('pasaje_micro_viaje').classList.contains('hidden')) {
         cerrar_pasaje_micro();
         return;
@@ -171,12 +170,10 @@ function renderizar_terminales_viaje(terminales) {
     const contenedor = $("#lista_terminales_viaje");
     contenedor.innerHTML = '';
 
-    // ¿Mostrar botón "Opciones"? Solo dueño/admin, y solo si hay paradas intermedias.
-    const esDuenoOAdmin = usuario_actual.nivel !== 'terminal';
-    const paradas = (viaje_seleccionado && Array.isArray(viaje_seleccionado.paradas_intermedias))
-        ? viaje_seleccionado.paradas_intermedias
-        : [];
-    const mostrarBotonOpciones = esDuenoOAdmin && paradas.length > 0;
+    // El botón "Opciones" ahora se muestra siempre para dueño/admin.
+    // Desde v1.5piloto.32 el modal incluye las condiciones de pago,
+    // que son configurables incluso sin paradas intermedias.
+    const mostrarBotonOpciones = usuario_actual.nivel !== 'terminal';
 
     terminales.forEach(terminal => {
         const div = document.createElement('div');
@@ -189,7 +186,9 @@ function renderizar_terminales_viaje(terminales) {
         contenedor.appendChild(div);
 
         const btnOpciones = div.querySelector('.btn-opciones-terminal');
-        if (btnOpciones) btnOpciones.addEventListener('click', () => abrir_modal_opciones_terminal(terminal));
+        if (btnOpciones) btnOpciones.addEventListener('click', () => {
+            abrir_modal_opciones_terminal(terminal, () => ver_detalle_viaje(viaje_seleccionado));
+        });
 
         const btnQuitar = div.querySelector('.btn-eliminar-terminal');
         if (btnQuitar) btnQuitar.addEventListener('click', () => eliminar_terminal_autorizada(terminal));
@@ -349,9 +348,12 @@ async function confirmar_agregar_terminal() {
  * Abre el modal de opciones específicas para la combinación viaje + terminal.
  * Solo aplicable a dueño/admin (el botón no se muestra a terminales).
  *
+ * Desde v1.5piloto.31 incluye el punto de subida/bajada (si hay paradas).
+ * Desde v1.5piloto.32 incluye las condiciones de pago (override opcional).
+ *
  * @param {string} nombre_terminal Nombre de usuario de la terminal.
  */
-async function abrir_modal_opciones_terminal(nombre_terminal) {
+async function abrir_modal_opciones_terminal(nombre_terminal, on_volver = null) {
     const nombre_dueno = obtener_nombre_dueno_actual();
 
     const respuesta = await fetch("index.php", {
@@ -370,59 +372,149 @@ async function abrir_modal_opciones_terminal(nombre_terminal) {
         return;
     }
 
-    const opciones = datos.opciones || { cambiar_punto_predeterminado: '0', punto_subida_bajada: '' };
+    const opciones = datos.opciones || {};
     const paradas = (viaje_seleccionado && Array.isArray(viaje_seleccionado.paradas_intermedias))
         ? viaje_seleccionado.paradas_intermedias
         : [];
+    const tieneParadas = paradas.length > 0;
 
-    // Defensivo: no debería llegarse acá sin paradas (el botón no se muestra en ese caso).
-    if (paradas.length === 0) {
-        mostrar_aviso("Este viaje no tiene paradas intermedias configuradas", 'error');
-        return;
-    }
-
+    // Punto de subida/bajada
     const cambiar_marcado = opciones.cambiar_punto_predeterminado === '1';
     const punto_actual = opciones.punto_subida_bajada || '';
 
-    const opciones_html = paradas.map(p => {
+    // Condiciones de pago (override)
+    const override_efectivo = opciones.permite_efectivo !== undefined && opciones.permite_efectivo !== '';
+    const override_transferencia = opciones.permite_transferencia !== undefined && opciones.permite_transferencia !== '';
+    const tiene_override_pago = override_efectivo || override_transferencia;
+
+    // Valores del viaje, para precargar como referencia si no hay override
+    const opciones_viaje = viaje_seleccionado?.opciones_avanzadas || {};
+    const permite_efectivo_val = override_efectivo ? opciones.permite_efectivo : (opciones_viaje.permite_efectivo || '1');
+    const cuotas_efectivo_max_val = (opciones.cuotas_efectivo_max && opciones.cuotas_efectivo_max !== '')
+        ? opciones.cuotas_efectivo_max
+        : (opciones_viaje.cuotas_efectivo_max || '3');
+    const permite_transferencia_val = override_transferencia ? opciones.permite_transferencia : (opciones_viaje.permite_transferencia || '1');
+    const cuotas_transferencia_max_val = (opciones.cuotas_transferencia_max && opciones.cuotas_transferencia_max !== '')
+        ? opciones.cuotas_transferencia_max
+        : (opciones_viaje.cuotas_transferencia_max || '1');
+
+    // HTML de las opciones de paradas
+    const opciones_html_paradas = paradas.map(p => {
         const sel = (p === punto_actual) ? ' selected' : '';
         const valor = String(p).replace(/"/g, '&quot;');
         return `<option value="${valor}"${sel}>${p}</option>`;
     }).join('');
 
+    const seccion_paradas = tieneParadas ? `
+        <div class="seccion-opciones">
+            <h4>Punto de subida/bajada</h4>
+            <div class="field">
+                <label><input type="checkbox" id="opciones_terminal_checkbox" ${cambiar_marcado ? 'checked' : ''}> ¿Cambiar punto de subida/bajada predeterminado?</label>
+            </div>
+            <div class="field" id="opciones_terminal_punto_container" style="${cambiar_marcado ? '' : 'display:none;'}">
+                <label>Punto de subida/bajada</label>
+                <select id="opciones_terminal_select_punto">
+                    <option value="">Sin selección</option>
+                    ${opciones_html_paradas}
+                </select>
+            </div>
+        </div>
+    ` : '';
+
     const html = `
         <h3>Opciones para "${nombre_terminal}"</h3>
-        <div class="field">
-            <label><input type="checkbox" id="opciones_terminal_checkbox" ${cambiar_marcado ? 'checked' : ''}> ¿Cambiar punto de subida/bajada predeterminado?</label>
+
+        ${seccion_paradas}
+
+        <div class="seccion-opciones" style="margin-top:20px; border-top:1px solid #ccc; padding-top:15px;">
+            <h4>Condiciones de pago</h4>
+            <div class="field">
+                <label><input type="checkbox" id="opciones_terminal_usar_override" ${tiene_override_pago ? 'checked' : ''}> Usar configuración propia para esta terminal</label>
+                <div class="small muted" style="margin-top:4px;">Si no se activa, esta terminal usa las condiciones de pago del viaje.</div>
+            </div>
+
+            <div id="opciones_terminal_pago_container" style="${tiene_override_pago ? '' : 'display:none;'} margin-top:12px;">
+                <div>
+                    <label><input type="checkbox" id="opciones_terminal_permite_efectivo" ${permite_efectivo_val === '1' ? 'checked' : ''}> Permitir pago en efectivo</label>
+                    <div class="field" id="opciones_terminal_cuotas_efectivo_container" style="margin-left:20px; margin-top:6px; ${permite_efectivo_val === '1' ? '' : 'display:none;'}">
+                        <label>Máximo de cuotas (efectivo):</label>
+                        <input type="number" id="opciones_terminal_cuotas_efectivo_max" value="${cuotas_efectivo_max_val}" min="1" max="12" style="max-width:100px;">
+                    </div>
+                </div>
+                <div style="margin-top:12px;">
+                    <label><input type="checkbox" id="opciones_terminal_permite_transferencia" ${permite_transferencia_val === '1' ? 'checked' : ''}> Permitir transferencia bancaria</label>
+                    <div class="field" id="opciones_terminal_cuotas_transferencia_container" style="margin-left:20px; margin-top:6px; ${permite_transferencia_val === '1' ? '' : 'display:none;'}">
+                        <label>Máximo de cuotas (transferencia):</label>
+                        <input type="number" id="opciones_terminal_cuotas_transferencia_max" value="${cuotas_transferencia_max_val}" min="1" max="12" style="max-width:100px;">
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="field" id="opciones_terminal_punto_container" style="${cambiar_marcado ? '' : 'display:none;'}">
-            <label>Punto de subida/bajada</label>
-            <select id="opciones_terminal_select_punto">
-                <option value="">Sin selección</option>
-                ${opciones_html}
-            </select>
-        </div>
-        <div class="actions" style="margin-top:15px;">
+
+        <div class="actions" style="margin-top:20px;">
             <button class="btn primary" id="opciones_terminal_guardar">Guardar</button>
             <button class="btn" id="opciones_terminal_cancelar">Cancelar</button>
         </div>
     `;
 
-    abrir_modal_generico('Opciones de terminal', html);
+    abrir_modal_generico('Opciones de terminal', html, on_volver);
 
-    const checkbox = document.getElementById('opciones_terminal_checkbox');
-    const contenedorPunto = document.getElementById('opciones_terminal_punto_container');
-    checkbox.addEventListener('change', () => {
-        contenedorPunto.style.display = checkbox.checked ? '' : 'none';
+    // Punto de subida/bajada (solo si hay paradas)
+    if (tieneParadas) {
+        const checkbox = document.getElementById('opciones_terminal_checkbox');
+        const contenedorPunto = document.getElementById('opciones_terminal_punto_container');
+        checkbox.addEventListener('change', () => {
+            contenedorPunto.style.display = checkbox.checked ? '' : 'none';
+        });
+    }
+
+    // Condiciones de pago
+    const checkOverride = document.getElementById('opciones_terminal_usar_override');
+    const contenedorPago = document.getElementById('opciones_terminal_pago_container');
+    checkOverride.addEventListener('change', () => {
+        contenedorPago.style.display = checkOverride.checked ? '' : 'none';
+    });
+
+    document.getElementById('opciones_terminal_permite_efectivo').addEventListener('change', function() {
+        document.getElementById('opciones_terminal_cuotas_efectivo_container').style.display = this.checked ? '' : 'none';
+    });
+    document.getElementById('opciones_terminal_permite_transferencia').addEventListener('change', function() {
+        document.getElementById('opciones_terminal_cuotas_transferencia_container').style.display = this.checked ? '' : 'none';
     });
 
     document.getElementById('opciones_terminal_cancelar').addEventListener('click', () => {
-        cerrar_modal_generico();
+        if (on_volver_modal) {
+            volver_modal_generico();
+        } else {
+            cerrar_modal_generico();
+        }
     });
 
     document.getElementById('opciones_terminal_guardar').addEventListener('click', async () => {
-        const cambiar = checkbox.checked ? '1' : '0';
-        const punto = document.getElementById('opciones_terminal_select_punto').value;
+        // Punto de subida/bajada
+        let cambiar = '0';
+        let punto = '';
+        if (tieneParadas) {
+            cambiar = document.getElementById('opciones_terminal_checkbox').checked ? '1' : '0';
+            punto = document.getElementById('opciones_terminal_select_punto').value;
+        }
+
+        // Condiciones de pago
+        let permite_efectivo = '';
+        let cuotas_efectivo_max = '';
+        let permite_transferencia = '';
+        let cuotas_transferencia_max = '';
+
+        if (checkOverride.checked) {
+            permite_efectivo = document.getElementById('opciones_terminal_permite_efectivo').checked ? '1' : '0';
+            permite_transferencia = document.getElementById('opciones_terminal_permite_transferencia').checked ? '1' : '0';
+            if (permite_efectivo === '0' && permite_transferencia === '0') {
+                mostrar_aviso('Debe permitirse al menos un método de pago', 'error');
+                return;
+            }
+            cuotas_efectivo_max = document.getElementById('opciones_terminal_cuotas_efectivo_max').value;
+            cuotas_transferencia_max = document.getElementById('opciones_terminal_cuotas_transferencia_max').value;
+        }
 
         const resp = await fetch("index.php", {
             method: "POST",
@@ -433,13 +525,21 @@ async function abrir_modal_opciones_terminal(nombre_terminal) {
                 nombre_terminal,
                 nombre_dueno,
                 cambiar_punto_predeterminado: cambiar,
-                punto_subida_bajada: punto
+                punto_subida_bajada: punto,
+                permite_efectivo,
+                cuotas_efectivo_max,
+                permite_transferencia,
+                cuotas_transferencia_max
             })
         });
         const resultado = await resp.json();
         if (resultado.exito) {
             mostrar_aviso("Opciones guardadas", 'exito');
-            cerrar_modal_generico();
+            if (on_volver_modal) {
+                volver_modal_generico();
+            } else {
+                cerrar_modal_generico();
+            }
         } else {
             mostrar_aviso(resultado.error || "Error al guardar opciones", 'error');
         }

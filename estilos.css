@@ -337,3 +337,15 @@ h3 { margin: 0 0 12px; font-size: 17px; color: var(--primary-dark); }
     .info-grid { grid-template-columns: 1fr 1fr; }
     .form-grid { grid-template-columns: 1fr; }
 }
+
+/* Header del modal genérico: botón Volver + título a la izquierda, X a la derecha */
+.modal-header-izquierda {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.modal-header-izquierda h3 {
+    margin: 0;
+}

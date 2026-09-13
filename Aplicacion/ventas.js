@@ -1,10 +1,19 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.25
+ * @version 1.5piloto.32
  */
 
 let ventas_actuales = [];
 let ultima_venta_id = null;
+
+// Configuración de pago resuelta para el viaje + terminal actual.
+// Se llena al abrir el modal de confirmación de venta.
+window.config_pago_actual = {
+    permite_efectivo: '1',
+    cuotas_efectivo_max: 3,
+    permite_transferencia: '1',
+    cuotas_transferencia_max: 1,
+};
 
 // Mostrar botón "Vender" si hay asientos seleccionados propios
 function mostrar_boton_confirmar_venta() {
@@ -21,17 +30,8 @@ function tiene_asientos_seleccionados_propios() {
     return estados_asientos_actuales.some(a => a.estado === 'seleccionado' && a.seleccionado_por === usuario_actual.nombre_usuario);
 }
 
-// Evento del botón "Vender"
-// Evento del botón "Vender" (se asigna dinámicamente al abrir el modal de detalle)
-// No usar listener global; el listener se asigna en ver_detalle_viaje
-/*document.addEventListener('click', function(event) {
-    if (event.target && event.target.id === 'boton_confirmar_venta') {
-        abrir_modal_confirmacion_venta();
-    }
-});*/
-
 // Abrir formulario de venta
-function abrir_modal_confirmacion_venta() {
+async function abrir_modal_confirmacion_venta() {
     if (!microSyncActual || !viaje_seleccionado) return;
 
     const asientos_seleccionados = estados_asientos_actuales.filter(a => a.estado === 'seleccionado' && a.seleccionado_por === usuario_actual.nombre_usuario);
@@ -39,6 +39,22 @@ function abrir_modal_confirmacion_venta() {
         mostrar_aviso("No tiene asientos seleccionados", 'error');
         return;
     }
+
+    // Resolver configuración de pago: override del terminal > viaje > default
+    const config_pago = await resolver_config_pago();
+    if (config_pago === null) {
+        return; // error ya mostrado
+    }
+    window.config_pago_actual = config_pago;
+
+    const metodos_permitidos = [];
+    if (config_pago.permite_efectivo === '1') metodos_permitidos.push('efectivo');
+    if (config_pago.permite_transferencia === '1') metodos_permitidos.push('transferencia');
+    if (metodos_permitidos.length === 0) {
+        mostrar_aviso("No hay métodos de pago habilitados para este viaje", 'error');
+        return;
+    }
+    const metodo_default = metodos_permitidos[0];
 
     const micro = viaje_seleccionado.micros.find(m => m.nombre_micro === microSyncActual);
     const monto = micro ? parseFloat(micro.monto) : 0;
@@ -49,6 +65,13 @@ function abrir_modal_confirmacion_venta() {
     $("#contenedor_boton_confirmar_venta").classList.add("hidden");
     $("#info_asiento_viaje").classList.add("hidden");
     $("#formulario_confirmacion_venta").classList.remove("hidden");
+
+    // Armar las opciones del select de método
+    const opciones_metodo = metodos_permitidos.map(m => {
+        const texto = m === 'efectivo' ? 'Efectivo' : 'Transferencia';
+        const sel = (m === metodo_default) ? ' selected' : '';
+        return `<option value="${m}"${sel}>${texto}</option>`;
+    }).join('');
 
     const formulario = $("#formulario_confirmacion_venta");
     formulario.innerHTML = `
@@ -61,22 +84,15 @@ function abrir_modal_confirmacion_venta() {
         <div class="form-grid" style="margin-top:15px;">
             <div class="field">
                 <label>Método de pago</label>
-                <select id="metodo_pago">
-                    <option value="efectivo">Efectivo</option>
-                    <option value="transferencia">Transferencia</option>
-                </select>
+                <select id="metodo_pago">${opciones_metodo}</select>
             </div>
             <div class="field" id="campo_cuotas">
-                <label>Cantidad de cuotas (1-3)</label>
-                <select id="cuotas_venta">
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                </select>
+                <label id="etiqueta_cuotas">Cantidad de cuotas</label>
+                <select id="cuotas_venta"></select>
             </div>
             <div class="field" id="campo_monto_pagado">
                 <label>Monto a pagar ahora *</label>
-                <input type="number" id="monto_pagado" step="0.01" min="0.01" value="">
+                <input type="number" id="monto_pagado" step="1000" min="0.01" value="">
             </div>
         </div>
         <div id="datos_comprador" style="margin-top:15px;">
@@ -96,9 +112,8 @@ function abrir_modal_confirmacion_venta() {
         </div>
     `;
 
-    $("#metodo_pago").value = 'efectivo';
-    $("#cuotas_venta").value = '1';
-    actualizar_visibilidad_cuotas();
+    // Llenar el select de cuotas según el método por defecto
+    regenerar_select_cuotas(metodo_default);
 
     $("#comprador_dni").value = '';
     $("#comprador_nombre").value = '';
@@ -111,7 +126,12 @@ function abrir_modal_confirmacion_venta() {
     venta_form_abierto = true;
     $("#contenedor_boton_confirmar_venta").classList.add("hidden");
 
-    $("#metodo_pago").addEventListener("change", actualizar_visibilidad_cuotas);
+    actualizar_visibilidad_cuotas();
+
+    $("#metodo_pago").addEventListener("change", function() {
+        regenerar_select_cuotas(this.value);
+        actualizar_visibilidad_cuotas();
+    });
     $("#cuotas_venta").addEventListener("change", function() {
         actualizar_visibilidad_cuotas();
     });
@@ -141,15 +161,112 @@ function abrir_modal_confirmacion_venta() {
     });
 }
 
-// Actualizar visibilidad de cuotas y monto a pagar según método de pago
+/**
+ * Pide al backend las opciones por terminal y resuelve la configuración
+ * efectiva de pago: override del terminal > config del viaje > default.
+ * Devuelve null si hubo error (ya mostrado al usuario).
+ */
+async function resolver_config_pago() {
+    const config_default = {
+        permite_efectivo: '1',
+        cuotas_efectivo_max: '3',
+        permite_transferencia: '1',
+        cuotas_transferencia_max: '1',
+    };
+
+    const opciones_viaje = (viaje_seleccionado && viaje_seleccionado.opciones_avanzadas) ? viaje_seleccionado.opciones_avanzadas : {};
+
+    let opciones_terminal = {};
+    try {
+        const nombre_dueno = (usuario_actual.nivel === 'terminal')
+            ? viaje_seleccionado.dueno
+            : obtener_nombre_dueno_actual();
+        const nombre_terminal = usuario_actual.nombre_usuario;
+
+        const resp = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/obtener_opciones_terminal",
+                nombre_viaje: viaje_seleccionado.nombre_viaje,
+                nombre_terminal,
+                nombre_dueno
+            })
+        });
+        const datos = await resp.json();
+        if (datos.exito && datos.opciones) {
+            opciones_terminal = datos.opciones;
+        }
+    } catch (e) {
+        console.error("Error al obtener opciones por terminal:", e);
+        // No es bloqueante: cae a la config del viaje.
+    }
+
+    const resolver = (campo, def) => {
+        if (opciones_terminal[campo] !== undefined && opciones_terminal[campo] !== '' && opciones_terminal[campo] !== null) {
+            return String(opciones_terminal[campo]);
+        }
+        if (opciones_viaje[campo] !== undefined && opciones_viaje[campo] !== '' && opciones_viaje[campo] !== null) {
+            return String(opciones_viaje[campo]);
+        }
+        return def;
+    };
+
+    return {
+        permite_efectivo: resolver('permite_efectivo', config_default.permite_efectivo),
+        cuotas_efectivo_max: resolver('cuotas_efectivo_max', config_default.cuotas_efectivo_max),
+        permite_transferencia: resolver('permite_transferencia', config_default.permite_transferencia),
+        cuotas_transferencia_max: resolver('cuotas_transferencia_max', config_default.cuotas_transferencia_max),
+    };
+}
+
+/**
+ * Regenera las opciones del select de cuotas según el método elegido.
+ * También ajusta la etiqueta del campo para que se vea el rango.
+ */
+function regenerar_select_cuotas(metodo) {
+    const select = $("#cuotas_venta");
+    const etiqueta = $("#etiqueta_cuotas");
+    if (!select) return;
+
+    const config = window.config_pago_actual;
+    let max = 1;
+    if (metodo === 'efectivo') {
+        max = parseInt(config.cuotas_efectivo_max) || 1;
+    } else if (metodo === 'transferencia') {
+        max = parseInt(config.cuotas_transferencia_max) || 1;
+    }
+    if (max < 1) max = 1;
+
+    let html = '';
+    for (let i = 1; i <= max; i++) {
+        html += `<option value="${i}">${i}</option>`;
+    }
+    select.innerHTML = html;
+    select.value = '1';
+
+    if (etiqueta) {
+        etiqueta.textContent = `Cantidad de cuotas (1-${max})`;
+    }
+}
+
+/**
+ * Actualiza la visibilidad del campo de cuotas y el valor/habilitación
+ * del monto a pagar según el método de pago y la cantidad de cuotas.
+ */
 function actualizar_visibilidad_cuotas() {
     const metodo = $("#metodo_pago").value;
     const cuotas = parseInt($("#cuotas_venta").value);
     const total = parseFloat(window.total_venta || 0);
 
-    if (metodo === 'transferencia') {
+    if (metodo === 'transferencia' && window.config_pago_actual.cuotas_transferencia_max === 1) {
+        // Transferencia con un solo pago: monto bloqueado al total.
         $("#campo_cuotas").style.display = 'none';
-        $("#cuotas_venta").value = '1';
+        $("#monto_pagado").value = total.toFixed(2);
+        $("#monto_pagado").disabled = true;
+    } else if (metodo === 'efectivo' && window.config_pago_actual.cuotas_efectivo_max === 1) {
+        // Efectivo de un solo pago: monto bloqueado al total.
+        $("#campo_cuotas").style.display = 'none';
         $("#monto_pagado").value = total.toFixed(2);
         $("#monto_pagado").disabled = true;
     } else {
@@ -353,6 +470,24 @@ async function confirmar_venta_modal() {
     const monto_pagado = parseFloat($("#monto_pagado").value);
     const total = parseFloat(window.total_venta || 0);
 
+    // Validación rápida contra la config resuelta (el backend igual valida)
+    const config = window.config_pago_actual;
+    if (metodo_pago === 'efectivo' && config.permite_efectivo !== '1') {
+        mostrar_aviso("El pago en efectivo no está permitido", 'error');
+        return;
+    }
+    if (metodo_pago === 'transferencia' && config.permite_transferencia !== '1') {
+        mostrar_aviso("La transferencia no está permitida", 'error');
+        return;
+    }
+    const max_cuotas = (metodo_pago === 'efectivo')
+        ? parseInt(config.cuotas_efectivo_max)
+        : parseInt(config.cuotas_transferencia_max);
+    if (isNaN(cuotas) || cuotas < 1 || cuotas > max_cuotas) {
+        mostrar_aviso(`Cantidad de cuotas inválida (1-${max_cuotas})`, 'error');
+        return;
+    }
+
     if (isNaN(monto_pagado) || monto_pagado <= 0) {
         mostrar_aviso("Ingrese un monto a pagar válido", 'error');
         return;
@@ -483,14 +618,13 @@ async function confirmar_venta_modal() {
         } else {
             // Mostrar error sin cerrar formulario
             mostrar_aviso(resultado.error || "Error al confirmar venta", 'error');
-            // El formulario permanece abierto para que el usuario corrija o cancele manualmente
         }
     } catch (error) {
         console.error("Error:", error);
         mostrar_aviso("Error de comunicación", 'error');
-        // Tampoco se cierra el formulario en caso de error de red
     }
 }
+
 function mostrar_opciones_impresion(id_venta) {
     const contenedor = $("#opciones_impresion");
     if (!contenedor) return;
