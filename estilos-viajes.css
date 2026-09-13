@@ -117,7 +117,71 @@
 }
 
 #info_asiento_viaje {
-    flex: 0 1 320px;
+    width: 100%;
+}
+
+/* Grilla de tarjetas de asiento en el panel de información */
+.asientos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.asiento-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.asiento-card-header {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+}
+
+.asiento-card-estado {
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.asiento-card-linea {
+    display: flex;
+    gap: 6px;
+    font-size: 12px;
+    flex-wrap: wrap;
+}
+
+.asiento-card-linea span {
+    color: var(--muted);
+    flex-shrink: 0;
+}
+
+.asiento-card-linea b {
+    color: var(--text);
+    word-break: break-word;
+}
+
+.asiento-card-acciones {
+    margin-top: 8px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.asiento-card-acciones .btn {
+    font-size: 12px;
+    padding: 5px 10px;
 }
 
 @media (max-width: 800px) {
@@ -127,6 +191,9 @@
     }
     #info_asiento_viaje {
         flex: 1 1 auto;
+    }
+    .asientos-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -238,4 +305,30 @@
 .badge-viaje-inactivo {
     background: #ececec;
     color: #666;
+}
+
+.status-propio { color: #1b7a2d; }
+
+/* Aviso de inactividad del panel de pasaje */
+#aviso_inactividad_pasaje {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    color: #856404;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+#aviso_inactividad_pasaje.hidden {
+    display: none;
+}
+
+#aviso_inactividad_pasaje .aviso-inactividad-icono {
+    font-size: 16px;
+    line-height: 1;
 }

@@ -1,6 +1,6 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.34
+ * @version 1.5piloto.35
  */
 
 function obtener_nombre_dueno_actual() {
@@ -219,13 +219,18 @@ async function ver_detalle_viaje(viaje) {
 
         <div id="pasaje_micro_viaje" class="panel hidden" style="margin-top:15px;">
             <h4>Pasaje del micro</h4>
+            <div id="aviso_inactividad_pasaje" class="hidden">
+                <span class="aviso-inactividad-icono">⏸</span>
+                <span>Actualización en pausa por inactividad. Movete o hacé clic para reanudar.</span>
+            </div>
             <div id="foto_micro_viaje" style="margin-bottom:10px;"></div>
             <div class="pasaje-layout" style="display:flex; flex-wrap:wrap; justify-content:center; gap:15px; align-items:flex-start; max-width:1200px; margin:0 auto;">
                 <div id="croquis_pasaje_micro" style="flex:1 1 300px; min-width:300px; display:flex; flex-direction:column; align-items:center;"></div>
-                <div class="columna-derecha" style="flex:1 1 250px; min-width:250px; display:flex; flex-direction:column; gap:10px;">
+                <div class="columna-derecha" style="flex:1 1 450px; min-width:400px; display:flex; flex-direction:column; gap:10px;">
                     <div id="info_asiento_viaje" class="panel hidden" style="padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
-                    <div id="contenedor_boton_confirmar_venta" class="hidden" style="text-align:left;">
+                    <div id="contenedor_boton_confirmar_venta" class="hidden" style="text-align:left; display:flex; gap:8px; flex-wrap:wrap;">
                         <button class="btn primary" id="boton_confirmar_venta">Vender</button>
+                        <button class="btn" id="boton_reiniciar_seleccion">Reiniciar selección</button>
                     </div>
                     <div id="formulario_confirmacion_venta" class="panel hidden" style="padding:15px; border:1px solid #ddd; border-radius:6px;"></div>
                 </div>
@@ -288,6 +293,11 @@ async function ver_detalle_viaje(viaje) {
     const btnVender = document.getElementById('boton_confirmar_venta');
     if (btnVender) {
         btnVender.addEventListener('click', abrir_modal_confirmacion_venta);
+    }
+
+    const btnReiniciar = document.getElementById('boton_reiniciar_seleccion');
+    if (btnReiniciar) {
+        btnReiniciar.addEventListener('click', reiniciar_seleccion_propia);
     }
 
     document.getElementById('boton_agregar_micro_viaje')?.addEventListener('click', abrir_formulario_agregar_micro);
