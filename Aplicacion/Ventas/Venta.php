@@ -153,6 +153,20 @@ function confirmar_venta_actual(
     $permite_transferencia = $resolver('permite_transferencia', '1');
     $cuotas_transferencia_max = (int)$resolver('cuotas_transferencia_max', '1');
 
+    // === Punto de subida/bajada ===
+    // Solo aplica si la terminal tiene configurada la opción de cambiar el
+    // punto de subida/bajada predeterminado, y hay un origen definido.
+    $cambiar_punto = $opciones_terminal_pago['cambiar_punto_predeterminado'] ?? '0';
+    $punto_subida_bajada_terminal = trim((string)($opciones_terminal_pago['punto_subida_bajada'] ?? ''));
+    $selector_subida_bajada_activo = ($cambiar_punto === '1' && $punto_subida_bajada_terminal !== '');
+
+    $origen_viaje = $nodo_viaje->adyacente('origen') ? trim($nodo_viaje->adyacente('origen')->dato()) : '';
+    if ($origen_viaje === '') {
+        // Sin origen no se puede ofrecer la opción. No es un error:
+        // simplemente no se muestra el selector.
+        $selector_subida_bajada_activo = false;
+    }
+
     // Validar método de pago y cuotas
     $metodo_pago = strtolower($metodo_pago);
     if (!in_array($metodo_pago, ['efectivo', 'transferencia'])) {
@@ -281,7 +295,20 @@ function confirmar_venta_actual(
                 return ['exito' => false, 'error' => "El pasajero " . ($indice_asiento + 1) . " no cumple con la restricción de edad ($edad_min-$edad_max años)"];
             }
         }
-        
+
+        // Punto de subida/bajada: validar y preparar el valor a guardar.
+        $punto_elegido = null;
+        if ($selector_subida_bajada_activo) {
+            $punto_elegido = trim((string)($datos_pasajero['punto_subida_bajada'] ?? ''));
+            $opciones_validas = [$punto_subida_bajada_terminal, $origen_viaje];
+            if (!in_array($punto_elegido, $opciones_validas, true)) {
+                return [
+                    'exito' => false,
+                    'error' => 'Punto de subida/bajada inválido para el pasajero ' . ($indice_asiento + 1)
+                ];
+            }
+        }
+
         if (empty($datos_pasajero['localidad']) || empty($datos_pasajero['direccion'])) {
             return ['exito' => false, 'error' => 'Faltan datos obligatorios del pasajero ' . ($indice_asiento + 1) . ': localidad y dirección'];
         }
@@ -310,6 +337,9 @@ function confirmar_venta_actual(
         $nodo_asiento_venta = Nodo::crear_con_dato('');
         $nodo_asiento_venta->_adyacente_en($asiento_real, 'asiento');
         $nodo_asiento_venta->_adyacente_en($nodo_pasajero, 'pasajero');
+        if ($punto_elegido !== null) {
+            $nodo_asiento_venta->_adyacente_en(Nodo::crear_con_dato($punto_elegido), 'punto_subida_bajada');
+        }
 
         if ($anterior_asiento_venta) {
             $anterior_asiento_venta->_adyacente_en($nodo_asiento_venta, 'siguiente');
@@ -517,10 +547,12 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
         while ($actual && $seguridad < 100) {
             $nodo_asiento_real = $actual->adyacente('asiento');
             $nodo_pasajero = $actual->adyacente('pasajero');
+            $nodo_punto_sb = $actual->adyacente('punto_subida_bajada');
             $asiento_info = [
                 'numero' => $nodo_asiento_real ? $nodo_asiento_real->dato() : '',
                 'fila' => $nodo_asiento_real && $nodo_asiento_real->adyacente('fila') ? $nodo_asiento_real->adyacente('fila')->dato() : '',
                 'columna' => $nodo_asiento_real && $nodo_asiento_real->adyacente('columna') ? $nodo_asiento_real->adyacente('columna')->dato() : '',
+                'punto_subida_bajada' => $nodo_punto_sb ? $nodo_punto_sb->dato() : null,
             ];
             if ($nodo_pasajero) {
                 $asiento_info['pasajero'] = [

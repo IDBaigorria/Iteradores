@@ -47,6 +47,21 @@ async function abrir_modal_confirmacion_venta() {
     }
     window.config_pago_actual = config_pago;
 
+    // Determinar si corresponde mostrar el selector de subida/bajada.
+    // Solo para terminales que tienen la opción configurada y cuando el
+    // viaje tiene un origen definido.
+    const origen_viaje = (viaje_seleccionado && viaje_seleccionado.origen) ? String(viaje_seleccionado.origen).trim() : '';
+    const punto_predeterminado = (config_pago.punto_subida_bajada || '').trim();
+    const mostrar_selector_subida_bajada = (
+        usuario_actual.nivel === 'terminal'
+        && config_pago.cambiar_punto_predeterminado === '1'
+        && punto_predeterminado !== ''
+        && origen_viaje !== ''
+    );
+    window.mostrar_selector_subida_bajada = mostrar_selector_subida_bajada;
+    window.punto_subida_bajada_predeterminado = punto_predeterminado;
+    window.origen_viaje = origen_viaje;
+
     const metodos_permitidos = [];
     if (config_pago.permite_efectivo === '1') metodos_permitidos.push('efectivo');
     if (config_pago.permite_transferencia === '1') metodos_permitidos.push('transferencia');
@@ -212,11 +227,23 @@ async function resolver_config_pago() {
         return def;
     };
 
+    // El punto de subida/bajada no es un override de "condiciones de pago",
+    // sino que viene directamente del TerminalViaje. Si no está configurado,
+    // no se muestra el selector al vender.
+    const cambiar_punto = (opciones_terminal['cambiar_punto_predeterminado'] !== undefined)
+        ? String(opciones_terminal['cambiar_punto_predeterminado'])
+        : '0';
+    const punto_subida_bajada = (opciones_terminal['punto_subida_bajada'] !== undefined)
+        ? String(opciones_terminal['punto_subida_bajada'])
+        : '';
+
     return {
         permite_efectivo: resolver('permite_efectivo', config_default.permite_efectivo),
         cuotas_efectivo_max: resolver('cuotas_efectivo_max', config_default.cuotas_efectivo_max),
         permite_transferencia: resolver('permite_transferencia', config_default.permite_transferencia),
         cuotas_transferencia_max: resolver('cuotas_transferencia_max', config_default.cuotas_transferencia_max),
+        cambiar_punto_predeterminado: cambiar_punto,
+        punto_subida_bajada: punto_subida_bajada,
     };
 }
 
@@ -310,6 +337,36 @@ function generar_formularios_pasajeros(asientos) {
                 <div class="field"><label>Localidad *</label><input id="pasajero_localidad_${index}" value=""></div>
             </div>
         `;
+
+        // Selector de punto de subida/bajada (solo para terminales autorizadas
+        // con la opción configurada).
+        if (window.mostrar_selector_subida_bajada) {
+            const predeterminado = window.punto_subida_bajada_predeterminado || '';
+            const origen = window.origen_viaje || '';
+
+            if (predeterminado === origen) {
+                // Caso borde: la parada predeterminada coincide con el origen.
+                // Se muestra como texto fijo, sin select.
+                html += `
+                    <div class="field" style="margin-top:10px;">
+                        <label>Sube/baja en:</label>
+                        <div class="small muted">${predeterminado}</div>
+                    </div>
+                `;
+            } else {
+                // Parada predeterminada primero (preseleccionada), origen después.
+                const opciones = `
+                    <option value="${predeterminado}" selected>${predeterminado}</option>
+                    <option value="${origen}">${origen}</option>
+                `;
+                html += `
+                    <div class="field" style="margin-top:10px;">
+                        <label>Sube/baja en:</label>
+                        <select id="pasajero_punto_subida_bajada_${index}">${opciones}</select>
+                    </div>
+                `;
+            }
+        }
 
         // Agregar sección de ficha médica solo si está habilitada
         if (mostrarFichaMedica) {
@@ -557,6 +614,17 @@ async function confirmar_venta_modal() {
             direccion,
             localidad
         };
+
+        // Punto de subida/bajada (opcional según la terminal)
+        if (window.mostrar_selector_subida_bajada) {
+            const select_sb = document.getElementById(`pasajero_punto_subida_bajada_${i}`);
+            if (select_sb) {
+                pasajeroData.punto_subida_bajada = select_sb.value;
+            } else {
+                // Caso borde: parada === origen. Se usa la parada predeterminada.
+                pasajeroData.punto_subida_bajada = window.punto_subida_bajada_predeterminado || '';
+            }
+        }
 
         // Incluir ficha de salud solo si existe el contenedor
         const fichaSaludDiv = document.getElementById(`ficha_salud_${i}`);

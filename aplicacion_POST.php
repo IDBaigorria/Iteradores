@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.32)
+ * ## Estructura de nodos actual (v1.5piloto.33)
  *
  * ### Nodos raíz especiales
  *
@@ -319,11 +319,21 @@
  *
  * - Dato del nodo: vacío.
  * - Enlaces salientes:
- *   | Enlace      | Nodo destino y dato esperado                                      |
- *   |-------------|-------------------------------------------------------------------|
- *   | `asiento`   | Enlace directo al nodo asiento real en la copia del vehículo.     |
- *   | `pasajero`  | Enlace al nodo pasajero correspondiente.                          |
- *   | `siguiente` | Siguiente nodo asiento-en-venta (no circular, termina en null).   |
+ *   | Enlace                 | Nodo destino y dato esperado                                      |
+ *   |------------------------|-------------------------------------------------------------------|
+ *   | `asiento`              | Enlace directo al nodo asiento real en la copia del vehículo.     |
+ *   | `pasajero`             | Enlace al nodo pasajero correspondiente.                          |
+ *   | `siguiente`            | Siguiente nodo asiento-en-venta (no circular, termina en null).   |
+ *   | `punto_subida_bajada`  | Nodo con dato string: nombre del punto elegido por el pasajero (puede ser la parada predeterminada de la terminal o el origen del viaje). Solo existe si la terminal tenía configurada la opción de cambiar el punto predeterminado. |
+ *
+ * **Nota (punto de subida/bajada):** A partir de v1.5piloto.33, las terminales
+ * autorizadas que tengan configurada la opción `cambiar_punto_predeterminado`
+ * pueden elegir, por cada pasajero, si sube/baja en la parada predeterminada
+ * del viaje (preseleccionada) o en el origen del viaje. La elección queda
+ * registrada como string en el nodo asiento-en-venta persistente, no como
+ * enlace, para que sea histórica: si después el dueño edita el origen o borra
+ * la parada, la venta no cambia. La validación es estricta en el backend:
+ * el valor tiene que ser exactamente uno de los dos.
  *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
@@ -364,7 +374,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.32
+ * @version   1.5piloto.33
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.
