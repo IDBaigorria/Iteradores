@@ -1,6 +1,6 @@
 /**
  * Micros y terminales dentro de viajes.
- * @version 1.5piloto.32
+ * @version 1.5piloto.34
  */
 
 function renderizar_micros_viaje(micros) {
@@ -398,11 +398,23 @@ async function abrir_modal_opciones_terminal(nombre_terminal, on_volver = null) 
         ? opciones.cuotas_transferencia_max
         : (opciones_viaje.cuotas_transferencia_max || '1');
 
-    // HTML de las opciones de paradas
+    // HTML de las opciones de paradas.
+    // `paradas` es un array de objetos {nombre, hora_estimada}, pero aceptamos
+    // strings por compatibilidad. Se muestra la hora entre paréntesis; si no
+    // hay hora, se indica "a confirmar".
     const opciones_html_paradas = paradas.map(p => {
-        const sel = (p === punto_actual) ? ' selected' : '';
-        const valor = String(p).replace(/"/g, '&quot;');
-        return `<option value="${valor}"${sel}>${p}</option>`;
+        let nombre = '';
+        let hora = '';
+        if (typeof p === 'string') {
+            nombre = p;
+        } else if (p && typeof p === 'object') {
+            nombre = String(p.nombre || '');
+            hora = String(p.hora_estimada || '');
+        }
+        const sel = (nombre === punto_actual) ? ' selected' : '';
+        const valor = String(nombre).replace(/"/g, '&quot;');
+        const texto = hora ? `${nombre} (${hora})` : `${nombre} (a confirmar)`;
+        return `<option value="${valor}"${sel}>${texto}</option>`;
     }).join('');
 
     const seccion_paradas = tieneParadas ? `

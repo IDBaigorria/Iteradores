@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.33)
+ * ## Estructura de nodos actual (v1.5piloto.34)
  *
  * ### Nodos raíz especiales
  *
@@ -154,7 +154,7 @@
  *   | `origen`                 | Nodo con dato string: lugar de partida.              |
  *   | `destino`                | Nodo con dato string: destino.                       |
  *   | `paradas_intermedias`    | Nodo contenedor con dato vacío (opcional). Es la raíz de una lista tipo árbol. |
- *   |                          | └─ Cada parada es un nodo con dato string, enlazados con `hmi`/`hd`.           |
+ *   |                          | └─ Cada parada es un Nodo Parada (ver abajo). Las paradas se enlazan con `hmi`/`hd`. |
  *   | `ocupacion`              | Nodo con dato string numérico: capacidad total de asientos del viaje. |
  *   | `disponibles`            | Nodo con dato string numérico: total asientos disponibles (capacidad - vendidos - reservados). |
  *   | `seleccionados`          | Nodo con dato string numérico: total asientos seleccionados. |
@@ -181,6 +181,23 @@
  * valor por método así: override del TerminalViaje > configuración del viaje >
  * default duro. Ya no hay una regla fija de "transferencia siempre 1 cuota":
  * ahora es configurable.
+ *
+ * ### Nodo Parada (dentro de `paradas_intermedias` de un viaje)
+ *
+ * Cada parada intermedia es un nodo cuyo dato es el **nombre visible** de la
+ * parada (string). Están enlazados como lista tipo árbol (hmi/hd).
+ *
+ * - Dato del nodo: nombre de la parada (string).
+ * - Enlaces salientes:
+ *   | Enlace           | Nodo destino y dato esperado                          |
+ *   |------------------|-------------------------------------------------------|
+ *   | `hora_estimada`  | Nodo con dato string `"HH:MM"` (formato 24h). **Opcional**. Si no existe, la parada no tiene hora estimada. |
+ *
+ * **Nota (hora estimada):** A partir de v1.5piloto.34, cada parada puede tener
+ * una hora estimada opcional. Se usa para mostrarle al pasajero cuándo sube/baja
+ * en esa parada intermedia, tanto en el detalle del viaje como en el pasaje
+ * impreso. Si no tiene hora, se muestra "hora a confirmar" (o equivalente) en
+ * la interfaz.
  *
  * ### Nodo TerminalViaje (intermedio en `terminales_autorizadas` de un viaje)
  *
@@ -325,6 +342,7 @@
  *   | `pasajero`             | Enlace al nodo pasajero correspondiente.                          |
  *   | `siguiente`            | Siguiente nodo asiento-en-venta (no circular, termina en null).   |
  *   | `punto_subida_bajada`  | Nodo con dato string: nombre del punto elegido por el pasajero (puede ser la parada predeterminada de la terminal o el origen del viaje). Solo existe si la terminal tenía configurada la opción de cambiar el punto predeterminado. |
+ *   | `hora_subida_bajada`   | Nodo con dato string `"HH:MM"` (formato 24h). **Opcional**. Solo existe si se guardó `punto_subida_bajada` y ese punto tiene una hora estimada asociada. Si la parada no tenía hora, no se guarda este enlace. |
  *
  * **Nota (punto de subida/bajada):** A partir de v1.5piloto.33, las terminales
  * autorizadas que tengan configurada la opción `cambiar_punto_predeterminado`
@@ -334,6 +352,13 @@
  * enlace, para que sea histórica: si después el dueño edita el origen o borra
  * la parada, la venta no cambia. La validación es estricta en el backend:
  * el valor tiene que ser exactamente uno de los dos.
+ *
+ * **Nota (hora de subida/bajada):** A partir de v1.5piloto.34, si el pasajero
+ * elige la parada predeterminada y esa parada tiene `hora_estimada`, se guarda
+ * también el string de la hora en el enlace `hora_subida_bajada`. Si la parada
+ * no tiene hora, el enlace no se crea (en la interfaz se muestra "hora estimada
+ * a confirmar"). Si el pasajero elige el origen, no se guarda ni punto ni hora:
+ * el origen ya tiene la hora general del viaje.
  *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
@@ -374,7 +399,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.33
+ * @version   1.5piloto.34
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.27
+ * @version   1.5piloto.34
  */
 
 
@@ -167,6 +167,23 @@ function confirmar_venta_actual(
         $selector_subida_bajada_activo = false;
     }
 
+    // Pre-indexar las paradas del viaje para resolver la hora estimada
+    // de la parada elegida por cada pasajero.
+    $paradas_viaje_por_nombre = [];  // nombre => hora_estimada (string)
+    if ($selector_subida_bajada_activo) {
+        $nodo_paradas = $nodo_viaje->adyacente('paradas_intermedias');
+        if ($nodo_paradas) {
+            $actual_parada = hmi($nodo_paradas);
+            $seg = 0;
+            while ($actual_parada && $seg < 100) {
+                $nodo_hora = $actual_parada->adyacente('hora_estimada');
+                $paradas_viaje_por_nombre[$actual_parada->dato()] = $nodo_hora ? $nodo_hora->dato() : '';
+                $actual_parada = hd($actual_parada);
+                $seg++;
+            }
+        }
+    }
+
     // Validar método de pago y cuotas
     $metodo_pago = strtolower($metodo_pago);
     if (!in_array($metodo_pago, ['efectivo', 'transferencia'])) {
@@ -296,8 +313,10 @@ function confirmar_venta_actual(
             }
         }
 
-        // Punto de subida/bajada: validar y preparar el valor a guardar.
+        // Punto de subida/bajada: validar y preparar los valores a guardar.
+        // $hora_elegida: null = sin hora; string = hora estimada de la parada.
         $punto_elegido = null;
+        $hora_elegida = null;
         if ($selector_subida_bajada_activo) {
             $punto_elegido = trim((string)($datos_pasajero['punto_subida_bajada'] ?? ''));
             $opciones_validas = [$punto_subida_bajada_terminal, $origen_viaje];
@@ -306,6 +325,10 @@ function confirmar_venta_actual(
                     'exito' => false,
                     'error' => 'Punto de subida/bajada inválido para el pasajero ' . ($indice_asiento + 1)
                 ];
+            }
+            // Si eligió la parada (y no el origen), tomar su hora estimada.
+            if ($punto_elegido === $punto_subida_bajada_terminal && $punto_elegido !== $origen_viaje) {
+                $hora_elegida = $paradas_viaje_por_nombre[$punto_elegido] ?? '';
             }
         }
 
@@ -339,6 +362,9 @@ function confirmar_venta_actual(
         $nodo_asiento_venta->_adyacente_en($nodo_pasajero, 'pasajero');
         if ($punto_elegido !== null) {
             $nodo_asiento_venta->_adyacente_en(Nodo::crear_con_dato($punto_elegido), 'punto_subida_bajada');
+            if ($hora_elegida !== null && $hora_elegida !== '') {
+                $nodo_asiento_venta->_adyacente_en(Nodo::crear_con_dato($hora_elegida), 'hora_subida_bajada');
+            }
         }
 
         if ($anterior_asiento_venta) {
@@ -548,11 +574,13 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
             $nodo_asiento_real = $actual->adyacente('asiento');
             $nodo_pasajero = $actual->adyacente('pasajero');
             $nodo_punto_sb = $actual->adyacente('punto_subida_bajada');
+            $nodo_hora_sb = $actual->adyacente('hora_subida_bajada');
             $asiento_info = [
                 'numero' => $nodo_asiento_real ? $nodo_asiento_real->dato() : '',
                 'fila' => $nodo_asiento_real && $nodo_asiento_real->adyacente('fila') ? $nodo_asiento_real->adyacente('fila')->dato() : '',
                 'columna' => $nodo_asiento_real && $nodo_asiento_real->adyacente('columna') ? $nodo_asiento_real->adyacente('columna')->dato() : '',
                 'punto_subida_bajada' => $nodo_punto_sb ? $nodo_punto_sb->dato() : null,
+                'hora_subida_bajada' => $nodo_hora_sb ? $nodo_hora_sb->dato() : null,
             ];
             if ($nodo_pasajero) {
                 $asiento_info['pasajero'] = [

@@ -4,6 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
+ * @version   1.5piloto.34
  */
 
 function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = ''): void {
@@ -25,8 +26,9 @@ function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = 
         echo "Tipo de impresión no válido";
     }
 }
+
 function imprimir_pasajes(array $venta, string $dni_filtro = ''): void {
-        // Datos generales
+    // Datos generales
     $nombre_viaje = $venta['nombre_viaje_visible'] ?? $venta['viaje'] ?? '';
     $fecha = $venta['fecha'] ?? '';
     $hora = $venta['hora'] ?? '';
@@ -141,15 +143,23 @@ function imprimir_pasajes(array $venta, string $dni_filtro = ''): void {
     </style>';
     echo '</head><body>';
 
-    $total_asientos = count($venta['asientos']);
-    $indice = 0;
-
+    // Pre-filtrar los asientos que se van a imprimir. Así el conteo de "último"
+    // y el separador de corte son coherentes cuando se filtra por DNI.
+    $asientos_a_imprimir = [];
     foreach ($venta['asientos'] as $asiento) {
         $pasajero = $asiento['pasajero'] ?? null;
-        // Si hay filtro por DNI, saltar asientos que no correspondan
         if ($dni_filtro !== '' && (!$pasajero || $pasajero['dni'] !== $dni_filtro)) {
             continue;
         }
+        $asientos_a_imprimir[] = $asiento;
+    }
+
+    $total_asientos = count($asientos_a_imprimir);
+    $indice = 0;
+
+    foreach ($asientos_a_imprimir as $asiento) {
+        $pasajero = $asiento['pasajero'] ?? null;
+
         echo '<div class="pasaje">';
         echo '<div class="logo-col"><img src="' . htmlspecialchars($logo_ruta) . '" alt="Logo"></div>';
         echo '<div class="datos-col">';
@@ -162,6 +172,22 @@ function imprimir_pasajes(array $venta, string $dni_filtro = ''): void {
         echo '<div class="campo"><strong>Cod. de venta:</strong> <span>' . htmlspecialchars($codigo_venta) . '</span></div>';
 
         echo '<div class="asiento">Asiento ' . htmlspecialchars($asiento['numero']) . '</div>';
+
+        // Punto de subida/bajada: solo si existe y difiere del origen del viaje.
+        // Si el pasajero sube/baja en el origen, no se muestra (el campo Origen ya lo cubre).
+        // La hora estimada se muestra entre paréntesis si existe; si no, se indica
+        // que está a confirmar.
+        $punto_sb = $asiento['punto_subida_bajada'] ?? null;
+        $hora_sb = $asiento['hora_subida_bajada'] ?? null;
+        if ($punto_sb !== null && trim((string)$punto_sb) !== '' && trim((string)$punto_sb) !== trim((string)$origen)) {
+            $texto_punto = $punto_sb;
+            if ($hora_sb !== null && trim((string)$hora_sb) !== '') {
+                $texto_punto .= ' (' . $hora_sb . ')';
+            } else {
+                $texto_punto .= ' (hora estimada a confirmar)';
+            }
+            echo '<div class="campo"><strong>Sube/baja en:</strong> <span>' . htmlspecialchars($texto_punto) . '</span></div>';
+        }
 
         if ($pasajero) {
             echo '<div class="campo"><strong>Pasajero:</strong> <span>' . htmlspecialchars($pasajero['nombre']) . '</span></div>';

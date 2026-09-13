@@ -1,6 +1,6 @@
 /***
  * Modal de alta/edición de viaje, opciones avanzadas y condiciones de pago.
- * @version 1.5piloto.32
+ * @version 1.5piloto.34
  */
 
 async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
@@ -177,9 +177,13 @@ async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
             return;
         }
 
-        const paradas = Array.from(document.querySelectorAll('#modal_viaje_paradas_lista .input_parada'))
-            .map(i => i.value.trim())
-            .filter(v => v !== '');
+        const paradas = Array.from(document.querySelectorAll('#modal_viaje_paradas_lista .input_parada_fila'))
+            .map(fila => {
+                const nombre = fila.querySelector('.input_parada_nombre').value.trim();
+                const hora = fila.querySelector('.input_parada_hora').value.trim();
+                return { nombre, hora_estimada: hora };
+            })
+            .filter(p => p.nombre !== '');
 
         const datosGuardar = {
             accion: "viajes/guardar",
@@ -251,9 +255,25 @@ async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
 
 /**
  * Agrega un input de parada intermedia al contenedor.
- * El botón alterna entre "Agregar otra" y "Quitar".
+ * Cada fila tiene: nombre (text) + hora estimada (time) + botón Agregar/Quitar.
+ *
+ * Acepta el valor inicial como string (formato viejo) o como objeto
+ * {nombre, hora_estimada} (formato nuevo desde v1.5piloto.34).
+ *
+ * @param {HTMLElement} contenedor
+ * @param {string|Object} parada
+ * @param {boolean} esUltimo
  */
-function agregar_input_parada(contenedor, valorInicial = '', esUltimo = true) {
+function agregar_input_parada(contenedor, parada = null, esUltimo = true) {
+    let nombre_inicial = '';
+    let hora_inicial = '';
+    if (typeof parada === 'string') {
+        nombre_inicial = parada;
+    } else if (parada && typeof parada === 'object') {
+        nombre_inicial = parada.nombre || '';
+        hora_inicial = parada.hora_estimada || '';
+    }
+
     const div = document.createElement('div');
     div.className = 'input_parada_fila';
     div.style.marginBottom = '5px';
@@ -263,10 +283,17 @@ function agregar_input_parada(contenedor, valorInicial = '', esUltimo = true) {
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.className = 'input_parada';
+    input.className = 'input_parada_nombre';
     input.placeholder = '¿Cuál?';
-    input.value = valorInicial;
+    input.value = nombre_inicial;
     input.style.flex = '1';
+
+    const inputHora = document.createElement('input');
+    inputHora.type = 'time';
+    inputHora.className = 'input_parada_hora';
+    inputHora.value = hora_inicial;
+    inputHora.style.width = '110px';
+    inputHora.title = 'Hora estimada (opcional)';
 
     const boton = document.createElement('button');
     boton.type = 'button';
@@ -281,13 +308,14 @@ function agregar_input_parada(contenedor, valorInicial = '', esUltimo = true) {
             esAgregar = false;
             boton.textContent = 'Quitar';
             boton.className = 'btn small danger';
-            agregar_input_parada(contenedor, '', true);
+            agregar_input_parada(contenedor, null, true);
         } else {
             div.remove();
         }
     });
 
     div.appendChild(input);
+    div.appendChild(inputHora);
     div.appendChild(boton);
     contenedor.appendChild(div);
 

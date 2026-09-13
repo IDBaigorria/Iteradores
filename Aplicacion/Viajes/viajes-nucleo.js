@@ -1,6 +1,6 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.30
+ * @version 1.5piloto.34
  */
 
 function obtener_nombre_dueno_actual() {
@@ -162,6 +162,7 @@ async function ver_detalle_viaje(viaje) {
     // Normalizar paradas intermedias (siempre array)
     const paradas = Array.isArray(viaje.paradas_intermedias) ? viaje.paradas_intermedias : [];
     const tieneParadas = paradas.length > 0;
+    const paradas_formateadas = formatear_paradas_con_hora(paradas);
 
     // Fecha y hora formateadas
     const fechaTexto = viaje.fecha === 'a confirmar' || viaje.fecha === '' ? 'A confirmar' : viaje.fecha;
@@ -189,7 +190,7 @@ async function ver_detalle_viaje(viaje) {
                 ${tieneParadas ? `
                 <div class="dato-viaje-linea">
                     <span class="dato-etiqueta">🚏 Paradas intermedias:</span>
-                    <span>${paradas.join(' · ')}</span>
+                    <span>${paradas_formateadas.join(' · ')}</span>
                 </div>
                 ` : ''}
             </div>
@@ -356,4 +357,45 @@ async function actualizar_detalle_viaje_actual() {
             }
         }
     }
+}
+
+/**
+ * Formatea un array de paradas intermedias para mostrarlas en el detalle.
+ * Ordena por hora ascendente, dejando las paradas sin hora al final
+ * (manteniendo entre ellas el orden original).
+ *
+ * Acepta tanto strings (formato viejo) como objetos {nombre, hora_estimada}.
+ *
+ * @param {Array} paradas
+ * @returns {Array<string>} Array de textos listos para unir con " · ".
+ */
+function formatear_paradas_con_hora(paradas) {
+    if (!Array.isArray(paradas)) return [];
+
+    const items = paradas.map(p => {
+        if (typeof p === 'string') {
+            return { nombre: p, hora_estimada: '' };
+        }
+        if (p && typeof p === 'object') {
+            return {
+                nombre: String(p.nombre || ''),
+                hora_estimada: String(p.hora_estimada || '')
+            };
+        }
+        return null;
+    }).filter(p => p && p.nombre);
+
+    items.sort((a, b) => {
+        const ah = a.hora_estimada;
+        const bh = b.hora_estimada;
+        if (ah && bh) return ah.localeCompare(bh);
+        if (ah && !bh) return -1;
+        if (!ah && bh) return 1;
+        return 0;
+    });
+
+    return items.map(p => {
+        if (p.hora_estimada) return `${p.nombre} (${p.hora_estimada})`;
+        return `${p.nombre} (hora a confirmar)`;
+    });
 }

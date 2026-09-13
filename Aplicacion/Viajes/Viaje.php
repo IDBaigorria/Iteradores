@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.31
+ * @version   1.5piloto.34
  */
 
 use Iteradores\Nodos\Nodo;
@@ -103,14 +103,20 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
     // 'reservados' se recalcula al final del loop de micros.
     $datos['reservados'] = '0';
 
-    // Paradas intermedias (lista tipo árbol hmi/hd)
+    // Paradas intermedias (lista tipo árbol hmi/hd).
+    // A partir de v1.5piloto.34 cada parada se devuelve como objeto
+    // {nombre, hora_estimada}. La hora estimada es opcional.
     $paradas = [];
     $nodo_paradas = $nodo_viaje->adyacente('paradas_intermedias');
     if ($nodo_paradas) {
         $actual_parada = hmi($nodo_paradas);
         $seg = 0;
         while ($actual_parada && $seg < 100) {
-            $paradas[] = $actual_parada->dato();
+            $nodo_hora = $actual_parada->adyacente('hora_estimada');
+            $paradas[] = [
+                'nombre' => $actual_parada->dato(),
+                'hora_estimada' => $nodo_hora ? $nodo_hora->dato() : '',
+            ];
             $actual_parada = hd($actual_parada);
             $seg++;
         }
@@ -285,19 +291,37 @@ function viaje_tiene_ventas(string $nombre_dueno, string $nombre_viaje): bool {
  * - Rechaza la operación si alguna parada que está siendo referenciada por algún
  *   TerminalViaje (vía `punto_subida_bajada`) quedaría fuera de la nueva lista.
  *
+ * A partir de v1.5piloto.34:
+ * - Acepta elementos como string (retrocompatible) o como array
+ *   {nombre, hora_estimada}. La hora se valida contra /^\d{2}:\d{2}$/;
+ *   si no cumple, se guarda vacío.
+ * - Escribe el enlace `hora_estimada` en el nodo parada cuando corresponda.
+ *
  * @param Nodo $nodo_viaje Nodo del viaje.
- * @param array $paradas Lista de strings con las paradas.
+ * @param array $paradas Lista de paradas (strings u objetos {nombre, hora_estimada}).
  * @return array Resultado con 'exito' => true, o 'exito' => false + 'error'.
  */
 function _guardar_paradas_intermedias(Nodo $nodo_viaje, array $paradas): array {
-    // 1. Normalizar la lista nueva (trim, sin vacíos, sin duplicados)
-    $paradas_nuevas = [];
-    foreach ($paradas as $parada) {
-        $parada = trim((string)$parada);
-        if ($parada !== '') $paradas_nuevas[] = $parada;
+    // 1. Normalizar la lista nueva.
+    //    Array asociativo nombre => hora (string). Si hay repetidos, gana el último.
+    $paradas_normalizadas = [];
+    foreach ($paradas as $p) {
+        if (is_array($p)) {
+            $nombre = trim((string)($p['nombre'] ?? ''));
+            $hora = trim((string)($p['hora_estimada'] ?? ''));
+        } else {
+            $nombre = trim((string)$p);
+            $hora = '';
+        }
+        if ($nombre === '') continue;
+        // Validar formato HH:MM. Si no cumple, se guarda vacío.
+        if ($hora !== '' && !preg_match('/^\d{2}:\d{2}$/', $hora)) {
+            $hora = '';
+        }
+        $paradas_normalizadas[$nombre] = $hora;
     }
-    $paradas_nuevas = array_values(array_unique($paradas_nuevas));
-    $set_nuevas = array_flip($paradas_nuevas);
+
+    $nombres_nuevos = array_keys($paradas_normalizadas);
 
     // 2. Validar que ninguna parada en uso quede fuera del set nuevo
     $nodo_terminales = $nodo_viaje->adyacente('terminales_autorizadas');
@@ -311,7 +335,7 @@ function _guardar_paradas_intermedias(Nodo $nodo_viaje, array $paradas): array {
             if (!$nodo_punto) continue;
 
             $nombre_parada = $nodo_punto->dato();
-            if (!isset($set_nuevas[$nombre_parada])) {
+            if (!isset($paradas_normalizadas[$nombre_parada])) {
                 return [
                     'exito' => false,
                     'error' => "No se puede eliminar la parada \"$nombre_parada\" porque está siendo usada como punto de subida/bajada por la terminal \"$nombre_terminal\". Primero hay que liberar esa configuración."
@@ -341,12 +365,25 @@ function _guardar_paradas_intermedias(Nodo $nodo_viaje, array $paradas): array {
     }
 
     // 4. Reinsertar en orden (usando _hmi, que agrega al inicio, por eso invertimos)
-    $paradas_invertidas = array_reverse($paradas_nuevas);
-    foreach ($paradas_invertidas as $parada) {
-        if (isset($nodos_existentes[$parada])) {
-            $nodo_parada = $nodos_existentes[$parada];
+    $nombres_invertidos = array_reverse($nombres_nuevos);
+    foreach ($nombres_invertidos as $nombre_parada) {
+        $hora = $paradas_normalizadas[$nombre_parada];
+
+        if (isset($nodos_existentes[$nombre_parada])) {
+            $nodo_parada = $nodos_existentes[$nombre_parada];
+            // Actualizar la hora estimada del nodo reutilizado
+            $nodo_hora = $nodo_parada->adyacente('hora_estimada');
+            if ($hora === '') {
+                if ($nodo_hora) $nodo_parada->eliminar_adyacente('hora_estimada');
+            } else {
+                if ($nodo_hora) $nodo_hora->_dato($hora);
+                else $nodo_parada->_adyacente_en(Nodo::crear_con_dato($hora), 'hora_estimada');
+            }
         } else {
-            $nodo_parada = Nodo::crear_con_dato($parada);
+            $nodo_parada = Nodo::crear_con_dato($nombre_parada);
+            if ($hora !== '') {
+                $nodo_parada->_adyacente_en(Nodo::crear_con_dato($hora), 'hora_estimada');
+            }
         }
         _hmi($nodo_paradas, $nodo_parada);
     }

@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.32
+ * @version 1.5piloto.34
  */
 
 let ventas_actuales = [];
@@ -339,10 +339,25 @@ function generar_formularios_pasajeros(asientos) {
         `;
 
         // Selector de punto de subida/bajada (solo para terminales autorizadas
-        // con la opción configurada).
+        // con la opción configurada). Muestra dos opciones: la parada
+        // predeterminada (preseleccionada, con su hora estimada si existe) y
+        // el origen del viaje.
         if (window.mostrar_selector_subida_bajada) {
             const predeterminado = window.punto_subida_bajada_predeterminado || '';
             const origen = window.origen_viaje || '';
+
+            // Resolver la hora estimada de la parada predeterminada
+            let hora_predeterminada = '';
+            const paradas_viaje = (viaje_seleccionado && Array.isArray(viaje_seleccionado.paradas_intermedias))
+                ? viaje_seleccionado.paradas_intermedias
+                : [];
+            for (const p of paradas_viaje) {
+                const nombre_p = (typeof p === 'string') ? p : (p.nombre || '');
+                if (nombre_p === predeterminado) {
+                    hora_predeterminada = (typeof p === 'string') ? '' : (p.hora_estimada || '');
+                    break;
+                }
+            }
 
             if (predeterminado === origen) {
                 // Caso borde: la parada predeterminada coincide con el origen.
@@ -355,8 +370,11 @@ function generar_formularios_pasajeros(asientos) {
                 `;
             } else {
                 // Parada predeterminada primero (preseleccionada), origen después.
+                const texto_predeterminado = hora_predeterminada
+                    ? `${predeterminado} (${hora_predeterminada})`
+                    : `${predeterminado} (a confirmar)`;
                 const opciones = `
-                    <option value="${predeterminado}" selected>${predeterminado}</option>
+                    <option value="${predeterminado}" selected>${texto_predeterminado}</option>
                     <option value="${origen}">${origen}</option>
                 `;
                 html += `
