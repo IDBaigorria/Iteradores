@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.34
+ * @version 1.5piloto.36
  */
 
 let ventas_actuales = [];
@@ -114,7 +114,8 @@ async function abrir_modal_confirmacion_venta() {
             <h4>Comprador</h4>
             <div class="form-grid">
                 <div class="field"><label>DNI *</label><input id="comprador_dni"></div>
-                <div class="field"><label>Nombre *</label><input id="comprador_nombre"></div>
+                <div class="field"><label>Apellido *</label><input id="comprador_apellido"></div>
+                <div class="field full"><label>Nombres *</label><input id="comprador_nombres"></div>
                 <div class="field"><label>Email</label><input id="comprador_email"></div>
                 <div class="field"><label>Celular *</label><input id="comprador_celular"></div>
             </div>
@@ -131,7 +132,8 @@ async function abrir_modal_confirmacion_venta() {
     regenerar_select_cuotas(metodo_default);
 
     $("#comprador_dni").value = '';
-    $("#comprador_nombre").value = '';
+    $("#comprador_apellido").value = '';
+    $("#comprador_nombres").value = '';
     $("#comprador_email").value = '';
     $("#comprador_celular").value = '';
 
@@ -153,12 +155,14 @@ async function abrir_modal_confirmacion_venta() {
 
     $("#usar_pasajero_como_comprador").addEventListener("click", () => {
         const primerDni = $("#pasajero_dni_0").value.trim();
-        const primerNombre = $("#pasajero_nombre_0").value.trim();
+        const primerApellido = $("#pasajero_apellido_0").value.trim();
+        const primerNombres = $("#pasajero_nombres_0").value.trim();
         const primerEmail = $("#pasajero_email_0").value.trim();
         const primerCelular = $("#pasajero_celular_0").value.trim();
         if (primerDni) {
             $("#comprador_dni").value = primerDni;
-            $("#comprador_nombre").value = primerNombre;
+            $("#comprador_apellido").value = primerApellido;
+            $("#comprador_nombres").value = primerNombres;
             $("#comprador_email").value = primerEmail;
             $("#comprador_celular").value = primerCelular;
         } else {
@@ -323,12 +327,14 @@ function generar_formularios_pasajeros(asientos) {
         div.className = 'panel';
         div.style.marginTop = '10px';
 
-        // Construir HTML base del pasajero
+        // Construir HTML base del pasajero.
+        // Orden: DNI, Apellido, Nombres, después el resto.
         let html = `
             <h5>Asiento ${asiento.numero} (F${asiento.fila}, C${asiento.columna})</h5>
             <div class="form-grid">
                 <div class="field"><label>DNI *</label><input id="pasajero_dni_${index}" value=""></div>
-                <div class="field"><label>Nombre *</label><input id="pasajero_nombre_${index}" value=""></div>
+                <div class="field"><label>Apellido *</label><input id="pasajero_apellido_${index}" value=""></div>
+                <div class="field full"><label>Nombres *</label><input id="pasajero_nombres_${index}" value=""></div>                
                 <div class="field"><label>Email</label><input id="pasajero_email_${index}" value=""></div>
                 <div class="field"><label>Celular *</label><input id="pasajero_celular_${index}" value=""></div>
                 <div class="field"><label>Celular Emergencia *</label><input id="pasajero_emergencia_${index}" value=""></div>
@@ -531,12 +537,13 @@ function agregarInputSalud(contenedor, tipo, index) {
 // Confirmar la venta (recopila datos del comprador y de cada pasajero, incluyendo ficha de salud)
 async function confirmar_venta_modal() {
     const comprador_dni = $("#comprador_dni").value.trim();
-    const comprador_nombre = $("#comprador_nombre").value.trim();
+    const comprador_apellido = $("#comprador_apellido").value.trim();
+    const comprador_nombres = $("#comprador_nombres").value.trim();
     const comprador_email = $("#comprador_email").value.trim();
     const comprador_celular = $("#comprador_celular").value.trim();
 
-    if (!comprador_dni || !comprador_nombre || !comprador_celular) {
-        mostrar_aviso("Complete DNI, nombre y celular del comprador", 'error');
+    if (!comprador_dni || !comprador_apellido || !comprador_nombres || !comprador_celular) {
+        mostrar_aviso("Complete DNI, apellido, nombres y celular del comprador", 'error');
         return;
     }
 
@@ -577,7 +584,8 @@ async function confirmar_venta_modal() {
 
     for (let i = 0; i < cantidadPasajeros; i++) {
         const dni = document.getElementById(`pasajero_dni_${i}`).value.trim();
-        const nombre = document.getElementById(`pasajero_nombre_${i}`).value.trim();
+        const apellido = document.getElementById(`pasajero_apellido_${i}`).value.trim();
+        const nombres = document.getElementById(`pasajero_nombres_${i}`).value.trim();
         const email = document.getElementById(`pasajero_email_${i}`).value.trim();
         const celular = document.getElementById(`pasajero_celular_${i}`).value.trim();
         const celular_emergencia = document.getElementById(`pasajero_emergencia_${i}`).value.trim();
@@ -601,8 +609,12 @@ async function confirmar_venta_modal() {
             mostrar_aviso(`Complete el DNI del pasajero ${i+1}`, 'error');
             return;
         }
-        if (!nombre) {
-            mostrar_aviso(`Complete el nombre del pasajero ${i+1}`, 'error');
+        if (!apellido) {
+            mostrar_aviso(`Complete el apellido del pasajero ${i+1}`, 'error');
+            return;
+        }
+        if (!nombres) {
+            mostrar_aviso(`Complete los nombres del pasajero ${i+1}`, 'error');
             return;
         }
         if (!fecha_nacimiento) {
@@ -624,7 +636,8 @@ async function confirmar_venta_modal() {
 
         const pasajeroData = {
             dni,
-            nombre,
+            apellido,
+            nombres,
             email,
             celular,
             celular_emergencia,
@@ -671,7 +684,8 @@ async function confirmar_venta_modal() {
         cuotas,
         monto_pagado: monto_pagado.toFixed(2),
         comprador_dni,
-        comprador_nombre,
+        comprador_apellido,
+        comprador_nombres,
         comprador_email,
         comprador_celular,
         pasajeros: JSON.stringify(pasajeros),

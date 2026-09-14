@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.25
+ * @version   1.5piloto.36
  */
 
 use Iteradores\Nodos\Nodo;
@@ -15,6 +15,21 @@ include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./miscelaneas/Arbol.php");
 include_once("./Aplicacion/Ventas/Venta.php");
+
+/**
+ * Devuelve el nombre completo del pasajero con el formato [apellido],[nombres].
+ * Si el apellido está vacío, devuelve ",nombres". Si ambos están vacíos, "".
+ *
+ * @param string $apellido
+ * @param string $nombres
+ * @return string
+ */
+function formatear_nombre_completo(string $apellido, string $nombres): string {
+    $apellido = trim($apellido);
+    $nombres = trim($nombres);
+    if ($apellido === '' && $nombres === '') return '';
+    return $apellido . ', ' . $nombres;
+}
 
 /**
  * Obtiene el contenedor de pasajeros de un dueño, creándolo si no existe.
@@ -70,7 +85,7 @@ function listar_pasajeros(string $nombre_dueno): array {
 }
 
 /**
- * Busca pasajeros por término (nombre o DNI) dentro de un dueño.
+ * Busca pasajeros por término (nombres, apellido o DNI) dentro de un dueño.
  */
 function buscar_pasajeros(string $nombre_dueno, string $termino): array {
     $termino = strtolower(trim($termino));
@@ -78,7 +93,8 @@ function buscar_pasajeros(string $nombre_dueno, string $termino): array {
     if (empty($termino)) return $todos;
 
     return array_filter($todos, function($pasajero) use ($termino) {
-        return strpos(strtolower($pasajero['nombre']), $termino) !== false ||
+        return strpos(strtolower($pasajero['nombres']), $termino) !== false ||
+               strpos(strtolower($pasajero['apellido']), $termino) !== false ||
                strpos($pasajero['dni'], $termino) !== false;
     });
 }
@@ -86,11 +102,18 @@ function buscar_pasajeros(string $nombre_dueno, string $termino): array {
 /**
  * Formatea los datos de un pasajero.
  * Incluye localidad, dirección y ficha de salud simplificada.
+ *
+ * Devuelve `nombres`, `apellido` y `nombre_completo` (formato [apellido],[nombres]).
  */
 function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
+    $nombres = $nodo_pasajero->adyacente('nombres') ? $nodo_pasajero->adyacente('nombres')->dato() : '';
+    $apellido = $nodo_pasajero->adyacente('apellido') ? $nodo_pasajero->adyacente('apellido')->dato() : '';
+
     $datos = [
         'dni' => $dni,
-        'nombre' => $nodo_pasajero->adyacente('nombre') ? $nodo_pasajero->adyacente('nombre')->dato() : '',
+        'nombres' => $nombres,
+        'apellido' => $apellido,
+        'nombre_completo' => formatear_nombre_completo($apellido, $nombres),
         'email' => $nodo_pasajero->adyacente('email') ? $nodo_pasajero->adyacente('email')->dato() : '',
         'celular' => $nodo_pasajero->adyacente('celular') ? $nodo_pasajero->adyacente('celular')->dato() : '',
         'celular_emergencia' => $nodo_pasajero->adyacente('celular_emergencia') ? $nodo_pasajero->adyacente('celular_emergencia')->dato() : '',
@@ -196,6 +219,7 @@ function guardar_ficha_salud(string $nombre_dueno, string $dni, array $salud): v
 
     Controlador::guardar(Conf::NOMBRE_APP);
 }
+
 /**
  * Obtiene un pasajero por DNI con sus ventas.
  */
@@ -251,7 +275,7 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
     $nodo_pasajero = $contenedor->adyacente($dni);
     if (!$nodo_pasajero) return ['exito' => false, 'error' => 'Pasajero no encontrado'];
 
-    $campos = ['nombre', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento', 'localidad', 'direccion'];
+    $campos = ['nombres', 'apellido', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento', 'localidad', 'direccion'];
     foreach ($campos as $campo) {
         if (isset($datos[$campo])) {
             $valor = trim($datos[$campo]);
@@ -333,12 +357,15 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
 
             if ($nodo_asiento_real && $nodo_pasajero) {
                 $numero_asiento = $nodo_asiento_real->dato();
-                $nombre_pasajero = $nodo_pasajero->adyacente('nombre') ? $nodo_pasajero->adyacente('nombre')->dato() : '';
+                $pas_nombres = $nodo_pasajero->adyacente('nombres') ? $nodo_pasajero->adyacente('nombres')->dato() : '';
+                $pas_apellido = $nodo_pasajero->adyacente('apellido') ? $nodo_pasajero->adyacente('apellido')->dato() : '';
                 $dni_pasajero = $nodo_pasajero->dato();
 
                 $pasajes_venta[] = [
                     'asiento' => $numero_asiento,
-                    'nombre' => $nombre_pasajero,
+                    'nombres' => $pas_nombres,
+                    'apellido' => $pas_apellido,
+                    'nombre_completo' => formatear_nombre_completo($pas_apellido, $pas_nombres),
                     'dni' => $dni_pasajero,
                 ];
 

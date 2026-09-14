@@ -68,7 +68,8 @@
  *
  * | Enlace              | Nodo destino y dato esperado                          |
  * |---------------------|-------------------------------------------------------|
- * | `nombre`            | Nodo con dato string: nombre completo.                |
+ * | `nombres`           | Nodo con dato string: nombres del pasajero.           |
+ * | `apellido`          | Nodo con dato string: apellido del pasajero. Puede estar vacío si el pasajero se migró desde una sola palabra y todavía no se editó. |
  * | `email`             | Nodo con dato string: correo electrónico (opcional).  |
  * | `celular`           | Nodo con dato string: celular personal.               |
  * | `celular_emergencia`| Nodo con dato string: celular de emergencia.          |
@@ -86,7 +87,22 @@
  * |                     | ├─ `regimenes_comida` → string (texto libre).         |
  * |                     | └─ `observaciones` → string (texto libre).            |
  *
- * **Nota:** A partir de la versión 1.5piloto.26, los campos que antes se almacenaban como listas enlazadas (`enfermedades`, `medicamentos`, `impedimentos`, `alergias`) ahora se guardan como un único string. Si existieran datos antiguos con listas, al leerlos se concatenan con `"; "` y se devuelven como string.
+ * **Nota (nombres y apellido):** A partir de v1.5piloto.36, el campo `nombre`
+ * dejó de existir. Se separó en dos enlaces: `nombres` y `apellido`. La
+ * migración `migrar_nombres_pasajeros` tomó la última palabra del `nombre`
+ * original como `apellido` y el resto como `nombres`. Cuando el nombre
+ * original tenía una sola palabra, `apellido` quedó vacío y se completa
+ * editando el pasajero. El formato de visualización es `[apellido],[nombres]`
+ * (con coma, sin espacio): por ejemplo, `Pérez,Juan` o `,Juan` si no hay
+ * apellido. La función `formatear_nombre_completo()` en `Pasajero.php` aplica
+ * este formato, y el backend lo expone como `nombre_completo` en
+ * `formatear_pasajero` y en `formatear_venta_completa`.
+ *
+ * **Nota (ficha de salud):** A partir de la versión 1.5piloto.26, los campos
+ * que antes se almacenaban como listas enlazadas (`enfermedades`,
+ * `medicamentos`, `impedimentos`, `alergias`) ahora se guardan como un único
+ * string. Si existieran datos antiguos con listas, al leerlos se concatenan
+ * con `"; "` y se devuelven como string.
  *
  * ### Nodo Empresa
  *

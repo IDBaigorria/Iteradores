@@ -190,7 +190,9 @@ function imprimir_pasajes(array $venta, string $dni_filtro = ''): void {
         }
 
         if ($pasajero) {
-            echo '<div class="campo"><strong>Pasajero:</strong> <span>' . htmlspecialchars($pasajero['nombre']) . '</span></div>';
+            $nombre_completo = $pasajero['nombre_completo']
+                ?? formatear_nombre_completo($pasajero['apellido'] ?? '', $pasajero['nombres'] ?? '');
+            echo '<div class="campo"><strong>Pasajero:</strong> <span>' . htmlspecialchars($nombre_completo) . '</span></div>';
             echo '<div class="campo"><strong>DNI:</strong> <span>' . htmlspecialchars($pasajero['dni']) . '</span></div>';
         }
 
@@ -335,7 +337,9 @@ function imprimir_cupon(array $venta): void {
         echo '<div class="fila"><strong>Fecha de venta:</strong> <span>' . htmlspecialchars($fecha_venta) . '</span></div>';
     }
     if (!empty($venta['comprador'])) {
-        echo '<div class="fila"><strong>Comprador:</strong> <span>' . htmlspecialchars($venta['comprador']['nombre']) . '</span></div>';
+        $comprador_nombre_completo = $venta['comprador']['nombre_completo']
+            ?? formatear_nombre_completo($venta['comprador']['apellido'] ?? '', $venta['comprador']['nombres'] ?? '');
+        echo '<div class="fila"><strong>Comprador:</strong> <span>' . htmlspecialchars($comprador_nombre_completo) . '</span></div>';
         echo '<div class="fila"><strong>DNI:</strong> <span>' . htmlspecialchars($venta['comprador']['dni']) . '</span></div>';
     }
     echo '</div>';
@@ -380,7 +384,9 @@ function imprimir_ficha_salud(string $nombre_dueno, string $dni): void {
     // Datos personales
     echo '<div class="seccion">';
     echo '<h3>Datos del pasajero</h3>';
-    echo '<div class="fila"><strong>Nombre completo:</strong> ' . htmlspecialchars($pasajero['nombre']) . '</div>';
+    $nombre_completo = $pasajero['nombre_completo']
+        ?? formatear_nombre_completo($pasajero['apellido'] ?? '', $pasajero['nombres'] ?? '');
+    echo '<div class="fila"><strong>Nombre completo:</strong> ' . htmlspecialchars($nombre_completo) . '</div>';
     echo '<div class="fila"><strong>DNI:</strong> ' . htmlspecialchars($pasajero['dni']) . '</div>';
     if (!empty($pasajero['celular'])) echo '<div class="fila"><strong>Celular:</strong> ' . htmlspecialchars($pasajero['celular']) . '</div>';
     if (!empty($pasajero['celular_emergencia'])) echo '<div class="fila"><strong>Emergencia:</strong> ' . htmlspecialchars($pasajero['celular_emergencia']) . '</div>';

@@ -1,6 +1,6 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.25
+ * @version 1.5piloto.36
  */
 
 let pasajeros_actuales = [];
@@ -124,7 +124,7 @@ async function ver_pasajes_pasajero(dni) {
     }
 
     const p = datos.pasajero;
-    let html = `<h3>Pasajes de ${p.nombre}</h3>`;
+    let html = `<h3>Pasajes de ${p.nombre_completo || p.dni}</h3>`;
     if (p.ventas && p.ventas.length) {
         html += p.ventas.map(v => {
             // Etiqueta de rol
@@ -170,7 +170,7 @@ async function ver_pasajes_pasajero(dni) {
                 tarjetasHtml = `<div class="pasajes-lista" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;">`;
                 tarjetasHtml += pasajesFiltrados.map(pas => `<div class="pasaje-card" data-id="${v.compra.id_venta}" data-dni="${pas.dni}" data-asiento="${pas.asiento}">
                     <strong>Asiento ${pas.asiento}</strong><br>
-                    <span class="small">${pas.nombre}</span>
+                    <span class="small">${pas.nombre_completo || pas.dni}</span>
                 </div>`).join('');
                 tarjetasHtml += `</div>`;
             }
@@ -266,7 +266,8 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
         return;
     }
 
-    const pasajero = asientoInfo.pasajero || { nombre: 'Desconocido', dni: '' };
+    const pasajero = asientoInfo.pasajero || { nombre_completo: 'Desconocido', dni: '' };
+    const nombre_pasajero = pasajero.nombre_completo || pasajero.dni || 'Desconocido';
     const viaje = venta;
     const micro_nombre = venta.micro_nombre_visible || venta.patente || '';
 
@@ -274,7 +275,7 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
         <h3>Detalle del pasaje</h3>
         <div class="seccion">
             <h4>Datos del pasajero</h4>
-            <div class="detail-line"><span>Nombre:</span><strong>${pasajero.nombre}</strong></div>
+            <div class="detail-line"><span>Nombre:</span><strong>${nombre_pasajero}</strong></div>
             <div class="detail-line"><span>DNI:</span><strong>${pasajero.dni}</strong></div>
         </div>
         <div class="seccion">
@@ -318,9 +319,10 @@ function renderizar_tabla_pasajeros(pasajeros) {
     pasajeros.forEach(pasajero => {
         const tieneFicha = pasajero.ficha_salud !== null && pasajero.ficha_salud !== undefined;
         const direccionCompleta = [pasajero.direccion, pasajero.localidad].filter(v => v).join(', ') || '—';
+        const nombreMostrar = pasajero.nombre_completo || pasajero.dni;
         const fila = document.createElement('tr');
         fila.innerHTML = `
-            <td>${pasajero.nombre}</td>
+            <td>${nombreMostrar}</td>
             <td>${pasajero.dni}</td>
             <td>${direccionCompleta}</td>
             <td>${pasajero.email || '—'}</td>
@@ -391,7 +393,9 @@ function renderizar_tabla_pasajeros(pasajeros) {
 document.getElementById('buscar_pasajero').addEventListener('input', function() {
     const termino = this.value.trim().toLowerCase();
     const filtrados = termino === '' ? pasajeros_actuales : pasajeros_actuales.filter(p => 
-        p.nombre.toLowerCase().includes(termino) || p.dni.includes(termino)
+        (p.nombres || '').toLowerCase().includes(termino) ||
+        (p.apellido || '').toLowerCase().includes(termino) ||
+        p.dni.includes(termino)
     );
     renderizar_tabla_pasajeros(filtrados);
 });
@@ -408,10 +412,12 @@ async function cargar_detalle_pasajero(dni) {
         pasajero_seleccionado_dni = dni;
         const p = datos.pasajero;
 
+        // Orden: DNI (no editable) primero, después Apellido, después Nombres.
         const contenido = `
             <div class="form-grid">
-                <div class="field full"><label>Nombre</label><input id="pasajero_nombre_modal" value="${p.nombre}"></div>
                 <div class="field"><label>DNI (no editable)</label><input id="pasajero_dni_modal" disabled value="${p.dni}"></div>
+                <div class="field"><label>Apellido</label><input id="pasajero_apellido_modal" value="${p.apellido || ''}"></div>
+                <div class="field full"><label>Nombres</label><input id="pasajero_nombres_modal" value="${p.nombres || ''}"></div>
                 <div class="field"><label>Email (opcional)</label><input id="pasajero_email_modal" value="${p.email || ''}"></div>
                 <div class="field"><label>Celular personal</label><input id="pasajero_celular_modal" value="${p.celular || ''}"></div>
                 <div class="field"><label>Celular emergencias</label><input id="pasajero_emergencia_modal" value="${p.celular_emergencia || ''}"></div>
@@ -429,7 +435,8 @@ async function cargar_detalle_pasajero(dni) {
                 accion: "pasajeros/actualizar",
                 dni: dni,
                 nombre_dueno,
-                nombre: document.getElementById('pasajero_nombre_modal').value.trim(),
+                apellido: document.getElementById('pasajero_apellido_modal').value.trim(),
+                nombres: document.getElementById('pasajero_nombres_modal').value.trim(),
                 email: document.getElementById('pasajero_email_modal').value.trim(),
                 celular: document.getElementById('pasajero_celular_modal').value.trim(),
                 celular_emergencia: document.getElementById('pasajero_emergencia_modal').value.trim(),

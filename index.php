@@ -132,6 +132,25 @@ if (isset($_GET['migrar_terminales_autorizadas'])) {
     echo "Terminales sin nodo usuario: {$res['terminales_sin_nodo_usuario']}\n";
     exit;
 }
+// ==== Bloque temporal para migración de nombres de pasajeros (v1.5piloto.36) ====
+// Separa el campo `nombre` de cada pasajero en dos enlaces: `nombres` y `apellido`.
+// Toma la última palabra como apellido y el resto como nombres. Si el nombre
+// original tiene una sola palabra, el apellido queda vacío.
+// Es idempotente: si un pasajero ya está migrado, lo saltea.
+if (isset($_GET['migrar_nombres_pasajeros'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_nombres_pasajeros.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_nombres_pasajeros();
+    echo "Migración de nombres de pasajeros completada.\n";
+    echo "Dueños procesados:    {$res['duenos_procesados']}\n";
+    echo "Pasajeros procesados: {$res['pasajeros_procesados']}\n";
+    echo "Migrados:             {$res['migrados']}\n";
+    echo "Sin cambio:           {$res['sin_cambio']}\n";
+    echo "Sin nombre:           {$res['sin_nombre']}\n";
+    echo "Sin apellido:         {$res['sin_apellido']}\n";
+    exit;
+}
+
 // Crear usuario administrador si no existe
 if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');

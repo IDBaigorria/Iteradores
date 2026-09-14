@@ -415,7 +415,9 @@ function construir_html_tarjeta_asiento(asiento) {
     }
 
     if (asiento.pasajero && typeof asiento.pasajero === 'object') {
-        const nombre = asiento.pasajero.nombre || '';
+        const nombre = asiento.pasajero.nombre_completo
+            || [asiento.pasajero.apellido, asiento.pasajero.nombres].filter(v => v).join(', ')
+            || '';
         const dni = asiento.pasajero.dni || '';
         const celular = asiento.pasajero.celular || '';
         if (nombre) html += `<div class="asiento-card-linea"><span>Pasajero:</span><b>${nombre}</b></div>`;

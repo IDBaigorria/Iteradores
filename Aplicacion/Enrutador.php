@@ -545,7 +545,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $cuotas = (int)($post['cuotas'] ?? 1);
                     $monto_pagado = (float)($post['monto_pagado'] ?? 0);
                     $comprador_dni = $post['comprador_dni'] ?? '';
-                    $comprador_nombre = $post['comprador_nombre'] ?? '';
+                    $comprador_apellido = $post['comprador_apellido'] ?? '';
+                    $comprador_nombres = $post['comprador_nombres'] ?? '';
                     $comprador_email = $post['comprador_email'] ?? '';
                     $comprador_celular = $post['comprador_celular'] ?? '';
                     $pasajeros_json = $post['pasajeros'] ?? '[]';
@@ -566,7 +567,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         $cuotas,
                         $monto_pagado,
                         $comprador_dni,
-                        $comprador_nombre,
+                        $comprador_apellido,
+                        $comprador_nombres,
                         $comprador_email,
                         $comprador_celular,
                         $pasajeros_por_asiento,
@@ -658,10 +660,13 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
                     }
                     $datos = [
-                        'nombre' => $post['nombre'] ?? '',
+                        'nombres' => $post['nombres'] ?? '',
+                        'apellido' => $post['apellido'] ?? '',
                         'email' => $post['email'] ?? '',
                         'celular' => $post['celular'] ?? '',
                         'celular_emergencia' => $post['celular_emergencia'] ?? '',
+                        'direccion' => $post['direccion'] ?? '',
+                        'localidad' => $post['localidad'] ?? '',
                     ];
                     $resultado = actualizar_pasajero($nombre_dueno, $dni, $datos);
                     responder_json($resultado);
