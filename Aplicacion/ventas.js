@@ -542,10 +542,18 @@ async function confirmar_venta_modal() {
     const comprador_email = $("#comprador_email").value.trim();
     const comprador_celular = $("#comprador_celular").value.trim();
 
-    if (!comprador_dni || !comprador_apellido || !comprador_nombres || !comprador_celular) {
-        mostrar_aviso("Complete DNI, apellido, nombres y celular del comprador", 'error');
-        return;
-    }
+    // Validaciones del comprador
+    let err;
+    err = validar_dni_js(comprador_dni);
+    if (err) { mostrar_aviso('Comprador - ' + err, 'error'); return; }
+    err = validar_nombre_o_apellido_js(comprador_apellido);
+    if (err) { mostrar_aviso('Comprador - Apellido: ' + err, 'error'); return; }
+    err = validar_nombre_o_apellido_js(comprador_nombres);
+    if (err) { mostrar_aviso('Comprador - Nombres: ' + err, 'error'); return; }
+    err = validar_email_js(comprador_email);
+    if (err) { mostrar_aviso('Comprador - ' + err, 'error'); return; }
+    err = validar_telefono_js(comprador_celular);
+    if (err) { mostrar_aviso('Comprador - Celular: ' + err, 'error'); return; }
 
     const metodo_pago = $("#metodo_pago").value;
     const cuotas = parseInt($("#cuotas_venta").value);
@@ -605,34 +613,26 @@ async function confirmar_venta_modal() {
             }
         }
 
-        if (!dni) {
-            mostrar_aviso(`Complete el DNI del pasajero ${i+1}`, 'error');
-            return;
-        }
-        if (!apellido) {
-            mostrar_aviso(`Complete el apellido del pasajero ${i+1}`, 'error');
-            return;
-        }
-        if (!nombres) {
-            mostrar_aviso(`Complete los nombres del pasajero ${i+1}`, 'error');
-            return;
-        }
-        if (!fecha_nacimiento) {
-            mostrar_aviso(`Complete la fecha de nacimiento del pasajero ${i+1}`, 'error');
-            return;
-        }
-        if (!celular) {
-            mostrar_aviso(`Complete el celular del pasajero ${i+1}`, 'error');
-            return;
-        }
-        if (!celular_emergencia) {
-            mostrar_aviso(`Complete el celular de emergencia del pasajero ${i+1}`, 'error');
-            return;
-        }
-        if (!direccion || !localidad) {
-            mostrar_aviso(`Complete dirección y localidad del pasajero ${i+1}`, 'error');
-            return;
-        }
+        const num_pas = i + 1;
+        let err;
+        err = validar_dni_js(dni);
+        if (err) { mostrar_aviso(`Pasajero ${num_pas} - ${err}`, 'error'); return; }
+        err = validar_nombre_o_apellido_js(apellido);
+        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Apellido: ${err}`, 'error'); return; }
+        err = validar_nombre_o_apellido_js(nombres);
+        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Nombres: ${err}`, 'error'); return; }
+        err = validar_email_js(email);
+        if (err) { mostrar_aviso(`Pasajero ${num_pas} - ${err}`, 'error'); return; }
+        err = validar_telefono_js(celular);
+        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Celular: ${err}`, 'error'); return; }
+        err = validar_telefono_js(celular_emergencia);
+        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Celular de emergencia: ${err}`, 'error'); return; }
+        err = validar_fecha_nacimiento_js(fecha_nacimiento);
+        if (err) { mostrar_aviso(`Pasajero ${num_pas} - ${err}`, 'error'); return; }
+        err = validar_localidad_js(localidad);
+        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Localidad: ${err}`, 'error'); return; }
+        err = validar_direccion_js(direccion);
+        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Dirección: ${err}`, 'error'); return; }
 
         const pasajeroData = {
             dni,
@@ -873,4 +873,76 @@ function formatear_fecha_hora_actual() {
     const horas = String(ahora.getHours()).padStart(2, '0');
     const minutos = String(ahora.getMinutes()).padStart(2, '0');
     return `${dia}/${mes}/${anio} ${horas}:${minutos}`;
+}
+
+// ============================================================
+// Validaciones locales del formulario de venta.
+// Todas devuelven null si OK, o un string con el error.
+// ============================================================
+
+function validar_dni_js(valor) {
+    const v = (valor || '').trim();
+    if (v === '') return 'El DNI es obligatorio';
+    if (!/^\d+$/.test(v)) return 'El DNI solo puede tener números';
+    if (v.length < 6 || v.length > 8) return 'El DNI debe tener entre 6 y 8 números';
+    return null;
+}
+
+function validar_telefono_js(valor) {
+    const v = (valor || '').trim();
+    if (v === '') return 'El teléfono es obligatorio';
+    const cuerpo = v.startsWith('+') ? v.substring(1) : v;
+    if (!/^\d+$/.test(cuerpo)) return 'El teléfono solo puede tener números, o empezar con +';
+    if (cuerpo.length < 10 || cuerpo.length > 15) return 'El teléfono debe tener entre 10 y 15 números';
+    return null;
+}
+
+function validar_email_js(valor) {
+    const v = (valor || '').trim();
+    if (v === '') return null;
+    if (v.length > 100) return 'El email no puede tener más de 100 caracteres';
+    if (!/^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(v)) return 'El email no parece válido';
+    return null;
+}
+
+function validar_nombre_o_apellido_js(valor) {
+    const v = (valor || '').trim();
+    if (v === '') return 'Este campo es obligatorio';
+    if (v.length > 60) return 'No puede tener más de 60 caracteres';
+    if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü'\- \t]+$/.test(v)) return 'Solo puede tener letras, espacios, apóstrofes y guiones';
+    return null;
+}
+
+function validar_fecha_nacimiento_js(valor) {
+    const v = (valor || '').trim();
+    if (v === '') return 'La fecha de nacimiento es obligatoria';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return 'La fecha de nacimiento no es válida';
+    const [anio, mes, dia] = v.split('-').map(Number);
+    const fecha = new Date(anio, mes - 1, dia);
+    if (fecha.getFullYear() !== anio || fecha.getMonth() !== mes - 1 || fecha.getDate() !== dia) {
+        return 'La fecha de nacimiento no es válida';
+    }
+    const hoy = new Date();
+    if (fecha > hoy) return 'La fecha de nacimiento no puede ser futura';
+    let edad = hoy.getFullYear() - anio;
+    const m = hoy.getMonth() - (mes - 1);
+    if (m < 0 || (m === 0 && hoy.getDate() < dia)) edad--;
+    if (edad > 120) return 'La fecha de nacimiento no parece válida';
+    return null;
+}
+
+function validar_localidad_js(valor) {
+    const v = (valor || '').trim();
+    if (v === '') return 'La localidad es obligatoria';
+    if (v.length > 80) return 'La localidad no puede tener más de 80 caracteres';
+    if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñÜü'\- \t]+$/.test(v)) return 'La localidad solo puede tener letras, números, espacios, apóstrofes y guiones';
+    return null;
+}
+
+function validar_direccion_js(valor) {
+    const v = (valor || '').trim();
+    if (v === '') return 'La dirección es obligatoria';
+    if (v.length > 120) return 'La dirección no puede tener más de 120 caracteres';
+    if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñÜü'\- \t,.°º]+$/.test(v)) return 'La dirección tiene caracteres no permitidos';
+    return null;
 }

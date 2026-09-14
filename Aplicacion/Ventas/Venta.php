@@ -207,6 +207,18 @@ function confirmar_venta_actual(
         }
     }
 
+    // === Validaciones de campos del comprador ===
+    $err = validar_dni($comprador_dni);
+    if ($err !== null) return ['exito' => false, 'error' => 'Comprador - ' . $err];
+    $err = validar_nombre_o_apellido($comprador_apellido);
+    if ($err !== null) return ['exito' => false, 'error' => 'Comprador - Apellido: ' . $err];
+    $err = validar_nombre_o_apellido($comprador_nombres);
+    if ($err !== null) return ['exito' => false, 'error' => 'Comprador - Nombres: ' . $err];
+    $err = validar_email($comprador_email);
+    if ($err !== null) return ['exito' => false, 'error' => 'Comprador - ' . $err];
+    $err = validar_telefono($comprador_celular);
+    if ($err !== null) return ['exito' => false, 'error' => 'Comprador - Celular: ' . $err];
+
     // Recorrer lista circular de asientos-en-venta de la venta actual
     $cabeza_venta_actual = $venta_actual->adyacente('asientos');
     if (!$cabeza_venta_actual) return ['exito' => false, 'error' => 'Venta actual sin asientos'];
@@ -300,9 +312,26 @@ function confirmar_venta_actual(
         $dni_pasajero = $datos_pasajero['dni'] ?? '';
         $fecha_nacimiento_pasajero = $datos_pasajero['fecha_nacimiento'] ?? '';
 
-        if (empty($dni_pasajero) || empty($fecha_nacimiento_pasajero) || empty($datos_pasajero['nombres']) || empty($datos_pasajero['apellido']) || empty($datos_pasajero['celular']) || empty($datos_pasajero['celular_emergencia'])) {
-            return ['exito' => false, 'error' => 'Faltan datos obligatorios del pasajero ' . ($indice_asiento + 1)];
-        }
+        $num_pas = $indice_asiento + 1;
+
+        $err = validar_dni($dni_pasajero);
+        if ($err !== null) return ['exito' => false, 'error' => "Pasajero $num_pas - $err"];
+        $err = validar_nombre_o_apellido($datos_pasajero['apellido'] ?? '');
+        if ($err !== null) return ['exito' => false, 'error' => "Pasajero $num_pas - Apellido: $err"];
+        $err = validar_nombre_o_apellido($datos_pasajero['nombres'] ?? '');
+        if ($err !== null) return ['exito' => false, 'error' => "Pasajero $num_pas - Nombres: $err"];
+        $err = validar_email($datos_pasajero['email'] ?? '');
+        if ($err !== null) return ['exito' => false, 'error' => "Pasajero $num_pas - $err"];
+        $err = validar_telefono($datos_pasajero['celular'] ?? '');
+        if ($err !== null) return ['exito' => false, 'error' => "Pasajero $num_pas - Celular: $err"];
+        $err = validar_telefono($datos_pasajero['celular_emergencia'] ?? '');
+        if ($err !== null) return ['exito' => false, 'error' => "Pasajero $num_pas - Celular de emergencia: $err"];
+        $err = validar_fecha_nacimiento($fecha_nacimiento_pasajero);
+        if ($err !== null) return ['exito' => false, 'error' => "Pasajero $num_pas - $err"];
+        $err = validar_localidad($datos_pasajero['localidad'] ?? '');
+        if ($err !== null) return ['exito' => false, 'error' => "Pasajero $num_pas - Localidad: $err"];
+        $err = validar_direccion($datos_pasajero['direccion'] ?? '');
+        if ($err !== null) return ['exito' => false, 'error' => "Pasajero $num_pas - Dirección: $err"];
 
         if ($restriccion_edad) {
             $fecha_nac = DateTime::createFromFormat('Y-m-d', $fecha_nacimiento_pasajero);
@@ -561,6 +590,7 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
         $comp_nombres = $nodo_comprador->adyacente('nombres') ? $nodo_comprador->adyacente('nombres')->dato() : '';
         $datos['comprador'] = [
             'dni' => $nodo_comprador->dato(),
+            'dni_visible' => normalizar_dni($nodo_comprador->dato()),
             'apellido' => $comp_apellido,
             'nombres' => $comp_nombres,
             'nombre_completo' => formatear_nombre_completo($comp_apellido, $comp_nombres),
@@ -594,6 +624,7 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
                 $pas_nombres = $nodo_pasajero->adyacente('nombres') ? $nodo_pasajero->adyacente('nombres')->dato() : '';
                 $asiento_info['pasajero'] = [
                     'dni' => $nodo_pasajero->dato(),
+                    'dni_visible' => normalizar_dni($nodo_pasajero->dato()),
                     'apellido' => $pas_apellido,
                     'nombres' => $pas_nombres,
                     'nombre_completo' => formatear_nombre_completo($pas_apellido, $pas_nombres),

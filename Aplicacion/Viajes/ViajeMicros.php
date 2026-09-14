@@ -220,10 +220,14 @@ function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, stri
     $nodo_copia_tmp = $nodo_micro->adyacente('vehiculo_copia');
     $patente = $nodo_copia_tmp ? $nodo_copia_tmp->dato() : ($nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '');    
     $monto = $nodo_micro->adyacente('monto') ? $nodo_micro->adyacente('monto')->dato() : '0';
-    $ocupacion = $nodo_micro->adyacente('ocupacion') ? $nodo_micro->adyacente('ocupacion')->dato() : '0';
-    $seleccionados = $nodo_micro->adyacente('seleccionados') ? $nodo_micro->adyacente('seleccionados')->dato() : '0';
-    $vendidos = $nodo_micro->adyacente('vendidos') ? $nodo_micro->adyacente('vendidos')->dato() : '0';
-    $reservados = $nodo_micro->adyacente('reservados') ? $nodo_micro->adyacente('reservados')->dato() : '0';
+
+    // Contadores calculados al vuelo, para no depender de que los nodos del
+    // micro estén al día. Misma fuente que usa el listado de viajes.
+    $contadores_micro = contar_contadores_micro($nodo_micro);
+    $ocupacion = (string)$contadores_micro['ocupacion'];
+    $seleccionados = (string)$contadores_micro['seleccionados'];
+    $vendidos = (string)$contadores_micro['vendidos'];
+    $reservados = (string)$contadores_micro['reservados'];
 
     $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
     if (!$nodo_copia) return ['exito' => false, 'error' => 'No existe copia del vehículo'];
@@ -299,18 +303,31 @@ function actualizar_contadores_viaje(string $nombre_viaje, string $nombre_dueno)
     $nodo_viaje->adyacente('disponibles')?->_dato((string)$total_disponibles);
 }
 
+
 /**
- * Actualiza los contadores de un micro (ocupación, seleccionados, vendidos, reservados).
+ * Cuenta los contadores de un micro recorriendo los asientos del vehículo copia.
+ *
+ * Devuelve un array con los 5 contadores:
+ *   ocupacion, seleccionados, vendidos, reservados, disponibles.
+ *
+ * No escribe nada en los nodos. Se usa desde:
+ *  - actualizar_contadores_micro (para persistir los valores)
+ *  - obtener_micro_de_viaje (para devolver los valores al frontend sin depender
+ *    de que los nodos del micro estén al día)
+ *
+ * @param Nodo $nodo_micro
+ * @return array
  */
-function actualizar_contadores_micro(Nodo $nodo_micro): void {
+function contar_contadores_micro(Nodo $nodo_micro): array {
     $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
-    if (!$nodo_copia) return;
-    
-    // Asegurar que existan los nodos de contadores
-    foreach (['ocupacion', 'seleccionados', 'vendidos', 'reservados', 'disponibles'] as $campo) {
-        if (!$nodo_micro->adyacente($campo)) {
-            $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), $campo);
-        }
+    if (!$nodo_copia) {
+        return [
+            'ocupacion' => 0,
+            'seleccionados' => 0,
+            'vendidos' => 0,
+            'reservados' => 0,
+            'disponibles' => 0,
+        ];
     }
 
     $total = 0;
@@ -346,11 +363,36 @@ function actualizar_contadores_micro(Nodo $nodo_micro): void {
         }
     }
 
-    $disponibles = $total - $vendidos - $reservados;
+    $disponibles = max(0, $total - $vendidos - $seleccionados - $reservados);
 
-    $nodo_micro->adyacente('ocupacion')?->_dato((string)$total);
-    $nodo_micro->adyacente('seleccionados')?->_dato((string)$seleccionados);
-    $nodo_micro->adyacente('vendidos')?->_dato((string)$vendidos);
-    $nodo_micro->adyacente('reservados')?->_dato((string)$reservados);
-    $nodo_micro->adyacente('disponibles')?->_dato((string)$disponibles);
+    return [
+        'ocupacion' => $total,
+        'seleccionados' => $seleccionados,
+        'vendidos' => $vendidos,
+        'reservados' => $reservados,
+        'disponibles' => $disponibles,
+    ];
+}
+
+/**
+ * Actualiza los contadores de un micro (ocupación, seleccionados, vendidos, reservados).
+ */
+function actualizar_contadores_micro(Nodo $nodo_micro): void {
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) return;
+
+    // Asegurar que existan los nodos de contadores
+    foreach (['ocupacion', 'seleccionados', 'vendidos', 'reservados', 'disponibles'] as $campo) {
+        if (!$nodo_micro->adyacente($campo)) {
+            $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), $campo);
+        }
+    }
+
+    $c = contar_contadores_micro($nodo_micro);
+
+    $nodo_micro->adyacente('ocupacion')?->_dato((string)$c['ocupacion']);
+    $nodo_micro->adyacente('seleccionados')?->_dato((string)$c['seleccionados']);
+    $nodo_micro->adyacente('vendidos')?->_dato((string)$c['vendidos']);
+    $nodo_micro->adyacente('reservados')?->_dato((string)$c['reservados']);
+    $nodo_micro->adyacente('disponibles')?->_dato((string)$c['disponibles']);
 }

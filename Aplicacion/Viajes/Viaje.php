@@ -93,14 +93,18 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
     $datos['dueno'] = $nodo_viaje->adyacente('dueno') ? $nodo_viaje->adyacente('dueno')->dato() : '';
     $datos['nombre'] = $nodo_viaje->adyacente('nombre') ? $nodo_viaje->adyacente('nombre')->dato() : '';
     $datos['fecha'] = $nodo_viaje->adyacente('fecha') ? $nodo_viaje->adyacente('fecha')->dato() : '';
+    $datos['fecha_visible'] = formatear_fecha_visible($datos['fecha']);
     $datos['hora'] = $nodo_viaje->adyacente('hora') ? $nodo_viaje->adyacente('hora')->dato() : '';
     $datos['origen'] = $nodo_viaje->adyacente('origen') ? $nodo_viaje->adyacente('origen')->dato() : '';
     $datos['destino'] = $nodo_viaje->adyacente('destino') ? $nodo_viaje->adyacente('destino')->dato() : '';
-    $datos['ocupacion'] = $nodo_viaje->adyacente('ocupacion') ? $nodo_viaje->adyacente('ocupacion')->dato() : '0';
-    $datos['disponibles'] = $nodo_viaje->adyacente('disponibles') ? $nodo_viaje->adyacente('disponibles')->dato() : '0';
-    $datos['seleccionados'] = $nodo_viaje->adyacente('seleccionados') ? $nodo_viaje->adyacente('seleccionados')->dato() : '0';
-    $datos['vendidos'] = $nodo_viaje->adyacente('vendidos') ? $nodo_viaje->adyacente('vendidos')->dato() : '0';
-    // 'reservados' se recalcula al final del loop de micros.
+    // Los contadores se calculan al final del loop de micros, sumando los de cada micro.
+    // Así no dependemos de que los nodos del viaje estén al día: cualquier
+    // desfase entre el nodo del viaje y el estado real de los micros se
+    // evita calculándolos siempre al vuelo.
+    $datos['ocupacion'] = '0';
+    $datos['disponibles'] = '0';
+    $datos['seleccionados'] = '0';
+    $datos['vendidos'] = '0';
     $datos['reservados'] = '0';
 
     // Paradas intermedias (lista tipo árbol hmi/hd).
@@ -176,6 +180,9 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
     // Micros
     $micros = [];
     $total_reservados_micros = 0;
+    $total_seleccionados_micros = 0;
+    $total_vendidos_micros = 0;
+    $total_ocupacion_micros = 0;
     $nodo_micros = $nodo_viaje->adyacente('micros');
     if ($nodo_micros) {
         $adyacentes_micros = (array) $nodo_micros->adyacentes();
@@ -214,8 +221,16 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
                 $nombre_vehiculo = $nodo_copia->adyacente('nombre')->dato();
             }
 
-            $reservados_micro = $nodo_micro->adyacente('reservados') ? (int)$nodo_micro->adyacente('reservados')->dato() : 0;
-            $total_reservados_micros += $reservados_micro;
+            // Contadores calculados al vuelo desde los asientos reales del micro.
+            // No dependemos de los nodos 'seleccionados', 'vendidos', etc. del
+            // micro, que pueden estar desactualizados si alguna operación no
+            // llamó a actualizar_contadores_micro.
+            $c_micro = contar_contadores_micro($nodo_micro);
+
+            $total_reservados_micros += $c_micro['reservados'];
+            $total_seleccionados_micros += $c_micro['seleccionados'];
+            $total_vendidos_micros += $c_micro['vendidos'];
+            $total_ocupacion_micros += $c_micro['ocupacion'];
 
             $micros[] = [
                 'nombre_micro' => $nombre_micro,
@@ -224,19 +239,29 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
                 'nombre_empresa' => $nombre_empresa,
                 'nombre_vehiculo' => $nombre_vehiculo,
                 'monto' => $nodo_micro->adyacente('monto') ? $nodo_micro->adyacente('monto')->dato() : '0',
-                'ocupacion' => $nodo_micro->adyacente('ocupacion') ? $nodo_micro->adyacente('ocupacion')->dato() : '0',
-                'seleccionados' => $nodo_micro->adyacente('seleccionados') ? $nodo_micro->adyacente('seleccionados')->dato() : '0',
-                'vendidos' => $nodo_micro->adyacente('vendidos') ? $nodo_micro->adyacente('vendidos')->dato() : '0',
-                'reservados' => (string)$reservados_micro,
-                'disponibles' => $nodo_micro->adyacente('disponibles') ? $nodo_micro->adyacente('disponibles')->dato() : '0',
+                'ocupacion' => (string)$c_micro['ocupacion'],
+                'seleccionados' => (string)$c_micro['seleccionados'],
+                'vendidos' => (string)$c_micro['vendidos'],
+                'reservados' => (string)$c_micro['reservados'],
+                'disponibles' => (string)$c_micro['disponibles'],
                 'vendidos_aqui' => ($nombre_terminal !== null) ? (string)($vendidos_por_micro[$nodo_micro->id()] ?? 0) : null,
             ];
         }
     }
     $datos['micros'] = $micros;
 
-    // Reservados del viaje: siempre la suma de los reservados de cada micro.
+    // Contadores del viaje: siempre la suma de los contadores de cada micro.
+    // Fórmula de disponibles consistente con el micro: los seleccionados y los
+    // reservados siguen restando, porque mientras lo están no pueden venderse
+    // desde otra terminal ni ser reservados de nuevo.
+    $datos['ocupacion'] = (string)$total_ocupacion_micros;
+    $datos['seleccionados'] = (string)$total_seleccionados_micros;
+    $datos['vendidos'] = (string)$total_vendidos_micros;
     $datos['reservados'] = (string)$total_reservados_micros;
+    $datos['disponibles'] = (string)max(
+        0,
+        $total_ocupacion_micros - $total_vendidos_micros - $total_seleccionados_micros - $total_reservados_micros
+    );
 
     // Terminales autorizadas
     // NOTA v1.5piloto.31: las claves del contenedor siguen siendo los nombres de las terminales,

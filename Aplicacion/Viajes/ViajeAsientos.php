@@ -382,6 +382,9 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
         $cabeza_venta->eliminar_adyacente('primer');
     }
 
+    actualizar_contadores_micro($nodo_micro);
+    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
+
     Controlador::guardar(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
@@ -485,6 +488,9 @@ function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro,
             }
         }
     }
+
+    actualizar_contadores_micro($nodo_micro);
+    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
     Controlador::guardar(Conf::NOMBRE_APP);
     return ['exito' => true];

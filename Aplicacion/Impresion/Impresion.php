@@ -193,7 +193,7 @@ function imprimir_pasajes(array $venta, string $dni_filtro = ''): void {
             $nombre_completo = $pasajero['nombre_completo']
                 ?? formatear_nombre_completo($pasajero['apellido'] ?? '', $pasajero['nombres'] ?? '');
             echo '<div class="campo"><strong>Pasajero:</strong> <span>' . htmlspecialchars($nombre_completo) . '</span></div>';
-            echo '<div class="campo"><strong>DNI:</strong> <span>' . htmlspecialchars($pasajero['dni']) . '</span></div>';
+            echo '<div class="campo"><strong>DNI:</strong> <span>' . htmlspecialchars(formatear_dni_con_puntos($pasajero['dni'])) . '</span></div>';
         }
 
         echo '<div class="frase-final">✨ ¡Compartamos en Comunidad! ✨</div>';
@@ -340,7 +340,7 @@ function imprimir_cupon(array $venta): void {
         $comprador_nombre_completo = $venta['comprador']['nombre_completo']
             ?? formatear_nombre_completo($venta['comprador']['apellido'] ?? '', $venta['comprador']['nombres'] ?? '');
         echo '<div class="fila"><strong>Comprador:</strong> <span>' . htmlspecialchars($comprador_nombre_completo) . '</span></div>';
-        echo '<div class="fila"><strong>DNI:</strong> <span>' . htmlspecialchars($venta['comprador']['dni']) . '</span></div>';
+        echo '<div class="fila"><strong>DNI:</strong> <span>' . htmlspecialchars(formatear_dni_con_puntos($venta['comprador']['dni'])) . '</span></div>';
     }
     echo '</div>';
 
@@ -376,7 +376,93 @@ function imprimir_ficha_salud(string $nombre_dueno, string $dni): void {
     $ficha = $pasajero['ficha_salud'] ?? null;
     $logo_ruta = './Aplicacion/LogoPeque.png';
 
-    // ... (estilos igual que antes)
+    echo '<!DOCTYPE html>';
+    echo '<html lang="es">';
+    echo '<head><meta charset="UTF-8"><title>Ficha de salud</title>';
+    echo '<style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: white;
+            color: black;
+            font-size: 12px;
+        }
+        .ficha {
+            max-width: 800px;
+            margin: 0 auto;
+            border: 2px solid black;
+            border-radius: 8px;
+            background: white;
+            overflow: hidden;
+        }
+        .membrete {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            border-bottom: 2px solid black;
+            padding: 10px 15px;
+        }
+        .membrete img {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+            filter: grayscale(100%);
+            margin-right: 15px;
+        }
+        .membrete-texto {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .contenido {
+            padding: 20px;
+        }
+        .encabezado {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .encabezado h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+        .seccion {
+            border: 1px solid black;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .seccion h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            border-bottom: 1px solid black;
+            padding-bottom: 5px;
+            font-size: 15px;
+        }
+        .fila {
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        .fila strong {
+            display: inline-block;
+            min-width: 140px;
+        }
+        .lista {
+            margin-left: 20px;
+            list-style-type: disc;
+        }
+        @media print {
+            body { padding: 0; background: white; }
+            .ficha { border: 2px solid black; box-shadow: none; }
+        }
+    </style>';
+    echo '</head><body>';
+
+    echo '<div class="ficha">';
+    echo '<div class="membrete">';
+    echo '<img src="' . htmlspecialchars($logo_ruta) . '" alt="Logo">';
+    echo '<div class="membrete-texto">Parroquia Nuestra Señora del Carmen - Tres Arroyos</div>';
+    echo '</div>';
 
     echo '<div class="contenido">';
     echo '<div class="encabezado"><h1>Ficha de salud</h1></div>';
@@ -387,11 +473,11 @@ function imprimir_ficha_salud(string $nombre_dueno, string $dni): void {
     $nombre_completo = $pasajero['nombre_completo']
         ?? formatear_nombre_completo($pasajero['apellido'] ?? '', $pasajero['nombres'] ?? '');
     echo '<div class="fila"><strong>Nombre completo:</strong> ' . htmlspecialchars($nombre_completo) . '</div>';
-    echo '<div class="fila"><strong>DNI:</strong> ' . htmlspecialchars($pasajero['dni']) . '</div>';
+    echo '<div class="fila"><strong>DNI:</strong> ' . htmlspecialchars(formatear_dni_con_puntos($pasajero['dni'])) . '</div>';
     if (!empty($pasajero['celular'])) echo '<div class="fila"><strong>Celular:</strong> ' . htmlspecialchars($pasajero['celular']) . '</div>';
     if (!empty($pasajero['celular_emergencia'])) echo '<div class="fila"><strong>Emergencia:</strong> ' . htmlspecialchars($pasajero['celular_emergencia']) . '</div>';
     if (!empty($pasajero['email'])) echo '<div class="fila"><strong>Email:</strong> ' . htmlspecialchars($pasajero['email']) . '</div>';
-    if (!empty($pasajero['fecha_nacimiento'])) echo '<div class="fila"><strong>Fecha nacimiento:</strong> ' . htmlspecialchars($pasajero['fecha_nacimiento']) . '</div>';
+    if (!empty($pasajero['fecha_nacimiento'])) echo '<div class="fila"><strong>Fecha nacimiento:</strong> ' . htmlspecialchars(formatear_fecha_visible($pasajero['fecha_nacimiento'])) . '</div>';
     $dir = trim(($pasajero['direccion'] ?? '') . ', ' . ($pasajero['localidad'] ?? ''));
     if (!empty($dir)) echo '<div class="fila"><strong>Dirección:</strong> ' . htmlspecialchars($dir) . '</div>';
     echo '</div>';

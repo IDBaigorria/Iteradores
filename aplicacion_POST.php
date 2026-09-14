@@ -104,6 +104,24 @@
  * string. Si existieran datos antiguos con listas, al leerlos se concatenan
  * con `"; "` y se devuelven como string.
  *
+ * **Nota (DNI - formato de visualización):** A partir de v1.5piloto.37, el DNI
+ * se guarda sin puntos (validado desde el frontend y el backend). Para los
+ * DNIs históricos que se cargaron con puntos, el backend expone un campo
+ * `dni_visible` (normalizado, sin puntos) que la UI usa para mostrar. En
+ * impresión (pasajes, cupón, ficha de salud), el DNI se muestra con puntos
+ * usando `formatear_dni_con_puntos`. Los helpers están en
+ * `Aplicacion/FuncionesAuxiliares.php`.
+ *
+ * **Nota (fechas):** Las fechas se guardan en formato ISO (`YYYY-MM-DD`) pero
+ * se exponen como `fecha_visible` en formato `DD/MM/YYYY` para la UI. La
+ * impresión también usa `formatear_fecha_visible`.
+ *
+ * **Nota (validaciones):** A partir de v1.5piloto.37, los campos del formulario
+ * de venta se validan en el frontend y en el backend con las funciones
+ * `validar_dni`, `validar_telefono`, `validar_email`,
+ * `validar_nombre_o_apellido`, `validar_fecha_nacimiento`,
+ * `validar_localidad` y `validar_direccion` (en `FuncionesAuxiliares.php`).
+ * 
  * ### Nodo Empresa
  *
  * Las empresas son nodos contenidos dentro del enlace `empresas` de un usuario dueño.

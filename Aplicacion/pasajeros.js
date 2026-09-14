@@ -2,6 +2,13 @@
  * Funciones del panel de pasajeros/clientes.
  * @version 1.5piloto.36
  */
+/**
+ * Normaliza un DNI dejando solo dígitos.
+ * Se usa como respaldo si el backend no envía dni_visible.
+ */
+function normalizar_dni_js(dni) {
+    return String(dni || '').replace(/\D+/g, '');
+}
 
 let pasajeros_actuales = [];
 let pasajero_seleccionado_dni = null;
@@ -124,7 +131,7 @@ async function ver_pasajes_pasajero(dni) {
     }
 
     const p = datos.pasajero;
-    let html = `<h3>Pasajes de ${p.nombre_completo || p.dni}</h3>`;
+    let html = `<h3>Pasajes de ${p.nombre_completo || p.dni_visible || p.dni}</h3>`;
     if (p.ventas && p.ventas.length) {
         html += p.ventas.map(v => {
             // Etiqueta de rol
@@ -170,7 +177,8 @@ async function ver_pasajes_pasajero(dni) {
                 tarjetasHtml = `<div class="pasajes-lista" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;">`;
                 tarjetasHtml += pasajesFiltrados.map(pas => `<div class="pasaje-card" data-id="${v.compra.id_venta}" data-dni="${pas.dni}" data-asiento="${pas.asiento}">
                     <strong>Asiento ${pas.asiento}</strong><br>
-                    <span class="small">${pas.nombre_completo || pas.dni}</span>
+                    <span class="small">${pas.nombre_completo || pas.dni_visible || pas.dni}</span><br>
+                    <span class="small muted">DNI: ${pas.dni_visible || normalizar_dni_js(pas.dni)}</span>
                 </div>`).join('');
                 tarjetasHtml += `</div>`;
             }
@@ -195,7 +203,7 @@ async function ver_pasajes_pasajero(dni) {
                             <div style="flex:1; min-width:200px;">
                                 <div class="seccion" style="margin-bottom:10px;">
                                     <h4>Pasajes</h4>
-                                    <div class="detail-line"><span>Fecha:</span><strong>${v.pasaje.fecha} ${v.pasaje.hora}</strong></div>
+                                    <div class="detail-line"><span>Fecha:</span><strong>${v.pasaje.fecha_visible || v.pasaje.fecha} ${v.pasaje.hora}</strong></div>
                                     <div class="detail-line"><span>Vehículo:</span><strong>${v.pasaje.micro_nombre_visible}</strong></div>
                                 </div>
                                 ${tarjetasHtml}
@@ -266,8 +274,9 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
         return;
     }
 
-    const pasajero = asientoInfo.pasajero || { nombre_completo: 'Desconocido', dni: '' };
-    const nombre_pasajero = pasajero.nombre_completo || pasajero.dni || 'Desconocido';
+    const pasajero = asientoInfo.pasajero || { nombre_completo: 'Desconocido', dni: '', dni_visible: '' };
+    const nombre_pasajero = pasajero.nombre_completo || pasajero.dni_visible || pasajero.dni || 'Desconocido';
+    const dni_pasajero_mostrar = pasajero.dni_visible || normalizar_dni_js(pasajero.dni);
     const viaje = venta;
     const micro_nombre = venta.micro_nombre_visible || venta.patente || '';
 
@@ -276,7 +285,7 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
         <div class="seccion">
             <h4>Datos del pasajero</h4>
             <div class="detail-line"><span>Nombre:</span><strong>${nombre_pasajero}</strong></div>
-            <div class="detail-line"><span>DNI:</span><strong>${pasajero.dni}</strong></div>
+            <div class="detail-line"><span>DNI:</span><strong>${dni_pasajero_mostrar}</strong></div>
         </div>
         <div class="seccion">
             <h4>Datos del viaje</h4>
@@ -319,11 +328,13 @@ function renderizar_tabla_pasajeros(pasajeros) {
     pasajeros.forEach(pasajero => {
         const tieneFicha = pasajero.ficha_salud !== null && pasajero.ficha_salud !== undefined;
         const direccionCompleta = [pasajero.direccion, pasajero.localidad].filter(v => v).join(', ') || '—';
-        const nombreMostrar = pasajero.nombre_completo || pasajero.dni;
+        const nc = (pasajero.nombre_completo || '').trim();
+        const nombreMostrar = (nc !== '' && nc !== ',' && nc !== ', ') ? nc : '(sin nombre)';
+        const dni_mostrar = pasajero.dni_visible || normalizar_dni_js(pasajero.dni);
         const fila = document.createElement('tr');
         fila.innerHTML = `
             <td>${nombreMostrar}</td>
-            <td>${pasajero.dni}</td>
+            <td>${dni_mostrar}</td>
             <td>${direccionCompleta}</td>
             <td>${pasajero.email || '—'}</td>
             <td>${pasajero.celular || '—'}</td>
@@ -392,11 +403,14 @@ function renderizar_tabla_pasajeros(pasajeros) {
 
 document.getElementById('buscar_pasajero').addEventListener('input', function() {
     const termino = this.value.trim().toLowerCase();
-    const filtrados = termino === '' ? pasajeros_actuales : pasajeros_actuales.filter(p => 
-        (p.nombres || '').toLowerCase().includes(termino) ||
-        (p.apellido || '').toLowerCase().includes(termino) ||
-        p.dni.includes(termino)
-    );
+    const termino_dni = termino.replace(/\D+/g, '');
+    const filtrados = termino === '' ? pasajeros_actuales : pasajeros_actuales.filter(p => {
+        if ((p.nombres || '').toLowerCase().includes(termino)) return true;
+        if ((p.apellido || '').toLowerCase().includes(termino)) return true;
+        if (p.dni && p.dni.toLowerCase().includes(termino)) return true;
+        if (termino_dni !== '' && p.dni && p.dni.replace(/\D+/g, '').includes(termino_dni)) return true;
+        return false;
+    });
     renderizar_tabla_pasajeros(filtrados);
 });
 
@@ -415,7 +429,7 @@ async function cargar_detalle_pasajero(dni) {
         // Orden: DNI (no editable) primero, después Apellido, después Nombres.
         const contenido = `
             <div class="form-grid">
-                <div class="field"><label>DNI (no editable)</label><input id="pasajero_dni_modal" disabled value="${p.dni}"></div>
+                <div class="field"><label>DNI (no editable)</label><input id="pasajero_dni_modal" disabled value="${p.dni_visible || normalizar_dni_js(p.dni)}"></div>
                 <div class="field"><label>Apellido</label><input id="pasajero_apellido_modal" value="${p.apellido || ''}"></div>
                 <div class="field full"><label>Nombres</label><input id="pasajero_nombres_modal" value="${p.nombres || ''}"></div>
                 <div class="field"><label>Email (opcional)</label><input id="pasajero_email_modal" value="${p.email || ''}"></div>

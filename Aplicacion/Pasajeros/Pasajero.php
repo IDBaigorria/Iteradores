@@ -92,10 +92,14 @@ function buscar_pasajeros(string $nombre_dueno, string $termino): array {
     $todos = listar_pasajeros($nombre_dueno);
     if (empty($termino)) return $todos;
 
-    return array_filter($todos, function($pasajero) use ($termino) {
-        return strpos(strtolower($pasajero['nombres']), $termino) !== false ||
-               strpos(strtolower($pasajero['apellido']), $termino) !== false ||
-               strpos($pasajero['dni'], $termino) !== false;
+    $dni_norm_buscado = normalizar_dni($termino);
+
+    return array_filter($todos, function($pasajero) use ($termino, $dni_norm_buscado) {
+        if (strpos(strtolower($pasajero['nombres']), $termino) !== false) return true;
+        if (strpos(strtolower($pasajero['apellido']), $termino) !== false) return true;
+        if (strpos($pasajero['dni'], $termino) !== false) return true;
+        if ($dni_norm_buscado !== '' && strpos(normalizar_dni($pasajero['dni']), $dni_norm_buscado) !== false) return true;
+        return false;
     });
 }
 
@@ -111,6 +115,7 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
 
     $datos = [
         'dni' => $dni,
+        'dni_visible' => normalizar_dni($dni),
         'nombres' => $nombres,
         'apellido' => $apellido,
         'nombre_completo' => formatear_nombre_completo($apellido, $nombres),
@@ -269,6 +274,36 @@ function obtener_pasajero_por_dni(string $nombre_dueno, string $dni): ?array {
  * Actualiza los datos de un pasajero (excepto DNI que es inmutable).
  */
 function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): array {
+    // Validaciones (solo si vienen campos)
+    if (isset($datos['apellido'])) {
+        $err = validar_nombre_o_apellido($datos['apellido']);
+        if ($err !== null) return ['exito' => false, 'error' => 'Apellido: ' . $err];
+    }
+    if (isset($datos['nombres'])) {
+        $err = validar_nombre_o_apellido($datos['nombres']);
+        if ($err !== null) return ['exito' => false, 'error' => 'Nombres: ' . $err];
+    }
+    if (isset($datos['email'])) {
+        $err = validar_email($datos['email']);
+        if ($err !== null) return ['exito' => false, 'error' => $err];
+    }
+    if (isset($datos['celular'])) {
+        $err = validar_telefono($datos['celular']);
+        if ($err !== null) return ['exito' => false, 'error' => 'Celular: ' . $err];
+    }
+    if (isset($datos['celular_emergencia'])) {
+        $err = validar_telefono($datos['celular_emergencia']);
+        if ($err !== null) return ['exito' => false, 'error' => 'Celular de emergencia: ' . $err];
+    }
+    if (isset($datos['localidad'])) {
+        $err = validar_localidad($datos['localidad']);
+        if ($err !== null) return ['exito' => false, 'error' => 'Localidad: ' . $err];
+    }
+    if (isset($datos['direccion'])) {
+        $err = validar_direccion($datos['direccion']);
+        if ($err !== null) return ['exito' => false, 'error' => 'Dirección: ' . $err];
+    }
+
     $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
     if (!$contenedor) return ['exito' => false, 'error' => 'No hay pasajeros registrados'];
 
@@ -424,6 +459,7 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
         'origen' => $origen,
         'destino' => $destino,
         'fecha' => $fecha_viaje,
+        'fecha_visible' => formatear_fecha_visible($fecha_viaje),
         'hora' => $hora,
         'micro_nombre_visible' => $micro_nombre_visible,
         'asientos' => $asientos_pasajero,

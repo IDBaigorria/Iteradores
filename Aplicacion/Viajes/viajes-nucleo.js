@@ -164,8 +164,10 @@ async function ver_detalle_viaje(viaje) {
     const tieneParadas = paradas.length > 0;
     const paradas_formateadas = formatear_paradas_con_hora(paradas);
 
-    // Fecha y hora formateadas
-    const fechaTexto = viaje.fecha === 'a confirmar' || viaje.fecha === '' ? 'A confirmar' : viaje.fecha;
+    // Fecha y hora formateadas.
+    // El backend expone 'fecha_visible' ya en DD/MM/YYYY; 'fecha' queda por compat.
+    const fecha_para_mostrar = viaje.fecha_visible || viaje.fecha;
+    const fechaTexto = (fecha_para_mostrar === 'a confirmar' || fecha_para_mostrar === '') ? 'A confirmar' : fecha_para_mostrar;
     const horaTexto = viaje.hora === 'a confirmar' || viaje.hora === '' ? 'A confirmar' : viaje.hora;
     const fechaPendiente = viaje.fecha === 'a confirmar' || viaje.fecha === '';
     const horaPendiente = viaje.hora === 'a confirmar' || viaje.hora === '';

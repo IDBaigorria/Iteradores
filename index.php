@@ -73,6 +73,7 @@ if (Controlador::existe($nombre_app)) {
 }
 
 // Incluir módulos de la aplicación
+require_once __DIR__ . '/Aplicacion/FuncionesAuxiliares.php';
 require_once __DIR__ . '/Aplicacion/Usuarios/Usuario.php';
 require_once __DIR__ . '/Aplicacion/Sesiones/Sesion.php';
 require_once __DIR__ . '/Aplicacion/Admin/Admin.php';
@@ -83,6 +84,7 @@ require_once __DIR__ . '/Aplicacion/Viajes/Viaje.php';
 require_once __DIR__ . '/Aplicacion/Ventas/Venta.php';
 require_once __DIR__ . '/Aplicacion/Pasajeros/Pasajero.php';
 require_once __DIR__ . '/Aplicacion/Enrutador.php';
+
 
 // ==== Bloque temporal para pruebas de árbol ====
 if (isset($_GET['probar_arbol'])) {
