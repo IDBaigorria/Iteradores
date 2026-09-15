@@ -173,8 +173,23 @@ if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
 // Manejo de impresión
 if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
     require_once __DIR__ . '/Aplicacion/Impresion/Impresion.php';
+    $tipo = $_GET['tipo'] ?? '';
+
+    // Caso especial: pasaje de asiento reservado para el equipo (sin venta).
+    // Se pasa dueño, viaje, micro, fila y columna por GET.
+    if ($tipo === 'pasaje_reserva') {
+        imprimir_pasaje_reserva(
+            $_GET['dueno'] ?? '',
+            $_GET['viaje'] ?? '',
+            $_GET['micro'] ?? '',
+            $_GET['fila'] ?? '',
+            $_GET['columna'] ?? ''
+        );
+        exit;
+    }
+
     $dni_filtro = $_GET['dni'] ?? '';
-    generar_impresion($_GET['tipo'] ?? '', $_GET['id_venta'] ?? '', $dni_filtro);
+    generar_impresion($tipo, $_GET['id_venta'] ?? '', $dni_filtro);
     exit;
 }
 

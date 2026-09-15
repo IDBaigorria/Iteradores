@@ -461,7 +461,33 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = reservar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno);
+                    // Datos del pasajero opcionales: si vienen, se asigna en el mismo paso.
+                    $datos_pasajero = [];
+                    if (isset($post['datos_pasajero']) && $post['datos_pasajero'] !== '') {
+                        $decodificado = json_decode($post['datos_pasajero'], true);
+                        if (is_array($decodificado)) {
+                            $datos_pasajero = $decodificado;
+                        }
+                    }
+                    $resultado = reservar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $datos_pasajero);
+                    responder_json($resultado);
+                    break;
+                    
+                case 'asignar_pasajero_reserva':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $fila = $post['fila'] ?? '';
+                    $columna = $post['columna'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $datos_pasajero_json = $post['datos_pasajero'] ?? '';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $datos_pasajero = json_decode($datos_pasajero_json, true);
+                    if (!is_array($datos_pasajero)) {
+                        responder_json(['exito' => false, 'error' => 'Datos del pasajero inválidos']);
+                    }
+                    $resultado = asignar_pasajero_a_reserva($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $datos_pasajero);
                     responder_json($resultado);
                     break;
 

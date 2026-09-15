@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.35
+ * @version 1.5piloto.38
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -8,19 +8,12 @@
 let info_asiento_modo = null;
 
 // Polling adaptativo por inactividad.
-// SYNC_INTERVALO_MS: cada cuánto pedir el estado de asientos.
-// SYNC_MAX_SIN_ACTIVIDAD: cuántos pedidos seguidos sin actividad del usuario
-// se permiten antes de pausar el polling. Al llegar al límite, se detiene
-// el intervalo y se muestra un cartel hasta que el usuario haga algo.
 const SYNC_INTERVALO_MS = 15000;
 const SYNC_MAX_SIN_ACTIVIDAD = 10;
 let sync_contador_sin_actividad = 0;
 let sync_asientos_pausado = false;
 
 function obtener_dueno_viaje_seleccionado() {
-    // Siempre que haya viaje seleccionado con dueño definido, esa es la fuente
-    // de verdad. Así admin, dueño y terminal coinciden, y no dependemos de
-    // que el selector de dueño esté cargado.
     if (viaje_seleccionado && viaje_seleccionado.dueno) {
         return viaje_seleccionado.dueno;
     }
@@ -69,23 +62,15 @@ async function solicitar_estado_asientos() {
     if (datos.exito) {
         estados_asientos_actuales = datos.asientos;
         actualizar_colores_asientos(datos.asientos);
-        // Refrescar el panel: si el modo es 'propios', actualizarlo; si es
-        // null (primera sincronización tras abrir el micro), forzar el
-        // renderizado para que aparezca la grilla si hay propios.
         refrescar_info_asientos_propios(info_asiento_modo === null);
     }
 
-    // Contar pedido y evaluar pausa por inactividad.
     sync_contador_sin_actividad++;
     if (sync_contador_sin_actividad >= SYNC_MAX_SIN_ACTIVIDAD && !sync_asientos_pausado) {
         pausar_sync_por_inactividad();
     }
 }
 
-/**
- * Pausa el polling por inactividad. Detiene el intervalo pero mantiene
- * el estado del micro abierto (microSyncActual, panel). Muestra el cartel.
- */
 function pausar_sync_por_inactividad() {
     if (intervaloSyncAsientos) {
         clearInterval(intervaloSyncAsientos);
@@ -95,10 +80,6 @@ function pausar_sync_por_inactividad() {
     mostrar_cartel_inactividad();
 }
 
-/**
- * Reanuda el polling tras detectar actividad del usuario.
- * Se llama desde el listener global de actividad.
- */
 function reanudar_sync_por_actividad() {
     if (!sync_asientos_pausado) return;
     if (!viaje_seleccionado || !micro_seleccionado) return;
@@ -110,10 +91,6 @@ function reanudar_sync_por_actividad() {
     intervaloSyncAsientos = setInterval(solicitar_estado_asientos, SYNC_INTERVALO_MS);
 }
 
-/**
- * Registra actividad del usuario. Se llama desde el listener global.
- * Resetea el contador y, si el polling estaba pausado, lo reanuda.
- */
 function registrar_actividad_usuario() {
     sync_contador_sin_actividad = 0;
     if (sync_asientos_pausado) {
@@ -156,8 +133,6 @@ function actualizar_colores_asientos(estados) {
         }
     });
     mostrar_boton_confirmar_venta();
-    // El refresco del panel se maneja desde cada operación y desde
-    // solicitar_estado_asientos, para no pisar el modo 'simple'.
 }
 
 async function seleccionar_asiento_pasaje(fila, columna) {
@@ -273,8 +248,8 @@ async function deseleccionar_asiento_pasaje(fila, columna) {
 
 /**
  * Determina si un asiento es "propio" del usuario actual:
- * - Para terminal: seleccionado por el propio usuario.
- * - Para dueño/admin: reservado por el propio dueño.
+ * - Terminal: seleccionado por el propio usuario.
+ * - Dueño/admin: reservado por el equipo.
  */
 function es_asiento_propio(asiento) {
     if (!asiento) return false;
@@ -282,34 +257,15 @@ function es_asiento_propio(asiento) {
         return asiento.estado === 'seleccionado' && asiento.seleccionado_por === usuario_actual.nombre_usuario;
     }
     if (usuario_actual.nivel === 'dueno' || usuario_actual.nivel === 'admin') {
-        // El backend no devuelve reservado_por, pero solo el dueño del viaje
-        // puede reservar asientos para el equipo. Cualquier asiento en estado
-        // reservado es del equipo.
         return asiento.estado === 'reservado';
     }
     return false;
 }
 
-/**
- * Devuelve todos los asientos "propios" del usuario actual en el micro.
- */
 function obtener_asientos_propios() {
     return estados_asientos_actuales.filter(es_asiento_propio);
 }
 
-/**
- * Deselecciona (o libera, según el rol) todos los asientos propios del usuario
- * actual en el micro.
- *
- * - Terminal: llama a `viajes/deseleccionar_asiento` por cada uno.
- * - Dueño/admin: llama a `viajes/liberar_reserva_asiento` por cada uno.
- *
- * Los errores se registran pero no abortan el bucle: se intenta deseleccionar
- * todos. Al final se llama a `actualizar_colores_asientos` para repintar.
- *
- * Se usa cuando el usuario hace click en un asiento ajeno teniendo propios
- * activos: hay que soltar los propios para no mezclar selecciones.
- */
 let deseleccion_masiva_en_curso = false;
 
 async function deseleccionar_todos_los_propios() {
@@ -368,6 +324,8 @@ async function _deseleccionar_todos_los_propios_interno() {
                 if (local) {
                     local.estado = 'libre';
                     local.reservado_por = null;
+                    local.pasajero = null;
+                    local.tiene_pasajero = false;
                 }
             }
         } catch (e) {
@@ -380,58 +338,88 @@ async function _deseleccionar_todos_los_propios_interno() {
 
 /**
  * Construye el HTML de una tarjeta de asiento individual.
- * No incluye el título general del panel; eso lo maneja renderizar_tarjetas_asientos.
  *
- * Muestra solo los campos clave:
+ * Muestra:
  * - Número de asiento
  * - Estado
- * - Quién lo seleccionó / reservó (si aplica y no es el propio usuario)
- * - Datos del pasajero (nombre, DNI, celular) si está vendido
- * - Botones según el rol y el estado (dueño: reservar/liberar)
+ * - Si tiene pasajero: nombre completo, DNI (sin puntos) y celular
+ * - Si fue seleccionado por otra terminal (no el propio usuario): quién
+ * - Botones según rol y estado
+ *
+ * Botones:
+ * - "Reservar para equipo" (dueño/admin, asiento libre)
+ * - "Liberar" (terminal, seleccionado por él mismo)
+ * - "Asignar pasajero" (dueño/admin, reservado sin pasajero)
+ * - "Liberar reserva" (dueño/admin, reservado)
+ * - "Ver pasaje" (todos, reservado con pasajero o vendido)
+ * - "Ver compra" (dueño/admin: vendido. Terminal: vendido y venta hecha por esta terminal)
  */
 function construir_html_tarjeta_asiento(asiento) {
     const es_propio = es_asiento_propio(asiento);
     const es_terminal = usuario_actual.nivel === 'terminal';
+    const es_dueno_o_admin = usuario_actual.nivel === 'dueno' || usuario_actual.nivel === 'admin';
 
     let html = `<div class="asiento-card">`;
     html += `<div class="asiento-card-header">Asiento ${asiento.numero}</div>`;
 
-    // Texto y color del estado.
-    // Para asientos propios de terminal: "SELECCIONADO POR TI" en verde.
-    // Para el resto: el estado tal cual.
+    // Texto y color del estado
     if (es_propio && es_terminal) {
         html += `<div class="asiento-card-estado status-propio">SELECCIONADO POR TI</div>`;
     } else {
         html += `<div class="asiento-card-estado status-${asiento.estado}">${String(asiento.estado).toUpperCase()}</div>`;
     }
 
+    // Seleccionado por otra terminal
     if (asiento.seleccionado_por && asiento.seleccionado_por !== usuario_actual.nombre_usuario) {
         html += `<div class="asiento-card-linea"><span>Seleccionado por:</span><b>${asiento.seleccionado_por}</b></div>`;
     }
-    // El backend no devuelve reservado_por, así que esta línea casi nunca
-    // aparece. Se conserva por si en el futuro se agrega el campo al estado.
-    if (asiento.reservado_por) {
-        html += `<div class="asiento-card-linea"><span>Reservado por:</span><b>${asiento.reservado_por}</b></div>`;
-    }
 
-    if (asiento.pasajero && typeof asiento.pasajero === 'object') {
-        const nombre = asiento.pasajero.nombre_completo
-            || [asiento.pasajero.apellido, asiento.pasajero.nombres].filter(v => v).join(', ')
-            || '';
-        const dni = asiento.pasajero.dni_visible || asiento.pasajero.dni || '';
-        const celular = asiento.pasajero.celular || '';
+    // Datos del pasajero (si hay)
+    if (asiento.tiene_pasajero && asiento.pasajero) {
+        const p = asiento.pasajero;
+        const nombre = p.nombre_completo || '';
+        const dni_visible = p.dni_visible || normalizar_dni_js(p.dni || '');
+        const celular = p.celular || '';
         if (nombre) html += `<div class="asiento-card-linea"><span>Pasajero:</span><b>${nombre}</b></div>`;
-        if (dni) html += `<div class="asiento-card-linea"><span>DNI:</span><b>${dni}</b></div>`;
+        if (dni_visible) html += `<div class="asiento-card-linea"><span>DNI:</span><b>${dni_visible}</b></div>`;
         if (celular) html += `<div class="asiento-card-linea"><span>Celular:</span><b>${celular}</b></div>`;
     }
 
-    // Botones según rol y estado (solo dueño/admin puede reservar/liberar).
-    if (usuario_actual.nivel === 'dueno' || usuario_actual.nivel === 'admin') {
-        if (asiento.estado === 'libre') {
-            html += `<div class="asiento-card-acciones"><button class="btn primary btn-reservar-asiento" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Reservar para equipo</button></div>`;
-        } else if (asiento.estado === 'reservado') {
-            html += `<div class="asiento-card-acciones"><button class="btn danger btn-liberar-reserva" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Liberar reserva</button></div>`;
+    // Botones
+    const botones = [];
+
+    if (es_dueno_o_admin && asiento.estado === 'libre') {
+        botones.push(`<button class="btn primary btn-reservar-asiento" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Reservar para equipo</button>`);
+    }
+
+    if (es_terminal && es_propio) {
+        botones.push(`<button class="btn danger btn-liberar-seleccion" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Liberar</button>`);
+    }
+
+    if (es_dueno_o_admin && asiento.estado === 'reservado' && !asiento.tiene_pasajero) {
+        botones.push(`<button class="btn primary btn-asignar-pasajero" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Asignar pasajero</button>`);
+    }
+
+    if (es_dueno_o_admin && asiento.estado === 'reservado') {
+        botones.push(`<button class="btn danger btn-liberar-reserva" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Liberar reserva</button>`);
+    }
+
+    // Ver pasaje: disponible en reservado con pasajero o vendido
+    if ((asiento.estado === 'reservado' && asiento.tiene_pasajero) || asiento.estado === 'vendido') {
+        botones.push(`<button class="btn btn-ver-pasaje-asiento" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Ver pasaje</button>`);
+    }
+
+    // Ver compra: solo vendido
+    if (asiento.estado === 'vendido' && asiento.venta_id) {
+        const puede_ver_compra = es_dueno_o_admin
+            || (es_terminal && asiento.venta_terminal === usuario_actual.nombre_usuario);
+        if (puede_ver_compra) {
+            botones.push(`<button class="btn btn-ver-compra-asiento" data-fila="${asiento.fila}" data-columna="${asiento.columna}" data-venta-id="${asiento.venta_id}">Ver compra</button>`);
         }
+    }
+
+    if (botones.length > 0) {
+        html += `<div class="asiento-card-acciones">${botones.join('')}</div>`;
     }
 
     html += `</div>`;
@@ -440,11 +428,6 @@ function construir_html_tarjeta_asiento(asiento) {
 
 /**
  * Renderiza el panel de info con una lista de tarjetas en grilla de 2 columnas.
- *
- * @param {Array} asientos Lista de asientos a mostrar.
- * @param {string} titulo Título del panel.
- * @param {string} modo Modo del panel: 'propios' o 'simple'. Se guarda para
- *                      decidir si se refresca automáticamente en cada sync.
  */
 function renderizar_tarjetas_asientos(asientos, titulo, modo) {
     const panel = $("#info_asiento_viaje");
@@ -468,26 +451,28 @@ function renderizar_tarjetas_asientos(asientos, titulo, modo) {
     panel.classList.remove('hidden');
     info_asiento_modo = modo;
 
-    // Listeners de botones (dentro del panel).
+    // Listeners de botones
     panel.querySelectorAll('.btn-reservar-asiento').forEach(btn => {
-        btn.addEventListener('click', () => reservar_asiento_equipo(btn.dataset.fila, btn.dataset.columna));
+        btn.addEventListener('click', () => abrir_modal_reservar_asiento(btn.dataset.fila, btn.dataset.columna));
+    });
+    panel.querySelectorAll('.btn-liberar-seleccion').forEach(btn => {
+        btn.addEventListener('click', () => deseleccionar_asiento_pasaje(btn.dataset.fila, btn.dataset.columna));
+    });
+    panel.querySelectorAll('.btn-asignar-pasajero').forEach(btn => {
+        btn.addEventListener('click', () => abrir_modal_asignar_pasajero(btn.dataset.fila, btn.dataset.columna));
     });
     panel.querySelectorAll('.btn-liberar-reserva').forEach(btn => {
         btn.addEventListener('click', () => liberar_reserva_equipo(btn.dataset.fila, btn.dataset.columna));
     });
+    panel.querySelectorAll('.btn-ver-pasaje-asiento').forEach(btn => {
+        btn.addEventListener('click', () => ver_pasaje_asiento(btn.dataset.fila, btn.dataset.columna));
+    });
+    panel.querySelectorAll('.btn-ver-compra-asiento').forEach(btn => {
+        btn.addEventListener('click', () => ver_compra_asiento(btn.dataset.ventaId));
+    });
 }
 
-/**
- * Refresca el panel si está mostrando la grilla de propios.
- * Se llama después de cada operación y en cada sync de asientos.
- * Si el panel está en modo 'simple' (mostrando un asiento ajeno/libre),
- * no lo pisa.
- */
 function refrescar_info_asientos_propios(forzar = false) {
-    // El candado solo aplica a los refrescos automáticos (sync periódico).
-    // Cuando el llamador es una operación en curso y pide refresco forzado,
-    // hay que dejarlo pasar: es la propia operación la que quiere actualizar
-    // el panel con el resultado de lo que acaba de hacer.
     if (!forzar && (operacion_asiento_en_curso || deseleccion_masiva_en_curso)) return;
     if (!forzar && info_asiento_modo !== 'propios') return;
 
@@ -508,14 +493,6 @@ function refrescar_info_asientos_propios(forzar = false) {
     renderizar_tarjetas_asientos(propios, titulo, 'propios');
 }
 
-/**
- * Muestra la info de un asiento.
- *
- * - Si el asiento es propio (seleccionado/reservado por el usuario actual),
- *   muestra TODOS los asientos propios en grilla.
- * - Si el asiento es ajeno (otra terminal, vendido, reservado por otro, libre),
- *   muestra solo ese asiento.
- */
 function mostrar_info_asiento(asiento) {
     if (!asiento) return;
 
@@ -530,9 +507,307 @@ function mostrar_info_asiento(asiento) {
     }
 }
 
+/**
+ * Abre el modal de reserva de un asiento libre para dueño/admin.
+ * Incluye un checkbox para asignar los datos del pasajero en el mismo paso.
+ */
+function abrir_modal_reservar_asiento(fila, columna) {
+    const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+    if (!asiento) {
+        mostrar_aviso("Asiento no encontrado", 'error');
+        return;
+    }
+    if (asiento.estado !== 'libre') {
+        mostrar_aviso("El asiento ya no está libre", 'error');
+        actualizar_detalle_viaje_actual();
+        return;
+    }
+
+    const html = `
+        <h3>Reservar asiento ${asiento.numero}</h3>
+        <div class="field">
+            <label><input type="checkbox" id="reservar_asignar_pasajero_check"> ¿Asignar datos del pasajero ahora?</label>
+        </div>
+        <div id="reservar_form_pasajero_container" style="display:none; margin-top:15px;">
+            ${construir_html_formulario_pasajero(0, { incluir_selector_sb: false, incluir_ficha: false })}
+        </div>
+        <div class="actions" style="margin-top:15px;">
+            <button class="btn primary" id="btn_confirmar_reserva">Reservar</button>
+            <button class="btn" id="btn_cancelar_reserva">Cancelar</button>
+        </div>
+    `;
+
+    // Al volver (o al terminar la operación), reabrir el detalle del viaje
+    // con el micro activo, para no perder el contexto.
+    const on_volver = () => {
+        actualizar_detalle_viaje_actual();
+    };
+
+    abrir_modal_generico('Reservar asiento', html, on_volver);
+
+    const contenedorModal = document.getElementById('modal_generico_contenido');
+    const checkbox = contenedorModal.querySelector('#reservar_asignar_pasajero_check');
+    const contenedorPasajero = contenedorModal.querySelector('#reservar_form_pasajero_container');
+
+    // Conectar listeners una sola vez. Aunque el contenedor esté oculto,
+    // los listeners quedan activos para cuando se muestre.
+    conectar_listeners_formulario_pasajero(contenedorPasajero, 0);
+
+    checkbox.addEventListener('change', () => {
+        contenedorPasajero.style.display = checkbox.checked ? '' : 'none';
+    });
+
+    contenedorModal.querySelector('#btn_cancelar_reserva').addEventListener('click', () => {
+        if (on_volver_modal) {
+            volver_modal_generico();
+        } else {
+            cerrar_modal_generico();
+        }
+    });
+
+    contenedorModal.querySelector('#btn_confirmar_reserva').addEventListener('click', async () => {
+        let datos_pasajero = null;
+
+        if (checkbox.checked) {
+            const r = recolectar_datos_pasajero(0, { incluir_selector_sb: false, incluir_ficha: false });
+            if (!r.ok) {
+                mostrar_aviso(r.error, 'error');
+                return;
+            }
+            datos_pasajero = r.datos;
+        }
+
+        const nombre_dueno = obtener_dueno_viaje_seleccionado();
+        const params = {
+            accion: "viajes/reservar_asiento",
+            nombre_viaje: viaje_seleccionado.nombre_viaje,
+            nombre_micro: micro_seleccionado,
+            fila,
+            columna,
+            nombre_dueno
+        };
+        if (datos_pasajero) {
+            params.datos_pasajero = JSON.stringify(datos_pasajero);
+        }
+
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams(params)
+        });
+        const resultado = await respuesta.json();
+
+        if (resultado.exito) {
+            mostrar_aviso("Asiento reservado", 'exito');
+            if (on_volver_modal) {
+                volver_modal_generico();
+            } else {
+                cerrar_modal_generico();
+            }
+        } else {
+            mostrar_aviso(resultado.error || "No se pudo reservar", 'error');
+        }
+    });
+}
+/**
+ * Abre el modal de asignación de pasajero a un asiento reservado sin pasajero.
+ */
+function abrir_modal_asignar_pasajero(fila, columna) {
+    const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+    if (!asiento) {
+        mostrar_aviso("Asiento no encontrado", 'error');
+        return;
+    }
+    if (asiento.estado !== 'reservado') {
+        mostrar_aviso("El asiento ya no está reservado", 'error');
+        actualizar_detalle_viaje_actual();
+        return;
+    }
+    if (asiento.tiene_pasajero) {
+        mostrar_aviso("El asiento ya tiene un pasajero asignado", 'error');
+        return;
+    }
+
+    const html = `
+        <h3>Asignar pasajero al asiento ${asiento.numero}</h3>
+        ${construir_html_formulario_pasajero(0, { incluir_selector_sb: false, incluir_ficha: false })}
+        <div class="actions" style="margin-top:15px;">
+            <button class="btn primary" id="btn_confirmar_asignar">Asignar</button>
+            <button class="btn" id="btn_cancelar_asignar">Cancelar</button>
+        </div>
+    `;
+
+    abrir_modal_generico('Asignar pasajero', html);
+
+    const contenedorModal = document.getElementById('modal_generico_contenido');
+    conectar_listeners_formulario_pasajero(contenedorModal, 0);
+
+    contenedorModal.querySelector('#btn_cancelar_asignar').addEventListener('click', () => {
+        cerrar_modal_generico();
+    });
+
+    contenedorModal.querySelector('#btn_confirmar_asignar').addEventListener('click', async () => {
+        const r = recolectar_datos_pasajero(0, { incluir_selector_sb: false, incluir_ficha: false });
+        if (!r.ok) {
+            mostrar_aviso(r.error, 'error');
+            return;
+        }
+
+        const nombre_dueno = obtener_dueno_viaje_seleccionado();
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/asignar_pasajero_reserva",
+                nombre_viaje: viaje_seleccionado.nombre_viaje,
+                nombre_micro: micro_seleccionado,
+                fila,
+                columna,
+                nombre_dueno,
+                datos_pasajero: JSON.stringify(r.datos)
+            })
+        });
+        const resultado = await respuesta.json();
+
+        if (resultado.exito) {
+            mostrar_aviso("Pasajero asignado", 'exito');
+            cerrar_modal_generico();
+            await solicitar_estado_asientos();
+            refrescar_info_asientos_propios(true);
+        } else {
+            mostrar_aviso(resultado.error || "No se pudo asignar", 'error');
+        }
+    });
+}
+
+/**
+ * Muestra el modal con los datos del pasajero de un asiento (reservado con
+ * pasajero o vendido). No muestra ficha de salud ni opción de imprimir.
+ */
+function ver_pasaje_asiento(fila, columna) {
+    const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+    if (!asiento) {
+        mostrar_aviso("Asiento no encontrado", 'error');
+        return;
+    }
+    if (!asiento.tiene_pasajero || !asiento.pasajero) {
+        mostrar_aviso("Este asiento no tiene pasajero", 'error');
+        return;
+    }
+
+    const p = asiento.pasajero;
+    const nombre = p.nombre_completo || '';
+    const dni_visible = p.dni_visible || normalizar_dni_js(p.dni || '');
+    const celular = p.celular || '';
+    const celular_emergencia = p.celular_emergencia || '';
+    const email = p.email || '';
+    const fecha_nacimiento = p.fecha_nacimiento_visible || p.fecha_nacimiento || '';
+    const direccion = p.direccion || '';
+    const localidad = p.localidad || '';
+
+    let html = `<h3>Pasaje del asiento ${asiento.numero}</h3>`;
+    html += `<div class="seccion">`;
+    html += `<h4>Datos del pasajero</h4>`;
+    if (nombre) html += `<div class="detail-line"><span>Nombre:</span><strong>${nombre}</strong></div>`;
+    if (dni_visible) html += `<div class="detail-line"><span>DNI:</span><strong>${dni_visible}</strong></div>`;
+    if (celular) html += `<div class="detail-line"><span>Celular:</span><strong>${celular}</strong></div>`;
+    if (celular_emergencia) html += `<div class="detail-line"><span>Celular de emergencia:</span><strong>${celular_emergencia}</strong></div>`;
+    if (email) html += `<div class="detail-line"><span>Email:</span><strong>${email}</strong></div>`;
+    if (fecha_nacimiento) html += `<div class="detail-line"><span>Fecha de nacimiento:</span><strong>${fecha_nacimiento}</strong></div>`;
+    if (direccion || localidad) {
+        const dir = [direccion, localidad].filter(v => v).join(', ');
+        html += `<div class="detail-line"><span>Dirección:</span><strong>${dir}</strong></div>`;
+    }
+    html += `</div>`;
+
+    // El botón de imprimir aparece siempre que haya pasajero. Según si hay
+    // venta asociada o no, la URL cambia:
+    //  - Con venta: usa el flujo de impresión de venta (con filtro por DNI).
+    //  - Sin venta (reserva del equipo): usa el flujo de impresión de reserva,
+    //    que muestra "EQUIPO" en lugar del código de venta.
+    const nv = viaje_seleccionado ? viaje_seleccionado.nombre_viaje : '';
+    const nm = micro_seleccionado || '';
+    const nd = obtener_dueno_viaje_seleccionado();
+    if (asiento.venta_id) {
+        html += `<div class="actions" style="margin-top:15px;">
+            <button class="btn primary" id="btn_imprimir_pasaje_asiento" data-modo="venta" data-venta-id="${asiento.venta_id}" data-dni="${p.dni || ''}">Imprimir pasaje</button>
+            <button class="btn" id="btn_cerrar_ver_pasaje">Volver</button>
+        </div>`;
+    } else {
+        html += `<div class="actions" style="margin-top:15px;">
+            <button class="btn primary" id="btn_imprimir_pasaje_asiento" data-modo="reserva" data-dueno="${nd}" data-viaje="${nv}" data-micro="${nm}" data-fila="${fila}" data-columna="${columna}">Imprimir pasaje</button>
+            <button class="btn" id="btn_cerrar_ver_pasaje">Volver</button>
+        </div>`;
+    }
+
+    const on_volver = () => {
+        actualizar_detalle_viaje_actual();
+    };
+
+    abrir_modal_generico('Ver pasaje', html, on_volver);
+
+    const btnImprimir = document.getElementById('btn_imprimir_pasaje_asiento');
+    if (btnImprimir) {
+        btnImprimir.addEventListener('click', function() {
+            const modo = this.dataset.modo;
+            if (modo === 'venta') {
+                const id = this.dataset.ventaId;
+                const dni = this.dataset.dni;
+                window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id}&dni=${dni}`, '_blank');
+            } else {
+                const nd = this.dataset.dueno;
+                const nv = this.dataset.viaje;
+                const nm = this.dataset.micro;
+                const fila = this.dataset.fila;
+                const columna = this.dataset.columna;
+                window.open(
+                    `index.php?imprimir=1&tipo=pasaje_reserva`
+                    + `&dueno=${encodeURIComponent(nd)}`
+                    + `&viaje=${encodeURIComponent(nv)}`
+                    + `&micro=${encodeURIComponent(nm)}`
+                    + `&fila=${fila}&columna=${columna}`,
+                    '_blank'
+                );
+            }
+        });
+    }
+
+    document.getElementById('btn_cerrar_ver_pasaje').addEventListener('click', () => {
+        if (on_volver_modal) {
+            volver_modal_generico();
+        } else {
+            cerrar_modal_generico();
+        }
+    });
+}
+
+/**
+ * Placeholder de "Ver compra". Se implementa en una versión futura.
+ */
+function ver_compra_asiento(venta_id) {
+    mostrar_aviso('Función en desarrollo: ' + venta_id, 'info');
+}
+
+/**
+ * Liberar reserva de un asiento. Si tiene pasajero asignado, avisa que
+ * se va a perder la asignación antes de continuar.
+ */
 async function liberar_reserva_equipo(fila, columna) {
     if (!micro_seleccionado || !viaje_seleccionado) return;
     if (operacion_asiento_en_curso) return;
+
+    const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+    if (!asiento) {
+        mostrar_aviso("Asiento no encontrado", 'error');
+        return;
+    }
+
+    let mensaje = `¿Liberar la reserva del asiento ${asiento.numero}?`;
+    if (asiento.tiene_pasajero) {
+        mensaje = `El asiento ${asiento.numero} tiene un pasajero asignado. Si liberás la reserva, también se pierde la asignación del pasajero.\n\n¿Continuar?`;
+    }
+    if (!confirm(mensaje)) return;
+
     operacion_asiento_en_curso = true;
     const nombre_dueno = obtener_nombre_dueno_actual();
     const nombre_micro = micro_seleccionado;
@@ -554,10 +829,12 @@ async function liberar_reserva_equipo(fila, columna) {
         const resultado = await respuesta.json();
         if (resultado.exito) {
             mostrar_aviso("Reserva liberada correctamente", 'exito');
-            const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
-            if (asiento) {
-                asiento.estado = 'libre';
-                asiento.reservado_por = null;
+            const asientoLocal = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            if (asientoLocal) {
+                asientoLocal.estado = 'libre';
+                asientoLocal.reservado_por = null;
+                asientoLocal.pasajero = null;
+                asientoLocal.tiene_pasajero = false;
             }
             actualizar_colores_asientos(estados_asientos_actuales);
             refrescar_info_asientos_propios(true);
@@ -577,6 +854,11 @@ async function liberar_reserva_equipo(fila, columna) {
     }
 }
 
+/**
+ * Reserva un asiento para el equipo (dueño). Sin pasajero asociado. Se
+ * mantiene por compatibilidad interna por si se usa programáticamente.
+ * El flujo interactivo ahora pasa por abrir_modal_reservar_asiento.
+ */
 async function reservar_asiento_equipo(fila, columna) {
     if (!micro_seleccionado || !viaje_seleccionado) return;
     if (operacion_asiento_en_curso) return;
@@ -684,10 +966,6 @@ function renderizar_pasaje_micro(micro) {
             contenedorCroquis.appendChild(busDiv);
         });
 
-        // Se asigna con .onclick (no addEventListener) para que cada
-        // rerenderizado del micro REEMPLACE el handler anterior. Con
-        // addEventListener se acumulaban listeners sobre el mismo
-        // contenedor y un solo click disparaba el handler varias veces.
         contenedorCroquis.onclick = async (event) => {
             if (venta_form_abierto || operacion_asiento_en_curso) return;
             const seat = event.target.closest('.seat');
@@ -699,13 +977,6 @@ function renderizar_pasaje_micro(micro) {
 
             const es_terminal = usuario_actual.nivel === 'terminal';
 
-            // Terminal: si tiene asientos propios y toca uno ajeno
-            // (reservado por el equipo, seleccionado por otra terminal,
-            // vendido o no disponible), primero suelta los propios.
-            // Un asiento libre no dispara la limpieza: se agrega a la
-            // selección actual.
-            // Dueño/admin: no se limpia nada. Los reservados se liberan
-            // solo uno a uno desde la tarjeta del asiento.
             if (es_terminal) {
                 const es_propio_clic = es_asiento_propio(asiento);
                 const es_libre_clic = asiento.estado === 'libre';
@@ -750,7 +1021,6 @@ function renderizar_pasaje_micro(micro) {
 
 /**
  * Manejador del botón "Reiniciar selección" del panel de pasaje.
- * Pide confirmación, deselecciona todos los propios y actualiza la UI.
  */
 async function reiniciar_seleccion_propia() {
     if (operacion_asiento_en_curso) return;
@@ -771,7 +1041,6 @@ async function reiniciar_seleccion_propia() {
 
     try {
         await deseleccionar_todos_los_propios();
-        // Vaciar el panel de info (ya no hay propios).
         const panel = $("#info_asiento_viaje");
         if (panel) {
             panel.innerHTML = '';
@@ -790,9 +1059,19 @@ async function reiniciar_seleccion_propia() {
     }
 }
 
-// Listeners globales de actividad del usuario. Se registran una sola vez
-// al cargar el archivo. Cualquier movimiento/click/tecla reanuda el polling
-// si estaba pausado por inactividad.
+/**
+ * Normaliza un DNI dejando solo dígitos. Respaldo por si el backend no envía
+ * dni_visible. Se define también en pasajeros.js; como ambos archivos cargan
+ * siempre juntos, el nombre de la función debe coincidir. Si ya está definida,
+ * no se redefine.
+ */
+if (typeof normalizar_dni_js !== 'function') {
+    window.normalizar_dni_js = function(dni) {
+        return String(dni || '').replace(/\D+/g, '');
+    };
+}
+
+// Listeners globales de actividad
 document.addEventListener('mousemove', registrar_actividad_usuario);
 document.addEventListener('keydown', registrar_actividad_usuario);
 document.addEventListener('click', registrar_actividad_usuario);

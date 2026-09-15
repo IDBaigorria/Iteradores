@@ -622,10 +622,10 @@ $("#boton_reiniciar_asientos").addEventListener("click", () => {
 });
 
 // Botón "Reiniciar numeración de asientos": renumera los asientos existentes
-$("#boton_reiniciar_numeracion").addEventListener("click", () => {
+/*$("#boton_reiniciar_numeracion").addEventListener("click", () => {
     reiniciar_numeracion_asientos();
     mostrar_aviso("Numeración reiniciada", 'info');
-});
+});*/
 
 // Subir foto
 $("#boton_subir_foto").addEventListener("click", () => {

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.34
+ * @version   1.5piloto.38
  */
 
 function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = ''): void {
@@ -27,7 +27,117 @@ function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = 
     }
 }
 
-function imprimir_pasajes(array $venta, string $dni_filtro = ''): void {
+/**
+ * Imprime el pasaje de un asiento reservado para el equipo (sin venta).
+ *
+ * A partir de v1.5piloto.38. Arma un array compatible con imprimir_pasajes
+ * a partir del grafo (viaje, micro, asiento, pasajero) y lo imprime con el
+ * flag es_reserva = true para que en lugar del código de venta aparezca
+ * el bloque "EQUIPO".
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $nombre_micro
+ * @param string $fila
+ * @param string $columna
+ */
+function imprimir_pasaje_reserva(string $nombre_dueno, string $nombre_viaje, string $nombre_micro, string $fila, string $columna): void {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) { echo "Dueño no encontrado"; return; }
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) { echo "Viaje no encontrado"; return; }
+
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) { echo "No hay micros en el viaje"; return; }
+
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) { echo "Micro no encontrado"; return; }
+
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) { echo "No existe copia del vehículo"; return; }
+
+    // Buscar el asiento por fila/columna
+    $nodo_asiento = null;
+    $nodo_asientos = $nodo_copia->adyacente('asientos');
+    if ($nodo_asientos) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$piso) continue;
+            $cabeza = $piso->adyacente('asientos');
+            if (!$cabeza) continue;
+            $actual = $cabeza->adyacente('primer');
+            while ($actual && $actual->id() !== $cabeza->id()) {
+                $f = $actual->adyacente('fila');
+                $c = $actual->adyacente('columna');
+                if ($f && $c && $f->dato() === $fila && $c->dato() === $columna) {
+                    $nodo_asiento = $actual;
+                    break 2;
+                }
+                $actual = $actual->adyacente('siguiente');
+            }
+        }
+    }
+
+    if (!$nodo_asiento) { echo "Asiento no encontrado"; return; }
+
+    $estado = $nodo_asiento->adyacente('estado');
+    if (!$estado || $estado->dato() !== 'reservado') {
+        echo "El asiento no está reservado para el equipo";
+        return;
+    }
+
+    $nodo_pasajero = $nodo_asiento->adyacente('pasajero');
+    if (!$nodo_pasajero) {
+        echo "El asiento reservado no tiene pasajero asignado";
+        return;
+    }
+
+    // Datos del pasajero
+    $p_dni = $nodo_pasajero->dato();
+    $p_apellido = $nodo_pasajero->adyacente('apellido') ? $nodo_pasajero->adyacente('apellido')->dato() : '';
+    $p_nombres = $nodo_pasajero->adyacente('nombres') ? $nodo_pasajero->adyacente('nombres')->dato() : '';
+
+    // Punto de subida/bajada
+    $nodo_punto_sb = $nodo_asiento->adyacente('punto_subida_bajada');
+    $nodo_hora_sb = $nodo_asiento->adyacente('hora_subida_bajada');
+
+    // Datos del viaje
+    $nombre_viaje_visible = $nodo_viaje->adyacente('nombre') ? $nodo_viaje->adyacente('nombre')->dato() : $nombre_viaje;
+    $fecha_viaje_iso = $nodo_viaje->adyacente('fecha') ? $nodo_viaje->adyacente('fecha')->dato() : '';
+    $hora_viaje = $nodo_viaje->adyacente('hora') ? $nodo_viaje->adyacente('hora')->dato() : '';
+    $origen = $nodo_viaje->adyacente('origen') ? $nodo_viaje->adyacente('origen')->dato() : '';
+    $destino = $nodo_viaje->adyacente('destino') ? $nodo_viaje->adyacente('destino')->dato() : '';
+
+    // Datos del micro
+    $micro_nombre_visible = $nodo_copia->adyacente('nombre') ? $nodo_copia->adyacente('nombre')->dato() : '';
+
+    // Armar el array compatible con imprimir_pasajes
+    $venta_simulada = [
+        'nombre_viaje_visible' => $nombre_viaje_visible,
+        'fecha' => formatear_fecha_visible($fecha_viaje_iso),
+        'hora' => $hora_viaje,
+        'origen' => $origen,
+        'destino' => $destino,
+        'micro_nombre_visible' => $micro_nombre_visible,
+        'id_venta' => '',
+        'asientos' => [
+            [
+                'numero' => $nodo_asiento->dato(),
+                'pasajero' => [
+                    'dni' => $p_dni,
+                    'nombre_completo' => formatear_nombre_completo($p_apellido, $p_nombres),
+                ],
+                'punto_subida_bajada' => $nodo_punto_sb ? $nodo_punto_sb->dato() : null,
+                'hora_subida_bajada' => $nodo_hora_sb ? $nodo_hora_sb->dato() : null,
+            ]
+        ]
+    ];
+
+    imprimir_pasajes($venta_simulada, '', true);
+}
+
+function imprimir_pasajes(array $venta, string $dni_filtro = '', bool $es_reserva = false): void {
     // Datos generales
     $nombre_viaje = $venta['nombre_viaje_visible'] ?? $venta['viaje'] ?? '';
     $fecha = $venta['fecha'] ?? '';
@@ -116,6 +226,19 @@ function imprimir_pasajes(array $venta, string $dni_filtro = ''): void {
             margin-top: 4px;
             border: 1px solid black;
         }
+        .equipo-bloque {
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            color: black;
+            background: #f0f0f0;
+            border-radius: 4px;
+            padding: 8px;
+            margin-top: 6px;
+            margin-bottom: 6px;
+            border: 2px solid black;
+            letter-spacing: 3px;
+        }
         .frase-final {
             text-align: center;
             margin-top: 10px;
@@ -169,7 +292,13 @@ function imprimir_pasajes(array $venta, string $dni_filtro = ''): void {
         echo '<div class="campo"><strong>Fecha:</strong> <span>' . htmlspecialchars($fecha) . '</span> <strong>Hora:</strong> <span>' . htmlspecialchars($hora) . '</span></div>';
         echo '<div class="campo"><strong>Origen:</strong> <span>' . htmlspecialchars($origen) . '</span> <strong>Destino:</strong> <span>' . htmlspecialchars($destino) . '</span></div>';
         echo '<div class="campo"><strong>Micro:</strong> <span>' . htmlspecialchars($micro_nombre_visible) . '</span></div>';
-        echo '<div class="campo"><strong>Cod. de venta:</strong> <span>' . htmlspecialchars($codigo_venta) . '</span></div>';
+
+        // Cod. de venta para pasajes vendidos; EQUIPO para reservas del equipo.
+        if ($es_reserva) {
+            echo '<div class="equipo-bloque">EQUIPO</div>';
+        } else {
+            echo '<div class="campo"><strong>Cod. de venta:</strong> <span>' . htmlspecialchars($codigo_venta) . '</span></div>';
+        }
 
         echo '<div class="asiento">Asiento ' . htmlspecialchars($asiento['numero']) . '</div>';
 

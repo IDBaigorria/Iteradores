@@ -332,3 +332,44 @@
     font-size: 16px;
     line-height: 1;
 }
+/* ===== v1.5piloto.38: tarjetas de asiento enriquecidas y modales de asignación ===== */
+
+/* Los botones de la tarjeta de asiento se acomodan en varias líneas si
+   hay muchos (Reservar + Asignar + Ver pasaje + Ver compra). */
+.asiento-card-acciones {
+    margin-top: 8px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.asiento-card-acciones .btn {
+    font-size: 12px;
+    padding: 5px 10px;
+}
+
+/* Checkbox "¿Asignar datos del pasajero ahora?" en el modal de reserva.
+   Lo alineamos con el label a la izquierda y le damos un poco de aire. */
+#reservar_asignar_pasajero_check {
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+/* Contenedor del formulario de pasajero dentro del modal de reserva */
+#reservar_form_pasajero_container {
+    padding: 10px 0;
+    border-top: 1px dashed var(--border);
+}
+
+/* El formulario de pasajero dentro del modal de asignación también necesita
+   separación con los botones de acción */
+#modal_generico_contenido .asiento-form-bloque {
+    padding: 10px 0;
+}
+
+/* El modal de "Ver pasaje" usa .seccion y .detail-line que ya existen.
+   Le damos un poco más de aire al título para que se vea claro */
+#modal_generico_contenido .seccion h4 {
+    margin-top: 0;
+    margin-bottom: 8px;
+}

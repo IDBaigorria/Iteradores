@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.34)
+ * ## Estructura de nodos actual (v1.5piloto.38)
  *
  * ### Nodos raíz especiales
  *
@@ -172,9 +172,27 @@
  *   | `estado`           | Nodo con dato string: `"libre"`, `"seleccionado"`, `"reservado"`, `"vendido"` o `"no disponible"`. |
  *   | `seleccionado_por` | Enlace directo al **nodo usuario** de la terminal que seleccionó el asiento. Solo existe si `estado` es `"seleccionado"`. |
  *   | `reservado_por`    | Enlace directo al **nodo usuario** del dueño que reservó el asiento para el equipo. Solo existe si `estado` es `"reservado"`. |
- *   | `pasajero`         | Enlace directo al **nodo pasajero** asociado (si `estado` es `"vendido"` o `"no disponible"`). |
+ *   | `pasajero`         | Enlace directo al **nodo pasajero** asociado. Puede estar presente en `"vendido"`, `"no disponible"`, o en un asiento `"reservado"` con pasajero ya asignado. |
  *   | `venta`            | Enlace directo al nodo **venta persistente** (si `estado` es `"vendido"`). |
+ * 
+ * **Nota (asignación de pasajeros a reservas):** A partir de v1.5piloto.38, el
+ * enlace `pasajero` puede existir también en un asiento en estado `"reservado"`.
+ * Esto permite que un dueño/admin reserve un asiento para el equipo y, o bien
+ * asigne los datos del pasajero en el mismo paso (al reservar, con el checkbox
+ * "¿Asignar datos del pasajero ahora?"), o bien asigne el pasajero más adelante
+ * con el botón "Asignar pasajero" que aparece en la tarjeta del asiento mientras
+ * siga reservado y sin pasajero.
  *
+ * El estado `"reservado"` es el mismo en ambos casos (con o sin pasajero): no se
+ * agrega un estado nuevo. La diferencia entre "reservado sin pasajero" y
+ * "reservado con pasajero" se detecta por la presencia del enlace `pasajero`.
+ *
+ * Al liberar la reserva, se eliminan tanto `reservado_por` como `pasajero`, para
+ * que el asiento quede limpio.
+ *
+ * Un mismo DNI no puede estar asignado a dos asientos del mismo viaje. El
+ * backend lo valida con la función `_dni_asignado_en_viaje`.
+ * 
  * ### Nodo Viaje
  *
  * - Dato del nodo: `nombre_viaje` (string, identificador único dentro del dueño).
@@ -433,7 +451,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.34
+ * @version   1.5piloto.38
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

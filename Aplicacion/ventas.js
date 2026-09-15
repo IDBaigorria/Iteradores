@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.36
+ * @version 1.5piloto.38
  */
 
 let ventas_actuales = [];
@@ -313,6 +313,307 @@ function actualizar_visibilidad_cuotas() {
     }
 }
 
+/**
+ * Construye el HTML de los campos de un formulario de pasajero.
+ *
+ * Reutilizable desde el flujo de venta y desde el flujo de asignación
+ * de pasajero a una reserva. Devuelve solo los campos (form-grid,
+ * selector de subida/bajada y bloque de ficha médica), sin envoltorio
+ * ni título. El llamador decide cómo envolverlo.
+ *
+ * @param {number} index Índice del pasajero (para los IDs únicos).
+ * @param {object} opciones Opciones:
+ *   - incluir_selector_sb: bool, incluir el select de punto de subida/bajada.
+ *   - incluir_ficha: bool, incluir el bloque de ficha médica.
+ * @returns {string} HTML del formulario.
+ */
+function construir_html_formulario_pasajero(index, opciones = {}) {
+    const incluir_selector_sb = opciones.incluir_selector_sb === true;
+    const incluir_ficha = opciones.incluir_ficha === true;
+
+    let html = `
+        <div class="form-grid">
+            <div class="field"><label>DNI *</label><input id="pasajero_dni_${index}" value=""></div>
+            <div class="field"><label>Apellido *</label><input id="pasajero_apellido_${index}" value=""></div>
+            <div class="field full"><label>Nombres *</label><input id="pasajero_nombres_${index}" value=""></div>
+            <div class="field"><label>Email</label><input id="pasajero_email_${index}" value=""></div>
+            <div class="field"><label>Celular *</label><input id="pasajero_celular_${index}" value=""></div>
+            <div class="field"><label>Celular Emergencia *</label><input id="pasajero_emergencia_${index}" value=""></div>
+            <div class="field"><label>Fecha de nacimiento *</label><input type="date" id="pasajero_fecha_nacimiento_${index}" value=""></div>
+            <div class="field"><label>Dirección *</label><input id="pasajero_direccion_${index}" value=""></div>
+            <div class="field"><label>Localidad *</label><input id="pasajero_localidad_${index}" value=""></div>
+        </div>
+    `;
+
+    // Selector de punto de subida/bajada (solo para terminales autorizadas
+    // con la opción configurada). Muestra dos opciones: la parada
+    // predeterminada (preseleccionada, con su hora estimada si existe) y
+    // el origen del viaje.
+    if (incluir_selector_sb && window.mostrar_selector_subida_bajada) {
+        const predeterminado = window.punto_subida_bajada_predeterminado || '';
+        const origen = window.origen_viaje || '';
+
+        // Resolver la hora estimada de la parada predeterminada
+        let hora_predeterminada = '';
+        const paradas_viaje = (viaje_seleccionado && Array.isArray(viaje_seleccionado.paradas_intermedias))
+            ? viaje_seleccionado.paradas_intermedias
+            : [];
+        for (const p of paradas_viaje) {
+            const nombre_p = (typeof p === 'string') ? p : (p.nombre || '');
+            if (nombre_p === predeterminado) {
+                hora_predeterminada = (typeof p === 'string') ? '' : (p.hora_estimada || '');
+                break;
+            }
+        }
+
+        if (predeterminado === origen) {
+            // Caso borde: la parada predeterminada coincide con el origen.
+            // Se muestra como texto fijo, sin select.
+            html += `
+                <div class="field" style="margin-top:10px;">
+                    <label>Sube/baja en:</label>
+                    <div class="small muted">${predeterminado}</div>
+                </div>
+            `;
+        } else {
+            // Parada predeterminada primero (preseleccionada), origen después.
+            const texto_predeterminado = hora_predeterminada
+                ? `${predeterminado} (${hora_predeterminada})`
+                : `${predeterminado} (a confirmar)`;
+            const opciones_select = `
+                <option value="${predeterminado}" selected>${texto_predeterminado}</option>
+                <option value="${origen}">${origen}</option>
+            `;
+            html += `
+                <div class="field" style="margin-top:10px;">
+                    <label>Sube/baja en:</label>
+                    <select id="pasajero_punto_subida_bajada_${index}">${opciones_select}</select>
+                </div>
+            `;
+        }
+    }
+
+    // Bloque de ficha médica (opcional)
+    if (incluir_ficha) {
+        html += `
+            <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
+                <label style="margin:0;">¿Padece algún problema de salud?</label>
+                <button type="button" class="btn" id="btn_ficha_salud_${index}" data-index="${index}">Anexar ficha de salud</button>
+            </div>
+            <div id="ficha_salud_${index}" style="display:none; margin-top:10px;">
+                <h5>Datos de salud</h5>
+                <div class="seccion-salud">
+                    <label>Grupo sanguíneo</label>
+                    <select id="pasajero_grupo_sanguineo_${index}">
+                        <option value="">Seleccione...</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="Desconocido" selected>Desconocido</option>
+                    </select>
+                </div>
+                <div class="seccion-salud">
+                    <label>Obra social o prepaga (incluya numero de emergencias si corresponde)</label>
+                    <input type="text" id="pasajero_obra_social_${index}" value="">
+                </div>
+                <div class="seccion-salud">
+                    <label>¿Tiene algún tipo de alergia?</label>
+                    <input type="checkbox" class="check_alergia" data-index="${index}">
+                    <input type="text" id="pasajero_alergias_${index}" placeholder="Detalle" style="display:none;">
+                </div>
+                <div class="seccion-salud">
+                    <label>¿Padece alguna enfermedad crónica o tiene secuelas de alguna que ha tenido?</label>
+                    <input type="checkbox" class="check_enfermedad" data-index="${index}">
+                    <input type="text" id="pasajero_enfermedades_${index}" placeholder="Detalle" style="display:none;">
+                </div>
+                <div class="seccion-salud">
+                    <label>¿Está tomando algún medicamento? ¿Cual/es? ¿En qué horarios?</label>
+                    <input type="checkbox" class="check_medicamento" data-index="${index}">
+                    <input type="text" id="pasajero_medicamentos_${index}" placeholder="Detalle" style="display:none;">
+                </div>
+                <div class="seccion-salud">
+                    <label>¿Posee algún impedimento físico?</label>
+                    <input type="checkbox" class="check_impedimento" data-index="${index}">
+                    <input type="text" id="pasajero_impedimentos_${index}" placeholder="Detalle" style="display:none;">
+                </div>
+                <div class="seccion-salud">
+                    <label>¿Sigue algún regimen especial de comida?</label>
+                    <input type="checkbox" class="check_regimen_comida" data-index="${index}">
+                    <input type="text" id="pasajero_regimenes_comida_${index}" placeholder="Detalle" style="display:none;">
+                </div>
+                <div class="seccion-salud">
+                    <label>Algún otro dato que considere importante:</label>
+                    <textarea id="pasajero_observaciones_${index}" rows="2"></textarea>
+                </div>
+            </div>
+        `;
+    }
+
+    return html;
+}
+
+/**
+ * Conecta los listeners internos de un formulario de pasajero (ficha médica).
+ * Se debe llamar una vez que el HTML ya está insertado en el DOM.
+ *
+ * @param {HTMLElement} contenedor El elemento que contiene el formulario del pasajero.
+ * @param {number} index Índice del pasajero.
+ */
+function conectar_listeners_formulario_pasajero(contenedor, index) {
+    // Toggle de la ficha médica
+    const btnFicha = contenedor.querySelector(`#btn_ficha_salud_${index}`);
+    if (btnFicha) {
+        btnFicha.addEventListener('click', () => {
+            const contenedorFicha = contenedor.querySelector(`#ficha_salud_${index}`);
+            if (contenedorFicha) {
+                contenedorFicha.style.display = contenedorFicha.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+    }
+
+    // Checkboxes de salud: mostrar/ocultar input asociado
+    const pares = [
+        ['check_alergia', 'alergias'],
+        ['check_enfermedad', 'enfermedades'],
+        ['check_medicamento', 'medicamentos'],
+        ['check_impedimento', 'impedimentos'],
+        ['check_regimen_comida', 'regimenes_comida']
+    ];
+    pares.forEach(([checkClass, campo]) => {
+        contenedor.querySelectorAll(`.${checkClass}`).forEach(check => {
+            check.addEventListener('change', function() {
+                const input = contenedor.querySelector(`#pasajero_${campo}_${index}`);
+                if (input) {
+                    input.style.display = this.checked ? '' : 'none';
+                    if (!this.checked) input.value = '';
+                }
+            });
+        });
+    });
+
+    // Listener para marcar fecha completada al cambiar
+    const fechaInput = contenedor.querySelector(`#pasajero_fecha_nacimiento_${index}`);
+    if (fechaInput) {
+        fechaInput.addEventListener('change', function() {
+            this.dataset.completado = 'true';
+        });
+    }
+}
+
+/**
+ * Recopila y valida los datos de un pasajero a partir del formulario en el DOM.
+ *
+ * Devuelve un objeto { ok, error, datos }:
+ *  - ok: true si todo está válido.
+ *  - error: mensaje de error si ok es false.
+ *  - datos: objeto con los campos del pasajero listos para enviar al backend.
+ *
+ * @param {number} index Índice del pasajero.
+ * @param {object} opciones Opciones:
+ *   - incluir_selector_sb: bool, leer el select de punto de subida/bajada.
+ *   - incluir_ficha: bool, leer el bloque de ficha médica.
+ * @returns {object}
+ */
+function recolectar_datos_pasajero(index, opciones = {}) {
+    const incluir_selector_sb = opciones.incluir_selector_sb === true;
+    const incluir_ficha = opciones.incluir_ficha === true;
+    const num_pas = index + 1;
+
+    const get_val = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value.trim() : '';
+    };
+
+    const dni = get_val(`pasajero_dni_${index}`);
+    const apellido = get_val(`pasajero_apellido_${index}`);
+    const nombres = get_val(`pasajero_nombres_${index}`);
+    const email = get_val(`pasajero_email_${index}`);
+    const celular = get_val(`pasajero_celular_${index}`);
+    const celular_emergencia = get_val(`pasajero_emergencia_${index}`);
+    const direccion = get_val(`pasajero_direccion_${index}`);
+    const localidad = get_val(`pasajero_localidad_${index}`);
+
+    const fechaInput = document.getElementById(`pasajero_fecha_nacimiento_${index}`);
+    let fecha_nacimiento = '';
+    if (fechaInput) {
+        fecha_nacimiento = fechaInput.value;
+        if (!fecha_nacimiento && fechaInput.valueAsDate) {
+            const d = fechaInput.valueAsDate;
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            fecha_nacimiento = `${year}-${month}-${day}`;
+        }
+    }
+
+    let err;
+    err = validar_dni_js(dni);
+    if (err) return { ok: false, error: `Pasajero ${num_pas} - ${err}`, datos: null };
+    err = validar_nombre_o_apellido_js(apellido);
+    if (err) return { ok: false, error: `Pasajero ${num_pas} - Apellido: ${err}`, datos: null };
+    err = validar_nombre_o_apellido_js(nombres);
+    if (err) return { ok: false, error: `Pasajero ${num_pas} - Nombres: ${err}`, datos: null };
+    err = validar_email_js(email);
+    if (err) return { ok: false, error: `Pasajero ${num_pas} - ${err}`, datos: null };
+    err = validar_telefono_js(celular);
+    if (err) return { ok: false, error: `Pasajero ${num_pas} - Celular: ${err}`, datos: null };
+    err = validar_telefono_js(celular_emergencia);
+    if (err) return { ok: false, error: `Pasajero ${num_pas} - Celular de emergencia: ${err}`, datos: null };
+    err = validar_fecha_nacimiento_js(fecha_nacimiento);
+    if (err) return { ok: false, error: `Pasajero ${num_pas} - ${err}`, datos: null };
+    err = validar_localidad_js(localidad);
+    if (err) return { ok: false, error: `Pasajero ${num_pas} - Localidad: ${err}`, datos: null };
+    err = validar_direccion_js(direccion);
+    if (err) return { ok: false, error: `Pasajero ${num_pas} - Dirección: ${err}`, datos: null };
+
+    const datos = {
+        dni,
+        apellido,
+        nombres,
+        email,
+        celular,
+        celular_emergencia,
+        fecha_nacimiento,
+        direccion,
+        localidad
+    };
+
+    // Punto de subida/bajada (opcional)
+    if (incluir_selector_sb && window.mostrar_selector_subida_bajada) {
+        const select_sb = document.getElementById(`pasajero_punto_subida_bajada_${index}`);
+        if (select_sb) {
+            datos.punto_subida_bajada = select_sb.value;
+        } else {
+            // Caso borde: parada === origen. Se usa la parada predeterminada.
+            datos.punto_subida_bajada = window.punto_subida_bajada_predeterminado || '';
+        }
+    }
+
+    // Ficha de salud (opcional)
+    if (incluir_ficha) {
+        const fichaSaludDiv = document.getElementById(`ficha_salud_${index}`);
+        if (fichaSaludDiv) {
+            datos.salud = {
+                grupo_sanguineo: document.getElementById(`pasajero_grupo_sanguineo_${index}`)?.value || '',
+                obra_social: document.getElementById(`pasajero_obra_social_${index}`)?.value.trim() || '',
+                alergias: document.getElementById(`pasajero_alergias_${index}`)?.value.trim() || '',
+                enfermedades: document.getElementById(`pasajero_enfermedades_${index}`)?.value.trim() || '',
+                medicamentos: document.getElementById(`pasajero_medicamentos_${index}`)?.value.trim() || '',
+                impedimentos: document.getElementById(`pasajero_impedimentos_${index}`)?.value.trim() || '',
+                regimenes_comida: document.getElementById(`pasajero_regimenes_comida_${index}`)?.value.trim() || '',
+                observaciones: document.getElementById(`pasajero_observaciones_${index}`)?.value.trim() || ''
+            };
+        }
+    }
+
+    return { ok: true, error: null, datos };
+}
+
 // Generar formularios para cada pasajero (incluye nuevos campos y ficha ampliada)
 function generar_formularios_pasajeros(asientos) {
     const contenedor = $("#pasajeros_venta");
@@ -327,173 +628,16 @@ function generar_formularios_pasajeros(asientos) {
         div.className = 'panel';
         div.style.marginTop = '10px';
 
-        // Construir HTML base del pasajero.
-        // Orden: DNI, Apellido, Nombres, después el resto.
-        let html = `
-            <h5>Asiento ${asiento.numero} (F${asiento.fila}, C${asiento.columna})</h5>
-            <div class="form-grid">
-                <div class="field"><label>DNI *</label><input id="pasajero_dni_${index}" value=""></div>
-                <div class="field"><label>Apellido *</label><input id="pasajero_apellido_${index}" value=""></div>
-                <div class="field full"><label>Nombres *</label><input id="pasajero_nombres_${index}" value=""></div>                
-                <div class="field"><label>Email</label><input id="pasajero_email_${index}" value=""></div>
-                <div class="field"><label>Celular *</label><input id="pasajero_celular_${index}" value=""></div>
-                <div class="field"><label>Celular Emergencia *</label><input id="pasajero_emergencia_${index}" value=""></div>
-                <div class="field"><label>Fecha de nacimiento *</label><input type="date" id="pasajero_fecha_nacimiento_${index}" value=""></div>
-                <div class="field"><label>Dirección *</label><input id="pasajero_direccion_${index}" value=""></div>
-                <div class="field"><label>Localidad *</label><input id="pasajero_localidad_${index}" value=""></div>
-            </div>
-        `;
+        const titulo = `<h5>Asiento ${asiento.numero} (F${asiento.fila}, C${asiento.columna})</h5>`;
+        const html_campos = construir_html_formulario_pasajero(index, {
+            incluir_selector_sb: true,
+            incluir_ficha: mostrarFichaMedica
+        });
 
-        // Selector de punto de subida/bajada (solo para terminales autorizadas
-        // con la opción configurada). Muestra dos opciones: la parada
-        // predeterminada (preseleccionada, con su hora estimada si existe) y
-        // el origen del viaje.
-        if (window.mostrar_selector_subida_bajada) {
-            const predeterminado = window.punto_subida_bajada_predeterminado || '';
-            const origen = window.origen_viaje || '';
-
-            // Resolver la hora estimada de la parada predeterminada
-            let hora_predeterminada = '';
-            const paradas_viaje = (viaje_seleccionado && Array.isArray(viaje_seleccionado.paradas_intermedias))
-                ? viaje_seleccionado.paradas_intermedias
-                : [];
-            for (const p of paradas_viaje) {
-                const nombre_p = (typeof p === 'string') ? p : (p.nombre || '');
-                if (nombre_p === predeterminado) {
-                    hora_predeterminada = (typeof p === 'string') ? '' : (p.hora_estimada || '');
-                    break;
-                }
-            }
-
-            if (predeterminado === origen) {
-                // Caso borde: la parada predeterminada coincide con el origen.
-                // Se muestra como texto fijo, sin select.
-                html += `
-                    <div class="field" style="margin-top:10px;">
-                        <label>Sube/baja en:</label>
-                        <div class="small muted">${predeterminado}</div>
-                    </div>
-                `;
-            } else {
-                // Parada predeterminada primero (preseleccionada), origen después.
-                const texto_predeterminado = hora_predeterminada
-                    ? `${predeterminado} (${hora_predeterminada})`
-                    : `${predeterminado} (a confirmar)`;
-                const opciones = `
-                    <option value="${predeterminado}" selected>${texto_predeterminado}</option>
-                    <option value="${origen}">${origen}</option>
-                `;
-                html += `
-                    <div class="field" style="margin-top:10px;">
-                        <label>Sube/baja en:</label>
-                        <select id="pasajero_punto_subida_bajada_${index}">${opciones}</select>
-                    </div>
-                `;
-            }
-        }
-
-        // Agregar sección de ficha médica solo si está habilitada
-        if (mostrarFichaMedica) {
-            html += `
-                <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
-                    <label style="margin:0;">¿Padece algún problema de salud?</label>
-                    <button type="button" class="btn" id="btn_ficha_salud_${index}" data-index="${index}">Anexar ficha de salud</button>
-                </div>
-                <div id="ficha_salud_${index}" style="display:none; margin-top:10px;">
-                    <h5>Datos de salud</h5>
-                    <div class="seccion-salud">
-                        <label>Grupo sanguíneo</label>
-                        <select id="pasajero_grupo_sanguineo_${index}">
-                            <option value="">Seleccione...</option>
-                            <option value="O+">O+</option>
-                            <option value="O-">O-</option>
-                            <option value="A+">A+</option>
-                            <option value="A-">A-</option>
-                            <option value="B+">B+</option>
-                            <option value="B-">B-</option>
-                            <option value="AB+">AB+</option>
-                            <option value="AB-">AB-</option>
-                            <option value="Desconocido" selected>Desconocido</option>
-                        </select>
-                    </div>
-                    <div class="seccion-salud">
-                        <label>Obra social o prepaga (incluya numero de emergencias si corresponde)</label>
-                        <input type="text" id="pasajero_obra_social_${index}" value="">
-                    </div>
-                    <div class="seccion-salud">
-                        <label>¿Tiene algún tipo de alergia?</label>
-                        <input type="checkbox" class="check_alergia" data-index="${index}">
-                        <input type="text" id="pasajero_alergias_${index}" placeholder="Detalle" style="display:none;">
-                    </div>
-                    <div class="seccion-salud">
-                        <label>¿Padece alguna enfermedad crónica o tiene secuelas de alguna que ha tenido?</label>
-                        <input type="checkbox" class="check_enfermedad" data-index="${index}">
-                        <input type="text" id="pasajero_enfermedades_${index}" placeholder="Detalle" style="display:none;">
-                    </div>
-                    <div class="seccion-salud">
-                        <label>¿Está tomando algún medicamento? ¿Cual/es? ¿En qué horarios?</label>
-                        <input type="checkbox" class="check_medicamento" data-index="${index}">
-                        <input type="text" id="pasajero_medicamentos_${index}" placeholder="Detalle" style="display:none;">
-                    </div>
-                    <div class="seccion-salud">
-                        <label>¿Posee algún impedimento físico?</label>
-                        <input type="checkbox" class="check_impedimento" data-index="${index}">
-                        <input type="text" id="pasajero_impedimentos_${index}" placeholder="Detalle" style="display:none;">
-                    </div>
-                    <div class="seccion-salud">
-                        <label>¿Sigue algún regimen especial de comida?</label>
-                        <input type="checkbox" class="check_regimen_comida" data-index="${index}">
-                        <input type="text" id="pasajero_regimenes_comida_${index}" placeholder="Detalle" style="display:none;">
-                    </div>
-                    <div class="seccion-salud">
-                        <label>Algún otro dato que considere importante:</label>
-                        <textarea id="pasajero_observaciones_${index}" rows="2"></textarea>
-                    </div>
-                </div>
-            `;
-        }
-
-        div.innerHTML = html;
+        div.innerHTML = titulo + html_campos;
         contenedor.appendChild(div);
 
-        // Listener para marcar fecha completada al cambiar
-        const fechaInput = div.querySelector(`#pasajero_fecha_nacimiento_${index}`);
-        if (fechaInput) {
-            fechaInput.addEventListener('change', function() {
-                this.dataset.completado = 'true';
-            });
-        }
-    });
-
-    // Eventos para mostrar/ocultar ficha de salud (solo si existen)
-    document.querySelectorAll('[id^="btn_ficha_salud_"]').forEach(boton => {
-        boton.addEventListener('click', () => {
-            const index = boton.dataset.index;
-            const contenedorFicha = document.getElementById(`ficha_salud_${index}`);
-            contenedorFicha.style.display = contenedorFicha.style.display === 'none' ? 'block' : 'none';
-        });
-    });
-
-    // Eventos para mostrar/ocultar inputs según checkbox
-    const checkboxes = [
-        ['check_alergia', 'alergias'],
-        ['check_enfermedad', 'enfermedades'],
-        ['check_medicamento', 'medicamentos'],
-        ['check_impedimento', 'impedimentos'],
-        ['check_regimen_comida', 'regimenes_comida']
-    ];
-
-    checkboxes.forEach(([checkClass, campo]) => {
-        document.querySelectorAll(`.${checkClass}`).forEach(check => {
-            check.addEventListener('change', function() {
-                const index = this.dataset.index;
-                const input = document.getElementById(`pasajero_${campo}_${index}`);
-                if (input) {
-                    input.style.display = this.checked ? '' : 'none';
-                    if (!this.checked) input.value = '';
-                }
-            });
-        });
+        conectar_listeners_formulario_pasajero(div, index);
     });
 }
 
@@ -591,88 +735,15 @@ async function confirmar_venta_modal() {
     const cantidadPasajeros = document.querySelectorAll('[id^="pasajero_dni_"]').length;
 
     for (let i = 0; i < cantidadPasajeros; i++) {
-        const dni = document.getElementById(`pasajero_dni_${i}`).value.trim();
-        const apellido = document.getElementById(`pasajero_apellido_${i}`).value.trim();
-        const nombres = document.getElementById(`pasajero_nombres_${i}`).value.trim();
-        const email = document.getElementById(`pasajero_email_${i}`).value.trim();
-        const celular = document.getElementById(`pasajero_celular_${i}`).value.trim();
-        const celular_emergencia = document.getElementById(`pasajero_emergencia_${i}`).value.trim();
-        const direccion = document.getElementById(`pasajero_direccion_${i}`).value.trim();
-        const localidad = document.getElementById(`pasajero_localidad_${i}`).value.trim();
-        const fechaInput = document.getElementById(`pasajero_fecha_nacimiento_${i}`);
-
-        let fecha_nacimiento = '';
-        if (fechaInput) {
-            fecha_nacimiento = fechaInput.value;
-            if (!fecha_nacimiento && fechaInput.valueAsDate) {
-                const d = fechaInput.valueAsDate;
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                fecha_nacimiento = `${year}-${month}-${day}`;
-            }
+        const r = recolectar_datos_pasajero(i, {
+            incluir_selector_sb: true,
+            incluir_ficha: true
+        });
+        if (!r.ok) {
+            mostrar_aviso(r.error, 'error');
+            return;
         }
-
-        const num_pas = i + 1;
-        let err;
-        err = validar_dni_js(dni);
-        if (err) { mostrar_aviso(`Pasajero ${num_pas} - ${err}`, 'error'); return; }
-        err = validar_nombre_o_apellido_js(apellido);
-        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Apellido: ${err}`, 'error'); return; }
-        err = validar_nombre_o_apellido_js(nombres);
-        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Nombres: ${err}`, 'error'); return; }
-        err = validar_email_js(email);
-        if (err) { mostrar_aviso(`Pasajero ${num_pas} - ${err}`, 'error'); return; }
-        err = validar_telefono_js(celular);
-        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Celular: ${err}`, 'error'); return; }
-        err = validar_telefono_js(celular_emergencia);
-        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Celular de emergencia: ${err}`, 'error'); return; }
-        err = validar_fecha_nacimiento_js(fecha_nacimiento);
-        if (err) { mostrar_aviso(`Pasajero ${num_pas} - ${err}`, 'error'); return; }
-        err = validar_localidad_js(localidad);
-        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Localidad: ${err}`, 'error'); return; }
-        err = validar_direccion_js(direccion);
-        if (err) { mostrar_aviso(`Pasajero ${num_pas} - Dirección: ${err}`, 'error'); return; }
-
-        const pasajeroData = {
-            dni,
-            apellido,
-            nombres,
-            email,
-            celular,
-            celular_emergencia,
-            fecha_nacimiento,
-            direccion,
-            localidad
-        };
-
-        // Punto de subida/bajada (opcional según la terminal)
-        if (window.mostrar_selector_subida_bajada) {
-            const select_sb = document.getElementById(`pasajero_punto_subida_bajada_${i}`);
-            if (select_sb) {
-                pasajeroData.punto_subida_bajada = select_sb.value;
-            } else {
-                // Caso borde: parada === origen. Se usa la parada predeterminada.
-                pasajeroData.punto_subida_bajada = window.punto_subida_bajada_predeterminado || '';
-            }
-        }
-
-        // Incluir ficha de salud solo si existe el contenedor
-        const fichaSaludDiv = document.getElementById(`ficha_salud_${i}`);
-        if (fichaSaludDiv) {
-            pasajeroData.salud = {
-                grupo_sanguineo: document.getElementById(`pasajero_grupo_sanguineo_${i}`)?.value || '',
-                obra_social: document.getElementById(`pasajero_obra_social_${i}`)?.value.trim() || '',
-                alergias: document.getElementById(`pasajero_alergias_${i}`)?.value.trim() || '',
-                enfermedades: document.getElementById(`pasajero_enfermedades_${i}`)?.value.trim() || '',
-                medicamentos: document.getElementById(`pasajero_medicamentos_${i}`)?.value.trim() || '',
-                impedimentos: document.getElementById(`pasajero_impedimentos_${i}`)?.value.trim() || '',
-                regimenes_comida: document.getElementById(`pasajero_regimenes_comida_${i}`)?.value.trim() || '',
-                observaciones: document.getElementById(`pasajero_observaciones_${i}`)?.value.trim() || ''
-            };
-        }
-
-        pasajeros.push(pasajeroData);
+        pasajeros.push(r.datos);
     }
 
     const fecha_actual = formatear_fecha_hora_actual();
@@ -943,6 +1014,6 @@ function validar_direccion_js(valor) {
     const v = (valor || '').trim();
     if (v === '') return 'La dirección es obligatoria';
     if (v.length > 120) return 'La dirección no puede tener más de 120 caracteres';
-    if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñÜü'\- \t,.°º]+$/.test(v)) return 'La dirección tiene caracteres no permitidos';
+    if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑÑÜü'\- \t,.°º]+$/.test(v)) return 'La dirección tiene caracteres no permitidos';
     return null;
 }
