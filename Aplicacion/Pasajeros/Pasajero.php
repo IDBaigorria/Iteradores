@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.36
+ * @version   1.5piloto.39
  */
 
 use Iteradores\Nodos\Nodo;
@@ -79,6 +79,8 @@ function listar_pasajeros(string $nombre_dueno): array {
     foreach ($adyacentes as $dni => $nodo_pasajero) {
         $datos = formatear_pasajero($dni, $nodo_pasajero);
         $datos['tiene_pasajes'] = pasajero_tiene_pasajes($nombre_dueno, $dni);
+        $datos['tiene_ventas_activas'] = pasajero_tiene_ventas_activas($nombre_dueno, $dni);
+        $datos['tiene_reservas_activas'] = pasajero_tiene_reservas_activas($nombre_dueno, $dni);
         $pasajeros[] = $datos;
     }
     return $pasajeros;
@@ -266,6 +268,7 @@ function obtener_pasajero_por_dni(string $nombre_dueno, string $dni): ?array {
         }
     }
     $datos['ventas'] = $ventas;
+    $datos['reservas'] = obtener_reservas_de_pasajero($nombre_dueno, $dni);
 
     return $datos;
 }
@@ -325,7 +328,13 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
     }
 
     Controlador::guardar(Conf::NOMBRE_APP);
-    return ['exito' => true];
+
+    $activos = pasajero_tiene_pasajes_activos($nombre_dueno, $dni);
+    return [
+        'exito' => true,
+        'tiene_pasajes_activos' => $activos['tiene_activos'],
+        'ventas_activas' => $activos['ventas'],
+    ];
 }
 
 /**
@@ -493,4 +502,298 @@ function eliminar_pasajero(string $nombre_dueno, string $dni): array {
 
     Controlador::guardar(Conf::NOMBRE_APP);
     return ['exito' => true];
+}
+
+/**
+ * Determina si la fecha de un viaje corresponde a un viaje activo.
+ *
+ * Un viaje activo es aquel cuya fecha de salida es posterior a la fecha
+ * actual. La fecha "a confirmar" se considera activa (todavía no se sabe
+ * cuándo sale, pero el viaje sigue vigente). Una fecha vacía no se considera
+ * activa.
+ *
+ * @param string $fecha_viaje Fecha en formato ISO (YYYY-MM-DD), "a confirmar" o "".
+ * @return bool
+ */
+function _fecha_viaje_es_activa(string $fecha_viaje): bool {
+    $fecha_viaje = trim($fecha_viaje);
+    if ($fecha_viaje === '') return false;
+    if ($fecha_viaje === 'a confirmar') return true;
+    $ts = strtotime($fecha_viaje);
+    if ($ts === false) return false;
+    $hoy_ts = strtotime(date('Y-m-d'));
+    return $ts > $hoy_ts;
+}
+
+/**
+ * Determina si un pasajero tiene pasajes propios en viajes activos.
+ *
+ * Un "pasaje propio" es un asiento-en-venta persistente cuyo nodo `pasajero`
+ * apunta a este DNI. No cuenta si el DNI es solo el comprador de la venta
+ * (puede ser el comprador y no viajar). Un "viaje activo" es aquel cuya
+ * fecha de salida es posterior a la fecha actual (o "a confirmar").
+ *
+ * Devuelve la lista de ventas activas donde el pasajero viaja, para que el
+ * frontend pueda mostrar el aviso de "imprimir pasajes actualizados".
+ * La comparación de DNI se hace con normalizar_dni para tolerar DNIs
+ * históricos con puntos.
+ *
+ * @param string $nombre_dueno
+ * @param string $dni
+ * @return array{tiene_activos: bool, ventas: array<int, array{id_venta: string, fecha_viaje: string, nombre_viaje: string}>}
+ */
+function pasajero_tiene_pasajes_activos(string $nombre_dueno, string $dni): array {
+    $resultado = ['tiene_activos' => false, 'ventas' => []];
+
+    $dni_norm = normalizar_dni($dni);
+    if ($dni_norm === '') return $resultado;
+
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if (!$contenedor_ventas) return $resultado;
+
+    $actual = hmi($contenedor_ventas);
+    while ($actual) {
+        // ¿El DNI es pasajero en algún asiento de esta venta?
+        $es_pasajero = false;
+        $cabeza_asientos = $actual->adyacente('asientos');
+        if ($cabeza_asientos) {
+            $asiento_venta = $cabeza_asientos->adyacente('primer');
+            $seguridad = 0;
+            while ($asiento_venta && $seguridad < 200) {
+                $nodo_pasajero = $asiento_venta->adyacente('pasajero');
+                if ($nodo_pasajero && normalizar_dni($nodo_pasajero->dato()) === $dni_norm) {
+                    $es_pasajero = true;
+                    break;
+                }
+                $asiento_venta = $asiento_venta->adyacente('siguiente');
+                $seguridad++;
+            }
+        }
+
+        if ($es_pasajero) {
+            $nodo_viaje = $actual->adyacente('viaje');
+            $fecha_viaje = ($nodo_viaje && $nodo_viaje->adyacente('fecha'))
+                ? $nodo_viaje->adyacente('fecha')->dato()
+                : '';
+            if (_fecha_viaje_es_activa($fecha_viaje)) {
+                $resultado['tiene_activos'] = true;
+                $resultado['ventas'][] = [
+                    'id_venta' => $actual->dato(),
+                    'fecha_viaje' => $fecha_viaje,
+                    'nombre_viaje' => $nodo_viaje ? $nodo_viaje->dato() : '',
+                ];
+            }
+        }
+
+        $actual = hd($actual);
+    }
+
+    return $resultado;
+}
+
+/**
+ * Recorre los viajes del dueño y llama a $callback por cada asiento reservado
+ * para el equipo cuyo pasajero sea el DNI buscado, y cuyo viaje sea activo.
+ *
+ * El callback recibe: ($nodo_viaje, $nodo_micro, $nodo_asiento).
+ *
+ * @param string   $nombre_dueno
+ * @param string   $dni_normalizado
+ * @param callable $callback
+ * @return void
+ */
+function _recorrer_reservas_de_pasajero(string $nombre_dueno, string $dni_normalizado, callable $callback): void {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return;
+
+    $adyacentes_viajes = (array) $nodo_viajes->adyacentes();
+    foreach ($adyacentes_viajes as $nombre_viaje => $nodo_viaje) {
+        // Solo viajes activos
+        $nodo_fecha = $nodo_viaje->adyacente('fecha');
+        $fecha_viaje = $nodo_fecha ? $nodo_fecha->dato() : '';
+        if (!_fecha_viaje_es_activa($fecha_viaje)) continue;
+
+        $nodo_micros = $nodo_viaje->adyacente('micros');
+        if (!$nodo_micros) continue;
+
+        $adyacentes_micros = (array) $nodo_micros->adyacentes();
+        foreach ($adyacentes_micros as $nodo_micro) {
+            $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+            if (!$nodo_copia) continue;
+            $nodo_asientos = $nodo_copia->adyacente('asientos');
+            if (!$nodo_asientos) continue;
+
+            for ($i = 1; $i <= 2; $i++) {
+                $piso = $nodo_asientos->adyacente("piso_$i");
+                if (!$piso) continue;
+                $cabeza = $piso->adyacente('asientos');
+                if (!$cabeza) continue;
+                $actual = $cabeza->adyacente('primer');
+                $seguridad = 0;
+                while ($actual && $actual->id() !== $cabeza->id() && $seguridad < 200) {
+                    $estado = $actual->adyacente('estado');
+                    $pasajero = $actual->adyacente('pasajero');
+                    if ($estado && $estado->dato() === 'reservado'
+                        && $pasajero && normalizar_dni($pasajero->dato()) === $dni_normalizado) {
+                        $callback($nodo_viaje, $nodo_micro, $actual);
+                    }
+                    $actual = $actual->adyacente('siguiente');
+                    $seguridad++;
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Determina si un pasajero tiene ventas activas (comprador o pasajero).
+ *
+ * No cuenta reservas del equipo. Se usa para decidir si mostrar el botón
+ * "Ver pasajes" a una terminal: la terminal ve los pasajes de ventas,
+ * pero no los del equipo.
+ *
+ * @param string $nombre_dueno
+ * @param string $dni
+ * @return bool
+ */
+function pasajero_tiene_ventas_activas(string $nombre_dueno, string $dni): bool {
+    $dni_norm = normalizar_dni($dni);
+    if ($dni_norm === '') return false;
+
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if (!$contenedor_ventas) return false;
+
+    $actual = hmi($contenedor_ventas);
+    while ($actual) {
+        $nodo_viaje = $actual->adyacente('viaje');
+        $fecha_viaje = ($nodo_viaje && $nodo_viaje->adyacente('fecha'))
+            ? $nodo_viaje->adyacente('fecha')->dato()
+            : '';
+        if (_fecha_viaje_es_activa($fecha_viaje)) {
+            $comprador = $actual->adyacente('comprador');
+            if ($comprador && normalizar_dni($comprador->dato()) === $dni_norm) {
+                return true;
+            }
+            $cabeza_asientos = $actual->adyacente('asientos');
+            if ($cabeza_asientos) {
+                $asiento_venta = $cabeza_asientos->adyacente('primer');
+                $seguridad = 0;
+                while ($asiento_venta && $seguridad < 200) {
+                    $nodo_pasajero = $asiento_venta->adyacente('pasajero');
+                    if ($nodo_pasajero && normalizar_dni($nodo_pasajero->dato()) === $dni_norm) {
+                        return true;
+                    }
+                    $asiento_venta = $asiento_venta->adyacente('siguiente');
+                    $seguridad++;
+                }
+            }
+        }
+        $actual = hd($actual);
+    }
+
+    return false;
+}
+
+/**
+ * Determina si un pasajero tiene reservas activas del equipo.
+ *
+ * Se usa para decidir si mostrar el botón "Ver pasajes" a un dueño/admin
+ * cuando el pasajero no tiene ventas activas pero sí reservas.
+ *
+ * @param string $nombre_dueno
+ * @param string $dni
+ * @return bool
+ */
+function pasajero_tiene_reservas_activas(string $nombre_dueno, string $dni): bool {
+    $dni_norm = normalizar_dni($dni);
+    if ($dni_norm === '') return false;
+
+    $encontrado = false;
+    _recorrer_reservas_de_pasajero($nombre_dueno, $dni_norm, function() use (&$encontrado) {
+        $encontrado = true;
+    });
+    return $encontrado;
+}
+
+/**
+ * Devuelve las reservas del equipo activas donde el DNI es pasajero.
+ *
+ * Cada reserva es un array con:
+ *   - viaje_id, viaje_nombre_visible
+ *   - fecha (ISO), fecha_visible (DD/MM/YYYY), hora
+ *   - origen, destino
+ *   - micro_id, micro_nombre_visible
+ *   - numero_asiento, fila, columna
+ *   - punto_subida_bajada (o null), hora_subida_bajada (o null)
+ *   - reservado_por (nombre del dueño que reservó, o '')
+ *
+ * @param string $nombre_dueno
+ * @param string $dni
+ * @return array
+ */
+function obtener_reservas_de_pasajero(string $nombre_dueno, string $dni): array {
+    $dni_norm = normalizar_dni($dni);
+    if ($dni_norm === '') return [];
+
+    $reservas = [];
+
+    _recorrer_reservas_de_pasajero($nombre_dueno, $dni_norm, function($nodo_viaje, $nodo_micro, $nodo_asiento) use (&$reservas) {
+        $viaje_id = $nodo_viaje->dato();
+        $viaje_nombre_visible = $nodo_viaje->adyacente('nombre')
+            ? $nodo_viaje->adyacente('nombre')->dato()
+            : $viaje_id;
+        $fecha_iso = $nodo_viaje->adyacente('fecha')
+            ? $nodo_viaje->adyacente('fecha')->dato()
+            : '';
+        $hora = $nodo_viaje->adyacente('hora')
+            ? $nodo_viaje->adyacente('hora')->dato()
+            : '';
+        $origen = $nodo_viaje->adyacente('origen')
+            ? $nodo_viaje->adyacente('origen')->dato()
+            : '';
+        $destino = $nodo_viaje->adyacente('destino')
+            ? $nodo_viaje->adyacente('destino')->dato()
+            : '';
+
+        $micro_id = $nodo_micro->dato();
+        $micro_nombre_visible = '';
+        $copia = $nodo_micro->adyacente('vehiculo_copia');
+        if ($copia && $copia->adyacente('nombre')) {
+            $micro_nombre_visible = $copia->adyacente('nombre')->dato();
+        }
+
+        $fila = $nodo_asiento->adyacente('fila')
+            ? $nodo_asiento->adyacente('fila')->dato()
+            : '';
+        $columna = $nodo_asiento->adyacente('columna')
+            ? $nodo_asiento->adyacente('columna')->dato()
+            : '';
+        $numero_asiento = $nodo_asiento->dato();
+
+        $nodo_punto_sb = $nodo_asiento->adyacente('punto_subida_bajada');
+        $nodo_hora_sb = $nodo_asiento->adyacente('hora_subida_bajada');
+        $reservado_por = $nodo_asiento->adyacente('reservado_por')
+            ? $nodo_asiento->adyacente('reservado_por')->dato()
+            : '';
+
+        $reservas[] = [
+            'viaje_id' => $viaje_id,
+            'viaje_nombre_visible' => $viaje_nombre_visible,
+            'fecha' => $fecha_iso,
+            'fecha_visible' => formatear_fecha_visible($fecha_iso),
+            'hora' => $hora,
+            'origen' => $origen,
+            'destino' => $destino,
+            'micro_id' => $micro_id,
+            'micro_nombre_visible' => $micro_nombre_visible,
+            'numero_asiento' => $numero_asiento,
+            'fila' => $fila,
+            'columna' => $columna,
+            'punto_subida_bajada' => $nodo_punto_sb ? $nodo_punto_sb->dato() : null,
+            'hora_subida_bajada' => $nodo_hora_sb ? $nodo_hora_sb->dato() : null,
+            'reservado_por' => $reservado_por,
+        ];
+    });
+
+    return $reservas;
 }

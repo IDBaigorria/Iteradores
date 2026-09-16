@@ -1,6 +1,6 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.36
+ * @version 1.5piloto.39
  */
 /**
  * Normaliza un DNI dejando solo dígitos.
@@ -131,6 +131,10 @@ async function ver_pasajes_pasajero(dni) {
     }
 
     const p = datos.pasajero;
+
+    // La terminal no debe ver reservas del equipo. Dueño/admin sí.
+    const es_admin_o_dueno = (usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno');
+
     let html = `<h3>Pasajes de ${p.nombre_completo || p.dni_visible || p.dni}</h3>`;
     if (p.ventas && p.ventas.length) {
         html += p.ventas.map(v => {
@@ -213,7 +217,52 @@ async function ver_pasajes_pasajero(dni) {
                 </div>
             `;
         }).join('');
-    } else {
+    }
+
+    // Reservas del equipo activas: solo se muestran a dueño/admin.
+    if (es_admin_o_dueno && p.reservas && p.reservas.length) {
+        html += `<h3 style="margin-top:20px;">Reservas del equipo</h3>`;
+        html += p.reservas.map(r => {
+            const viajeTitulo = r.origen && r.destino
+                ? `${r.origen} → ${r.destino}`
+                : (r.viaje_nombre_visible || r.viaje_id);
+            const fechaTexto = r.fecha_visible && r.hora
+                ? `${r.fecha_visible} ${r.hora}`
+                : (r.fecha_visible || r.fecha || 'a confirmar');
+            const puntoSb = r.punto_subida_bajada
+                ? `${r.punto_subida_bajada}${r.hora_subida_bajada ? ' (' + r.hora_subida_bajada + ')' : ''}`
+                : '';
+            const urlImprimir = `index.php?imprimir=1&tipo=pasaje_reserva`
+                + `&dueno=${encodeURIComponent(nombre_dueno)}`
+                + `&viaje=${encodeURIComponent(r.viaje_id)}`
+                + `&micro=${encodeURIComponent(r.micro_id)}`
+                + `&fila=${encodeURIComponent(r.fila)}`
+                + `&columna=${encodeURIComponent(r.columna)}`;
+            return `
+                <div class="sale-card" style="margin-bottom:15px; background:#eef4ff;">
+                    <strong>${viajeTitulo}</strong>
+                    <span class="badge">Reserva del equipo</span>
+                    <div class="seccion" style="margin-top:10px;">
+                        <h4>Datos de la reserva</h4>
+                        <div class="detail-line"><span>Viaje:</span><strong>${r.viaje_nombre_visible || r.viaje_id}</strong></div>
+                        <div class="detail-line"><span>Fecha:</span><strong>${fechaTexto}</strong></div>
+                        <div class="detail-line"><span>Micro:</span><strong>${r.micro_nombre_visible || r.micro_id}</strong></div>
+                        <div class="detail-line"><span>Asiento:</span><strong>${r.numero_asiento}</strong></div>
+                        ${puntoSb ? `<div class="detail-line"><span>Sube/baja en:</span><strong>${puntoSb}</strong></div>` : ''}
+                        ${r.reservado_por ? `<div class="detail-line"><span>Reservado por:</span><strong>${r.reservado_por}</strong></div>` : ''}
+                        <div class="actions" style="margin-top:8px;">
+                            <button class="btn primary imprimir_pasaje_reserva" data-url="${urlImprimir}">Imprimir pasaje de equipo</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Si no hay ni ventas ni reservas visibles, mostramos el mensaje vacío.
+    const hay_ventas = (p.ventas && p.ventas.length > 0);
+    const hay_reservas_visibles = es_admin_o_dueno && (p.reservas && p.reservas.length > 0);
+    if (!hay_ventas && !hay_reservas_visibles) {
         html += '<p>Sin pasajes registrados</p>';
     }
 
@@ -240,6 +289,13 @@ async function ver_pasajes_pasajero(dni) {
             const dni_pas = this.dataset.dni;
             const asiento = this.dataset.asiento;
             ver_detalle_pasaje_individual(id_venta, dni_pas, asiento);
+        });
+    });
+
+    // Evento botones "Imprimir pasaje de equipo" (reservas)
+    document.querySelectorAll('.imprimir_pasaje_reserva').forEach(btn => {
+        btn.addEventListener('click', function() {
+            window.open(this.dataset.url, '_blank');
         });
     });
 }
@@ -345,9 +401,16 @@ function renderizar_tabla_pasajeros(pasajeros) {
                 </button>
             </td>
             <td>
-                ${pasajero.tiene_pasajes 
-                    ? `<button class="btn ver_pasajes_pasajero" data-dni="${pasajero.dni}">Ver pasajes</button>` 
-                    : '<span class="muted">Sin pasajes</span>'}
+                ${(() => {
+                    // Terminal: solo ve pasajes de ventas activas (no del equipo).
+                    // Dueño/admin: ve pasajes de ventas activas o reservas activas del equipo.
+                    const es_admin_o_dueno = (usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno');
+                    const tiene_ventas = pasajero.tiene_ventas_activas === true;
+                    const tiene_reservas = pasajero.tiene_reservas_activas === true;
+                    const mostrar = tiene_ventas || (es_admin_o_dueno && tiene_reservas);
+                    if (!mostrar) return '';
+                    return `<button class="btn ver_pasajes_pasajero" data-dni="${pasajero.dni}">Ver pasajes</button>`;
+                })()}
             </td>
             <td>
                 <button class="btn editar_pasajero" data-dni="${pasajero.dni}" title="Editar">✏️</button>
@@ -426,6 +489,18 @@ async function cargar_detalle_pasajero(dni) {
         pasajero_seleccionado_dni = dni;
         const p = datos.pasajero;
 
+        // Guardar los valores originales del formulario para poder detectar
+        // si hubo cambios reales antes de llamar al backend (D2).
+        const valores_originales = {
+            apellido: p.apellido || '',
+            nombres: p.nombres || '',
+            email: p.email || '',
+            celular: p.celular || '',
+            celular_emergencia: p.celular_emergencia || '',
+            direccion: p.direccion || '',
+            localidad: p.localidad || ''
+        };
+
         // Orden: DNI (no editable) primero, después Apellido, después Nombres.
         const contenido = `
             <div class="form-grid">
@@ -445,10 +520,8 @@ async function cargar_detalle_pasajero(dni) {
 
         document.getElementById('boton_guardar_pasajero_modal').addEventListener('click', async () => {
             const nombre_dueno = obtener_nombre_dueno_pasajeros();
-            const datos = {
-                accion: "pasajeros/actualizar",
-                dni: dni,
-                nombre_dueno,
+
+            const valores_nuevos = {
                 apellido: document.getElementById('pasajero_apellido_modal').value.trim(),
                 nombres: document.getElementById('pasajero_nombres_modal').value.trim(),
                 email: document.getElementById('pasajero_email_modal').value.trim(),
@@ -456,6 +529,28 @@ async function cargar_detalle_pasajero(dni) {
                 celular_emergencia: document.getElementById('pasajero_emergencia_modal').value.trim(),
                 direccion: document.getElementById('pasajero_direccion_modal').value.trim(),
                 localidad: document.getElementById('pasajero_localidad_modal').value.trim()
+            };
+
+            // Si no hubo cambios, no llamamos al backend (D2).
+            const hay_cambios = Object.keys(valores_originales).some(
+                campo => valores_originales[campo] !== valores_nuevos[campo]
+            );
+            if (!hay_cambios) {
+                cerrar_modal_generico();
+                return;
+            }
+
+            const datos = {
+                accion: "pasajeros/actualizar",
+                dni: dni,
+                nombre_dueno,
+                apellido: valores_nuevos.apellido,
+                nombres: valores_nuevos.nombres,
+                email: valores_nuevos.email,
+                celular: valores_nuevos.celular,
+                celular_emergencia: valores_nuevos.celular_emergencia,
+                direccion: valores_nuevos.direccion,
+                localidad: valores_nuevos.localidad
             };
             const respuesta = await fetch("index.php", {
                 method: "POST",
@@ -467,6 +562,12 @@ async function cargar_detalle_pasajero(dni) {
                 mostrar_aviso("Pasajero actualizado", 'exito');
                 cerrar_modal_generico();
                 cargar_pasajeros();
+
+                // Si el pasajero tiene pasajes propios en viajes activos,
+                // ofrecer imprimirlos actualizados.
+                if (resultado.tiene_pasajes_activos === true) {
+                    mostrar_modal_chico_impresion_pasajero(dni, nombre_dueno);
+                }
             } else {
                 mostrar_aviso(resultado.error || "Error al actualizar", 'error');
             }
@@ -474,6 +575,40 @@ async function cargar_detalle_pasajero(dni) {
     } else {
         mostrar_aviso(datos.error || 'Pasajero no encontrado', 'error');
     }
+}
+
+/**
+ * Muestra el modal chico flotante para imprimir los pasajes actualizados
+ * de un pasajero. Se invoca después de editar los datos personales de un
+ * pasajero que tiene pasajes propios en al menos un viaje activo.
+ *
+ * Al cerrar, el modal de edición ya está cerrado y el usuario ve la tabla
+ * de pasajeros debajo.
+ *
+ * @param {string} dni DNI del pasajero (puede tener o no puntos).
+ * @param {string} nombre_dueno Nombre de usuario del dueño del pasajero.
+ */
+function mostrar_modal_chico_impresion_pasajero(dni, nombre_dueno) {
+    const contenedor = document.getElementById('modal_chico_impresion_pasajero');
+    const titulo = document.getElementById('modal_chico_impresion_pasajero_titulo');
+    const btnImprimir = document.getElementById('btn_modal_chico_imprimir_pasajero');
+    const btnCerrar = document.getElementById('btn_modal_chico_cerrar_pasajero');
+    if (!contenedor || !titulo || !btnImprimir || !btnCerrar) return;
+
+    titulo.textContent = 'Pasajero actualizado';
+
+    btnImprimir.onclick = () => {
+        const url = `index.php?imprimir=1&tipo=pasajes_actualizados`
+            + `&dueno=${encodeURIComponent(nombre_dueno)}`
+            + `&dni=${encodeURIComponent(dni)}`;
+        window.open(url, '_blank');
+    };
+
+    btnCerrar.onclick = () => {
+        contenedor.classList.add('hidden');
+    };
+
+    contenedor.classList.remove('hidden');
 }
 
 function mostrar_ficha_salud_edicion(dni, fichaSalud) {

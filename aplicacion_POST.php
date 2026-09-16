@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.38)
+ * ## Estructura de nodos actual (v1.5piloto.39)
  *
  * ### Nodos raíz especiales
  *
@@ -121,7 +121,29 @@
  * `validar_dni`, `validar_telefono`, `validar_email`,
  * `validar_nombre_o_apellido`, `validar_fecha_nacimiento`,
  * `validar_localidad` y `validar_direccion` (en `FuncionesAuxiliares.php`).
- * 
+ *
+ * **Nota (pasajes activos):** A partir de v1.5piloto.39, la edición de un
+ * pasajero (`actualizar_pasajero`) devuelve dos campos adicionales en la
+ * respuesta JSON:
+ *   - `tiene_pasajes_activos` (bool): true si el pasajero tiene al menos
+ *     un asiento propio en un viaje activo.
+ *   - `ventas_activas` (array): lista de `{id_venta, fecha_viaje, nombre_viaje}`
+ *     de las ventas activas donde el pasajero viaja.
+ *
+ * Un "pasaje activo" se define como un asiento-en-venta persistente cuyo
+ * enlace `pasajero` apunta al DNI consultado, dentro de una venta cuyo viaje
+ * asociado tiene fecha activa. Se considera fecha activa a cualquier fecha
+ * ISO posterior a hoy, o a la cadena `"a confirmar"`. **No cuenta** si el
+ * DNI es solo el comprador de la venta y no tiene asiento propio (puede ser
+ * el comprador y no viajar).
+ *
+ * La UI usa esta información para ofrecer, tras editar los datos personales
+ * de un pasajero, el botón "Imprimir pasajes actualizados", que apunta a
+ * `index.php?imprimir=1&tipo=pasajes_actualizados&dueno=X&dni=Y`. Ese flujo
+ * (en `Impresion.php`, función `imprimir_pasajes_actualizados`) reúne los
+ * pasajes propios del pasajero en todos sus viajes activos y los imprime
+ * juntos en un solo HTML.
+ *
  * ### Nodo Empresa
  *
  * Las empresas son nodos contenidos dentro del enlace `empresas` de un usuario dueño.
@@ -451,7 +473,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.38
+ * @version   1.5piloto.39
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.38
+ * @version   1.5piloto.39
  */
 
 function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = ''): void {
@@ -137,17 +137,27 @@ function imprimir_pasaje_reserva(string $nombre_dueno, string $nombre_viaje, str
     imprimir_pasajes($venta_simulada, '', true);
 }
 
+/**
+ * Imprime los pasajes de una venta.
+ *
+ * Envoltorio de la API pública: abre el HTML, emite el cuerpo de la venta
+ * y cierra el HTML. Si se necesita imprimir varias ventas en un solo HTML,
+ * usar las funciones auxiliares _pasajes_html_inicio, _pasajes_venta_cuerpo
+ * y _pasajes_html_fin.
+ */
 function imprimir_pasajes(array $venta, string $dni_filtro = '', bool $es_reserva = false): void {
-    // Datos generales
-    $nombre_viaje = $venta['nombre_viaje_visible'] ?? $venta['viaje'] ?? '';
-    $fecha = $venta['fecha'] ?? '';
-    $hora = $venta['hora'] ?? '';
-    $origen = $venta['origen'] ?? '';
-    $destino = $venta['destino'] ?? '';
-    $micro_nombre_visible = $venta['micro_nombre_visible'] ?? '';
-    $codigo_venta = $venta['id_venta'] ?? '';
-    $logo_ruta = './Aplicacion/Logo.png';
+    _pasajes_html_inicio();
+    _pasajes_venta_cuerpo($venta, $dni_filtro, $es_reserva, false);
+    _pasajes_html_fin(true);
+}
 
+/**
+ * Emite el inicio del HTML de impresión de pasajes.
+ *
+ * Abre el doctype, el head con el CSS común y el body. La contraparte es
+ * _pasajes_html_fin.
+ */
+function _pasajes_html_inicio(): void {
     echo '<!DOCTYPE html>';
     echo '<html lang="es">';
     echo '<head><meta charset="UTF-8"><title>Pasajes</title>';
@@ -265,6 +275,40 @@ function imprimir_pasajes(array $venta, string $dni_filtro = '', bool $es_reserv
         }
     </style>';
     echo '</head><body>';
+}
+
+/**
+ * Emite el cierre del HTML de impresión de pasajes.
+ *
+ * @param bool $imprimir_al_cargar Si es true, agrega el script que dispara
+ *                                 window.print() automáticamente al cargar.
+ */
+function _pasajes_html_fin(bool $imprimir_al_cargar = true): void {
+    if ($imprimir_al_cargar) {
+        echo '<script>window.onload = function() { window.print(); }</script>';
+    }
+    echo '</body></html>';
+}
+
+/**
+ * Emite el cuerpo de los pasajes de UNA venta.
+ *
+ * @param array  $venta           Datos de la venta (mismo formato que usa imprimir_pasajes).
+ * @param string $dni_filtro      Si no es vacío, solo imprime los asientos de ese DNI.
+ * @param bool   $es_reserva      Si es true, muestra el bloque "EQUIPO" en lugar del código de venta.
+ * @param bool   $separador_final Si es true, agrega un separador de corte después del último asiento
+ *                                (para conectar con una venta siguiente cuando se imprimen varias juntas).
+ */
+function _pasajes_venta_cuerpo(array $venta, string $dni_filtro, bool $es_reserva, bool $separador_final = false): void {
+    // Datos generales
+    $nombre_viaje = $venta['nombre_viaje_visible'] ?? $venta['viaje'] ?? '';
+    $fecha = $venta['fecha'] ?? '';
+    $hora = $venta['hora'] ?? '';
+    $origen = $venta['origen'] ?? '';
+    $destino = $venta['destino'] ?? '';
+    $micro_nombre_visible = $venta['micro_nombre_visible'] ?? '';
+    $codigo_venta = $venta['id_venta'] ?? '';
+    $logo_ruta = './Aplicacion/Logo.png';
 
     // Pre-filtrar los asientos que se van a imprimir. Así el conteo de "último"
     // y el separador de corte son coherentes cuando se filtra por DNI.
@@ -328,15 +372,158 @@ function imprimir_pasajes(array $venta, string $dni_filtro = '', bool $es_reserv
         echo '<div class="frase-final">✨ ¡Compartamos en Comunidad! ✨</div>';
         echo '</div></div>';
 
-        if ($indice < $total_asientos - 1) {
+        if ($indice < $total_asientos - 1 || $separador_final) {
             echo '<div class="separador-corte">✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ✂</div>';
         }
 
         $indice++;
     }
+}
 
-    echo '<script>window.onload = function() { window.print(); }</script>';
-    echo '</body></html>';
+/**
+ * Imprime los pasajes propios de un pasajero en todos sus viajes activos.
+ *
+ * A partir de v1.5piloto.39. Recorre las ventas del dueño, se queda con
+ * aquellas donde:
+ *   - El DNI aparece como pasajero en algún asiento-en-venta persistente
+ *     (no cuenta si es solo comprador y no viaja).
+ *   - El viaje asociado tiene fecha activa (posterior a hoy, o "a confirmar").
+ *
+ * Emite todos los pasajes propios en un solo HTML, con separadores de corte
+ * entre asientos (incluso entre ventas).
+ *
+ * @param string $nombre_dueno
+ * @param string $dni
+ */
+function imprimir_pasajes_actualizados(string $nombre_dueno, string $dni): void {
+    $dni_norm = normalizar_dni($dni);
+    if ($dni_norm === '') {
+        echo "DNI inválido";
+        return;
+    }
+
+    $ventas = _recolectar_ventas_con_pasajero_activo($nombre_dueno, $dni_norm);
+    if (empty($ventas)) {
+        echo "No hay pasajes activos para este pasajero";
+        return;
+    }
+
+    _pasajes_html_inicio();
+
+    $total_ventas = count($ventas);
+    foreach ($ventas as $idx => $venta_arr) {
+        $es_ultima = ($idx === $total_ventas - 1);
+        // El separador de corte va después de cada asiento, salvo después del
+        // último asiento de la última venta (ahí no tiene sentido).
+        _pasajes_venta_cuerpo($venta_arr, $dni_norm, false, !$es_ultima);
+    }
+
+    _pasajes_html_fin(true);
+}
+
+/**
+ * Recolecta las ventas activas de un dueño donde el DNI figura como pasajero.
+ *
+ * Devuelve un array de arrays, cada uno con el mismo formato que espera
+ * _pasajes_venta_cuerpo (compatible con imprimir_pasajes). No incluye ventas
+ * donde el DNI es solo comprador.
+ *
+ * @param string $nombre_dueno
+ * @param string $dni_normalizado
+ * @return array
+ */
+function _recolectar_ventas_con_pasajero_activo(string $nombre_dueno, string $dni_normalizado): array {
+    $resultado = [];
+
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if (!$contenedor_ventas) return $resultado;
+
+    $actual = hmi($contenedor_ventas);
+    while ($actual) {
+        $id_venta = $actual->dato();
+        $nodo_viaje = $actual->adyacente('viaje');
+        $nodo_micro = $actual->adyacente('micro');
+
+        // Chequear que el viaje sea activo
+        $fecha_viaje_iso = ($nodo_viaje && $nodo_viaje->adyacente('fecha'))
+            ? $nodo_viaje->adyacente('fecha')->dato()
+            : '';
+        if (!_fecha_viaje_es_activa($fecha_viaje_iso)) {
+            $actual = hd($actual);
+            continue;
+        }
+
+        // Recolectar asientos donde el DNI es pasajero
+        $asientos_pasajero = [];
+        $cabeza_asientos = $actual->adyacente('asientos');
+        if ($cabeza_asientos) {
+            $asiento_venta = $cabeza_asientos->adyacente('primer');
+            $seguridad = 0;
+            while ($asiento_venta && $seguridad < 200) {
+                $nodo_pasajero = $asiento_venta->adyacente('pasajero');
+                if ($nodo_pasajero && normalizar_dni($nodo_pasajero->dato()) === $dni_normalizado) {
+                    $nodo_asiento_real = $asiento_venta->adyacente('asiento');
+                    $numero_asiento = $nodo_asiento_real ? $nodo_asiento_real->dato() : '';
+                    $p_apellido = $nodo_pasajero->adyacente('apellido') ? $nodo_pasajero->adyacente('apellido')->dato() : '';
+                    $p_nombres = $nodo_pasajero->adyacente('nombres') ? $nodo_pasajero->adyacente('nombres')->dato() : '';
+                    $nodo_punto = $asiento_venta->adyacente('punto_subida_bajada');
+                    $nodo_hora = $asiento_venta->adyacente('hora_subida_bajada');
+
+                    $asientos_pasajero[] = [
+                        'numero' => $numero_asiento,
+                        'pasajero' => [
+                            'dni' => $nodo_pasajero->dato(),
+                            'nombre_completo' => formatear_nombre_completo($p_apellido, $p_nombres),
+                        ],
+                        'punto_subida_bajada' => $nodo_punto ? $nodo_punto->dato() : null,
+                        'hora_subida_bajada' => $nodo_hora ? $nodo_hora->dato() : null,
+                    ];
+                }
+                $asiento_venta = $asiento_venta->adyacente('siguiente');
+                $seguridad++;
+            }
+        }
+
+        if (!empty($asientos_pasajero)) {
+            // Datos visibles del viaje
+            $nombre_viaje_visible = ($nodo_viaje && $nodo_viaje->adyacente('nombre'))
+                ? $nodo_viaje->adyacente('nombre')->dato()
+                : ($nodo_viaje ? $nodo_viaje->dato() : '');
+            $hora_viaje = ($nodo_viaje && $nodo_viaje->adyacente('hora'))
+                ? $nodo_viaje->adyacente('hora')->dato()
+                : '';
+            $origen = ($nodo_viaje && $nodo_viaje->adyacente('origen'))
+                ? $nodo_viaje->adyacente('origen')->dato()
+                : '';
+            $destino = ($nodo_viaje && $nodo_viaje->adyacente('destino'))
+                ? $nodo_viaje->adyacente('destino')->dato()
+                : '';
+
+            // Nombre visible del micro (desde la copia del vehículo)
+            $micro_nombre_visible = '';
+            if ($nodo_micro) {
+                $copia = $nodo_micro->adyacente('vehiculo_copia');
+                if ($copia && $copia->adyacente('nombre')) {
+                    $micro_nombre_visible = $copia->adyacente('nombre')->dato();
+                }
+            }
+
+            $resultado[] = [
+                'nombre_viaje_visible' => $nombre_viaje_visible,
+                'fecha' => formatear_fecha_visible($fecha_viaje_iso),
+                'hora' => $hora_viaje,
+                'origen' => $origen,
+                'destino' => $destino,
+                'micro_nombre_visible' => $micro_nombre_visible,
+                'id_venta' => $id_venta,
+                'asientos' => $asientos_pasajero,
+            ];
+        }
+
+        $actual = hd($actual);
+    }
+
+    return $resultado;
 }
 
 function imprimir_cupon(array $venta): void {

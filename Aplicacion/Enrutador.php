@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.4
+ * @version   1.5piloto.39
  */
 
 use Iteradores\Nodos\Nodo;

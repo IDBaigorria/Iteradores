@@ -18,7 +18,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.3
+ * @version   1.5piloto.39
  */
 
 // --- Utilidades base ----------------------------------
@@ -187,7 +187,15 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
         );
         exit;
     }
-
+    // Caso especial: pasajes actualizados de un pasajero en viajes activos.
+    // Se pasa dueño y DNI por GET.
+    if ($tipo === 'pasajes_actualizados') {
+        imprimir_pasajes_actualizados(
+            $_GET['dueno'] ?? '',
+            $_GET['dni'] ?? ''
+        );
+        exit;
+    }
     $dni_filtro = $_GET['dni'] ?? '';
     generar_impresion($tipo, $_GET['id_venta'] ?? '', $dni_filtro);
     exit;

@@ -6,7 +6,7 @@
 <title>Administrador de Viajes - Pquia. del Carmen Tres Arroyos</title>
 <link rel="stylesheet" href="estilos.css?v=1.5piloto.38">
 <link rel="stylesheet" href="estilos-vehiculos.css?v=1.5piloto.38">
-<link rel="stylesheet" href="estilos-viajes.css?v=1.5piloto.38">
+<link rel="stylesheet" href="estilos-viajes.css?v=1.5piloto.39">
 <link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.38">
 </head>
 <body>
@@ -371,6 +371,20 @@
         <button class="btn" id="btn_cerrar_opciones">Cerrar</button>
     </div>
 </div>
+<div id="modal_chico_impresion_reserva" class="modal-chico hidden">
+    <strong id="modal_chico_impresion_reserva_titulo">Asiento reservado</strong>
+    <div style="margin-top:10px;">
+        <button class="btn primary" id="btn_modal_chico_imprimir_reserva">Imprimir pasaje de equipo</button>
+        <button class="btn" id="btn_modal_chico_cerrar_reserva">Cerrar</button>
+    </div>
+</div>
+<div id="modal_chico_impresion_pasajero" class="modal-chico hidden">
+    <strong id="modal_chico_impresion_pasajero_titulo">Pasajero actualizado</strong>
+    <div style="margin-top:10px;">
+        <button class="btn primary" id="btn_modal_chico_imprimir_pasajero">Imprimir pasajes actualizados</button>
+        <button class="btn" id="btn_modal_chico_cerrar_pasajero">Cerrar</button>
+    </div>
+</div>
 <!-- Modal genérico -->
 <div id="modal_generico" class="modal hidden">
   <div class="modal-content modal-grande">
@@ -390,9 +404,9 @@
 <script src="Aplicacion/micros.js?v=1.5piloto.38a"></script>
 <script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.38"></script>
 <script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.38"></script>
-<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.38d"></script>
+<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.39d"></script>
 <script src="Aplicacion/Viajes/viajes-opciones.js?v=1.5piloto.38"></script>
 <script src="Aplicacion/ventas.js?v=1.5piloto.38"></script>
-<script src="Aplicacion/pasajeros.js?v=1.5piloto.38"></script>
+<script src="Aplicacion/pasajeros.js?v=1.5piloto.39c"></script>
 </body>
 </html>
