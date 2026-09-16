@@ -1,6 +1,6 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.40
+ * @version 1.5piloto.41
  */
 
 function obtener_nombre_dueno_actual() {
@@ -247,39 +247,6 @@ async function ver_detalle_viaje(viaje) {
             <div id="lista_terminales_viaje"></div>
         </div>
 
-        <div id="formulario_agregar_micro" class="panel hidden" style="margin-top:15px;">
-            <h3>Agregar micro</h3>
-            <div class="form-grid">
-                <div class="field">
-                    <label>Empresa</label>
-                    <select id="selector_empresa_micro_viaje"></select>
-                </div>
-                <div class="field">
-                    <label>Vehículo</label>
-                    <select id="selector_vehiculo_micro_viaje"></select>
-                </div>
-                <div class="field">
-                    <label>Monto del pasaje *</label>
-                    <input type="number" id="monto_micro_viaje" min="0" step="0.01" placeholder="0.00">
-                </div>
-            </div>
-            <div class="actions" style="margin-top:12px;">
-                <button class="btn primary" id="boton_confirmar_micro">Confirmar</button>
-                <button class="btn" id="boton_cancelar_micro">Cancelar</button>
-            </div>
-        </div>
-
-        <div id="formulario_agregar_terminal" class="panel hidden" style="margin-top:15px;">
-            <h3>Agregar punto de venta autorizado</h3>
-            <div class="field">
-                <label>Terminal</label>
-                <select id="selector_terminal_autorizada"></select>
-            </div>
-            <div class="actions" style="margin-top:12px;">
-                <button class="btn primary" id="boton_confirmar_terminal">Confirmar</button>
-                <button class="btn" id="boton_cancelar_terminal_viaje">Cancelar</button>
-            </div>
-        </div>
     `;
 
     abrir_modal_generico('Detalle del viaje', html);
@@ -304,10 +271,6 @@ async function ver_detalle_viaje(viaje) {
 
     document.getElementById('boton_agregar_micro_viaje')?.addEventListener('click', abrir_formulario_agregar_micro);
     document.getElementById('boton_agregar_terminal_viaje')?.addEventListener('click', abrir_formulario_agregar_terminal);
-    document.getElementById('boton_confirmar_micro')?.addEventListener('click', confirmar_agregar_micro);
-    document.getElementById('boton_cancelar_micro')?.addEventListener('click', () => document.getElementById('formulario_agregar_micro').classList.add('hidden'));
-    document.getElementById('boton_confirmar_terminal')?.addEventListener('click', confirmar_agregar_terminal);
-    document.getElementById('boton_cancelar_terminal_viaje')?.addEventListener('click', () => document.getElementById('formulario_agregar_terminal').classList.add('hidden'));
 
     // Renderizar contenido
     renderizar_micros_viaje(viaje.micros);
@@ -433,11 +396,19 @@ async function refrescar_contadores_viaje_actual() {
         if (document.getElementById('lista_micros_viaje')) {
             renderizar_micros_viaje(viajeActualizado.micros);
         }
+
+        // Volver a dibujar la lista de terminales autorizadas (liviana:
+        // solo reescribe la lista de botones). Solo para dueño/admin,
+        // porque la terminal no ve esta sección.
+        if (usuario_actual.nivel !== 'terminal'
+            && document.getElementById('lista_terminales_viaje')
+            && Array.isArray(viajeActualizado.terminales_autorizadas)) {
+            renderizar_terminales_viaje(viajeActualizado.terminales_autorizadas);
+        }
     } catch (error) {
         console.error("Error al refrescar contadores del viaje:", error);
     }
 }
-
 /**
  * Formatea un array de paradas intermedias para mostrarlas en el detalle.
  * Ordena por hora ascendente, dejando las paradas sin hora al final
