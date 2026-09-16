@@ -1,6 +1,6 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.35
+ * @version 1.5piloto.40
  */
 
 function obtener_nombre_dueno_actual() {
@@ -199,11 +199,11 @@ async function ver_detalle_viaje(viaje) {
 
             <div class="viaje-detalle-seccion">
                 <div class="viaje-detalle-contadores">
-                    <div class="contador-item"><span>Capacidad total:</span><b>${viaje.ocupacion}</b></div>
-                    <div class="contador-item"><span>Disponibles:</span><b>${viaje.disponibles}</b></div>
-                    <div class="contador-item"><span>Seleccionados:</span><b>${viaje.seleccionados}</b></div>
-                    <div class="contador-item"><span>Vendidos:</span><b>${viaje.vendidos}</b></div>
-                    ${usuario_actual.nivel !== 'terminal' ? `<div class="contador-item"><span>Reservados para el equipo:</span><b>${viaje.reservados}</b></div>` : ''}
+                    <div class="contador-item"><span>Capacidad total:</span><b data-contador="ocupacion">${viaje.ocupacion}</b></div>
+                    <div class="contador-item"><span>Disponibles:</span><b data-contador="disponibles">${viaje.disponibles}</b></div>
+                    <div class="contador-item"><span>Seleccionados:</span><b data-contador="seleccionados">${viaje.seleccionados}</b></div>
+                    <div class="contador-item"><span>Vendidos:</span><b data-contador="vendidos">${viaje.vendidos}</b></div>
+                    ${usuario_actual.nivel !== 'terminal' ? `<div class="contador-item"><span>Reservados para el equipo:</span><b data-contador="reservados">${viaje.reservados}</b></div>` : ''}
                 </div>
             </div>
         </div>
@@ -368,6 +368,73 @@ async function actualizar_detalle_viaje_actual() {
                 }
             }
         }
+    }
+}
+
+/**
+ * Refresca los contadores del viaje y la lista de micros en el modal abierto,
+ * sin reconstruir el modal ni redibujar el croquis.
+ *
+ * A diferencia de actualizar_detalle_viaje_actual, que hace un fetch y luego
+ * reabre el modal completo (reconstruyendo croquis, panel de asiento, etc.),
+ * esta función hace un solo fetch, actualiza en el lugar los 5 contadores del
+ * viaje y vuelve a dibujar la lista de micros (que es liviana). No toca el
+ * croquis ni el panel de asiento: esos se actualizan aparte con
+ * solicitar_estado_asientos() y refrescar_info_asientos_propios().
+ *
+ * Pensada para invocarse después de operaciones que no cambian la estructura
+ * del viaje (reservar, asignar pasajero, vender): así se evita el parpadeo
+ * del modal grande.
+ */
+async function refrescar_contadores_viaje_actual() {
+    if (!viaje_seleccionado) return;
+
+    const nombre_viaje_actual = viaje_seleccionado.nombre_viaje;
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const tipo = usuario_actual.nivel === 'terminal' ? 'terminal' : 'dueno';
+    const accion = tipo === 'dueno' ? 'viajes/listar_por_dueno' : 'viajes/listar_por_terminal';
+    const param = tipo === 'dueno' ? { nombre_dueno } : { nombre_terminal: usuario_actual.nombre_usuario };
+
+    try {
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ accion, ...param })
+        });
+        const datos = await respuesta.json();
+        if (!datos.exito) return;
+
+        const viajeActualizado = datos.viajes.find(v => v.nombre_viaje === nombre_viaje_actual);
+        if (!viajeActualizado) return;
+
+        // Actualizar el viaje en memoria para que la próxima operación
+        // trabaje con datos frescos.
+        viaje_seleccionado = viajeActualizado;
+
+        // Actualizar los 5 contadores en el DOM, sin redibujar el modal.
+        const contenedor = document.getElementById('modal_generico_contenido');
+        if (contenedor) {
+            const valores = {
+                ocupacion: viajeActualizado.ocupacion,
+                disponibles: viajeActualizado.disponibles,
+                seleccionados: viajeActualizado.seleccionados,
+                vendidos: viajeActualizado.vendidos,
+                reservados: viajeActualizado.reservados
+            };
+            Object.keys(valores).forEach(clave => {
+                const el = contenedor.querySelector(`[data-contador="${clave}"]`);
+                if (el) el.textContent = valores[clave];
+            });
+        }
+
+        // Volver a dibujar la lista de micros (liviana: no toca el croquis).
+        // Solo si el contenedor existe en el DOM (puede no estar si el
+        // modal grande ya fue reemplazado por un sub-modal).
+        if (document.getElementById('lista_micros_viaje')) {
+            renderizar_micros_viaje(viajeActualizado.micros);
+        }
+    } catch (error) {
+        console.error("Error al refrescar contadores del viaje:", error);
     }
 }
 

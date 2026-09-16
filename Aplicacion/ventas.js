@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.38
+ * @version 1.5piloto.40
  */
 
 let ventas_actuales = [];
@@ -781,7 +781,9 @@ async function confirmar_venta_modal() {
             venta_form_abierto = false;
             await solicitar_estado_asientos();
             mostrar_boton_confirmar_venta();
-            await actualizar_detalle_viaje_actual();
+            // Refrescar contadores sin reconstruir el modal: así no parpadea
+            // el croquis ni el panel de asiento.
+            await refrescar_contadores_viaje_actual();
 
             if (ultima_venta_id) {
                 mostrar_opciones_impresion(ultima_venta_id);

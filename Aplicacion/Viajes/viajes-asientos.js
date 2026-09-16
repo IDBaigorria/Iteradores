@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.39
+ * @version 1.5piloto.40
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -543,20 +543,12 @@ function abrir_modal_reservar_asiento(fila, columna) {
         </div>
     `;
 
-    // Al volver (o al terminar la operación), reabrir el detalle del viaje
-    // con el micro activo, para no perder el contexto.
-    const on_volver = () => {
-        actualizar_detalle_viaje_actual();
-    };
+    abrir_modal_apilado('Reservar asiento', html);
 
-    abrir_modal_generico('Reservar asiento', html, on_volver);
-
-    const contenedorModal = document.getElementById('modal_generico_contenido');
+    const contenedorModal = document.getElementById('modal_apilado_contenido');
     const checkbox = contenedorModal.querySelector('#reservar_asignar_pasajero_check');
     const contenedorPasajero = contenedorModal.querySelector('#reservar_form_pasajero_container');
 
-    // Conectar listeners una sola vez. Aunque el contenedor esté oculto,
-    // los listeners quedan activos para cuando se muestre.
     conectar_listeners_formulario_pasajero(contenedorPasajero, 0);
 
     checkbox.addEventListener('change', () => {
@@ -564,11 +556,7 @@ function abrir_modal_reservar_asiento(fila, columna) {
     });
 
     contenedorModal.querySelector('#btn_cancelar_reserva').addEventListener('click', () => {
-        if (on_volver_modal) {
-            volver_modal_generico();
-        } else {
-            cerrar_modal_generico();
-        }
+        cerrar_modal_apilado();
     });
 
     contenedorModal.querySelector('#btn_confirmar_reserva').addEventListener('click', async () => {
@@ -606,19 +594,17 @@ function abrir_modal_reservar_asiento(fila, columna) {
         if (resultado.exito) {
             mostrar_aviso("Asiento reservado", 'exito');
 
-            // Capturar los datos ANTES de cerrar el modal, porque
-            // cerrar_modal_generico() limpia micro_seleccionado.
             const nombre_dueno_reserva = nombre_dueno;
             const nombre_viaje_reserva = viaje_seleccionado ? viaje_seleccionado.nombre_viaje : '';
             const nombre_micro_reserva = micro_seleccionado || '';
 
-            if (on_volver_modal) {
-                volver_modal_generico();
-            } else {
-                cerrar_modal_generico();
-            }
-            // Si se asignó pasajero en el mismo paso, ofrecer imprimir el pasaje
-            // de equipo. Si no, no hay nada que imprimir todavía.
+            cerrar_modal_apilado();
+
+            // Refrescar el modal grande que quedó vivo detrás, sin reconstruirlo.
+            await refrescar_contadores_viaje_actual();
+            await solicitar_estado_asientos();
+            refrescar_info_asientos_propios(true);
+
             if (datos_pasajero) {
                 mostrar_modal_chico_impresion_reserva(
                     nombre_dueno_reserva,
@@ -669,23 +655,13 @@ function abrir_modal_asignar_pasajero(fila, columna) {
         </div>
     `;
 
-    // Al volver (o al terminar la operación con éxito), reabrir el detalle
-    // del viaje con el micro activo, para no perder el contexto.
-    const on_volver = () => {
-        actualizar_detalle_viaje_actual();
-    };
+    abrir_modal_apilado('Asignar pasajero', html);
 
-    abrir_modal_generico('Asignar pasajero', html, on_volver);
-
-    const contenedorModal = document.getElementById('modal_generico_contenido');
+    const contenedorModal = document.getElementById('modal_apilado_contenido');
     conectar_listeners_formulario_pasajero(contenedorModal, 0);
 
     contenedorModal.querySelector('#btn_cancelar_asignar').addEventListener('click', () => {
-        if (on_volver_modal) {
-            volver_modal_generico();
-        } else {
-            cerrar_modal_generico();
-        }
+        cerrar_modal_apilado();
     });
 
     contenedorModal.querySelector('#btn_confirmar_asignar').addEventListener('click', async () => {
@@ -696,8 +672,6 @@ function abrir_modal_asignar_pasajero(fila, columna) {
         }
 
         const nombre_dueno = obtener_dueno_viaje_seleccionado();
-        // Capturar viaje y micro ANTES del fetch: si hay éxito, vamos a
-        // volver al detalle y micro_seleccionado puede quedar limpio.
         const nombre_viaje_asig = viaje_seleccionado ? viaje_seleccionado.nombre_viaje : '';
         const nombre_micro_asig = micro_seleccionado || '';
 
@@ -719,17 +693,13 @@ function abrir_modal_asignar_pasajero(fila, columna) {
         if (resultado.exito) {
             mostrar_aviso("Pasajero asignado", 'exito');
 
-            // Volver al detalle del viaje: mantiene el modal abierto,
-            // re-renderiza el contenido con el callback y deja visible
-            // el micro con el asiento ya actualizado.
-            if (on_volver_modal) {
-                volver_modal_generico();
-            } else {
-                cerrar_modal_generico();
-            }
+            cerrar_modal_apilado();
 
+            // Refrescar el modal grande que quedó vivo detrás.
+            await refrescar_contadores_viaje_actual();
             await solicitar_estado_asientos();
             refrescar_info_asientos_propios(true);
+
             mostrar_modal_chico_impresion_reserva(
                 nombre_dueno,
                 nombre_viaje_asig,
@@ -795,20 +765,16 @@ function ver_pasaje_asiento(fila, columna) {
     if (asiento.venta_id) {
         html += `<div class="actions" style="margin-top:15px;">
             <button class="btn primary" id="btn_imprimir_pasaje_asiento" data-modo="venta" data-venta-id="${asiento.venta_id}" data-dni="${p.dni || ''}">Imprimir pasaje</button>
-            <button class="btn" id="btn_cerrar_ver_pasaje">Volver</button>
+            <button class="btn" id="btn_cerrar_ver_pasaje">Cerrar</button>
         </div>`;
     } else {
         html += `<div class="actions" style="margin-top:15px;">
             <button class="btn primary" id="btn_imprimir_pasaje_asiento" data-modo="reserva" data-dueno="${nd}" data-viaje="${nv}" data-micro="${nm}" data-fila="${fila}" data-columna="${columna}">Imprimir pasaje</button>
-            <button class="btn" id="btn_cerrar_ver_pasaje">Volver</button>
+            <button class="btn" id="btn_cerrar_ver_pasaje">Cerrar</button>
         </div>`;
     }
 
-    const on_volver = () => {
-        actualizar_detalle_viaje_actual();
-    };
-
-    abrir_modal_generico('Ver pasaje', html, on_volver);
+    abrir_modal_apilado('Ver pasaje', html);
 
     const btnImprimir = document.getElementById('btn_imprimir_pasaje_asiento');
     if (btnImprimir) {
@@ -836,13 +802,10 @@ function ver_pasaje_asiento(fila, columna) {
         });
     }
 
-    document.getElementById('btn_cerrar_ver_pasaje').addEventListener('click', () => {
-        if (on_volver_modal) {
-            volver_modal_generico();
-        } else {
-            cerrar_modal_generico();
-        }
-    });
+    const btnCerrar = document.getElementById('btn_cerrar_ver_pasaje');
+    if (btnCerrar) {
+        btnCerrar.addEventListener('click', cerrar_modal_apilado);
+    }
 }
 
 /**

@@ -6,7 +6,7 @@
 <title>Administrador de Viajes - Pquia. del Carmen Tres Arroyos</title>
 <link rel="stylesheet" href="estilos.css?v=1.5piloto.38">
 <link rel="stylesheet" href="estilos-vehiculos.css?v=1.5piloto.38">
-<link rel="stylesheet" href="estilos-viajes.css?v=1.5piloto.39">
+<link rel="stylesheet" href="estilos-viajes.css?v=1.5piloto.40">
 <link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.38">
 </head>
 <body>
@@ -398,15 +398,27 @@
     <div class="modal-body" id="modal_generico_contenido"></div>
   </div>
 </div>
-<script src="aplicacion.js?v=1.5piloto.38"></script>
+<!-- Modal apilado: se abre encima del genérico sin reemplazarlo -->
+<div id="modal_apilado" class="modal hidden">
+  <div class="modal-content modal-grande">
+    <div class="modal-header">
+      <div class="modal-header-izquierda">
+        <h3 id="modal_apilado_titulo"></h3>
+      </div>
+      <button class="btn" id="cerrar_modal_apilado">✕</button>
+    </div>
+    <div class="modal-body" id="modal_apilado_contenido"></div>
+  </div>
+</div>
+<script src="aplicacion.js?v=1.5piloto.40a"></script>
 <script src="Aplicacion/admin.js?v=1.5piloto.38"></script>
 <script src="Aplicacion/terminales.js?v=1.5piloto.38"></script>
 <script src="Aplicacion/micros.js?v=1.5piloto.38a"></script>
-<script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.38"></script>
-<script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.38"></script>
-<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.39d"></script>
+<script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.40b"></script>
+<script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.40"></script>
+<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.40d"></script>
 <script src="Aplicacion/Viajes/viajes-opciones.js?v=1.5piloto.38"></script>
-<script src="Aplicacion/ventas.js?v=1.5piloto.38"></script>
+<script src="Aplicacion/ventas.js?v=1.5piloto.40b"></script>
 <script src="Aplicacion/pasajeros.js?v=1.5piloto.39c"></script>
 </body>
 </html>

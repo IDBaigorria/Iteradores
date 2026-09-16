@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.32
+ * @version 1.5piloto.40
  */
 
 // Utilidades
@@ -311,3 +311,50 @@ $("#modal_generico").addEventListener("click", function(e) {
         cerrar_modal_generico();
     }
 });
+
+// ============================================================
+// ====== MODAL APILADO ========================================
+// ============================================================
+
+/**
+ * Abre un modal apilado encima del modal genérico. El modal grande
+ * queda vivo detrás (con su croquis y panel de asiento intactos) y
+ * esto permite cerrar el sub-modal sin destruir el estado del de abajo.
+ *
+ * Sin botón "Volver": el modal grande sigue abierto y visible detrás,
+ * no hay nada que "volver a abrir".
+ *
+ * @param {string} titulo Título del modal apilado.
+ * @param {string} contenido_html HTML del cuerpo.
+ */
+function abrir_modal_apilado(titulo, contenido_html) {
+    const tituloEl = document.getElementById('modal_apilado_titulo');
+    const contenidoEl = document.getElementById('modal_apilado_contenido');
+    const modalEl = document.getElementById('modal_apilado');
+    if (!tituloEl || !contenidoEl || !modalEl) return;
+
+    tituloEl.textContent = titulo;
+    contenidoEl.innerHTML = contenido_html;
+    modalEl.classList.remove('hidden');
+    modalEl.style.display = 'flex';
+}
+
+/**
+ * Cierra el modal apilado y limpia su contenido. No toca el modal
+ * genérico ni su estado (micro_seleccionado, polling, etc.).
+ */
+function cerrar_modal_apilado() {
+    const modalEl = document.getElementById('modal_apilado');
+    if (modalEl) {
+        modalEl.classList.add('hidden');
+        modalEl.style.display = 'none';
+    }
+    const contenidoEl = document.getElementById('modal_apilado_contenido');
+    if (contenidoEl) contenidoEl.innerHTML = '';
+}
+
+document.getElementById('cerrar_modal_apilado')?.addEventListener('click', cerrar_modal_apilado);
+document.getElementById('modal_apilado')?.addEventListener('click', function(e) {
+    if (e.target === this) cerrar_modal_apilado();
+});
+

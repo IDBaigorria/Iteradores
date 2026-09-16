@@ -58,7 +58,8 @@ function editar_monto_micro(nombre_micro, monto_actual) {
     .then(resultado => {
         if (resultado.exito) {
             mostrar_aviso("Monto actualizado", 'exito');
-            actualizar_detalle_viaje_actual();
+            // Refrescar contadores y lista de micros sin reconstruir el modal.
+            refrescar_contadores_viaje_actual();
         } else {
             mostrar_aviso(resultado.error || "Error al actualizar monto", 'error');
         }
@@ -187,7 +188,7 @@ function renderizar_terminales_viaje(terminales) {
 
         const btnOpciones = div.querySelector('.btn-opciones-terminal');
         if (btnOpciones) btnOpciones.addEventListener('click', () => {
-            abrir_modal_opciones_terminal(terminal, () => ver_detalle_viaje(viaje_seleccionado));
+            abrir_modal_opciones_terminal(terminal);
         });
 
         const btnQuitar = div.querySelector('.btn-eliminar-terminal');
@@ -353,7 +354,7 @@ async function confirmar_agregar_terminal() {
  *
  * @param {string} nombre_terminal Nombre de usuario de la terminal.
  */
-async function abrir_modal_opciones_terminal(nombre_terminal, on_volver = null) {
+async function abrir_modal_opciones_terminal(nombre_terminal) {
     const nombre_dueno = obtener_nombre_dueno_actual();
 
     const respuesta = await fetch("index.php", {
@@ -465,11 +466,11 @@ async function abrir_modal_opciones_terminal(nombre_terminal, on_volver = null) 
 
         <div class="actions" style="margin-top:20px;">
             <button class="btn primary" id="opciones_terminal_guardar">Guardar</button>
-            <button class="btn" id="opciones_terminal_cancelar">Cancelar</button>
+            <button class="btn" id="opciones_terminal_cancelar">Cerrar</button>
         </div>
     `;
 
-    abrir_modal_generico('Opciones de terminal', html, on_volver);
+    abrir_modal_apilado('Opciones de terminal', html);
 
     // Punto de subida/bajada (solo si hay paradas)
     if (tieneParadas) {
@@ -495,11 +496,7 @@ async function abrir_modal_opciones_terminal(nombre_terminal, on_volver = null) 
     });
 
     document.getElementById('opciones_terminal_cancelar').addEventListener('click', () => {
-        if (on_volver_modal) {
-            volver_modal_generico();
-        } else {
-            cerrar_modal_generico();
-        }
+        cerrar_modal_apilado();
     });
 
     document.getElementById('opciones_terminal_guardar').addEventListener('click', async () => {
@@ -547,11 +544,7 @@ async function abrir_modal_opciones_terminal(nombre_terminal, on_volver = null) 
         const resultado = await resp.json();
         if (resultado.exito) {
             mostrar_aviso("Opciones guardadas", 'exito');
-            if (on_volver_modal) {
-                volver_modal_generico();
-            } else {
-                cerrar_modal_generico();
-            }
+            cerrar_modal_apilado();
         } else {
             mostrar_aviso(resultado.error || "Error al guardar opciones", 'error');
         }
