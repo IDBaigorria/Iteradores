@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.41
+ * @version   1.5piloto.42
  */
 
 
@@ -538,6 +538,11 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
         }
     }
 
+    // Estado de pago, para el filtro Estado del panel Vendidos.
+    $nodo_cuotas_restantes = $nodo_venta->adyacente('cuotas_restantes');
+    $cuotas_restantes = $nodo_cuotas_restantes ? $nodo_cuotas_restantes->dato() : '0';
+    $estado_pago = ((int)$cuotas_restantes > 0) ? 'cuotas_pendientes' : 'pagado';
+
     return [
         'id_venta' => $id_venta,
         'terminal' => $nombre_terminal,
@@ -547,6 +552,8 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
         'total' => $total,
         'fecha' => $fecha,
         'cantidad_asientos' => $cantidad_asientos,
+        'cuotas_restantes' => $cuotas_restantes,
+        'estado_pago' => $estado_pago,
     ];
 }
 

@@ -1,6 +1,6 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.41
+ * @version 1.5piloto.42
  */
 /**
  * Normaliza un DNI dejando solo dígitos.
@@ -161,9 +161,10 @@ async function ver_pasajes_pasajero(dni) {
             const puede_ver_compra = es_admin_o_dueno
                 || (usuario_actual.nivel === 'terminal'
                     && compra.terminal_nombre_usuario === usuario_actual.nombre_usuario);
+            const viaje_id_boton = (v.pasaje && v.pasaje.viaje_id) ? v.pasaje.viaje_id : '';
             const botonVerCompra = puede_ver_compra
                 ? `<div class="actions" style="margin-top:8px;">
-                        <button class="btn ver_compra" data-id="${compra.id_venta}">Ver compra</button>
+                        <button class="btn ver_compra" data-id="${compra.id_venta}" data-dueno="${nombre_dueno}" data-viaje="${viaje_id_boton}">Ver compra</button>
                     </div>`
                 : '';
             let compraHtml = `
@@ -277,10 +278,11 @@ async function ver_pasajes_pasajero(dni) {
 
     abrir_modal_generico('Pasajes del pasajero', html);
 
-    // Evento botones "Ver compra" (placeholder)
+    // Evento botones "Ver compra": navega a la pestaña Vendidos con
+    // los filtros adecuados y resalta la venta correspondiente.
     document.querySelectorAll('.ver_compra').forEach(btn => {
         btn.addEventListener('click', function() {
-            ver_compra_desde_pasajero(this.dataset.id);
+            ver_compra_desde_pasajero(this.dataset.id, this.dataset.dueno, this.dataset.viaje);
         });
     });
 
@@ -388,8 +390,8 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
  * Vendidos y resalta la tarjeta de la venta indicada. La lógica de la
  * navegación vive en ventas.js (función ir_a_venta_en_vendidos).
  */
-function ver_compra_desde_pasajero(id_venta) {
-    ir_a_venta_en_vendidos(id_venta);
+function ver_compra_desde_pasajero(id_venta, nombre_dueno = '', nombre_viaje = '') {
+    ir_a_venta_en_vendidos(id_venta, nombre_dueno, nombre_viaje);
 }
 
 function renderizar_tabla_pasajeros(pasajeros) {

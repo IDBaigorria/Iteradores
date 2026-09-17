@@ -314,11 +314,27 @@
     <section id="vendidos" class="tab-content hidden">
       <div class="panel">
         <h2>Ventas realizadas</h2>
-        <div class="row">
-          <label for="selector_viaje_vendido">Viaje:</label>
-          <select id="selector_viaje_vendido"><option value="todos">Todos</option></select>
-          <label for="filtro_vendedor">Vendedor:</label>
-          <select id="filtro_vendedor"><option value="Todos">Todos</option></select>
+        <div class="row" style="flex-wrap:wrap; gap:10px;">
+          <div id="contenedor_filtro_dueno_vendidos" style="display:none;">
+            <label for="selector_dueno_vendidos">Dueño:</label>
+            <select id="selector_dueno_vendidos"><option value="">Seleccione dueño...</option></select>
+          </div>
+          <div id="contenedor_filtro_viaje_vendidos">
+            <label for="selector_viaje_vendido">Viaje:</label>
+            <select id="selector_viaje_vendido"><option value="todos">Todos</option></select>
+          </div>
+          <div id="contenedor_filtro_vendedor_vendidos">
+            <label for="filtro_vendedor">Vendedor:</label>
+            <select id="filtro_vendedor"><option value="Todos">Todos</option></select>
+          </div>
+          <div id="contenedor_filtro_estado_vendidos">
+            <label for="filtro_estado">Estado:</label>
+            <select id="filtro_estado">
+              <option value="todos">Todos</option>
+              <option value="pagado">Pagado</option>
+              <option value="cuotas_pendientes">Cuotas pendientes</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="panel">
@@ -416,9 +432,9 @@
 <script src="Aplicacion/micros.js?v=1.5piloto.38a"></script>
 <script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.41a"></script>
 <script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.41b"></script>
-<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.41c"></script>
+<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.42"></script>
 <script src="Aplicacion/Viajes/viajes-opciones.js?v=1.5piloto.38"></script>
-<script src="Aplicacion/ventas.js?v=1.5piloto.41b"></script>
-<script src="Aplicacion/pasajeros.js?v=1.5piloto.41c"></script>
+<script src="Aplicacion/ventas.js?v=1.5piloto.42a"></script>
+<script src="Aplicacion/pasajeros.js?v=1.5piloto.42"></script>
 </body>
 </html>

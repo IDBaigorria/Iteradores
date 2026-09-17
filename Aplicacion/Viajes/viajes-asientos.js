@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.41
+ * @version 1.5piloto.42
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -827,7 +827,11 @@ function ver_pasaje_asiento(fila, columna) {
  * vive en ventas.js (función ir_a_venta_en_vendidos).
  */
 function ver_compra_asiento(venta_id) {
-    ir_a_venta_en_vendidos(venta_id);
+    // Desde el croquis conocemos el viaje y el dueño, así que se los pasamos
+    // para que la pestaña Vendidos pueda aplicar el filtro correcto.
+    const nombre_dueno = viaje_seleccionado ? viaje_seleccionado.dueno : '';
+    const nombre_viaje = viaje_seleccionado ? viaje_seleccionado.nombre_viaje : '';
+    ir_a_venta_en_vendidos(venta_id, nombre_dueno, nombre_viaje);
 }
 
 /**

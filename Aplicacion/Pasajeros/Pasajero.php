@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.41
+ * @version   1.5piloto.42
  */
 
 use Iteradores\Nodos\Nodo;
@@ -469,7 +469,12 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
         }
     }
 
+    // Identificador del viaje: lo usa el frontend para aplicar el filtro
+    // Viaje cuando el usuario llega a la pestaña Vendidos desde "Ver compra".
+    $viaje_id_pasaje = $nodo_viaje ? $nodo_viaje->dato() : '';
+
     $pasaje = [
+        'viaje_id' => $viaje_id_pasaje,
         'origen' => $origen,
         'destino' => $destino,
         'fecha' => $fecha_viaje,

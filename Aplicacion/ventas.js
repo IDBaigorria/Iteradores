@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.41
+ * @version 1.5piloto.42
  */
 
 let ventas_actuales = [];
@@ -814,21 +814,96 @@ function mostrar_opciones_impresion(id_venta) {
 }
 
 // ====== Panel Vendidos ======
-async function cargar_ventas() {
-    if (!usuario_actual) return;
 
-    let tipo, nombre;
-    if (usuario_actual.nivel === 'dueno') {
-        tipo = 'dueno';
-        nombre = usuario_actual.nombre_usuario;
-    } else if (usuario_actual.nivel === 'terminal') {
-        tipo = 'terminal';
-        nombre = usuario_actual.nombre_usuario;
-    } else {
-        mostrar_aviso("Seleccione un dueño para ver ventas (no implementado)", 'info');
+/**
+ * Configura la visibilidad de los filtros del panel Vendidos según el rol.
+ *
+ * - Admin: solo el filtro Dueño al principio. Los demás aparecen al elegir dueño.
+ * - Dueño: Viaje, Vendedor y Estado visibles.
+ * - Terminal: Viaje y Estado visibles (Vendedor oculto).
+ */
+function configurar_filtros_vendidos() {
+    const cont_dueno = document.getElementById('contenedor_filtro_dueno_vendidos');
+    const es_admin = usuario_actual.nivel === 'admin';
+    if (cont_dueno) cont_dueno.style.display = es_admin ? '' : 'none';
+}
+
+/**
+ * Muestra u oculta los filtros de Viaje, Vendedor y Estado. Se usa para el
+ * admin, que no los ve hasta que elige un dueño.
+ *
+ * @param {boolean} visibles
+ */
+function mostrar_filtros_secundarios_vendidos(visibles) {
+    const cont_viaje = document.getElementById('contenedor_filtro_viaje_vendidos');
+    const cont_vendedor = document.getElementById('contenedor_filtro_vendedor_vendidos');
+    const cont_estado = document.getElementById('contenedor_filtro_estado_vendidos');
+    const es_dueno = usuario_actual.nivel === 'dueno';
+    const es_admin = usuario_actual.nivel === 'admin';
+
+    if (cont_viaje) cont_viaje.style.display = visibles ? '' : 'none';
+    // Vendedor: visible para admin y dueño, no para terminal.
+    if (cont_vendedor) cont_vendedor.style.display = (visibles && (es_admin || es_dueno)) ? '' : 'none';
+    if (cont_estado) cont_estado.style.display = visibles ? '' : 'none';
+}
+
+/**
+ * Carga los dueños en el select del filtro Dueño. Solo se llena la primera
+ * vez. Al cambiar de dueño, resetea Viaje y Vendedor; el filtro Estado queda
+ * como está para que el usuario lo pueda aplicar sobre los datos recargados.
+ */
+async function cargar_duenos_en_select_vendidos() {
+    const select = document.getElementById('selector_dueno_vendidos');
+    if (!select) return;
+
+    if (select.options.length > 1) return; // ya está lleno
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "administrador/listar_duenos" })
+    });
+    const datos = await respuesta.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al cargar dueños", 'error');
         return;
     }
 
+    select.innerHTML = '<option value="">Seleccione dueño...</option>';
+    datos.duenos.forEach(dueno => {
+        const opcion = document.createElement('option');
+        opcion.value = dueno.nombre_usuario;
+        opcion.textContent = dueno.nombre_real
+            ? `${dueno.nombre_real} (${dueno.nombre_usuario})`
+            : dueno.nombre_usuario;
+        select.appendChild(opcion);
+    });
+
+    select.onchange = () => {
+        // Resetear Viaje y Vendedor. Estado queda como está.
+        const sel_viaje = document.getElementById('selector_viaje_vendido');
+        const sel_vendedor = document.getElementById('filtro_vendedor');
+        if (sel_viaje) sel_viaje.value = 'todos';
+        if (sel_vendedor) sel_vendedor.value = 'Todos';
+
+        if (!select.value) {
+            ventas_actuales = [];
+            mostrar_filtros_secundarios_vendidos(false);
+            const lista = document.getElementById('lista_ventas');
+            if (lista) lista.innerHTML = '<p style="color:#888; margin:20px;">Seleccione un dueño para ver las ventas.</p>';
+            return;
+        }
+
+        mostrar_filtros_secundarios_vendidos(true);
+        _cargar_ventas_con_parametros('dueno', select.value);
+    };
+}
+
+/**
+ * Hace el fetch de ventas, llena los filtros de viaje y vendedor, y
+ * renderiza. Función reutilizable para dueño, terminal y admin.
+ */
+async function _cargar_ventas_con_parametros(tipo, nombre) {
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -842,6 +917,47 @@ async function cargar_ventas() {
         renderizar_ventas();
     } else {
         mostrar_aviso(datos.error || "Error al cargar ventas", 'error');
+    }
+}
+
+async function cargar_ventas() {
+    if (!usuario_actual) return;
+
+    configurar_filtros_vendidos();
+
+    if (usuario_actual.nivel === 'admin') {
+        // Para admin, los filtros secundarios solo se muestran cuando hay un
+        // dueño seleccionado. Si ya había uno elegido antes, lo respetamos.
+        await cargar_duenos_en_select_vendidos();
+
+        const select = document.getElementById('selector_dueno_vendidos');
+        const dueno = select ? select.value : '';
+
+        if (!dueno) {
+            mostrar_filtros_secundarios_vendidos(false);
+            ventas_actuales = [];
+            const lista = document.getElementById('lista_ventas');
+            if (lista) lista.innerHTML = '<p style="color:#888; margin:20px;">Seleccione un dueño para ver las ventas.</p>';
+            return;
+        }
+        mostrar_filtros_secundarios_vendidos(true);
+        await _cargar_ventas_con_parametros('dueno', dueno);
+        return;
+    }
+
+    // Dueño y terminal: los filtros secundarios siempre visibles. El chequeo
+    // interno de mostrar_filtros_secundarios_vendidos oculta Vendedor para
+    // la terminal.
+    mostrar_filtros_secundarios_vendidos(true);
+
+    if (usuario_actual.nivel === 'dueno') {
+        await _cargar_ventas_con_parametros('dueno', usuario_actual.nombre_usuario);
+        return;
+    }
+
+    if (usuario_actual.nivel === 'terminal') {
+        await _cargar_ventas_con_parametros('terminal', usuario_actual.nombre_usuario);
+        return;
     }
 }
 
@@ -880,8 +996,10 @@ function llenar_filtro_vendedores(ventas) {
 }
 
 function renderizar_ventas() {
-    const filtroViaje = $("#selector_viaje_vendido").value;
-    const filtroVendedor = $("#filtro_vendedor").value;
+    const filtroViaje = document.getElementById('selector_viaje_vendido').value;
+    const filtroVendedor = document.getElementById('filtro_vendedor').value;
+    const filtroEstado = document.getElementById('filtro_estado').value;
+
     let ventas_filtradas = ventas_actuales;
     if (filtroViaje !== 'todos') {
         ventas_filtradas = ventas_filtradas.filter(v => v.viaje === filtroViaje);
@@ -889,6 +1007,10 @@ function renderizar_ventas() {
     if (filtroVendedor !== 'Todos') {
         ventas_filtradas = ventas_filtradas.filter(v => v.terminal === filtroVendedor);
     }
+    if (filtroEstado !== 'todos') {
+        ventas_filtradas = ventas_filtradas.filter(v => v.estado_pago === filtroEstado);
+    }
+
     const lista = $("#lista_ventas");
     lista.innerHTML = '';
     if (ventas_filtradas.length === 0) {
@@ -949,7 +1071,21 @@ async function ver_detalle_venta(id_venta) {
  *
  * @param {string} id_venta
  */
-async function ir_a_venta_en_vendidos(id_venta) {
+/**
+ * Navega a la pestaña "Vendidos" y resalta la tarjeta de la venta indicada.
+ *
+ * Cierra los modales abiertos, activa la pestaña, espera a que se carguen
+ * las ventas, aplica los filtros necesarios (Dueño para admin, Viaje si
+ * viene), hace scroll hasta la tarjeta y le aplica una animación de
+ * resaltado que se desvanece sola.
+ *
+ * @param {string} id_venta
+ * @param {string} nombre_dueno Nombre de usuario del dueño de la venta.
+ *                              Necesario para admin.
+ * @param {string} nombre_viaje Nombre del viaje (opcional). Si viene, se
+ *                              aplica el filtro Viaje para acotar el listado.
+ */
+async function ir_a_venta_en_vendidos(id_venta, nombre_dueno = '', nombre_viaje = '') {
     if (!id_venta) return;
 
     // Cerrar modales abiertos (si están abiertos; si no, no pasa nada)
@@ -960,18 +1096,39 @@ async function ir_a_venta_en_vendidos(id_venta) {
     const chico_pasajero = document.getElementById('modal_chico_impresion_pasajero');
     if (chico_pasajero) chico_pasajero.classList.add('hidden');
 
-    // Activar la pestaña Vendidos y esperar a que las ventas estén cargadas
+    // Si es admin, seleccionar el dueño ANTES de activar la pestaña.
+    // La pestaña Vendidos depende de esa selección para cargar las ventas.
+    if (usuario_actual.nivel === 'admin' && nombre_dueno) {
+        await cargar_duenos_en_select_vendidos();
+        const select_dueno = document.getElementById('selector_dueno_vendidos');
+        if (select_dueno) select_dueno.value = nombre_dueno;
+        mostrar_filtros_secundarios_vendidos(true);
+    }
+
+    // Activar la pestaña Vendidos y esperar a que las ventas estén cargadas.
     await activar_pestana('vendidos');
+
+    // Aplicar filtro Viaje si vino, para reducir el listado.
+    if (nombre_viaje) {
+        const select_viaje = document.getElementById('selector_viaje_vendido');
+        if (select_viaje) {
+            const existe = Array.from(select_viaje.options).some(o => o.value === nombre_viaje);
+            if (existe) select_viaje.value = nombre_viaje;
+            renderizar_ventas();
+        }
+    }
 
     let panel = document.querySelector(`.sale-card[data-id-venta="${id_venta}"]`);
 
-    // Si no aparece, probablemente sea por los filtros aplicados.
-    // Los reseteamos y volvemos a renderizar.
+    // Si no aparece, probablemente sea por los filtros (incluido Estado).
+    // Los reseteamos todos y volvemos a renderizar.
     if (!panel) {
         const select_viaje = document.getElementById('selector_viaje_vendido');
         const select_vendedor = document.getElementById('filtro_vendedor');
+        const select_estado = document.getElementById('filtro_estado');
         if (select_viaje) select_viaje.value = 'todos';
         if (select_vendedor) select_vendedor.value = 'Todos';
+        if (select_estado) select_estado.value = 'todos';
         renderizar_ventas();
         panel = document.querySelector(`.sale-card[data-id-venta="${id_venta}"]`);
     }
@@ -981,7 +1138,7 @@ async function ir_a_venta_en_vendidos(id_venta) {
         return;
     }
 
-    // Scroll suave hasta la tarjeta (centrada en la pantalla si se puede)
+    // Scroll suave hasta la tarjeta (centrada si se puede)
     panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     // Aplicar el resaltado. Quitamos la clase primero y forzamos un reflow
@@ -990,8 +1147,7 @@ async function ir_a_venta_en_vendidos(id_venta) {
     void panel.offsetWidth;
     panel.classList.add('venta-resaltada');
 
-    // Limpiar la clase después de que termine la animación para no dejarla
-    // acumulada si se vuelve a llamar más tarde.
+    // Limpiar la clase después de que termine la animación.
     setTimeout(() => {
         panel.classList.remove('venta-resaltada');
     }, 2600);
@@ -1094,3 +1250,13 @@ function validar_direccion_js(valor) {
     if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑÑÜü'\- \t,.°º]+$/.test(v)) return 'La dirección tiene caracteres no permitidos';
     return null;
 }
+
+// ===== Inicialización de listeners del panel Vendidos =====
+// El select de Estado es estático (no se regenera), así que el listener
+// se conecta una sola vez al cargar el script.
+(function() {
+    const sel_estado = document.getElementById('filtro_estado');
+    if (sel_estado) {
+        sel_estado.addEventListener('change', () => renderizar_ventas());
+    }
+})();
