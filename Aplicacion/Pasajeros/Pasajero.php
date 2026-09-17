@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.39
+ * @version   1.5piloto.41
  */
 
 use Iteradores\Nodos\Nodo;
@@ -434,8 +434,12 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
     $nodo_cuotas_restantes = $nodo_venta->adyacente('cuotas_restantes');
 
     $terminal_nombre = '';
+    $terminal_nombre_usuario = '';
     if ($nodo_terminal) {
-        $terminal_nombre = $nodo_terminal->adyacente('nombre_real') ? $nodo_terminal->adyacente('nombre_real')->dato() : $nodo_terminal->dato();
+        $terminal_nombre_usuario = $nodo_terminal->dato();
+        $terminal_nombre = $nodo_terminal->adyacente('nombre_real')
+            ? $nodo_terminal->adyacente('nombre_real')->dato()
+            : $terminal_nombre_usuario;
     }
 
     $cuotas_restantes = $nodo_cuotas_restantes ? $nodo_cuotas_restantes->dato() : '0';
@@ -444,6 +448,7 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
     $compra = [
         'id_venta' => $id_venta,
         'terminal_nombre' => $terminal_nombre,
+        'terminal_nombre_usuario' => $terminal_nombre_usuario,
         'fecha' => $nodo_fecha ? $nodo_fecha->dato() : '',
         'estado_pago' => $estado_pago,
     ];
@@ -616,8 +621,12 @@ function _recorrer_reservas_de_pasajero(string $nombre_dueno, string $dni_normal
         $nodo_micros = $nodo_viaje->adyacente('micros');
         if (!$nodo_micros) continue;
 
+        // Recorremos las claves del contenedor `micros`: el nombre del micro
+        // es la clave del enlace (micro_1, micro_2, ...), no el dato del nodo,
+        // que es vacío por diseño.
         $adyacentes_micros = (array) $nodo_micros->adyacentes();
-        foreach ($adyacentes_micros as $nodo_micro) {
+        foreach ($adyacentes_micros as $nombre_micro => $nodo_micro) {
+            $nombre_micro = (string) $nombre_micro;
             $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
             if (!$nodo_copia) continue;
             $nodo_asientos = $nodo_copia->adyacente('asientos');
@@ -635,7 +644,7 @@ function _recorrer_reservas_de_pasajero(string $nombre_dueno, string $dni_normal
                     $pasajero = $actual->adyacente('pasajero');
                     if ($estado && $estado->dato() === 'reservado'
                         && $pasajero && normalizar_dni($pasajero->dato()) === $dni_normalizado) {
-                        $callback($nodo_viaje, $nodo_micro, $actual);
+                        $callback($nodo_viaje, $nodo_micro, $actual, $nombre_micro);
                     }
                     $actual = $actual->adyacente('siguiente');
                     $seguridad++;
@@ -737,7 +746,7 @@ function obtener_reservas_de_pasajero(string $nombre_dueno, string $dni): array 
 
     $reservas = [];
 
-    _recorrer_reservas_de_pasajero($nombre_dueno, $dni_norm, function($nodo_viaje, $nodo_micro, $nodo_asiento) use (&$reservas) {
+    _recorrer_reservas_de_pasajero($nombre_dueno, $dni_norm, function($nodo_viaje, $nodo_micro, $nodo_asiento, $nombre_micro) use (&$reservas) {
         $viaje_id = $nodo_viaje->dato();
         $viaje_nombre_visible = $nodo_viaje->adyacente('nombre')
             ? $nodo_viaje->adyacente('nombre')->dato()
@@ -755,7 +764,10 @@ function obtener_reservas_de_pasajero(string $nombre_dueno, string $dni): array 
             ? $nodo_viaje->adyacente('destino')->dato()
             : '';
 
-        $micro_id = $nodo_micro->dato();
+        // El nombre del micro es la clave del contenedor, no su dato (que
+        // es vacío por diseño). Es el valor que necesita el flujo de
+        // impresión para encontrar el micro.
+        $micro_id = $nombre_micro;
         $micro_nombre_visible = '';
         $copia = $nodo_micro->adyacente('vehiculo_copia');
         if ($copia && $copia->adyacente('nombre')) {
@@ -772,9 +784,22 @@ function obtener_reservas_de_pasajero(string $nombre_dueno, string $dni): array 
 
         $nodo_punto_sb = $nodo_asiento->adyacente('punto_subida_bajada');
         $nodo_hora_sb = $nodo_asiento->adyacente('hora_subida_bajada');
-        $reservado_por = $nodo_asiento->adyacente('reservado_por')
-            ? $nodo_asiento->adyacente('reservado_por')->dato()
-            : '';
+
+        // El enlace `reservado_por` guarda el nombre de usuario del dueño.
+        // Para mostrarlo en la UI preferimos el nombre real si existe.
+        $reservado_por = '';
+        $nodo_reservado_por = $nodo_asiento->adyacente('reservado_por');
+        if ($nodo_reservado_por) {
+            $nombre_usuario_reservo = $nodo_reservado_por->dato();
+            $reservado_por = $nombre_usuario_reservo;
+            $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+            if ($raiz_usuarios) {
+                $nodo_usuario_reservo = $raiz_usuarios->adyacente($nombre_usuario_reservo);
+                if ($nodo_usuario_reservo && $nodo_usuario_reservo->adyacente('nombre_real')) {
+                    $reservado_por = $nodo_usuario_reservo->adyacente('nombre_real')->dato();
+                }
+            }
+        }
 
         $reservas[] = [
             'viaje_id' => $viaje_id,

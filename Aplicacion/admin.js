@@ -1,6 +1,7 @@
 /***
  * Funciones de administración de usuarios.
- * @version 1.5piloto.15
+ * @since 1.5piloto.15
+ * @version 1.5piloto.41
  */
 
 async function cargar_datos_admin() {
@@ -14,8 +15,18 @@ async function cargar_datos_admin() {
     if (datos.exito) {
         const cuerpo_tabla = $("#tabla_usuarios_admin");
         cuerpo_tabla.innerHTML = "";
+        // Mapa nombre_usuario → nombre_real con todos los usuarios cargados,
+        // para poder mostrar el nombre real del dueño de cada terminal.
+        const mapa_nombres_reales = {};
+        datos.usuarios.forEach(u => {
+            mapa_nombres_reales[u.nombre_usuario] = u.nombre_real || u.nombre_usuario;
+        });
+
         datos.usuarios.forEach(usuario => {
             const fila = document.createElement("tr");
+            const nombre_dueno_mostrar = usuario.dueno
+                ? (mapa_nombres_reales[usuario.dueno] || usuario.dueno)
+                : '—';
             fila.innerHTML = `
                 <td>${usuario.nombre_usuario}</td>
                 <td>${usuario.nombre_real || "—"}</td>
@@ -26,7 +37,7 @@ async function cargar_datos_admin() {
                 <td>${usuario.bancarizado || "0"}</td>
                 <td>${usuario.banco.nombre || "—"}</td>
                 <td>${usuario.banco.cuenta || "—"}</td>
-                <td>${usuario.dueno || "—"}</td>
+                <td>${nombre_dueno_mostrar}</td>
                 <td>
                     <button class="btn_editar_usuario" data-usuario="${usuario.nombre_usuario}">✏️</button>
                     <button class="btn_eliminar_usuario" data-usuario="${usuario.nombre_usuario}">🗑️</button>

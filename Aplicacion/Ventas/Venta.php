@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.34
+ * @version   1.5piloto.41
  */
 
 
@@ -505,6 +505,11 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
     $nodo_fecha = $nodo_venta->adyacente('fecha_hora');
 
     $nombre_terminal = $nodo_terminal ? $nodo_terminal->dato() : '';
+    // Nombre visible del terminal (nombre_real) con fallback al usuario.
+    $nombre_terminal_real = $nombre_terminal;
+    if ($nodo_terminal && $nodo_terminal->adyacente('nombre_real')) {
+        $nombre_terminal_real = $nodo_terminal->adyacente('nombre_real')->dato();
+    }
     $nombre_viaje = $nodo_viaje ? $nodo_viaje->dato() : '';
     $nombre_micro = $nodo_micro ? ($nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '') : '';
     $total = $nodo_total ? $nodo_total->dato() : '0';
@@ -536,6 +541,7 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
     return [
         'id_venta' => $id_venta,
         'terminal' => $nombre_terminal,
+        'terminal_nombre_real' => $nombre_terminal_real,
         'viaje' => $nombre_viaje,
         'micro' => $nombre_micro,
         'total' => $total,

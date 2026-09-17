@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.40
+ * @version 1.5piloto.41
  */
 
 // Utilidades
@@ -97,6 +97,14 @@ function configurar_pestanas_segun_nivel(nivel) {
 }
 
 // Activación de pestañas
+/**
+ * Activa la pestaña indicada y devuelve una promesa que se resuelve
+ * cuando terminó la carga de datos asociada a esa pestaña (si la hay).
+ *
+ * Los llamadores que no esperan la promesa siguen funcionando igual.
+ * Los que sí esperan (por ejemplo, ir_a_venta_en_vendidos) pueden
+ * confiar en que el DOM ya está actualizado al resolver.
+ */
 function activar_pestana(id_pestana) {
     if (id_pestana !== 'viajes') {
         ocultar_detalle_viaje();
@@ -108,16 +116,13 @@ function activar_pestana(id_pestana) {
     const seccion_activa = document.getElementById(id_pestana);
     if (seccion_activa) seccion_activa.classList.remove("hidden");
 
-    if (id_pestana === 'micros') {
-        cargar_datos_micros();
-    }
-    if (id_pestana === 'viajes') {
-        cargar_viajes();
-    }
-    if (id_pestana === 'vendidos') cargar_ventas();
-    if (id_pestana === 'pasajeros') cargar_pasajeros();
-    if (id_pestana === 'admin') cargar_datos_admin();
-    if (id_pestana === 'terminales') cargar_datos_terminales();
+    if (id_pestana === 'micros') return cargar_datos_micros();
+    if (id_pestana === 'viajes') return cargar_viajes();
+    if (id_pestana === 'vendidos') return cargar_ventas();
+    if (id_pestana === 'pasajeros') return cargar_pasajeros();
+    if (id_pestana === 'admin') return cargar_datos_admin();
+    if (id_pestana === 'terminales') return cargar_datos_terminales();
+    return Promise.resolve();
 }
 
 // Autenticación

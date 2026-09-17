@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.38
+ * @version   1.5piloto.41
  */
 
 use Iteradores\Nodos\Nodo;
@@ -478,17 +478,36 @@ function obtener_estados_asientos_micro(string $nombre_viaje, string $nombre_mic
                 $nodo_pasajero = $actual->adyacente('pasajero');
                 $nodo_venta = $actual->adyacente('venta');
 
+                // Nombre real del terminal que seleccionó el asiento, con
+                // fallback al nombre de usuario. La comparación en el
+                // frontend sigue usando `seleccionado_por` (nombre de usuario)
+                // para identificar al propio usuario; este campo es solo
+                // para mostrar.
+                $seleccionado_por_usuario = $seleccionado_por ? $seleccionado_por->dato() : null;
+                $seleccionado_por_real = $seleccionado_por_usuario;
+                if ($seleccionado_por_usuario !== null) {
+                    $raiz_usuarios_sel = Nodo::nodo_por_id('usuarios');
+                    if ($raiz_usuarios_sel) {
+                        $nodo_sel_usuario = $raiz_usuarios_sel->adyacente($seleccionado_por_usuario);
+                        if ($nodo_sel_usuario && $nodo_sel_usuario->adyacente('nombre_real')) {
+                            $seleccionado_por_real = $nodo_sel_usuario->adyacente('nombre_real')->dato();
+                        }
+                    }
+                }
+
                 $asiento_info = [
                     'fila' => $fila ? $fila->dato() : '',
                     'columna' => $columna ? $columna->dato() : '',
                     'numero' => $actual->dato(),
                     'estado' => $estado ? $estado->dato() : 'libre',
-                    'seleccionado_por' => $seleccionado_por ? $seleccionado_por->dato() : null,
+                    'seleccionado_por' => $seleccionado_por_usuario,
+                    'seleccionado_por_nombre_real' => $seleccionado_por_real,
                     'reservado_por' => $reservado_por ? $reservado_por->dato() : null,
                     'tiene_pasajero' => false,
                     'pasajero' => null,
                     'venta_id' => null,
                     'venta_terminal' => null,
+                    'venta_terminal_nombre_real' => null,
                 ];
 
                 if ($nodo_pasajero) {
@@ -516,7 +535,17 @@ function obtener_estados_asientos_micro(string $nombre_viaje, string $nombre_mic
                 if ($nodo_venta) {
                     $asiento_info['venta_id'] = $nodo_venta->dato();
                     $nodo_venta_terminal = $nodo_venta->adyacente('terminal');
-                    $asiento_info['venta_terminal'] = $nodo_venta_terminal ? $nodo_venta_terminal->dato() : null;
+                    $venta_terminal_usuario = $nodo_venta_terminal ? $nodo_venta_terminal->dato() : null;
+                    $asiento_info['venta_terminal'] = $venta_terminal_usuario;
+                    // Nombre visible de la terminal que hizo la venta, con
+                    // fallback al nombre de usuario. La comparación para saber
+                    // si la venta es del usuario actual sigue siendo contra
+                    // `venta_terminal` (nombre de usuario).
+                    $venta_terminal_real = $venta_terminal_usuario;
+                    if ($nodo_venta_terminal && $nodo_venta_terminal->adyacente('nombre_real')) {
+                        $venta_terminal_real = $nodo_venta_terminal->adyacente('nombre_real')->dato();
+                    }
+                    $asiento_info['venta_terminal_nombre_real'] = $venta_terminal_real;
                 }
 
                 $asientos_estados[] = $asiento_info;

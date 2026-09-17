@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.40
+ * @version 1.5piloto.41
  */
 
 let ventas_actuales = [];
@@ -861,11 +861,19 @@ function llenar_filtro_viajes(ventas) {
 function llenar_filtro_vendedores(ventas) {
     const select = $("#filtro_vendedor");
     select.innerHTML = '<option value="Todos">Todos</option>';
+    // El `value` sigue siendo el nombre de usuario porque es el identificador
+    // que usa el filtro. Solo cambia el texto de la opción.
+    const mapa_nombres = {};
+    ventas.forEach(v => {
+        if (v.terminal) {
+            mapa_nombres[v.terminal] = v.terminal_nombre_real || v.terminal;
+        }
+    });
     const vendedoresUnicos = [...new Set(ventas.map(v => v.terminal))];
     vendedoresUnicos.forEach(vendedor => {
         const opcion = document.createElement('option');
         opcion.value = vendedor;
-        opcion.textContent = vendedor;
+        opcion.textContent = mapa_nombres[vendedor] || vendedor;
         select.appendChild(opcion);
     });
     select.onchange = () => renderizar_ventas();
@@ -890,8 +898,11 @@ function renderizar_ventas() {
     ventas_filtradas.forEach(venta => {
         const tarjeta = document.createElement('div');
         tarjeta.className = 'sale-card';
+        // Identificador único para poder ubicar esta tarjeta desde otros flujos
+        // (por ejemplo, el botón "Ver compra" de un asiento o del modal de pasajes).
+        tarjeta.dataset.idVenta = venta.id_venta;
         tarjeta.innerHTML = `
-            <div class="sale-header"><div class="sale-id">Venta ${venta.id_venta}</div><span class="badge">${venta.terminal}</span></div>
+            <div class="sale-header"><div class="sale-id">Venta ${venta.id_venta}</div><span class="badge">${venta.terminal_nombre_real || venta.terminal}</span></div>
             <div class="sale-grid">
                 <div class="sale-metric"><span>Cantidad de asientos</span><b>${venta.cantidad_asientos}</b></div>
                 <div class="sale-metric"><span>Monto total</span><b>$${venta.total}</b></div>
@@ -920,6 +931,70 @@ async function ver_detalle_venta(id_venta) {
     } else {
         mostrar_aviso(datos.error || "Error al obtener detalle", 'error');
     }
+}
+
+/**
+ * Navega a la pestaña "Vendidos" y resalta la tarjeta de la venta indicada.
+ *
+ * Cierra los modales abiertos (genérico, apilado y los chicos flotantes),
+ * activa la pestaña, espera a que se carguen las ventas, hace scroll hasta
+ * la tarjeta correspondiente y le aplica una animación de resaltado que
+ * se desvanece sola.
+ *
+ * Si la tarjeta no está visible por los filtros aplicados, los resetea
+ * (a "Todos") y vuelve a intentar.
+ *
+ * Pensada para ser llamada desde el botón "Ver compra" de la tarjeta de
+ * asiento y del modal de pasajes del pasajero.
+ *
+ * @param {string} id_venta
+ */
+async function ir_a_venta_en_vendidos(id_venta) {
+    if (!id_venta) return;
+
+    // Cerrar modales abiertos (si están abiertos; si no, no pasa nada)
+    if (typeof cerrar_modal_generico === 'function') cerrar_modal_generico();
+    if (typeof cerrar_modal_apilado === 'function') cerrar_modal_apilado();
+    const chico_reserva = document.getElementById('modal_chico_impresion_reserva');
+    if (chico_reserva) chico_reserva.classList.add('hidden');
+    const chico_pasajero = document.getElementById('modal_chico_impresion_pasajero');
+    if (chico_pasajero) chico_pasajero.classList.add('hidden');
+
+    // Activar la pestaña Vendidos y esperar a que las ventas estén cargadas
+    await activar_pestana('vendidos');
+
+    let panel = document.querySelector(`.sale-card[data-id-venta="${id_venta}"]`);
+
+    // Si no aparece, probablemente sea por los filtros aplicados.
+    // Los reseteamos y volvemos a renderizar.
+    if (!panel) {
+        const select_viaje = document.getElementById('selector_viaje_vendido');
+        const select_vendedor = document.getElementById('filtro_vendedor');
+        if (select_viaje) select_viaje.value = 'todos';
+        if (select_vendedor) select_vendedor.value = 'Todos';
+        renderizar_ventas();
+        panel = document.querySelector(`.sale-card[data-id-venta="${id_venta}"]`);
+    }
+
+    if (!panel) {
+        mostrar_aviso('No se encontró la venta en el listado', 'error');
+        return;
+    }
+
+    // Scroll suave hasta la tarjeta (centrada en la pantalla si se puede)
+    panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Aplicar el resaltado. Quitamos la clase primero y forzamos un reflow
+    // para que la animación arranque aunque ya estuviera aplicada.
+    panel.classList.remove('venta-resaltada');
+    void panel.offsetWidth;
+    panel.classList.add('venta-resaltada');
+
+    // Limpiar la clase después de que termine la animación para no dejarla
+    // acumulada si se vuelve a llamar más tarde.
+    setTimeout(() => {
+        panel.classList.remove('venta-resaltada');
+    }, 2600);
 }
 
 async function cancelar_venta(id_venta) {

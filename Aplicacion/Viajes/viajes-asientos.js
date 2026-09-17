@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.40
+ * @version 1.5piloto.41
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -343,7 +343,7 @@ async function _deseleccionar_todos_los_propios_interno() {
  * - Número de asiento
  * - Estado
  * - Si fue seleccionado por otra terminal (no el propio usuario): quién
- * - Si tiene venta asociada: código de venta
+ * - Si tiene venta asociada: código de venta y terminal vendedora
  * - Si tiene pasajero: nombre completo, DNI (sin puntos) y celular
  * - Botones según rol y estado
  *
@@ -353,7 +353,7 @@ async function _deseleccionar_todos_los_propios_interno() {
  * - "Asignar pasajero" (dueño/admin, reservado sin pasajero)
  * - "Liberar reserva" (dueño/admin, reservado)
  * - "Ver pasaje" (todos, reservado con pasajero o vendido)
- * - "Ver compra" (dueño/admin: vendido. Terminal: vendido y venta hecha por esta terminal)
+ * - "Ver compra" (solo si el usuario actual fue quien realizó la venta)
  */
 function construir_html_tarjeta_asiento(asiento) {
     const es_propio = es_asiento_propio(asiento);
@@ -370,14 +370,24 @@ function construir_html_tarjeta_asiento(asiento) {
         html += `<div class="asiento-card-estado status-${asiento.estado}">${String(asiento.estado).toUpperCase()}</div>`;
     }
 
-    // Seleccionado por otra terminal
+    // Seleccionado por otra terminal.
+    // La comparación sigue siendo contra `seleccionado_por` (nombre de usuario)
+    // porque es lo que identifica al propio usuario; solo cambia el texto que
+    // se muestra, que prefiere el nombre real.
     if (asiento.seleccionado_por && asiento.seleccionado_por !== usuario_actual.nombre_usuario) {
-        html += `<div class="asiento-card-linea"><span>Seleccionado por:</span><b>${asiento.seleccionado_por}</b></div>`;
+        const nombre_mostrar = asiento.seleccionado_por_nombre_real || asiento.seleccionado_por;
+        html += `<div class="asiento-card-linea"><span>Seleccionado por:</span><b>${nombre_mostrar}</b></div>`;
     }
 
     // Código de venta (si el asiento tiene venta asociada)
     if (asiento.venta_id) {
         html += `<div class="asiento-card-linea"><span>Cód. de venta:</span><b>${asiento.venta_id}</b></div>`;
+    }
+
+    // Terminal vendedora (solo en asientos vendidos)
+    if (asiento.estado === 'vendido' && asiento.venta_terminal) {
+        const vendedor_mostrar = asiento.venta_terminal_nombre_real || asiento.venta_terminal;
+        html += `<div class="asiento-card-linea"><span>Vendido por:</span><b>${vendedor_mostrar}</b></div>`;
     }
 
     // Datos del pasajero (si hay)
@@ -415,7 +425,10 @@ function construir_html_tarjeta_asiento(asiento) {
         botones.push(`<button class="btn btn-ver-pasaje-asiento" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Ver pasaje</button>`);
     }
 
-    // Ver compra: solo vendido
+    // Ver compra: dueño y admin lo ven siempre; la terminal solo si ella
+    // hizo la venta. La comparación es contra `venta_terminal`, que guarda
+    // el nombre de usuario (identificador). El texto que se muestra en la
+    // tarjeta usa `venta_terminal_nombre_real` como fallback.
     if (asiento.estado === 'vendido' && asiento.venta_id) {
         const puede_ver_compra = es_dueno_o_admin
             || (es_terminal && asiento.venta_terminal === usuario_actual.nombre_usuario);
@@ -809,10 +822,12 @@ function ver_pasaje_asiento(fila, columna) {
 }
 
 /**
- * Placeholder de "Ver compra". Se implementa en una versión futura.
+ * "Ver compra" desde la tarjeta de asiento: navega a la pestaña Vendidos
+ * y resalta la tarjeta de la venta indicada. La lógica de la navegación
+ * vive en ventas.js (función ir_a_venta_en_vendidos).
  */
 function ver_compra_asiento(venta_id) {
-    mostrar_aviso('Función en desarrollo: ' + venta_id, 'info');
+    ir_a_venta_en_vendidos(venta_id);
 }
 
 /**

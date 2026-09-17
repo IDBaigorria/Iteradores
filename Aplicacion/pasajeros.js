@@ -1,6 +1,6 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.39
+ * @version 1.5piloto.41
  */
 /**
  * Normaliza un DNI dejando solo dígitos.
@@ -132,9 +132,6 @@ async function ver_pasajes_pasajero(dni) {
 
     const p = datos.pasajero;
 
-    // La terminal no debe ver reservas del equipo. Dueño/admin sí.
-    const es_admin_o_dueno = (usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno');
-
     let html = `<h3>Pasajes de ${p.nombre_completo || p.dni_visible || p.dni}</h3>`;
     if (p.ventas && p.ventas.length) {
         html += p.ventas.map(v => {
@@ -157,6 +154,18 @@ async function ver_pasajes_pasajero(dni) {
 
             // Sección compra (sin total)
             const compra = v.compra;
+            // Ver compra: dueño y admin lo ven siempre; la terminal solo si
+            // ella hizo la venta. Comparamos contra `terminal_nombre_usuario`
+            // porque `terminal_nombre` puede ser el nombre visible.
+            const es_admin_o_dueno = (usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno');
+            const puede_ver_compra = es_admin_o_dueno
+                || (usuario_actual.nivel === 'terminal'
+                    && compra.terminal_nombre_usuario === usuario_actual.nombre_usuario);
+            const botonVerCompra = puede_ver_compra
+                ? `<div class="actions" style="margin-top:8px;">
+                        <button class="btn ver_compra" data-id="${compra.id_venta}">Ver compra</button>
+                    </div>`
+                : '';
             let compraHtml = `
                 <div class="seccion" style="margin-top:10px;">
                     <h4>Información de la compra</h4>
@@ -164,9 +173,7 @@ async function ver_pasajes_pasajero(dni) {
                     <div class="detail-line"><span>Punto de venta:</span><strong>${compra.terminal_nombre}</strong></div>
                     <div class="detail-line"><span>Fecha:</span><strong>${compra.fecha}</strong></div>
                     <div class="detail-line"><span>Estado:</span><strong>${compra.estado_pago}</strong></div>
-                    <div class="actions" style="margin-top:8px;">
-                        <button class="btn ver_compra" data-id="${compra.id_venta}">Ver compra</button>
-                    </div>
+                    ${botonVerCompra}
                 </div>
             `;
 
@@ -219,8 +226,10 @@ async function ver_pasajes_pasajero(dni) {
         }).join('');
     }
 
-    // Reservas del equipo activas: solo se muestran a dueño/admin.
-    if (es_admin_o_dueno && p.reservas && p.reservas.length) {
+    // Reservas del equipo activas: se muestran a todos los roles. La terminal
+    // las ve desde el croquis (asiento reservado con pasajero), así que desde
+    // acá también tiene que verlas.
+    if (p.reservas && p.reservas.length) {
         html += `<h3 style="margin-top:20px;">Reservas del equipo</h3>`;
         html += p.reservas.map(r => {
             const viajeTitulo = r.origen && r.destino
@@ -259,10 +268,10 @@ async function ver_pasajes_pasajero(dni) {
         }).join('');
     }
 
-    // Si no hay ni ventas ni reservas visibles, mostramos el mensaje vacío.
+    // Si no hay ni ventas ni reservas, mostramos el mensaje vacío.
     const hay_ventas = (p.ventas && p.ventas.length > 0);
-    const hay_reservas_visibles = es_admin_o_dueno && (p.reservas && p.reservas.length > 0);
-    if (!hay_ventas && !hay_reservas_visibles) {
+    const hay_reservas = (p.reservas && p.reservas.length > 0);
+    if (!hay_ventas && !hay_reservas) {
         html += '<p>Sin pasajes registrados</p>';
     }
 
@@ -374,8 +383,13 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
 }
 
 
+/**
+ * "Ver compra" desde el modal de pasajes del pasajero: navega a la pestaña
+ * Vendidos y resalta la tarjeta de la venta indicada. La lógica de la
+ * navegación vive en ventas.js (función ir_a_venta_en_vendidos).
+ */
 function ver_compra_desde_pasajero(id_venta) {
-    mostrar_aviso('Función en desarrollo', 'info');
+    ir_a_venta_en_vendidos(id_venta);
 }
 
 function renderizar_tabla_pasajeros(pasajeros) {
@@ -402,13 +416,13 @@ function renderizar_tabla_pasajeros(pasajeros) {
             </td>
             <td>
                 ${(() => {
-                    // Terminal: solo ve pasajes de ventas activas (no del equipo).
-                    // Dueño/admin: ve pasajes de ventas activas o reservas activas del equipo.
-                    const es_admin_o_dueno = (usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno');
+                    // Muestra el botón si el pasajero tiene ventas activas o
+                    // reservas del equipo activas. Vale para todos los roles:
+                    // la terminal ve lo mismo que un dueño desde el croquis,
+                    // así que desde acá también tiene que verlo.
                     const tiene_ventas = pasajero.tiene_ventas_activas === true;
                     const tiene_reservas = pasajero.tiene_reservas_activas === true;
-                    const mostrar = tiene_ventas || (es_admin_o_dueno && tiene_reservas);
-                    if (!mostrar) return '';
+                    if (!tiene_ventas && !tiene_reservas) return '';
                     return `<button class="btn ver_pasajes_pasajero" data-dni="${pasajero.dni}">Ver pasajes</button>`;
                 })()}
             </td>
