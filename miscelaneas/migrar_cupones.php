@@ -57,7 +57,7 @@ function migrar_cupones(): array {
 
             $cuotas = (int)($actual->adyacente('cuotas') ? $actual->adyacente('cuotas')->dato() : '0');
             $total = $actual->adyacente('total') ? $actual->adyacente('total')->dato() : '';
-            $cuotas_restantes = (int)($actual->adyacente('cuotas_restantes') ? $actual->adyacente('cuotas_restantes')->dato() : '0');
+            $monto_pagado = $actual->adyacente('pagado') ? $actual->adyacente('pagado')->dato() : '0';
             $fecha_pago = $actual->adyacente('fecha_ultimo_pago') ? $actual->adyacente('fecha_ultimo_pago')->dato() : '';
 
             if ($cuotas <= 0 || $total === '') {
@@ -66,8 +66,7 @@ function migrar_cupones(): array {
                 continue;
             }
 
-            $cupones_pagados = max(0, $cuotas - $cuotas_restantes);
-            _crear_lista_cupones_venta($actual, $cuotas, $total, $cupones_pagados, $fecha_pago);
+            _crear_lista_cupones_venta($actual, $cuotas, $total, $monto_pagado, $fecha_pago);
             $res['ventas_migradas']++;
 
             $actual = $siguiente;

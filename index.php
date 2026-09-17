@@ -213,7 +213,8 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
         exit;
     }
     $dni_filtro = $_GET['dni'] ?? '';
-    generar_impresion($tipo, $_GET['id_venta'] ?? '', $dni_filtro);
+    $numero_cupon = $_GET['numero_cupon'] ?? '';
+    generar_impresion($tipo, $_GET['id_venta'] ?? '', $dni_filtro, $numero_cupon);
     exit;
 }
 

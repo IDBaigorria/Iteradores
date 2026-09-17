@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.44
+ * @version   1.5piloto.45e
  */
 
 
@@ -415,9 +415,10 @@ function confirmar_venta_actual(
 
     // Crear la lista de cupones. El contenedor `cupones` es el padre,
     // y cada cupón es un hijo enlazado con la estructura de árbol
-    // (hmi/hd/p) de miscelaneas/Arbol.php.
-    $cupones_pagados = max(0, $cuotas - $cuotas_restantes);
-    _crear_lista_cupones_venta($nodo_venta, $cuotas, (string)$total, $cupones_pagados, $fecha_pago);
+    // (hmi/hd/p) de miscelaneas/Arbol.php. El cupón 1 refleja el
+    // monto real abonado al momento de la venta; los cupones
+    // pendientes reparten el saldo restante.
+    _crear_lista_cupones_venta($nodo_venta, $cuotas, (string)$total, (string)$monto_pagado, $fecha_pago);
 
     // Actualizar contadores
     actualizar_contadores_micro($nodo_micro);
@@ -737,7 +738,23 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
     if (empty($cupones)) {
         $cupones = _construir_cupones_derivados($nodo_venta);
     }
+
+    // Rellenar metodo_pago en cada cupón que no lo tenga: hereda el
+    // de la venta. Solo se escribe el enlace en el cupón cuando el
+    // método del pago efectivo difiere del de la venta.
+    $metodo_pago_venta = $nodo_venta->adyacente('metodo_pago')
+        ? $nodo_venta->adyacente('metodo_pago')->dato() : '';
+    foreach ($cupones as &$c) {
+        if (empty($c['metodo_pago'])) {
+            $c['metodo_pago'] = $metodo_pago_venta;
+        }
+    }
+    unset($c);
     $datos['cupones'] = $cupones;
+
+    // Métodos de pago permitidos para esta venta: se resuelven con el
+    // override del TerminalViaje > viaje > default, igual que al vender.
+    $datos['metodos_permitidos'] = _resolver_metodos_permitidos_venta($nodo_venta);
 
     return $datos;
 }
@@ -837,6 +854,270 @@ function cancelar_venta(string $id_venta): array {
 }
 
 /**
+ * Resuelve la lista de métodos de pago permitidos para una venta,
+ * según el override del TerminalViaje > configuración del viaje >
+ * default. Devuelve un array con "efectivo" y/o "transferencia".
+ *
+ * @param Nodo $nodo_venta
+ * @return array<int, string>
+ */
+function _resolver_metodos_permitidos_venta(Nodo $nodo_venta): array {
+    $nodo_viaje = $nodo_venta->adyacente('viaje');
+    $nodo_terminal = $nodo_venta->adyacente('terminal');
+    if (!$nodo_viaje || !$nodo_terminal) return [];
+
+    $nombre_viaje = $nodo_viaje->dato();
+    $nombre_terminal = $nodo_terminal->dato();
+    $nodo_dueno = $nodo_viaje->adyacente('dueno');
+    $nombre_dueno = $nodo_dueno ? $nodo_dueno->dato() : '';
+    if ($nombre_dueno === '') return [];
+
+    $opciones_viaje = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
+    $opciones_terminal = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal);
+
+    $resolver = function(string $campo, string $default) use ($opciones_viaje, $opciones_terminal) {
+        if (isset($opciones_terminal[$campo]) && trim((string)$opciones_terminal[$campo]) !== '') {
+            return (string)$opciones_terminal[$campo];
+        }
+        if (isset($opciones_viaje[$campo]) && trim((string)$opciones_viaje[$campo]) !== '') {
+            return (string)$opciones_viaje[$campo];
+        }
+        return $default;
+    };
+
+    $metodos = [];
+    if ($resolver('permite_efectivo', '1') === '1') $metodos[] = 'efectivo';
+    if ($resolver('permite_transferencia', '1') === '1') $metodos[] = 'transferencia';
+    return $metodos;
+}
+
+/**
+ * Elimina un cupón específico del contenedor `cupones`.
+ *
+ * @param Nodo $contenedor
+ * @param Nodo $cupon
+ * @return void
+ */
+function _eliminar_cupon_del_contenedor(Nodo $contenedor, Nodo $cupon): void {
+    $primero = hmi($contenedor);
+    if ($primero && $primero->id() === $cupon->id()) {
+        eliminar_hmi($contenedor);
+        Nodo::eliminar($cupon);
+        return;
+    }
+    $anterior = $primero;
+    $seg = 0;
+    while ($anterior && $seg < 200) {
+        $siguiente = hd($anterior);
+        if ($siguiente && $siguiente->id() === $cupon->id()) {
+            eliminar_hd($anterior);
+            Nodo::eliminar($cupon);
+            return;
+        }
+        $anterior = $siguiente;
+        $seg++;
+    }
+}
+
+/**
+ * Registra el pago de un cupón de una venta.
+ *
+ * Reglas:
+ *  - El cupón debe estar pendiente.
+ *  - El monto debe ser > 0 y <= saldo pendiente de la venta.
+ *  - Si es el último cupón pendiente, el monto debe ser exactamente el saldo.
+ *  - El método de pago debe estar permitido para esa terminal/viaje.
+ *  - Al pagar, se actualiza el monto del cupón al real, se marca como
+ *    pagado, y se recalculan los montos teóricos de los cupones
+ *    pendientes restantes (saldo / pendientes).
+ *  - Si el saldo llega a 0, se eliminan los cupones pendientes sobrantes.
+ *  - Se suma el monto a la terminal (efectivo o banco).
+ *
+ * @param string $id_venta
+ * @param string $numero_cupon
+ * @param string $monto
+ * @param string $metodo_pago
+ * @return array
+ */
+function pagar_cupon_venta(string $id_venta, string $numero_cupon, string $monto, string $metodo_pago): array {
+    $monto_num = (float)$monto;
+    if ($monto_num <= 0) return ['exito' => false, 'error' => 'Monto inválido'];
+
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
+
+    // Buscar la venta en el árbol del dueño.
+    $nodo_venta = null;
+    $nombre_dueno_venta = '';
+    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nivel = $nodo_dueno->adyacente('nivel');
+        if (!$nivel || $nivel->dato() !== 'dueno') continue;
+        $cont = obtener_contenedor_ventas_dueno($nombre_dueno);
+        if (!$cont) continue;
+        $actual = hmi($cont);
+        while ($actual) {
+            if ($actual->dato() === $id_venta) {
+                $nodo_venta = $actual;
+                $nombre_dueno_venta = $nombre_dueno;
+                break 2;
+            }
+            $actual = hd($actual);
+        }
+    }
+    if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
+
+    // Resolver métodos permitidos.
+    $metodos_permitidos = _resolver_metodos_permitidos_venta($nodo_venta);
+    $metodo_pago = strtolower($metodo_pago);
+    if ($metodo_pago !== 'efectivo' && $metodo_pago !== 'transferencia') {
+        return ['exito' => false, 'error' => 'Método de pago inválido'];
+    }
+    if (!in_array($metodo_pago, $metodos_permitidos, true)) {
+        return ['exito' => false, 'error' => 'El método de pago no está permitido para esta venta'];
+    }
+
+    // Leer cupones del contenedor.
+    $contenedor_cupones = $nodo_venta->adyacente('cupones');
+    if (!$contenedor_cupones) return ['exito' => false, 'error' => 'La venta no tiene cupones'];
+
+    $cupon_objetivo = null;
+    $cupones_pendientes = [];
+    $actual = hmi($contenedor_cupones);
+    $seg = 0;
+    while ($actual && $seg < 200) {
+        $num = $actual->adyacente('numero') ? $actual->adyacente('numero')->dato() : '';
+        $est = $actual->adyacente('estado') ? $actual->adyacente('estado')->dato() : 'pendiente';
+        if ($num === $numero_cupon) $cupon_objetivo = $actual;
+        if ($est === 'pendiente') $cupones_pendientes[] = $actual;
+        $actual = hd($actual);
+        $seg++;
+    }
+
+    if (!$cupon_objetivo) return ['exito' => false, 'error' => 'Cupón no encontrado'];
+    $estado_obj = $cupon_objetivo->adyacente('estado') ? $cupon_objetivo->adyacente('estado')->dato() : 'pendiente';
+    if ($estado_obj !== 'pendiente') return ['exito' => false, 'error' => 'El cupón ya está pagado'];
+
+    // Calcular saldo.
+    $total = (float)($nodo_venta->adyacente('total') ? $nodo_venta->adyacente('total')->dato() : '0');
+    $pagado_previo = (float)($nodo_venta->adyacente('pagado') ? $nodo_venta->adyacente('pagado')->dato() : '0');
+    $saldo = max(0, $total - $pagado_previo);
+
+    if ($monto_num > $saldo + 0.001) {
+        return ['exito' => false, 'error' => 'El monto no puede superar el saldo pendiente'];
+    }
+
+    // Es el último pendiente?
+    $es_ultimo = (count($cupones_pendientes) === 1 && $cupones_pendientes[0]->id() === $cupon_objetivo->id());
+    if ($es_ultimo && abs($monto_num - $saldo) > 0.001) {
+        return ['exito' => false, 'error' => 'En el último cupón pendiente debe cobrarse el saldo exacto'];
+    }
+
+    $fecha_pago = date('d/m/Y H:i');
+
+    // Actualizar monto, estado y fecha del cupón.
+    $nodo_monto = $cupon_objetivo->adyacente('monto');
+    $monto_str = number_format($monto_num, 2, '.', '');
+    if ($nodo_monto) $nodo_monto->_dato($monto_str);
+    else $cupon_objetivo->_adyacente_en(Nodo::crear_con_dato($monto_str), 'monto');
+
+    $nodo_estado = $cupon_objetivo->adyacente('estado');
+    if ($nodo_estado) $nodo_estado->_dato('pagado');
+    else $cupon_objetivo->_adyacente_en(Nodo::crear_con_dato('pagado'), 'estado');
+
+    $nodo_fecha_cupon = $cupon_objetivo->adyacente('fecha_pago');
+    if ($nodo_fecha_cupon) $nodo_fecha_cupon->_dato($fecha_pago);
+    else $cupon_objetivo->_adyacente_en(Nodo::crear_con_dato($fecha_pago), 'fecha_pago');
+
+    // Método de pago: solo se escribe si difiere del de la venta.
+    $metodo_venta = $nodo_venta->adyacente('metodo_pago') ? $nodo_venta->adyacente('metodo_pago')->dato() : '';
+    if ($metodo_pago !== $metodo_venta) {
+        $nodo_metodo_cupon = $cupon_objetivo->adyacente('metodo_pago');
+        if ($nodo_metodo_cupon) $nodo_metodo_cupon->_dato($metodo_pago);
+        else $cupon_objetivo->_adyacente_en(Nodo::crear_con_dato($metodo_pago), 'metodo_pago');
+    } else {
+        $cupon_objetivo->eliminar_adyacente('metodo_pago');
+    }
+
+    // Actualizar pagado de la venta.
+    $nuevo_pagado = $pagado_previo + $monto_num;
+    $nodo_pagado = $nodo_venta->adyacente('pagado');
+    $nuevo_pagado_str = number_format($nuevo_pagado, 2, '.', '');
+    if ($nodo_pagado) $nodo_pagado->_dato($nuevo_pagado_str);
+    else $nodo_venta->_adyacente_en(Nodo::crear_con_dato($nuevo_pagado_str), 'pagado');
+
+    $nodo_fp = $nodo_venta->adyacente('fecha_ultimo_pago');
+    if ($nodo_fp) $nodo_fp->_dato($fecha_pago);
+    else $nodo_venta->_adyacente_en(Nodo::crear_con_dato($fecha_pago), 'fecha_ultimo_pago');
+
+    // Recolectar cupones pendientes restantes (post pago).
+    $pendientes_restantes = [];
+    $actual = hmi($contenedor_cupones);
+    $seg = 0;
+    while ($actual && $seg < 200) {
+        $est = $actual->adyacente('estado') ? $actual->adyacente('estado')->dato() : 'pendiente';
+        if ($est === 'pendiente') $pendientes_restantes[] = $actual;
+        $actual = hd($actual);
+        $seg++;
+    }
+
+    $saldo_restante = max(0, $total - $nuevo_pagado);
+
+    if ($saldo_restante <= 0.001) {
+        // Pagó todo: eliminar cupones pendientes sobrantes.
+        foreach ($pendientes_restantes as $p) {
+            _eliminar_cupon_del_contenedor($contenedor_cupones, $p);
+        }
+        $pendientes_restantes = [];
+    } else if (count($pendientes_restantes) > 0) {
+        // Recalcular montos teóricos.
+        $cantidad = count($pendientes_restantes);
+        $teorico = round($saldo_restante / $cantidad, 2);
+        foreach ($pendientes_restantes as $i => $p) {
+            $monto_nuevo = ($i === $cantidad - 1)
+                ? round($saldo_restante - $teorico * $i, 2)
+                : $teorico;
+            $monto_nuevo_str = number_format($monto_nuevo, 2, '.', '');
+            $nodo_m = $p->adyacente('monto');
+            if ($nodo_m) $nodo_m->_dato($monto_nuevo_str);
+            else $p->_adyacente_en(Nodo::crear_con_dato($monto_nuevo_str), 'monto');
+        }
+    }
+
+    // Actualizar cuotas_restantes de la venta.
+    $nodo_cr = $nodo_venta->adyacente('cuotas_restantes');
+    $cr_str = (string)count($pendientes_restantes);
+    if ($nodo_cr) $nodo_cr->_dato($cr_str);
+    else $nodo_venta->_adyacente_en(Nodo::crear_con_dato($cr_str), 'cuotas_restantes');
+
+    // Impacto en la terminal.
+    $nodo_terminal = $nodo_venta->adyacente('terminal');
+    if ($nodo_terminal) {
+        if ($metodo_pago === 'efectivo') {
+            $nodo_ef = $nodo_terminal->adyacente('efectivo');
+            if (!$nodo_ef) {
+                $nodo_ef = Nodo::crear_con_dato('0');
+                $nodo_terminal->_adyacente_en($nodo_ef, 'efectivo');
+            }
+            $nuevo_ef = (float)$nodo_ef->dato() + $monto_num;
+            $nodo_ef->_dato((string)$nuevo_ef);
+        } else {
+            $nodo_banco = $nodo_terminal->adyacente('banco');
+            if ($nodo_banco) {
+                $nuevo_b = (float)$nodo_banco->dato() + $monto_num;
+                $nodo_banco->_dato((string)$nuevo_b);
+            }
+        }
+    }
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+
+    return [
+        'exito' => true,
+        'venta' => formatear_venta_completa($nodo_venta),
+    ];
+}
+
+/**
  * Calcula el monto teórico de cada cuota y el remanente de la última.
  *
  * Devuelve [monto_cuota, monto_ultima] como strings con dos decimales.
@@ -868,47 +1149,74 @@ function _calcular_montos_cuotas(string $total, int $cuotas): array {
  * Crea la lista de cupones de una venta como hijos del contenedor
  * `cupones`. Usa la estructura de árbol (hmi/hd/p) de Arbol.php.
  *
- * Los primeros $cupones_pagados cupones quedan en estado `pagado` con
- * la fecha indicada. El resto en estado `pendiente`.
+ * El cupón 1 refleja el monto real abonado al momento de la venta
+ * (monto_pagado). Los cupones pendientes (2..N) reparten el saldo
+ * restante en partes iguales; el último absorbe el remanente de
+ * centavos para que la suma sea exactamente igual al total.
+ *
+ * Si el comprador pagó todo al momento de la venta, se crea un solo
+ * cupón (el 1) con el monto total y no quedan oportunidades.
  *
  * @param Nodo   $nodo_venta
  * @param int    $cuotas
  * @param string $total
- * @param int    $cupones_pagados
- * @param string $fecha_pago Fecha a usar para los cupones pagados.
+ * @param string $monto_pagado Monto real abonado al momento de la venta.
+ * @param string $fecha_pago Fecha a usar para el cupón pagado.
  * @return void
  */
-function _crear_lista_cupones_venta(Nodo $nodo_venta, int $cuotas, string $total, int $cupones_pagados, string $fecha_pago): void {
+function _crear_lista_cupones_venta(Nodo $nodo_venta, int $cuotas, string $total, string $monto_pagado, string $fecha_pago): void {
     if ($cuotas <= 0) return;
+
+    $total_num = (float)$total;
+    $monto_pagado_num = (float)$monto_pagado;
+    $saldo = max(0, $total_num - $monto_pagado_num);
 
     $contenedor_cupones = Nodo::crear_con_dato('');
     $nodo_venta->_adyacente_en($contenedor_cupones, 'cupones');
 
-    [$monto_cuota, $monto_ultima] = _calcular_montos_cuotas($total, $cuotas);
+    // Caso A: pagó todo al momento de la venta. Un solo cupón pagado
+    // con el monto total. No quedan más oportunidades.
+    if ($saldo <= 0.001) {
+        $cupon = Nodo::crear_con_dato('');
+        $cupon->_adyacente_en(Nodo::crear_con_dato('1'), 'numero');
+        $cupon->_adyacente_en(Nodo::crear_con_dato(number_format($total_num, 2, '.', '')), 'monto');
+        $cupon->_adyacente_en(Nodo::crear_con_dato('pagado'), 'estado');
+        if ($fecha_pago !== '') {
+            $cupon->_adyacente_en(Nodo::crear_con_dato($fecha_pago), 'fecha_pago');
+        }
+        _hmi($contenedor_cupones, $cupon);
+        return;
+    }
 
-    $anterior = null;
-    for ($i = 1; $i <= $cuotas; $i++) {
+    // Caso B: pagó parte. Cupón 1 pagado con el monto real. Cupones
+    // 2..N pendientes con el saldo repartido.
+    $cuotas_restantes = $cuotas - 1;
+
+    // Cupón 1 (pagado).
+    $cupon_1 = Nodo::crear_con_dato('');
+    $cupon_1->_adyacente_en(Nodo::crear_con_dato('1'), 'numero');
+    $cupon_1->_adyacente_en(Nodo::crear_con_dato(number_format($monto_pagado_num, 2, '.', '')), 'monto');
+    $cupon_1->_adyacente_en(Nodo::crear_con_dato('pagado'), 'estado');
+    if ($fecha_pago !== '') {
+        $cupon_1->_adyacente_en(Nodo::crear_con_dato($fecha_pago), 'fecha_pago');
+    }
+    _hmi($contenedor_cupones, $cupon_1);
+    $anterior = $cupon_1;
+
+    // Cupones 2..N (pendientes).
+    $teorico_pendiente = round($saldo / $cuotas_restantes, 2);
+    for ($i = 2; $i <= $cuotas; $i++) {
+        $es_ultimo = ($i === $cuotas);
+        $monto_pendiente = $es_ultimo
+            ? round($saldo - $teorico_pendiente * ($cuotas_restantes - 1), 2)
+            : $teorico_pendiente;
+
         $cupon = Nodo::crear_con_dato('');
         $cupon->_adyacente_en(Nodo::crear_con_dato((string)$i), 'numero');
+        $cupon->_adyacente_en(Nodo::crear_con_dato(number_format($monto_pendiente, 2, '.', '')), 'monto');
+        $cupon->_adyacente_en(Nodo::crear_con_dato('pendiente'), 'estado');
 
-        $monto = ($i === $cuotas) ? $monto_ultima : $monto_cuota;
-        $cupon->_adyacente_en(Nodo::crear_con_dato($monto), 'monto');
-
-        $es_pagado = ($i <= $cupones_pagados);
-        if ($es_pagado) {
-            $cupon->_adyacente_en(Nodo::crear_con_dato('pagado'), 'estado');
-            if ($fecha_pago !== '') {
-                $cupon->_adyacente_en(Nodo::crear_con_dato($fecha_pago), 'fecha_pago');
-            }
-        } else {
-            $cupon->_adyacente_en(Nodo::crear_con_dato('pendiente'), 'estado');
-        }
-
-        if ($anterior === null) {
-            _hmi($contenedor_cupones, $cupon);
-        } else {
-            _hd($anterior, $cupon);
-        }
+        _hd($anterior, $cupon);
         $anterior = $cupon;
     }
 }
@@ -932,6 +1240,7 @@ function _leer_cupones_de_venta(Nodo $nodo_venta): array {
             'monto' => $actual->adyacente('monto') ? $actual->adyacente('monto')->dato() : '0.00',
             'estado' => $actual->adyacente('estado') ? $actual->adyacente('estado')->dato() : 'pendiente',
             'fecha_pago' => $actual->adyacente('fecha_pago') ? $actual->adyacente('fecha_pago')->dato() : '',
+            'metodo_pago' => $actual->adyacente('metodo_pago') ? $actual->adyacente('metodo_pago')->dato() : '',
         ];
         $actual = hd($actual);
         $seguridad++;
@@ -965,6 +1274,7 @@ function _construir_cupones_derivados(Nodo $nodo_venta): array {
             'monto' => ($i === $cuotas) ? $monto_ultima : $monto_cuota,
             'estado' => $es_pagado ? 'pagado' : 'pendiente',
             'fecha_pago' => $es_pagado ? $fecha_pago : '',
+            'metodo_pago' => '',
         ];
     }
     return $cupones;

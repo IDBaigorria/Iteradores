@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.39
+ * @version   1.5piloto.45
  */
 
 use Iteradores\Nodos\Nodo;
@@ -622,6 +622,17 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'ID de venta no especificado']);
                     }
                     $resultado = cancelar_venta($id_venta);
+                    responder_json($resultado);
+                    break;
+                case 'pagar_cupon':
+                    $id_venta = $post['id_venta'] ?? '';
+                    $numero_cupon = $post['numero_cupon'] ?? '';
+                    $monto = $post['monto'] ?? '';
+                    $metodo_pago = $post['metodo_pago'] ?? '';
+                    if (empty($id_venta) || empty($numero_cupon) || empty($monto) || empty($metodo_pago)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = pagar_cupon_venta($id_venta, $numero_cupon, $monto, $metodo_pago);
                     responder_json($resultado);
                     break;
                 case 'listar':

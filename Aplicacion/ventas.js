@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.44c
+ * @version 1.5piloto.45d
  */
 
 // (aplicar_cambios.php funcionó)
@@ -806,8 +806,10 @@ function mostrar_opciones_impresion(id_venta) {
     $("#btn_imprimir_pasajes").onclick = () => {
         window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id_venta}`, '_blank');
     };
+    // El cupón post-venta corresponde siempre al primer pago de la venta,
+    // que es el cupón 1.
     $("#btn_imprimir_cupon").onclick = () => {
-        window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${id_venta}`, '_blank');
+        window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${id_venta}&numero_cupon=1`, '_blank');
     };
     $("#btn_cerrar_opciones").onclick = () => {
         contenedor.classList.add("hidden");
@@ -1128,6 +1130,14 @@ function renderizar_ventas() {
  *
  * @param {string} id_venta
  */
+/**
+ * Abre el modal de la cuponera de una venta.
+ *
+ * Muestra los datos de la compra y la grilla de cupones. Los cupones
+ * pagados ofrecen "Imprimir", los pendientes "Pagar".
+ *
+ * @param {string} id_venta
+ */
 async function ver_cuponera_venta(id_venta) {
     const respuesta = await fetch("index.php", {
         method: "POST",
@@ -1140,22 +1150,37 @@ async function ver_cuponera_venta(id_venta) {
         return;
     }
 
-    const venta = datos.venta;
+    window.venta_cuponera_actual = datos.venta;
+
+    // Refrescar la lista de Vendidos al cerrar la cuponera, sin importar
+    // cómo se cierre (X, backdrop o botón Cerrar).
+    window.on_cerrar_modal_generico = () => {
+        window.venta_cuponera_actual = null;
+        if (typeof cargar_ventas === 'function') cargar_ventas();
+    };
+
+    abrir_modal_generico('Cuponera de la venta', '');
+    _renderizar_cuponera_en_modal();
+}
+
+/**
+ * Vuelve a armar el contenido del modal de la cuponera con la venta
+ * actual. Se usa después de un pago para reflejar los cambios.
+ */
+function _renderizar_cuponera_en_modal() {
+    const venta = window.venta_cuponera_actual;
+    if (!venta) return;
+
     const cupones = Array.isArray(venta.cupones) ? venta.cupones : [];
 
-    // Encabezado con ID y vendedor.
     const nombre_vendedor = venta.terminal_nombre_real || venta.terminal || '';
-
-    // Línea de datos del viaje y micro.
     const viaje_visible = venta.viaje_visible || venta.viaje || '';
     const micro_visible = venta.micro_nombre_visible || venta.micro || '';
 
-    // Último pago: solo si difiere de la fecha de compra.
     const fecha_compra = venta.fecha || '';
     const fecha_pago = venta.fecha_pago || '';
     const mostrar_fecha_pago = fecha_pago && fecha_pago !== fecha_compra;
 
-    // Comprador.
     const c = venta.comprador || null;
     let comprador_html = '';
     if (c) {
@@ -1169,10 +1194,6 @@ async function ver_cuponera_venta(id_venta) {
             comprador_html = `<div class="cuponera-dato-bloque">${lineas.join('')}</div>`;
         }
     }
-
-    // Totales.
-    const pendiente_num = parseFloat(venta.pendiente || '0');
-    const clase_pendiente = pendiente_num > 0 ? ' cuponera-total-pendiente' : '';
 
     // Grilla de cupones.
     let cupones_html = '';
@@ -1188,19 +1209,22 @@ async function ver_cuponera_venta(id_venta) {
             const linea_fecha = (es_pagado && cup.fecha_pago)
                 ? `<div class="cupon-fecha">${cup.fecha_pago}</div>`
                 : '';
+            const linea_metodo = (es_pagado && cup.metodo_pago)
+                ? `<div class="cupon-metodo">${cup.metodo_pago === 'efectivo' ? 'Efectivo' : 'Transferencia'}</div>`
+                : '';
             return `
                 <div class="cupon ${clase_estado}">
                     <div class="cupon-numero">Cupón ${cup.numero}</div>
                     <div class="cupon-monto">$${cup.monto}</div>
                     <div class="cupon-estado">${texto_estado}</div>
                     ${linea_fecha}
+                    ${linea_metodo}
                     <button class="btn cupon-accion cupon-accion-${accion_boton}" data-cupon="${cup.numero}" data-accion="${accion_boton}">${texto_boton}</button>
                 </div>
             `;
         }).join('');
     }
 
-    // Bloque compacto de datos de la compra.
     const info_partes = [];
     if (viaje_visible) info_partes.push(`<span><b>Viaje:</b> ${viaje_visible}</span>`);
     if (micro_visible) info_partes.push(`<span><b>Micro:</b> ${micro_visible}</span>`);
@@ -1243,25 +1267,134 @@ async function ver_cuponera_venta(id_venta) {
         </div>
     `;
 
-    abrir_modal_generico(`Cuponera de la venta`, html);
+    const contenedor = document.getElementById('modal_generico_contenido');
+    if (contenedor) contenedor.innerHTML = html;
 
-    // Listener para el botón Cerrar.
+    // Listener para el botón Cerrar: cierra el modal y refresca la lista
+    // de ventas para que la tarjeta del panel refleje el nuevo estado.
     const btn_cerrar = document.getElementById('cuponera_cerrar');
     if (btn_cerrar) {
         btn_cerrar.addEventListener('click', cerrar_modal_generico);
     }
 
-    // Listeners de los botones de cupón. Por ahora son placeholders.
+    // Listeners de los botones de cupón.
     document.querySelectorAll('.cupon-accion').forEach(btn => {
         btn.addEventListener('click', function() {
             const accion = this.dataset.accion;
             const numero = this.dataset.cupon;
             if (accion === 'imprimir') {
-                mostrar_aviso(`Imprimir cupón ${numero} (función en desarrollo)`, 'info');
+                window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${venta.id_venta}&numero_cupon=${numero}`, '_blank');
             } else if (accion === 'pagar') {
-                mostrar_aviso(`Pagar cupón ${numero} (función en desarrollo)`, 'info');
+                _abrir_modal_pagar_cupon(numero);
             }
         });
+    });
+}
+
+/**
+ * Abre el modal apilado para pagar un cupón pendiente.
+ *
+ * El input de monto viene precargado con el monto actual del cupón.
+ * Si es el último pendiente, se bloquea con el saldo exacto de la venta.
+ *
+ * @param {string|number} numero_cupon
+ */
+function _abrir_modal_pagar_cupon(numero_cupon) {
+    const venta = window.venta_cuponera_actual;
+    if (!venta) return;
+
+    const cupones = Array.isArray(venta.cupones) ? venta.cupones : [];
+    const cupon = cupones.find(c => String(c.numero) === String(numero_cupon));
+    if (!cupon) {
+        mostrar_aviso('Cupón no encontrado', 'error');
+        return;
+    }
+
+    const pendientes = cupones.filter(c => c.estado === 'pendiente');
+    const es_ultimo_pendiente = (pendientes.length === 1 && String(pendientes[0].numero) === String(numero_cupon));
+    const saldo = parseFloat(venta.pendiente || '0');
+    const metodos = Array.isArray(venta.metodos_permitidos) && venta.metodos_permitidos.length > 0
+        ? venta.metodos_permitidos
+        : ['efectivo'];
+
+    const valor_input = es_ultimo_pendiente ? saldo.toFixed(2) : cupon.monto;
+    const opciones_metodo = metodos.map(m => {
+        const texto = m === 'efectivo' ? 'Efectivo' : 'Transferencia';
+        return `<option value="${m}">${texto}</option>`;
+    }).join('');
+
+    const html = `
+        <h3>Pagar cupón ${cupon.numero}</h3>
+        <div class="seccion" style="margin-bottom:15px;">
+            <div class="detail-line"><span>Monto del cupón:</span><strong>$${cupon.monto}</strong></div>
+            <div class="detail-line"><span>Saldo pendiente de la venta:</span><strong>$${venta.pendiente}</strong></div>
+        </div>
+        <div class="form-grid">
+            <div class="field">
+                <label>Monto a cobrar *</label>
+                <input type="number" id="pagar_cupon_monto" step="1000" min="1000" value="${valor_input}" ${es_ultimo_pendiente ? 'disabled' : ''}>
+            </div>
+            <div class="field">
+                <label>Método de pago *</label>
+                <select id="pagar_cupon_metodo">${opciones_metodo}</select>
+            </div>
+        </div>
+        <div class="actions" style="margin-top:15px;">
+            <button class="btn primary" id="btn_confirmar_pagar_cupon">Confirmar pago</button>
+            <button class="btn" id="btn_cancelar_pagar_cupon">Cancelar</button>
+        </div>
+    `;
+
+    abrir_modal_apilado(`Pagar cupón ${cupon.numero}`, html);
+
+    const contenedor = document.getElementById('modal_apilado_contenido');
+
+    contenedor.querySelector('#btn_cancelar_pagar_cupon').addEventListener('click', cerrar_modal_apilado);
+
+    contenedor.querySelector('#btn_confirmar_pagar_cupon').addEventListener('click', async () => {
+        const input_monto = contenedor.querySelector('#pagar_cupon_monto');
+        const select_metodo = contenedor.querySelector('#pagar_cupon_metodo');
+        const monto_str = input_monto.value.trim();
+        const metodo = select_metodo.value;
+
+        const monto_num = parseFloat(monto_str);
+        if (isNaN(monto_num) || monto_num <= 0) {
+            mostrar_aviso('Ingrese un monto válido', 'error');
+            return;
+        }
+        if (monto_num > saldo + 0.001) {
+            mostrar_aviso('El monto no puede superar el saldo pendiente', 'error');
+            return;
+        }
+        if (es_ultimo_pendiente && Math.abs(monto_num - saldo) > 0.001) {
+            mostrar_aviso('En el último cupón pendiente debe cobrarse el saldo exacto', 'error');
+            return;
+        }
+
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "ventas/pagar_cupon",
+                id_venta: venta.id_venta,
+                numero_cupon: cupon.numero,
+                monto: monto_num.toFixed(2),
+                metodo_pago: metodo
+            })
+        });
+        const resultado = await respuesta.json();
+        if (!resultado.exito) {
+            mostrar_aviso(resultado.error || 'Error al registrar el pago', 'error');
+            return;
+        }
+
+        mostrar_aviso('Pago registrado', 'exito');
+        cerrar_modal_apilado();
+
+        // Actualizar la venta en memoria con la versión devuelta por el
+        // backend y volver a renderizar el modal de la cuponera.
+        window.venta_cuponera_actual = resultado.venta;
+        _renderizar_cuponera_en_modal();
     });
 }
 

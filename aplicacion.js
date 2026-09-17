@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.41
+ * @version 1.5piloto.45
  */
 
 // Utilidades
@@ -283,6 +283,15 @@ function volver_modal_generico() {
 }
 
 function cerrar_modal_generico() {
+    // Hook opcional: algunos flujos quieren ejecutar algo al cerrar el
+    // modal genérico (por ejemplo, refrescar la lista de ventas después
+    // de la cuponera), sin importar cómo se cierre (X, backdrop o botón).
+    if (typeof window.on_cerrar_modal_generico === 'function') {
+        const cb = window.on_cerrar_modal_generico;
+        window.on_cerrar_modal_generico = null;
+        try { cb(); } catch (e) { console.error('on_cerrar_modal_generico:', e); }
+    }
+
     const modalEl = document.getElementById('modal_generico');
     if (modalEl) {
         modalEl.classList.add('hidden');

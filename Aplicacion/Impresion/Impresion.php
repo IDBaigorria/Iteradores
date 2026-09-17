@@ -4,10 +4,10 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.39
+ * @version   1.5piloto.45
  */
 
-function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = ''): void {
+function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = '', string $numero_cupon = ''): void {
     if ($tipo === 'ficha_salud') {
         // Para ficha de salud, id_venta contendrá el nombre_dueno y dni_filtro el dni
         imprimir_ficha_salud($id_venta, $dni_filtro);
@@ -21,7 +21,7 @@ function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = 
     if ($tipo === 'pasajes') {
         imprimir_pasajes($venta, $dni_filtro);
     } elseif ($tipo === 'cupon') {
-        imprimir_cupon($venta);
+        imprimir_cupon($venta, $numero_cupon);
     } else {
         echo "Tipo de impresión no válido";
     }
@@ -526,7 +526,7 @@ function _recolectar_ventas_con_pasajero_activo(string $nombre_dueno, string $dn
     return $resultado;
 }
 
-function imprimir_cupon(array $venta): void {
+function imprimir_cupon(array $venta, string $numero_cupon = ''): void {
     $codigo_venta = $venta['id_venta'] ?? '';
     // Usar nombre visible del viaje si está disponible, si no el identificador
     $nombre_viaje = $venta['viaje_visible'] ?? $venta['viaje'] ?? '';
@@ -534,10 +534,13 @@ function imprimir_cupon(array $venta): void {
     $total = $venta['total'] ?? '0';
     $pagado = $venta['pagado'] ?? '0';
     $cuotas_restantes = $venta['cuotas_restantes'] ?? '0';
+    $cuotas = $venta['cuotas'] ?? '1';
     $pendiente = number_format((float)$total - (float)$pagado, 2, '.', '');
     // Ahora $venta['fecha'] es la fecha de venta (ya formateada)
     $fecha_venta = $venta['fecha'] ?? '';
     $fecha_pago = $venta['fecha_pago'] ?? '';
+    // Vendedor: nombre visible con fallback al nombre de usuario.
+    $vendedor = $venta['terminal_nombre_real'] ?? $venta['terminal'] ?? '';
     $logo_ruta = './Aplicacion/LogoPeque.png';
 
     echo '<!DOCTYPE html>';
@@ -649,6 +652,9 @@ function imprimir_cupon(array $venta): void {
     echo '<div class="seccion">';
     echo '<h3>Datos de la venta</h3>';
     echo '<div class="fila"><strong>Cod. de Venta:</strong> <span>' . htmlspecialchars($codigo_venta) . '</span></div>';
+    if (!empty($vendedor)) {
+        echo '<div class="fila"><strong>Vendedor:</strong> <span>' . htmlspecialchars($vendedor) . '</span></div>';
+    }
     if (!empty($fecha_venta)) {
         echo '<div class="fila"><strong>Fecha de venta:</strong> <span>' . htmlspecialchars($fecha_venta) . '</span></div>';
     }
@@ -665,6 +671,16 @@ function imprimir_cupon(array $venta): void {
     echo '<h3>Datos del pago</h3>';
     echo '<div class="fila"><strong>Fecha de pago:</strong> <span>' . htmlspecialchars($fecha_pago) . '</span></div>';
     echo '<div class="fila"><strong>Método de pago:</strong> <span>' . htmlspecialchars($metodo_pago) . '</span></div>';
+    if (!empty($cuotas) && (int)$cuotas > 1) {
+        echo '<div class="fila"><strong>Cuotas pactadas:</strong> <span>' . htmlspecialchars($cuotas) . '</span></div>';
+    }
+    if ($numero_cupon !== '') {
+        $texto_cupon = 'Cuota ' . htmlspecialchars($numero_cupon);
+        if (!empty($cuotas) && (int)$cuotas > 1) {
+            $texto_cupon .= ' de ' . htmlspecialchars($cuotas);
+        }
+        echo '<div class="fila"><strong>Cuota:</strong> <span>' . $texto_cupon . '</span></div>';
+    }
     echo '<div class="fila"><strong>Cantidad:</strong> <span>$' . htmlspecialchars(number_format((float)$pagado, 2, '.', '')) . '</span></div>';
     echo '<div class="fila"><strong>Total:</strong> <span>$' . htmlspecialchars(number_format((float)$total, 2, '.', '')) . '</span></div>';
     echo '<div class="fila"><strong>Total abonado:</strong> <span>$' . htmlspecialchars(number_format((float)$pagado, 2, '.', '')) . '</span></div>';
