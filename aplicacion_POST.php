@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.39)
+ * ## Estructura de nodos actual (v1.5piloto.44)
  *
  * ### Nodos raíz especiales
  *
@@ -399,7 +399,10 @@
  *   | `cuotas_restantes`| Nodo con dato string numérico: cuotas que faltan pagar.           |
  *   | `comprador`       | Enlace al nodo pasajero (o un nodo con datos del comprador).      |
  *   | `asientos`        | Nodo cabeza de lista enlazada (no circular) de asientos-en-venta persistente. |
- *   |                   | └─ Enlace `primer` → primer nodo asiento-en-venta persistente.    |
+ *   |                   | └─ Enlace `primer` → primer nodo asiento-en-venta persistente.
+ * | `cupones`         | Nodo contenedor con dato vacío. Es el "padre" de los cupones.
+ * |                   | └─ Cada cupón es un hijo, enlazados con la estructura de árbol
+ * |                   |    (`hmi`/`hd`/`p`) de miscelaneas/Arbol.php. Ver Nodo Cupón.    |
  *
  * **Nota (cuotas):** A partir de v1.5piloto.32, el rango de cuotas ya no está fijo
  * en 1-3 para efectivo y 1 para transferencia. Se resuelve al confirmar la venta
@@ -433,6 +436,34 @@
  * no tiene hora, el enlace no se crea (en la interfaz se muestra "hora estimada
  * a confirmar"). Si el pasajero elige el origen, no se guarda ni punto ni hora:
  * el origen ya tiene la hora general del viaje.
+ *
+ * ### Nodo Cupón (hijo del contenedor `cupones` de una venta)
+ *
+ * A partir de v1.5piloto.44. Cada venta tiene un contenedor `cupones`
+ * con N hijos, uno por cuota. Los cupones se enlazan con la estructura
+ * de árbol (`hmi`/`hd`/`p`) de `miscelaneas/Arbol.php`.
+ *
+ * - Dato del nodo: vacío.
+ * - Enlaces salientes:
+ *   | Enlace       | Nodo destino y dato esperado                          |
+ *   |--------------|-------------------------------------------------------|
+ *   | `numero`     | Nodo con dato string numérico: número de cupón (1..N). |
+ *   | `monto`      | Nodo con dato string numérico: monto teórico de la cuota. El último absorbe el remanente para que la suma sea exactamente igual al total. |
+ *   | `estado`     | Nodo con dato string: `"pagado"` o `"pendiente"`.     |
+ *   | `fecha_pago` | Nodo con dato string `"DD/MM/YYYY HH:MM"`. Solo existe si `estado` es `"pagado"`. |
+ *
+ * **Nota (resumen en la venta):** Los enlaces `cuotas`, `pagado` y
+ * `cuotas_restantes` del Nodo Venta Persistente se siguen escribiendo
+ * como antes, para no romper los filtros y lecturas rápidas. Pero la
+ * fuente de verdad de los cupones individuales son los nodos de esta
+ * lista. El frontend lee los cupones del contenedor y calcula los
+ * totales a partir de ellos.
+ *
+ * **Nota (migración):** Las ventas creadas antes de v1.5piloto.44 no
+ * tienen contenedor `cupones`. Se ejecutó la migración
+ * `migrar_cupones` (bloque temporal en `index.php`) para crearlos. Si
+ * por alguna razón el contenedor no existe al leer la venta,
+ * `formatear_venta_completa` deriva los cupones al vuelo.
  *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
@@ -473,7 +504,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.39
+ * @version   1.5piloto.44
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

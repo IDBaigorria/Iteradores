@@ -18,7 +18,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.39
+ * @version   1.5piloto.44
  */
 
 // --- Utilidades base ----------------------------------
@@ -134,6 +134,22 @@ if (isset($_GET['migrar_terminales_autorizadas'])) {
     echo "Terminales sin nodo usuario: {$res['terminales_sin_nodo_usuario']}\n";
     exit;
 }
+// ==== Bloque temporal para migración de cupones (v1.5piloto.44) ====
+// Crea el contenedor `cupones` en cada venta existente que no lo tenga.
+// Es idempotente: si una venta ya tiene cupones, la saltea.
+if (isset($_GET['migrar_cupones'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_cupones.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_cupones();
+    echo "Migración de cupones completada.\n";
+    echo "Dueños procesados:    {$res['duenos_procesados']}\n";
+    echo "Ventas procesadas:    {$res['ventas_procesadas']}\n";
+    echo "Ventas migradas:      {$res['ventas_migradas']}\n";
+    echo "Ventas ya migradas:   {$res['ventas_ya_migradas']}\n";
+    echo "Ventas sin datos:     {$res['ventas_sin_datos']}\n";
+    exit;
+}
+
 // ==== Bloque temporal para migración de nombres de pasajeros (v1.5piloto.36) ====
 // Separa el campo `nombre` de cada pasajero en dos enlaces: `nombres` y `apellido`.
 // Toma la última palabra como apellido y el resto como nombres. Si el nombre

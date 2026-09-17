@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.42
+ * @version   1.5piloto.44
  */
 
 
@@ -413,6 +413,12 @@ function confirmar_venta_actual(
         $cabeza_asientos_venta->_adyacente_en($primer_asiento_venta, 'primer');
     }
 
+    // Crear la lista de cupones. El contenedor `cupones` es el padre,
+    // y cada cupón es un hijo enlazado con la estructura de árbol
+    // (hmi/hd/p) de miscelaneas/Arbol.php.
+    $cupones_pagados = max(0, $cuotas - $cuotas_restantes);
+    _crear_lista_cupones_venta($nodo_venta, $cuotas, (string)$total, $cupones_pagados, $fecha_pago);
+
     // Actualizar contadores
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
@@ -724,6 +730,15 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
         $datos['patente'] = $nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '';
     }
 
+    // Cupones: si la venta tiene el contenedor `cupones` en el grafo,
+    // se leen directamente. Si no (ventas viejas sin migrar), se
+    // derivan al vuelo para que el frontend siempre tenga datos.
+    $cupones = _leer_cupones_de_venta($nodo_venta);
+    if (empty($cupones)) {
+        $cupones = _construir_cupones_derivados($nodo_venta);
+    }
+    $datos['cupones'] = $cupones;
+
     return $datos;
 }
 
@@ -819,5 +834,139 @@ function cancelar_venta(string $id_venta): array {
     }
 
     return ['exito' => false, 'error' => 'Venta no encontrada'];
+}
+
+/**
+ * Calcula el monto teórico de cada cuota y el remanente de la última.
+ *
+ * Devuelve [monto_cuota, monto_ultima] como strings con dos decimales.
+ * La última cuota absorbe el remanente de centavos para que la suma
+ * sea exactamente igual al total.
+ *
+ * @param string $total
+ * @param int    $cuotas
+ * @return array{0: string, 1: string}
+ */
+function _calcular_montos_cuotas(string $total, int $cuotas): array {
+    if ($cuotas <= 0) {
+        return ['0.00', '0.00'];
+    }
+    $total_num = (float)$total;
+    if ($cuotas === 1) {
+        $unico = number_format($total_num, 2, '.', '');
+        return [$unico, $unico];
+    }
+    $monto_cuota = round($total_num / $cuotas, 2);
+    $monto_ultima = round($total_num - $monto_cuota * ($cuotas - 1), 2);
+    return [
+        number_format($monto_cuota, 2, '.', ''),
+        number_format($monto_ultima, 2, '.', '')
+    ];
+}
+
+/**
+ * Crea la lista de cupones de una venta como hijos del contenedor
+ * `cupones`. Usa la estructura de árbol (hmi/hd/p) de Arbol.php.
+ *
+ * Los primeros $cupones_pagados cupones quedan en estado `pagado` con
+ * la fecha indicada. El resto en estado `pendiente`.
+ *
+ * @param Nodo   $nodo_venta
+ * @param int    $cuotas
+ * @param string $total
+ * @param int    $cupones_pagados
+ * @param string $fecha_pago Fecha a usar para los cupones pagados.
+ * @return void
+ */
+function _crear_lista_cupones_venta(Nodo $nodo_venta, int $cuotas, string $total, int $cupones_pagados, string $fecha_pago): void {
+    if ($cuotas <= 0) return;
+
+    $contenedor_cupones = Nodo::crear_con_dato('');
+    $nodo_venta->_adyacente_en($contenedor_cupones, 'cupones');
+
+    [$monto_cuota, $monto_ultima] = _calcular_montos_cuotas($total, $cuotas);
+
+    $anterior = null;
+    for ($i = 1; $i <= $cuotas; $i++) {
+        $cupon = Nodo::crear_con_dato('');
+        $cupon->_adyacente_en(Nodo::crear_con_dato((string)$i), 'numero');
+
+        $monto = ($i === $cuotas) ? $monto_ultima : $monto_cuota;
+        $cupon->_adyacente_en(Nodo::crear_con_dato($monto), 'monto');
+
+        $es_pagado = ($i <= $cupones_pagados);
+        if ($es_pagado) {
+            $cupon->_adyacente_en(Nodo::crear_con_dato('pagado'), 'estado');
+            if ($fecha_pago !== '') {
+                $cupon->_adyacente_en(Nodo::crear_con_dato($fecha_pago), 'fecha_pago');
+            }
+        } else {
+            $cupon->_adyacente_en(Nodo::crear_con_dato('pendiente'), 'estado');
+        }
+
+        if ($anterior === null) {
+            _hmi($contenedor_cupones, $cupon);
+        } else {
+            _hd($anterior, $cupon);
+        }
+        $anterior = $cupon;
+    }
+}
+
+/**
+ * Lee los cupones de una venta desde el grafo.
+ *
+ * @param Nodo $nodo_venta
+ * @return array<int, array{numero: string, monto: string, estado: string, fecha_pago: string}>
+ */
+function _leer_cupones_de_venta(Nodo $nodo_venta): array {
+    $contenedor = $nodo_venta->adyacente('cupones');
+    if (!$contenedor) return [];
+
+    $cupones = [];
+    $actual = hmi($contenedor);
+    $seguridad = 0;
+    while ($actual && $seguridad < 200) {
+        $cupones[] = [
+            'numero' => $actual->adyacente('numero') ? $actual->adyacente('numero')->dato() : '',
+            'monto' => $actual->adyacente('monto') ? $actual->adyacente('monto')->dato() : '0.00',
+            'estado' => $actual->adyacente('estado') ? $actual->adyacente('estado')->dato() : 'pendiente',
+            'fecha_pago' => $actual->adyacente('fecha_pago') ? $actual->adyacente('fecha_pago')->dato() : '',
+        ];
+        $actual = hd($actual);
+        $seguridad++;
+    }
+    return $cupones;
+}
+
+/**
+ * Deriva los cupones al vuelo para ventas que no tienen el contenedor
+ * `cupones` en el grafo (ventas viejas sin migrar).
+ *
+ * @param Nodo $nodo_venta
+ * @return array<int, array{numero: string, monto: string, estado: string, fecha_pago: string}>
+ */
+function _construir_cupones_derivados(Nodo $nodo_venta): array {
+    $total = $nodo_venta->adyacente('total') ? $nodo_venta->adyacente('total')->dato() : '0';
+    $cuotas = (int)($nodo_venta->adyacente('cuotas') ? $nodo_venta->adyacente('cuotas')->dato() : '1');
+    $cuotas_restantes = (int)($nodo_venta->adyacente('cuotas_restantes') ? $nodo_venta->adyacente('cuotas_restantes')->dato() : '0');
+    $fecha_pago = $nodo_venta->adyacente('fecha_ultimo_pago') ? $nodo_venta->adyacente('fecha_ultimo_pago')->dato() : '';
+
+    if ($cuotas <= 0) return [];
+
+    [$monto_cuota, $monto_ultima] = _calcular_montos_cuotas($total, $cuotas);
+    $cupones_pagados = max(0, $cuotas - $cuotas_restantes);
+
+    $cupones = [];
+    for ($i = 1; $i <= $cuotas; $i++) {
+        $es_pagado = ($i <= $cupones_pagados);
+        $cupones[] = [
+            'numero' => (string)$i,
+            'monto' => ($i === $cuotas) ? $monto_ultima : $monto_cuota,
+            'estado' => $es_pagado ? 'pagado' : 'pendiente',
+            'fecha_pago' => $es_pagado ? $fecha_pago : '',
+        ];
+    }
+    return $cupones;
 }
 

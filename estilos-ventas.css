@@ -225,3 +225,249 @@
     gap: 10px;
     flex-wrap: wrap;
 }
+
+/* ===== v1.5piloto.44: cuponera digital ===== */
+
+/* Contenedor general del modal de la cuponera. */
+.cuponera {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Header: ID de venta + fechas a la izquierda, badge del vendedor a la derecha. */
+.cuponera-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.cuponera-header-izq {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.cuponera-titulo-venta {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary-dark);
+}
+
+.cuponera-fecha-compra {
+    font-size: 13px;
+    color: var(--muted);
+}
+.cuponera-fecha-compra b {
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* Bloque de datos: viaje/micro + comprador. */
+.cuponera-datos {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cuponera-info-linea {
+    font-size: 14px;
+    color: var(--text);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: baseline;
+}
+.cuponera-info-linea b {
+    color: var(--primary-dark);
+    font-weight: 700;
+}
+
+.cuponera-sep {
+    color: var(--muted);
+    opacity: 0.5;
+    padding: 0 2px;
+}
+
+.cuponera-dato-bloque {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.cuponera-dato-linea {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.cuponera-dato-linea span {
+    color: var(--muted);
+    flex-shrink: 0;
+    min-width: 80px;
+}
+.cuponera-dato-linea b {
+    color: var(--text);
+    font-weight: 600;
+    word-break: break-word;
+}
+
+/* Totales en una sola línea, sin cajas. */
+.cuponera-totales-linea {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: baseline;
+    font-size: 14px;
+    color: var(--text);
+    padding: 4px 0 12px 0;
+    border-bottom: 1px solid var(--border);
+}
+.cuponera-totales-linea b {
+    color: var(--primary-dark);
+    font-weight: 700;
+}
+.cuponera-total-pendiente-texto {
+    color: #b85e00;
+    font-weight: 700;
+}
+
+/* Título de la sección Cupones. */
+.cuponera-seccion-titulo {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    margin-top: 6px;
+}
+
+/* Grilla de cupones: ancho fijo, centrada. */
+.cuponera-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, 180px);
+    justify-content: center;
+    gap: 12px;
+}
+
+/* Cupón individual: cuadrado de 180x180. */
+.cupon {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 12px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: #fff;
+    transition: box-shadow 0.2s, transform 0.2s;
+    text-align: center;
+    width: 180px;
+    min-height: 180px;
+    box-sizing: border-box;
+}
+
+.cupon:hover {
+    box-shadow: 0 4px 12px rgba(60, 40, 20, 0.18);
+    transform: translateY(-2px);
+}
+
+.cupon-numero {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.cupon-monto {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.cupon-estado {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 12px;
+    align-self: center;
+}
+
+.cupon-fecha {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+}
+
+.cupon-accion {
+    margin-top: 4px;
+    font-size: 12px;
+    padding: 6px 10px;
+    width: 100%;
+}
+
+/* Cupón pagado: verde. */
+.cupon.pagado {
+    background: #e7f4ea;
+    border-color: #28713b;
+}
+.cupon.pagado .cupon-numero,
+.cupon.pagado .cupon-monto {
+    color: #28713b;
+}
+.cupon.pagado .cupon-estado {
+    background: #28713b;
+    color: #fff;
+}
+.cupon.pagado .cupon-accion {
+    background: #fff;
+    color: #28713b;
+    border: 1px solid #28713b;
+}
+.cupon.pagado .cupon-accion:hover {
+    background: #28713b;
+    color: #fff;
+}
+
+/* Cupón pendiente: naranja. */
+.cupon.pendiente {
+    background: #fff4e5;
+    border-color: #e8a44e;
+}
+.cupon.pendiente .cupon-numero,
+.cupon.pendiente .cupon-monto {
+    color: #b85e00;
+}
+.cupon.pendiente .cupon-estado {
+    background: #b85e00;
+    color: #fff;
+}
+.cupon.pendiente .cupon-accion {
+    background: #b85e00;
+    color: #fff;
+    border: 1px solid #b85e00;
+}
+.cupon.pendiente .cupon-accion:hover {
+    background: #a05200;
+}
+
+/* Responsive. */
+@media (max-width: 650px) {
+    .cuponera-totales {
+        grid-template-columns: 1fr;
+    }
+    .cuponera-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

@@ -1,8 +1,9 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.43
+ * @version 1.5piloto.44c
  */
 
+// (aplicar_cambios.php funcionó)
 let ventas_actuales = [];
 let ultima_venta_id = null;
 
@@ -1112,24 +1113,156 @@ function renderizar_ventas() {
             </div>`;
 
         lista.appendChild(tarjeta);
-        tarjeta.querySelector('.ver_detalle_venta').addEventListener('click', () => ver_detalle_venta(venta.id_venta));
+        tarjeta.querySelector('.ver_detalle_venta').addEventListener('click', () => ver_cuponera_venta(venta.id_venta));
         tarjeta.querySelector('.cancelar_venta').addEventListener('click', () => cancelar_venta(venta.id_venta));
     });
 }
 
-async function ver_detalle_venta(id_venta) {
+/**
+ * Abre el modal de la cuponera de una venta.
+ *
+ * Muestra los datos de la compra (viaje, micro, comprador, totales)
+ * y una grilla con los cupones (uno por cuota). Cada cupón tiene su
+ * número, monto, estado (pagado/pendiente) y un botón de acción
+ * (placeholder por ahora).
+ *
+ * @param {string} id_venta
+ */
+async function ver_cuponera_venta(id_venta) {
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ accion: "ventas/obtener", id_venta })
     });
     const datos = await respuesta.json();
-    if (datos.exito) {
-        const venta = datos.venta;
-        alert(`Detalle de venta ${venta.id_venta}\nTotal: $${venta.total}\nMétodo: ${venta.metodo_pago}\nCuotas: ${venta.cuotas}\nPagado: $${venta.pagado}\nPasajeros: ${venta.asientos.length}`);
-    } else {
-        mostrar_aviso(datos.error || "Error al obtener detalle", 'error');
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al obtener la venta", 'error');
+        return;
     }
+
+    const venta = datos.venta;
+    const cupones = Array.isArray(venta.cupones) ? venta.cupones : [];
+
+    // Encabezado con ID y vendedor.
+    const nombre_vendedor = venta.terminal_nombre_real || venta.terminal || '';
+
+    // Línea de datos del viaje y micro.
+    const viaje_visible = venta.viaje_visible || venta.viaje || '';
+    const micro_visible = venta.micro_nombre_visible || venta.micro || '';
+
+    // Último pago: solo si difiere de la fecha de compra.
+    const fecha_compra = venta.fecha || '';
+    const fecha_pago = venta.fecha_pago || '';
+    const mostrar_fecha_pago = fecha_pago && fecha_pago !== fecha_compra;
+
+    // Comprador.
+    const c = venta.comprador || null;
+    let comprador_html = '';
+    if (c) {
+        const lineas = [];
+        if (c.nombre_completo) lineas.push(`<div class="cuponera-dato-linea"><span>Nombre:</span><b>${c.nombre_completo}</b></div>`);
+        if (c.celular) lineas.push(`<div class="cuponera-dato-linea"><span>Celular:</span><b>${c.celular}</b></div>`);
+        if (c.email) lineas.push(`<div class="cuponera-dato-linea"><span>Email:</span><b>${c.email}</b></div>`);
+        const dir = [c.direccion, c.localidad].filter(v => v).join(', ');
+        if (dir) lineas.push(`<div class="cuponera-dato-linea"><span>Dirección:</span><b>${dir}</b></div>`);
+        if (lineas.length > 0) {
+            comprador_html = `<div class="cuponera-dato-bloque">${lineas.join('')}</div>`;
+        }
+    }
+
+    // Totales.
+    const pendiente_num = parseFloat(venta.pendiente || '0');
+    const clase_pendiente = pendiente_num > 0 ? ' cuponera-total-pendiente' : '';
+
+    // Grilla de cupones.
+    let cupones_html = '';
+    if (cupones.length === 0) {
+        cupones_html = '<p class="muted">Esta venta no tiene cupones registrados.</p>';
+    } else {
+        cupones_html = cupones.map(cup => {
+            const es_pagado = cup.estado === 'pagado';
+            const clase_estado = es_pagado ? 'pagado' : 'pendiente';
+            const texto_estado = es_pagado ? 'Pagado' : 'Pendiente';
+            const texto_boton = es_pagado ? 'Imprimir' : 'Pagar';
+            const accion_boton = es_pagado ? 'imprimir' : 'pagar';
+            const linea_fecha = (es_pagado && cup.fecha_pago)
+                ? `<div class="cupon-fecha">${cup.fecha_pago}</div>`
+                : '';
+            return `
+                <div class="cupon ${clase_estado}">
+                    <div class="cupon-numero">Cupón ${cup.numero}</div>
+                    <div class="cupon-monto">$${cup.monto}</div>
+                    <div class="cupon-estado">${texto_estado}</div>
+                    ${linea_fecha}
+                    <button class="btn cupon-accion cupon-accion-${accion_boton}" data-cupon="${cup.numero}" data-accion="${accion_boton}">${texto_boton}</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Bloque compacto de datos de la compra.
+    const info_partes = [];
+    if (viaje_visible) info_partes.push(`<span><b>Viaje:</b> ${viaje_visible}</span>`);
+    if (micro_visible) info_partes.push(`<span><b>Micro:</b> ${micro_visible}</span>`);
+    const info_html = info_partes.length > 0
+        ? `<div class="cuponera-info-linea">${info_partes.join('<span class="cuponera-sep">·</span>')}</div>`
+        : '';
+
+    const html = `
+        <div class="cuponera">
+            <div class="cuponera-header">
+                <div class="cuponera-header-izq">
+                    <div class="cuponera-titulo-venta">Venta ${venta.id_venta}</div>
+                    <div class="cuponera-fecha-compra"><b>Fecha de compra:</b> ${fecha_compra}</div>
+                    ${mostrar_fecha_pago ? `<div class="cuponera-fecha-compra"><b>Último pago:</b> ${fecha_pago}</div>` : ''}
+                </div>
+                <span class="badge">${nombre_vendedor}</span>
+            </div>
+
+            <div class="cuponera-datos">
+                ${info_html}
+                ${comprador_html}
+            </div>
+
+            <div class="cuponera-totales-linea">
+                <span><b>Total:</b> $${venta.total}</span>
+                <span class="cuponera-sep">·</span>
+                <span><b>Abonado:</b> $${venta.pagado}</span>
+                <span class="cuponera-sep">·</span>
+                <span><b>Pendiente:</b> <span class="cuponera-total-pendiente-texto">$${venta.pendiente}</span></span>
+            </div>
+
+            <div class="cuponera-seccion-titulo">Cupones</div>
+            <div class="cuponera-grid">
+                ${cupones_html}
+            </div>
+
+            <div class="actions" style="margin-top:20px;">
+                <button class="btn" id="cuponera_cerrar">Cerrar</button>
+            </div>
+        </div>
+    `;
+
+    abrir_modal_generico(`Cuponera de la venta`, html);
+
+    // Listener para el botón Cerrar.
+    const btn_cerrar = document.getElementById('cuponera_cerrar');
+    if (btn_cerrar) {
+        btn_cerrar.addEventListener('click', cerrar_modal_generico);
+    }
+
+    // Listeners de los botones de cupón. Por ahora son placeholders.
+    document.querySelectorAll('.cupon-accion').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const accion = this.dataset.accion;
+            const numero = this.dataset.cupon;
+            if (accion === 'imprimir') {
+                mostrar_aviso(`Imprimir cupón ${numero} (función en desarrollo)`, 'info');
+            } else if (accion === 'pagar') {
+                mostrar_aviso(`Pagar cupón ${numero} (función en desarrollo)`, 'info');
+            }
+        });
+    });
 }
 
 /**
