@@ -504,24 +504,50 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
     $nodo_total = $nodo_venta->adyacente('total');
     $nodo_fecha = $nodo_venta->adyacente('fecha_hora');
 
+    // Terminal vendedora: nombre de usuario (identificador) y nombre real.
     $nombre_terminal = $nodo_terminal ? $nodo_terminal->dato() : '';
-    // Nombre visible del terminal (nombre_real) con fallback al usuario.
     $nombre_terminal_real = $nombre_terminal;
     if ($nodo_terminal && $nodo_terminal->adyacente('nombre_real')) {
         $nombre_terminal_real = $nodo_terminal->adyacente('nombre_real')->dato();
     }
-    $nombre_viaje = $nodo_viaje ? $nodo_viaje->dato() : '';
-    $nombre_micro = $nodo_micro ? ($nodo_micro->adyacente('patente') ? $nodo_micro->adyacente('patente')->dato() : '') : '';
+
+    // Viaje: guardamos el identificador y también el nombre visible.
+    $viaje_id = $nodo_viaje ? $nodo_viaje->dato() : '';
+    $viaje_visible = $viaje_id;
+    if ($nodo_viaje && $nodo_viaje->adyacente('nombre')) {
+        $viaje_visible = $nodo_viaje->adyacente('nombre')->dato();
+    }
+
+    // Micro: el dato del Nodo Micro es vacío por diseño. El nombre visible
+    // sale de `vehiculo_copia->nombre`. Se mantiene `micro` (identificador,
+    // que viene siendo el nombre del enlace) por compatibilidad con otros
+    // flujos que puedan necesitarlo.
+    $nombre_micro = '';
+    $micro_nombre_visible = '';
+    if ($nodo_micro) {
+        $nombre_micro = $nodo_micro->dato();
+        $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+        if ($nodo_copia && $nodo_copia->adyacente('nombre')) {
+            $micro_nombre_visible = $nodo_copia->adyacente('nombre')->dato();
+        }
+    }
+
     $total = $nodo_total ? $nodo_total->dato() : '0';
+    $pagado = $nodo_venta->adyacente('pagado') ? $nodo_venta->adyacente('pagado')->dato() : '0';
+    $pendiente = number_format(max(0, (float)$total - (float)$pagado), 2, '.', '');
+
+    $metodo_pago = $nodo_venta->adyacente('metodo_pago') ? $nodo_venta->adyacente('metodo_pago')->dato() : '';
+    $cuotas = $nodo_venta->adyacente('cuotas') ? $nodo_venta->adyacente('cuotas')->dato() : '1';
+    $nodo_cuotas_restantes = $nodo_venta->adyacente('cuotas_restantes');
+    $cuotas_restantes = $nodo_cuotas_restantes ? $nodo_cuotas_restantes->dato() : '0';
+    $estado_pago = ((int)$cuotas_restantes > 0) ? 'cuotas_pendientes' : 'pagado';
 
     $fecha = '';
     if ($nodo_fecha) {
         $valor_fecha = $nodo_fecha->dato();
-        // Si es numérico, es un timestamp antiguo; lo convertimos con la zona horaria configurada.
         if (is_numeric($valor_fecha)) {
             $fecha = date('d/m/Y H:i', (int)$valor_fecha);
         } else {
-            // Ya es una cadena formateada desde el frontend, se devuelve tal cual.
             $fecha = $valor_fecha;
         }
     }
@@ -538,22 +564,45 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
         }
     }
 
-    // Estado de pago, para el filtro Estado del panel Vendidos.
-    $nodo_cuotas_restantes = $nodo_venta->adyacente('cuotas_restantes');
-    $cuotas_restantes = $nodo_cuotas_restantes ? $nodo_cuotas_restantes->dato() : '0';
-    $estado_pago = ((int)$cuotas_restantes > 0) ? 'cuotas_pendientes' : 'pagado';
+    // Comprador: se arma un resumen con los campos que necesita la tarjeta
+    // del panel Vendidos. La versión completa (formatear_venta_completa)
+    // vuelve a sobrescribir este campo con datos más extensos.
+    $comprador = null;
+    $nodo_comprador = $nodo_venta->adyacente('comprador');
+    if ($nodo_comprador) {
+        $comp_apellido = $nodo_comprador->adyacente('apellido') ? $nodo_comprador->adyacente('apellido')->dato() : '';
+        $comp_nombres = $nodo_comprador->adyacente('nombres') ? $nodo_comprador->adyacente('nombres')->dato() : '';
+        $comprador = [
+            'dni' => $nodo_comprador->dato(),
+            'dni_visible' => normalizar_dni($nodo_comprador->dato()),
+            'apellido' => $comp_apellido,
+            'nombres' => $comp_nombres,
+            'nombre_completo' => formatear_nombre_completo($comp_apellido, $comp_nombres),
+            'email' => $nodo_comprador->adyacente('email') ? $nodo_comprador->adyacente('email')->dato() : '',
+            'celular' => $nodo_comprador->adyacente('celular') ? $nodo_comprador->adyacente('celular')->dato() : '',
+            'direccion' => $nodo_comprador->adyacente('direccion') ? $nodo_comprador->adyacente('direccion')->dato() : '',
+            'localidad' => $nodo_comprador->adyacente('localidad') ? $nodo_comprador->adyacente('localidad')->dato() : '',
+        ];
+    }
 
     return [
         'id_venta' => $id_venta,
         'terminal' => $nombre_terminal,
         'terminal_nombre_real' => $nombre_terminal_real,
-        'viaje' => $nombre_viaje,
+        'viaje' => $viaje_id,
+        'viaje_visible' => $viaje_visible,
         'micro' => $nombre_micro,
+        'micro_nombre_visible' => $micro_nombre_visible,
         'total' => $total,
-        'fecha' => $fecha,
-        'cantidad_asientos' => $cantidad_asientos,
+        'pagado' => $pagado,
+        'pendiente' => $pendiente,
+        'metodo_pago' => $metodo_pago,
+        'cuotas' => $cuotas,
         'cuotas_restantes' => $cuotas_restantes,
         'estado_pago' => $estado_pago,
+        'fecha' => $fecha,
+        'cantidad_asientos' => $cantidad_asientos,
+        'comprador' => $comprador,
     ];
 }
 
@@ -611,6 +660,8 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
             'celular' => $nodo_comprador->adyacente('celular') ? $nodo_comprador->adyacente('celular')->dato() : '',
             'celular_emergencia' => $nodo_comprador->adyacente('celular_emergencia') ? $nodo_comprador->adyacente('celular_emergencia')->dato() : '',
             'fecha_nacimiento' => $nodo_comprador->adyacente('fecha_nacimiento') ? $nodo_comprador->adyacente('fecha_nacimiento')->dato() : '',
+            'direccion' => $nodo_comprador->adyacente('direccion') ? $nodo_comprador->adyacente('direccion')->dato() : '',
+            'localidad' => $nodo_comprador->adyacente('localidad') ? $nodo_comprador->adyacente('localidad')->dato() : '',
         ];
     }
 

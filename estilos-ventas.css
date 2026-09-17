@@ -79,3 +79,149 @@
 .sale-card.venta-resaltada {
     animation: resaltar_venta 2.5s ease-out forwards;
 }
+/* ===== v1.5piloto.43: tarjetas de venta enriquecidas ===== */
+
+/* Header: dos columnas. A la izquierda, el ID y los datos del viaje, micro
+   y fecha; a la derecha, el badge del terminal vendedor. */
+.sale-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.sale-header-izq {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.sale-header-info {
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: baseline;
+}
+
+.sale-header-info b {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.sale-sep {
+    color: var(--muted);
+    opacity: 0.5;
+    padding: 0 2px;
+}
+
+/* Grilla de métricas: 4 columnas. Asientos, Monto total, Abonado, Pendiente. */
+.sale-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.sale-metric {
+    background: var(--panel-claro);
+    border: 1px solid var(--border);
+    padding: 9px;
+    border-radius: 6px;
+}
+.sale-metric span { display: block; color: var(--muted); font-size: 12px; }
+.sale-metric b { display: block; margin-top: 3px; color: var(--primary-dark); }
+
+/* La celda "Pendiente" se pinta con un tinte naranja cuando hay deuda.
+   Sin badge, pero con color de fondo distinto para que se vea a ojo. */
+.sale-metric-pendiente {
+    background: #fff4e5;
+    border-color: #ffd59e;
+}
+.sale-metric-pendiente b {
+    color: #b85e00;
+}
+
+/* Línea de método de pago y cuotas. El separador dashed se movió a
+   .sale-comprador, que ahora es el que cierra visualmente el encabezado
+   antes de la grilla de métricas. */
+.sale-pago {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 12px;
+}
+.sale-pago b {
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* Sección de contacto del comprador: va entre el header y la grilla.
+   El separador dashed queda al final para cerrar visualmente el bloque
+   de identificación de la venta antes de las métricas. */
+.sale-comprador {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-bottom: 1px dashed var(--border);
+}
+.sale-comprador-titulo {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.sale-comprador-linea {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.sale-comprador-linea span {
+    color: var(--muted);
+    flex-shrink: 0;
+    min-width: 70px;
+}
+.sale-comprador-linea b {
+    color: var(--text);
+    font-weight: 600;
+    word-break: break-word;
+}
+
+/* Ajuste responsive para la grilla de 4 columnas: se acomoda a 2 columnas
+   en pantallas angostas. Ya existía la regla @media 950px; la completamos. */
+@media (max-width: 950px) {
+    .sale-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 650px) {
+    .sale-grid { grid-template-columns: 1fr 1fr; }
+    .sale-header { flex-direction: column; align-items: flex-start; }
+}
+
+/* ===== v1.5piloto.43c: acciones de la tarjeta de venta ===== */
+
+/* Los botones de acción de la tarjeta se separan a los extremos: "Ver cupones"
+   a la izquierda, "Cancelar venta" a la derecha. */
+.sale-acciones {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}

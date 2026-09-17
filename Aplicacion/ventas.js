@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.42
+ * @version 1.5piloto.43
  */
 
 let ventas_actuales = [];
@@ -1023,17 +1023,94 @@ function renderizar_ventas() {
         // Identificador único para poder ubicar esta tarjeta desde otros flujos
         // (por ejemplo, el botón "Ver compra" de un asiento o del modal de pasajes).
         tarjeta.dataset.idVenta = venta.id_venta;
+
+        // Título de viaje y micro.
+        const viaje_visible = venta.viaje_visible || venta.viaje || '';
+        const micro_visible = venta.micro_nombre_visible || venta.micro || '';
+
+        // Método de pago: capitalizado.
+        const metodo = venta.metodo_pago
+            ? (venta.metodo_pago.charAt(0).toUpperCase() + venta.metodo_pago.slice(1))
+            : '';
+        const cuotas = parseInt(venta.cuotas || '1');
+        const cuotas_restantes = parseInt(venta.cuotas_restantes || '0');
+        let texto_cuotas = '';
+        if (cuotas > 1) {
+            texto_cuotas = `${cuotas}`;
+            if (cuotas_restantes > 0) {
+                texto_cuotas += ` (${cuotas_restantes} pendiente${cuotas_restantes === 1 ? '' : 's'})`;
+            } else {
+                texto_cuotas += ` (pagadas)`;
+            }
+        }
+
+        // Comprador: se arma solo si hay datos.
+        let comprador_html = '';
+        const c = venta.comprador;
+        if (c) {
+            const nombre = c.nombre_completo || '';
+            const celular = c.celular || '';
+            const email = c.email || '';
+            const direccion_completa = [c.direccion, c.localidad].filter(v => v).join(', ');
+
+            const lineas = [];
+            if (nombre) lineas.push(`<div class="sale-comprador-linea"><span>Nombre:</span><b>${nombre}</b></div>`);
+            if (celular) lineas.push(`<div class="sale-comprador-linea"><span>Celular:</span><b>${celular}</b></div>`);
+            if (email) lineas.push(`<div class="sale-comprador-linea"><span>Email:</span><b>${email}</b></div>`);
+            if (direccion_completa) lineas.push(`<div class="sale-comprador-linea"><span>Dirección:</span><b>${direccion_completa}</b></div>`);
+
+            if (lineas.length > 0) {
+                comprador_html = `
+                    <div class="sale-comprador">
+                        <div class="sale-comprador-titulo">Comprador</div>
+                        ${lineas.join('')}
+                    </div>
+                `;
+            }
+        }
+
+        // Clase extra en la celda Pendiente si hay deuda.
+        const pendiente_num = parseFloat(venta.pendiente || '0');
+        const clase_pendiente = pendiente_num > 0 ? ' sale-metric-pendiente' : '';
+
+        // Línea de pago: método y cuotas.
+        const lineas_pago = [];
+        if (metodo) lineas_pago.push(`<span>Método: <b>${metodo}</b></span>`);
+        if (texto_cuotas) lineas_pago.push(`<span>Cuotas: <b>${texto_cuotas}</b></span>`);
+        const pago_html = lineas_pago.length > 0
+            ? `<div class="sale-pago">${lineas_pago.join('')}</div>`
+            : '';
+
+        // Bloque de datos del viaje y la fecha, junto al ID.
+        const info_partes = [];
+        if (viaje_visible) info_partes.push(`<span>Viaje: <b>${viaje_visible}</b></span>`);
+        if (micro_visible) info_partes.push(`<span>Micro: <b>${micro_visible}</b></span>`);
+        if (venta.fecha) info_partes.push(`<span>Fecha de compra: <b>${venta.fecha}</b></span>`);
+            const info_html = info_partes.length > 0
+            ? `<div class="sale-header-info">${info_partes.join('<span class="sale-sep">·</span>')}</div>`
+            : '';
+
         tarjeta.innerHTML = `
-            <div class="sale-header"><div class="sale-id">Venta ${venta.id_venta}</div><span class="badge">${venta.terminal_nombre_real || venta.terminal}</span></div>
-            <div class="sale-grid">
-                <div class="sale-metric"><span>Cantidad de asientos</span><b>${venta.cantidad_asientos}</b></div>
-                <div class="sale-metric"><span>Monto total</span><b>$${venta.total}</b></div>
-                <div class="sale-metric"><span>Fecha</span><b>${venta.fecha}</b></div>
+            <div class="sale-header">
+                <div class="sale-header-izq">
+                    <div class="sale-id">Venta ${venta.id_venta}</div>
+                    ${info_html}
+                </div>
+                <span class="badge">${venta.terminal_nombre_real || venta.terminal}</span>
             </div>
-            <div class="actions">
-                <button class="btn ver_detalle_venta" data-id="${venta.id_venta}">Ver detalle</button>
+            ${comprador_html}
+            <div class="sale-grid">
+                <div class="sale-metric"><span>Asientos</span><b>${venta.cantidad_asientos}</b></div>
+                <div class="sale-metric"><span>Monto total</span><b>$${venta.total}</b></div>
+                <div class="sale-metric"><span>Abonado</span><b>$${venta.pagado}</b></div>
+                <div class="sale-metric${clase_pendiente}"><span>Pendiente</span><b>$${venta.pendiente}</b></div>
+            </div>
+            ${pago_html}
+            <div class="actions sale-acciones">
+                <button class="btn ver_detalle_venta" data-id="${venta.id_venta}">Ver cupones</button>
                 <button class="btn danger cancelar_venta" data-id="${venta.id_venta}">Cancelar venta</button>
             </div>`;
+
         lista.appendChild(tarjeta);
         tarjeta.querySelector('.ver_detalle_venta').addEventListener('click', () => ver_detalle_venta(venta.id_venta));
         tarjeta.querySelector('.cancelar_venta').addEventListener('click', () => cancelar_venta(venta.id_venta));
