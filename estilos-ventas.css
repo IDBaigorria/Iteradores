@@ -769,3 +769,178 @@
         position: static;
     }
 }
+
+/* ===== v1.5piloto.50: modal de cierre de rendición ===== */
+
+.rendicion-aviso {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.rendicion-datos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    background: var(--panel-claro);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+}
+.rendicion-dato-linea {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+}
+.rendicion-dato-linea span { color: var(--muted); }
+.rendicion-dato-linea b { color: var(--text); font-weight: 700; }
+
+.rendicion-resumen {
+    background: #eef4ff;
+    border: 2px solid #4a7ab8;
+    border-radius: 8px;
+    padding: 14px;
+}
+.rendicion-resumen-titulo {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #2a4a78;
+    margin-bottom: 10px;
+}
+.rendicion-resumen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+}
+.rendicion-resumen-item {
+    background: #fff;
+    border: 1px solid #c8daf0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    text-align: center;
+}
+.rendicion-resumen-item span {
+    display: block;
+    font-size: 11px;
+    color: #4a6a9a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+.rendicion-resumen-item b {
+    display: block;
+    font-size: 18px;
+    color: #1a3a68;
+    font-weight: 700;
+}
+
+.rendicion-seccion {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.rendicion-seccion-titulo {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+.rendicion-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.rendicion-tabla th, .rendicion-tabla td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+}
+.rendicion-tabla th {
+    background: #f9e08a;
+    font-size: 12px;
+    color: var(--primary-dark);
+}
+.rendicion-tabla td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.rendicion-ventas-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.rendicion-venta-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+}
+.rendicion-venta-item:hover {
+    background: var(--panel-claro);
+}
+.rendicion-venta-check {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+.rendicion-venta-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.rendicion-venta-id {
+    font-weight: 700;
+    color: var(--primary-dark);
+    font-size: 13px;
+}
+.rendicion-venta-detalle {
+    font-size: 12px;
+    color: var(--muted);
+    word-break: break-word;
+}
+.rendicion-venta-monto {
+    font-weight: 700;
+    color: var(--primary-dark);
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+.rendicion-acciones {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.rendicion-sin-datos {
+    border: 1px solid var(--border);
+    background: var(--panel-claro);
+    border-radius: 6px;
+    padding: 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+}

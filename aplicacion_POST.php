@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.47c)
+ * ## Estructura de nodos actual (v1.5piloto.50)
  *
  * ### Nodos raíz especiales
  *
@@ -467,6 +467,41 @@
  * por alguna razón el contenedor no existe al leer la venta,
  * `formatear_venta_completa` deriva los cupones al vuelo.
  *
+ * ### Nodo Rendición (dato del nodo: `id_rendicion`)
+ *
+ * A partir de v1.5piloto.50. Cuelga del contenedor `rendiciones` del
+ * usuario dueño, en lista tipo árbol (hmi/hd), igual que las ventas.
+ * Representa un hecho inmutable: el retiro de dinero de las terminales.
+ *
+ * - Dato del nodo: `id_rendicion` (string único, ej. `rendicion_1747526400`).
+ * - Enlaces salientes:
+ *   | Enlace                 | Nodo destino y dato esperado                          |
+ *   |------------------------|-------------------------------------------------------|
+ *   | `dueno`                | Nodo con dato string: nombre de usuario del dueño.    |
+ *   | `fecha_hora`           | Nodo con dato string `"DD/MM/YYYY HH:MM"`.            |
+ *   | `total`                | Nodo con dato string numérico: total rendido.         |
+ *   | `total_efectivo`       | Nodo con dato string numérico: total rendido en efectivo. |
+ *   | `total_banco`          | Nodo con dato string numérico: total rendido por transferencia. |
+ *   | `cantidad_cupones`     | Nodo con dato string numérico: cantidad de cupones rendidos. |
+ *   | `cantidad_ventas`      | Nodo con dato string numérico: cantidad de ventas distintas incluidas. |
+ *   | `detalle_terminales`   | Nodo contenedor con hijos en lista árbol (hmi/hd).    |
+ *   |                        | └─ Cada hijo: `terminal`, `terminal_nombre_real`, `total`, `efectivo`, `banco`, `cantidad_cupones`. |
+ *   | `detalle_cupones`      | Nodo contenedor con hijos en lista árbol (hmi/hd).    |
+ *   |                        | └─ Cada hijo: `venta_id`, `numero_cupon`, `monto`, `metodo_pago`, `terminal`, `terminal_nombre_real`. |
+ *
+ * **Nota (enlace `rendido` en cupones):** Al confirmar la rendición,
+ * cada cupón incluido recibe un enlace `rendido` que apunta al Nodo
+ * Rendición. Los métodos que calculan "A rendir" chequean la existencia
+ * de este enlace con `adyacente('rendido')`, así que quedan
+ * automáticamente descontados.
+ *
+ * **Nota (inmutabilidad):** El preview del modal de rendición es
+ * inmutable. El frontend manda la lista exacta de cupones que el
+ * usuario vio y seleccionó. Si entre abrir y confirmar algo cambió
+ * (un cupón se rindió, se canceló la venta, se pagó un cupón nuevo
+ * fuera de la lista), la confirmación aborta con un mensaje genérico
+ * y no se escribe nada en el grafo.
+ *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
  * | Enlace      | Nodo destino y dato esperado                          |
@@ -506,7 +541,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.47c
+ * @version   1.5piloto.50
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

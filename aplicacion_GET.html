@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="estilos.css?v=1.5piloto.38">
 <link rel="stylesheet" href="estilos-vehiculos.css?v=1.5piloto.38">
 <link rel="stylesheet" href="estilos-viajes.css?v=1.5piloto.40">
-<link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.49e">
+<link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.50">
 </head>
 <body>
 <!-- Pantalla de login (código de acceso) -->
@@ -315,7 +315,10 @@
       <div class="panel">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
           <h2 style="margin:0;">Ventas realizadas</h2>
-          <button class="btn primary" id="boton_imprimir_informe_ventas">Imprimir informe</button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn" id="boton_cerrar_rendicion" style="display:none;">Cerrar rendición</button>
+            <button class="btn primary" id="boton_imprimir_informe_ventas">Imprimir informe</button>
+          </div>
         </div>
 
         <!-- Selector de contexto (solo admin): a qué dueño mirar -->
@@ -485,7 +488,7 @@
 <script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.41b"></script>
 <script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.42"></script>
 <script src="Aplicacion/Viajes/viajes-opciones.js?v=1.5piloto.38"></script>
-<script src="Aplicacion/ventas.js?v=1.5piloto.49d"></script>
+<script src="Aplicacion/ventas.js?v=1.5piloto.50"></script>
 <script src="Aplicacion/pasajeros.js?v=1.5piloto.42"></script>
 </body>
 </html>

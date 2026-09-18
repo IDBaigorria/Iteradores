@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.46
+ * @version   1.5piloto.50
  */
 
 use Iteradores\Nodos\Nodo;
@@ -742,6 +742,52 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     responder_json(['exito' => false, 'error' => 'Subacción de pasajeros no válida']);
             }
             break;
+        case 'rendiciones':
+            switch ($subaccion) {
+                case 'previsualizar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $filtros = [
+                        'viaje' => $post['viaje'] ?? 'todos',
+                        'vendedor' => $post['vendedor'] ?? 'Todos',
+                        'estado' => $post['estado'] ?? 'todos',
+                        'codigo' => $post['codigo'] ?? '',
+                        'comprador' => $post['comprador'] ?? '',
+                        'fecha_desde' => $post['fecha_desde'] ?? '',
+                        'fecha_hasta' => $post['fecha_hasta'] ?? '',
+                    ];
+                    $resultado = previsualizar_rendicion($nombre_dueno, $filtros);
+                    responder_json($resultado);
+                    break;
+
+                case 'confirmar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $ventas_json = $post['ventas_seleccionadas'] ?? '[]';
+                    $ventas_sel = json_decode($ventas_json, true);
+                    if (!is_array($ventas_sel)) $ventas_sel = [];
+                    $filtros = [
+                        'viaje' => $post['viaje'] ?? 'todos',
+                        'vendedor' => $post['vendedor'] ?? 'Todos',
+                        'estado' => $post['estado'] ?? 'todos',
+                        'codigo' => $post['codigo'] ?? '',
+                        'comprador' => $post['comprador'] ?? '',
+                        'fecha_desde' => $post['fecha_desde'] ?? '',
+                        'fecha_hasta' => $post['fecha_hasta'] ?? '',
+                    ];
+                    $resultado = confirmar_rendicion($nombre_dueno, $ventas_sel, $filtros);
+                    responder_json($resultado);
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de rendiciones no válida']);
+            }
+            break;
+
         default:
             responder_json(['exito' => false, 'error' => 'Módulo no reconocido']);
     }
