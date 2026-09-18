@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.46c
+ * @version   1.5piloto.47b
  */
 
 
@@ -571,6 +571,46 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
         }
     }
 
+    // Montos por método: recorrer los cupones pagados y sumar según el
+    // método de cada uno. Se usan en la sección "Saldos" de la pestaña
+    // Vendidos. Si la venta no tiene contenedor de cupones, se cae al
+    // método de la venta como fallback.
+    //
+    // Además se calcula "a_rendir": la suma de cupones pagados que NO
+    // tienen el enlace `rendido`. Hoy ningún cupón lo tiene (la función
+    // de rendir todavía no existe), así que a_rendir = efectivo + banco.
+    $pagado_efectivo = 0.0;
+    $pagado_banco = 0.0;
+    $a_rendir = 0.0;
+    $contenedor_cupones_saldos = $nodo_venta->adyacente('cupones');
+    if ($contenedor_cupones_saldos) {
+        $cupon_actual = hmi($contenedor_cupones_saldos);
+        $seg_saldos = 0;
+        while ($cupon_actual && $seg_saldos < 200) {
+            $estado_cupon = $cupon_actual->adyacente('estado') ? $cupon_actual->adyacente('estado')->dato() : '';
+            if ($estado_cupon === 'pagado') {
+                $monto_cupon = (float)($cupon_actual->adyacente('monto') ? $cupon_actual->adyacente('monto')->dato() : '0');
+                $metodo_cupon = $cupon_actual->adyacente('metodo_pago') ? $cupon_actual->adyacente('metodo_pago')->dato() : '';
+                if ($metodo_cupon === '') $metodo_cupon = $metodo_pago;
+                if ($metodo_cupon === 'transferencia') $pagado_banco += $monto_cupon;
+                else $pagado_efectivo += $monto_cupon;
+
+                // A rendir: si el cupón no tiene enlace `rendido`,
+                // significa que el dinero todavía está en la terminal.
+                if (!$cupon_actual->adyacente('rendido')) {
+                    $a_rendir += $monto_cupon;
+                }
+            }
+            $cupon_actual = hd($cupon_actual);
+            $seg_saldos++;
+        }
+    } else {
+        if ($metodo_pago === 'transferencia') $pagado_banco = (float)$pagado;
+        else $pagado_efectivo = (float)$pagado;
+        // Sin cupones: todo lo pagado está aún sin rendir.
+        $a_rendir = (float)$pagado;
+    }
+
     // Comprador: se arma un resumen con los campos que necesita la tarjeta
     // del panel Vendidos. La versión completa (formatear_venta_completa)
     // vuelve a sobrescribir este campo con datos más extensos.
@@ -602,6 +642,9 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
         'micro_nombre_visible' => $micro_nombre_visible,
         'total' => $total,
         'pagado' => $pagado,
+        'pagado_efectivo' => number_format($pagado_efectivo, 2, '.', ''),
+        'pagado_banco' => number_format($pagado_banco, 2, '.', ''),
+        'a_rendir' => number_format($a_rendir, 2, '.', ''),
         'pendiente' => $pendiente,
         'metodo_pago' => $metodo_pago,
         'cuotas' => $cuotas,

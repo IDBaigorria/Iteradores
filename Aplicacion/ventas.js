@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.46b
+ * @version 1.5piloto.48
  */
 
 // (aplicar_cambios.php funcionó)
@@ -1018,6 +1018,7 @@ function renderizar_ventas() {
     lista.innerHTML = '';
     if (ventas_filtradas.length === 0) {
         lista.innerHTML = '<p style="color:#888; margin:20px;">No hay ventas registradas para los filtros seleccionados.</p>';
+        renderizar_saldos_vendidos(ventas_filtradas);
         return;
     }
     ventas_filtradas.forEach(venta => {
@@ -1118,6 +1119,7 @@ function renderizar_ventas() {
         tarjeta.querySelector('.ver_detalle_venta').addEventListener('click', () => ver_cuponera_venta(venta.id_venta));
         tarjeta.querySelector('.cancelar_venta').addEventListener('click', () => cancelar_venta(venta.id_venta));
     });
+    renderizar_saldos_vendidos(ventas_filtradas);
 }
 
 /**
@@ -1130,6 +1132,112 @@ function renderizar_ventas() {
  *
  * @param {string} id_venta
  */
+/**
+ * Renderiza la sección "Saldos" en la pestaña Vendidos. Agrupa las
+ * ventas filtradas por terminal y suma los montos por método
+ * (efectivo y banco) según los cupones pagados de cada venta.
+ *
+ * Rol terminal: ve solo su fila (sin fila de total).
+ * Rol dueño/admin: una fila por terminal + fila de total.
+ *
+ * @param {Array} ventas_filtradas
+ */
+function renderizar_saldos_vendidos(ventas_filtradas) {
+    const contenedor = document.getElementById('saldos_vendidos');
+    if (!contenedor) return;
+
+    // Agrupar por terminal. Además de efectivo y banco, acumulamos:
+    //  - cantidad: cantidad de ventas.
+    //  - valor: suma de los totales de las ventas.
+    //  - adeudan: suma de los pendientes (lo que falta cobrar).
+    //  - a_rendir: suma de los montos pagados sin marcar como rendidos.
+    const por_terminal = {};
+    (ventas_filtradas || []).forEach(v => {
+        const t = v.terminal || '';
+        if (!por_terminal[t]) {
+            por_terminal[t] = {
+                terminal: t,
+                nombre: v.terminal_nombre_real || t,
+                cantidad: 0,
+                valor: 0,
+                efectivo: 0,
+                banco: 0,
+                adeudan: 0,
+                a_rendir: 0,
+            };
+        }
+        const f = por_terminal[t];
+        f.cantidad += 1;
+        f.valor += parseFloat(v.total || '0');
+        f.efectivo += parseFloat(v.pagado_efectivo || '0');
+        f.banco += parseFloat(v.pagado_banco || '0');
+        f.adeudan += parseFloat(v.pendiente || '0');
+        f.a_rendir += parseFloat(v.a_rendir || '0');
+    });
+
+    const filas = Object.values(por_terminal);
+    filas.sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    let html = '<h4 class="saldos-titulo">Saldos (Montos según los filtros aplicados)</h4>';
+
+    if (filas.length === 0) {
+        html += '<p style="color:#888;">Sin ventas para los filtros seleccionados.</p>';
+        contenedor.innerHTML = html;
+        return;
+    }
+
+    html += '<div class="table-wrap"><table class="data-table">';
+    html += '<thead><tr>';
+    html += '<th>Terminal</th>';
+    html += '<th>Ventas</th>';
+    html += '<th>Valor</th>';
+    html += '<th>Efectivo</th>';
+    html += '<th>Banco</th>';
+    html += '<th>Le adeudan</th>';
+    html += '<th>A rendir</th>';
+    html += '<th>Total</th>';
+    html += '</tr></thead><tbody>';
+
+    const totales = { cantidad: 0, valor: 0, efectivo: 0, banco: 0, adeudan: 0, a_rendir: 0 };
+    filas.forEach(f => {
+        const total = f.efectivo + f.banco;
+        totales.cantidad += f.cantidad;
+        totales.valor += f.valor;
+        totales.efectivo += f.efectivo;
+        totales.banco += f.banco;
+        totales.adeudan += f.adeudan;
+        totales.a_rendir += f.a_rendir;
+        html += '<tr>';
+        html += `<td>${f.nombre}</td>`;
+        html += `<td>${f.cantidad}</td>`;
+        html += `<td>$${f.valor.toFixed(2)}</td>`;
+        html += `<td>$${f.efectivo.toFixed(2)}</td>`;
+        html += `<td>$${f.banco.toFixed(2)}</td>`;
+        html += `<td>$${f.adeudan.toFixed(2)}</td>`;
+        html += `<td>$${f.a_rendir.toFixed(2)}</td>`;
+        html += `<td>$${total.toFixed(2)}</td>`;
+        html += '</tr>';
+    });
+
+    // Fila de total: solo para dueño/admin.
+    if (usuario_actual.nivel !== 'terminal') {
+        const total_general = totales.efectivo + totales.banco;
+        html += '<tr class="saldos-total-fila">';
+        html += '<td><b>TOTAL</b></td>';
+        html += `<td><b>${totales.cantidad}</b></td>`;
+        html += `<td><b>$${totales.valor.toFixed(2)}</b></td>`;
+        html += `<td><b>$${totales.efectivo.toFixed(2)}</b></td>`;
+        html += `<td><b>$${totales.banco.toFixed(2)}</b></td>`;
+        html += `<td><b>$${totales.adeudan.toFixed(2)}</b></td>`;
+        html += `<td><b>$${totales.a_rendir.toFixed(2)}</b></td>`;
+        html += `<td><b>$${total_general.toFixed(2)}</b></td>`;
+        html += '</tr>';
+    }
+
+    html += '</tbody></table></div>';
+    contenedor.innerHTML = html;
+}
+
 /**
  * Abre el modal de la cuponera de una venta.
  *
@@ -1713,4 +1821,55 @@ function validar_direccion_js(valor) {
     if (sel_estado) {
         sel_estado.addEventListener('change', () => renderizar_ventas());
     }
+    const btn_informe = document.getElementById('boton_imprimir_informe_ventas');
+    if (btn_informe) {
+        btn_informe.addEventListener('click', imprimir_informe_ventas);
+    }
 })();
+
+/**
+ * Abre el informe imprimible de la pestaña Vendidos en una pestaña
+ * nueva. Arma la URL con los filtros aplicados y los datos del
+ * usuario que lo solicita.
+ */
+function imprimir_informe_ventas() {
+    if (!usuario_actual) return;
+
+    // Determinar tipo y nombre según el rol.
+    let tipo_ventas, nombre;
+    if (usuario_actual.nivel === 'admin') {
+        tipo_ventas = 'dueno';
+        const sel = document.getElementById('selector_dueno_vendidos');
+        nombre = sel ? sel.value : '';
+        if (!nombre) {
+            mostrar_aviso('Seleccione un dueño primero', 'error');
+            return;
+        }
+    } else if (usuario_actual.nivel === 'dueno') {
+        tipo_ventas = 'dueno';
+        nombre = usuario_actual.nombre_usuario;
+    } else {
+        tipo_ventas = 'terminal';
+        nombre = usuario_actual.nombre_usuario;
+    }
+
+    const filtro_viaje = document.getElementById('selector_viaje_vendido').value;
+    const filtro_vendedor = document.getElementById('filtro_vendedor').value;
+    const filtro_estado = document.getElementById('filtro_estado').value;
+
+    const solicitante_nombre = usuario_actual.nombre_real || usuario_actual.nombre_usuario;
+
+    const params = new URLSearchParams({
+        imprimir: '1',
+        tipo: 'informe_ventas',
+        tipo_ventas: tipo_ventas,
+        nombre: nombre,
+        viaje: filtro_viaje,
+        vendedor: filtro_vendedor,
+        estado: filtro_estado,
+        solicitante: usuario_actual.nombre_usuario,
+        solicitante_nombre: solicitante_nombre
+    });
+
+    window.open(`index.php?${params.toString()}`, '_blank');
+}

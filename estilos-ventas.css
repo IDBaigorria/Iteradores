@@ -604,3 +604,24 @@
     flex-wrap: wrap;
     margin-top: 4px;
 }
+
+/* ===== v1.5piloto.47: sección Saldos en la pestaña Vendidos ===== */
+
+#saldos_vendidos {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border);
+}
+
+.saldos-titulo {
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    color: var(--primary-dark);
+}
+
+.saldos-total-fila {
+    background: #eef4ff;
+}
+.saldos-total-fila td {
+    border-top: 2px solid var(--border);
+}

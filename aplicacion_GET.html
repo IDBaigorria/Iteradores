@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="estilos.css?v=1.5piloto.38">
 <link rel="stylesheet" href="estilos-vehiculos.css?v=1.5piloto.38">
 <link rel="stylesheet" href="estilos-viajes.css?v=1.5piloto.40">
-<link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.46">
+<link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.47c">
 </head>
 <body>
 <!-- Pantalla de login (código de acceso) -->
@@ -313,7 +313,10 @@
     <!-- Sección Vendidos -->
     <section id="vendidos" class="tab-content hidden">
       <div class="panel">
-        <h2>Ventas realizadas</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+          <h2 style="margin:0;">Ventas realizadas</h2>
+          <button class="btn primary" id="boton_imprimir_informe_ventas">Imprimir informe</button>
+        </div>
         <div class="row" style="flex-wrap:wrap; gap:10px;">
           <div id="contenedor_filtro_dueno_vendidos" style="display:none;">
             <label for="selector_dueno_vendidos">Dueño:</label>
@@ -336,6 +339,7 @@
             </select>
           </div>
         </div>
+        <div id="saldos_vendidos"></div>
       </div>
       <div class="panel">
         <div class="sales-list" id="lista_ventas"></div>
@@ -434,7 +438,7 @@
 <script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.41b"></script>
 <script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.42"></script>
 <script src="Aplicacion/Viajes/viajes-opciones.js?v=1.5piloto.38"></script>
-<script src="Aplicacion/ventas.js?v=1.5piloto.46b"></script>
+<script src="Aplicacion/ventas.js?v=1.5piloto.48"></script>
 <script src="Aplicacion/pasajeros.js?v=1.5piloto.42"></script>
 </body>
 </html>

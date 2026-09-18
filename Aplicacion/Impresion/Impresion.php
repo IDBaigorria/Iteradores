@@ -4,9 +4,16 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.45
+ * @version   1.5piloto.48b
  */
-
+use Iteradores\Nodos\Nodo;
+use Iteradores\Controlador\Controlador;
+use Iteradores\Configuracion\Conf;
+include_once("./Configuracion/Configuracion.php");
+include_once("./Nodos/Nodo.php");
+include_once("./Controlador/Controlador.php");
+include_once("./miscelaneas/Arbol.php");
+include_once("./Aplicacion/Ventas/Venta.php");
 function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = '', string $numero_cupon = ''): void {
     if ($tipo === 'ficha_salud') {
         // Para ficha de salud, id_venta contendrá el nombre_dueno y dni_filtro el dni
@@ -858,6 +865,447 @@ function imprimir_ficha_salud(string $nombre_dueno, string $dni): void {
 
     echo '</div>'; // cierre contenido
     echo '</div>'; // cierre ficha
+
+    echo '<script>window.onload = function() { window.print(); }</script>';
+    echo '</body></html>';
+}
+
+/**
+ * Devuelve el nombre real de un usuario con fallback al nombre de
+ * usuario si no tiene `nombre_real` cargado o no existe.
+ *
+ * @param string $nombre_usuario
+ * @return string
+ */
+function _nombre_real_usuario(string $nombre_usuario): string {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return $nombre_usuario;
+    $nodo = $raiz->adyacente($nombre_usuario);
+    if (!$nodo) return $nombre_usuario;
+    if ($nodo->adyacente('nombre_real')) {
+        return $nodo->adyacente('nombre_real')->dato();
+    }
+    return $nombre_usuario;
+}
+
+/**
+ * Recolecta las ventas que corresponden a un informe, con el formato
+ * completo (formatear_venta_completa). Si el tipo es `terminal`,
+ * filtra solo las ventas de esa terminal; si es `dueno`, todas las
+ * del dueño.
+ *
+ * @param string $tipo `dueno` o `terminal`
+ * @param string $nombre Nombre de usuario del dueño o terminal
+ * @return array
+ */
+function _recolectar_ventas_para_informe(string $tipo, string $nombre): array {
+    $ventas = [];
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_usuarios) return [];
+
+    if ($tipo === 'terminal') {
+        $nodo_terminal = $raiz_usuarios->adyacente($nombre);
+        if (!$nodo_terminal) return [];
+        $nodo_dueno = $nodo_terminal->adyacente('dueno');
+        if (!$nodo_dueno) return [];
+        $nombre_dueno = $nodo_dueno->dato();
+        $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
+        if (!$contenedor) return [];
+        $actual = hmi($contenedor);
+        $seg = 0;
+        while ($actual && $seg < 1000) {
+            $venta = formatear_venta_completa($actual);
+            if (($venta['terminal'] ?? '') === $nombre) {
+                $ventas[] = $venta;
+            }
+            $actual = hd($actual);
+            $seg++;
+        }
+    } else {
+        $contenedor = obtener_contenedor_ventas_dueno($nombre);
+        if (!$contenedor) return [];
+        $actual = hmi($contenedor);
+        $seg = 0;
+        while ($actual && $seg < 1000) {
+            $ventas[] = formatear_venta_completa($actual);
+            $actual = hd($actual);
+            $seg++;
+        }
+    }
+    return $ventas;
+}
+
+/**
+ * Imprime un informe de las ventas de la pestaña Vendidos, según los
+ * filtros aplicados por el usuario. Incluye membrete, datos del
+ * solicitante, filtros usados, tabla de saldos y detalle de ventas.
+ *
+ * Parámetros esperados en $params (todos por GET):
+ *   - tipo_ventas: `dueno` o `terminal`.
+ *   - nombre: nombre de usuario del dueño o terminal consultado.
+ *   - viaje, vendedor, estado: filtros aplicados.
+ *   - solicitante: nombre de usuario del que pide el informe.
+ *   - solicitante_nombre: nombre visible del que pide el informe.
+ *
+ * @param array $params
+ */
+function imprimir_informe_ventas(array $params): void {
+    $tipo_ventas = $params['tipo_ventas'] ?? 'dueno';
+    $nombre = $params['nombre'] ?? '';
+    $filtro_viaje = $params['viaje'] ?? 'todos';
+    $filtro_vendedor = $params['vendedor'] ?? 'Todos';
+    $filtro_estado = $params['estado'] ?? 'todos';
+    $solicitante = $params['solicitante'] ?? '';
+    $solicitante_nombre = $params['solicitante_nombre'] ?? $solicitante;
+
+    if ($nombre === '') { echo "Falta el nombre del dueño o terminal"; return; }
+
+    $ventas = _recolectar_ventas_para_informe($tipo_ventas, $nombre);
+
+    // Aplicar filtros.
+    if ($filtro_viaje !== 'todos') {
+        $ventas = array_filter($ventas, function($v) use ($filtro_viaje) {
+            return ($v['viaje'] ?? '') === $filtro_viaje;
+        });
+    }
+    if ($filtro_vendedor !== 'Todos') {
+        $ventas = array_filter($ventas, function($v) use ($filtro_vendedor) {
+            return ($v['terminal'] ?? '') === $filtro_vendedor;
+        });
+    }
+    if ($filtro_estado !== 'todos') {
+        $ventas = array_filter($ventas, function($v) use ($filtro_estado) {
+            return ($v['estado_pago'] ?? '') === $filtro_estado;
+        });
+    }
+    $ventas = array_values($ventas);
+
+    // Nombres visibles de los filtros.
+    $nombre_dueno_visible = _nombre_real_usuario($nombre);
+    $nombre_vendedor_visible = ($filtro_vendedor === 'Todos') ? 'Todos' : _nombre_real_usuario($filtro_vendedor);
+    $viaje_visible = ($filtro_viaje === 'todos') ? 'Todos' : $filtro_viaje;
+    switch ($filtro_estado) {
+        case 'pagado': $estado_visible = 'Pagado'; break;
+        case 'cuotas_pendientes': $estado_visible = 'Cuotas pendientes'; break;
+        default: $estado_visible = 'Todos';
+    }
+
+    $fecha_informe = date('d/m/Y H:i');
+    $logo_ruta = './Aplicacion/LogoPeque.png';
+
+    // Armar la tabla de saldos (misma lógica que el frontend).
+    $por_terminal = [];
+    foreach ($ventas as $v) {
+        $t = $v['terminal'] ?? '';
+        if (!isset($por_terminal[$t])) {
+            $por_terminal[$t] = [
+                'nombre' => $v['terminal_nombre_real'] ?? $t,
+                'cantidad' => 0,
+                'valor' => 0.0,
+                'efectivo' => 0.0,
+                'banco' => 0.0,
+                'adeudan' => 0.0,
+                'a_rendir' => 0.0,
+            ];
+        }
+        $por_terminal[$t]['cantidad']++;
+        $por_terminal[$t]['valor']     += (float)($v['total'] ?? 0);
+        $por_terminal[$t]['efectivo']  += (float)($v['pagado_efectivo'] ?? 0);
+        $por_terminal[$t]['banco']     += (float)($v['pagado_banco'] ?? 0);
+        $por_terminal[$t]['adeudan']   += (float)($v['pendiente'] ?? 0);
+        $por_terminal[$t]['a_rendir']  += (float)($v['a_rendir'] ?? 0);
+    }
+    usort($por_terminal, function($a, $b) {
+        return strcasecmp($a['nombre'], $b['nombre']);
+    });
+
+    // HTML.
+    echo '<!DOCTYPE html>';
+    echo '<html lang="es">';
+    echo '<head><meta charset="UTF-8"><title>Informe de ventas</title>';
+    echo '<style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: white;
+            color: black;
+            font-size: 12px;
+        }
+        .informe {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .membrete {
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid black;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .membrete img {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+            filter: grayscale(100%);
+            margin-right: 15px;
+        }
+        .membrete-texto {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .titulo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .titulo h1 {
+            margin: 0 0 6px 0;
+            font-size: 22px;
+        }
+        .titulo .meta {
+            font-size: 13px;
+            color: #333;
+        }
+        .titulo .meta b {
+            color: black;
+        }
+        .seccion {
+            border: 1px solid black;
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin-bottom: 18px;
+        }
+        .seccion h2 {
+            margin: 0 0 12px 0;
+            border-bottom: 1px solid black;
+            padding-bottom: 6px;
+            font-size: 16px;
+        }
+        .filtros-lista {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .filtros-lista b {
+            display: inline-block;
+            min-width: 90px;
+        }
+        table.saldos {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        table.saldos th, table.saldos td {
+            border: 1px solid black;
+            padding: 6px 8px;
+            text-align: left;
+        }
+        table.saldos th {
+            background: #f0f0f0;
+            font-weight: 700;
+        }
+        table.saldos td.num {
+            text-align: right;
+        }
+        table.saldos tr.total {
+            background: #f8f8f8;
+            font-weight: 700;
+        }
+        .venta-card {
+            border: 1px solid black;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            break-inside: avoid;
+        }
+        .venta-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 1px solid black;
+            background: #f0f0f0;
+        }
+        .venta-header .id {
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .venta-header .vendedor {
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .venta-body {
+            padding: 10px 14px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .venta-body .linea {
+            margin-bottom: 3px;
+        }
+        .venta-body .linea b {
+            display: inline-block;
+            min-width: 120px;
+        }
+        .venta-body .totales {
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px dashed #999;
+        }
+        .sin-datos {
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+            padding: 12px;
+        }
+        @media print {
+            body { padding: 10px; }
+            .informe { max-width: 100%; }
+            .venta-card { border: 1px solid black; box-shadow: none; }
+        }
+    </style>';
+    echo '</head><body>';
+
+    echo '<div class="informe">';
+
+    // Membrete.
+    echo '<div class="membrete">';
+    echo '<img src="' . htmlspecialchars($logo_ruta) . '" alt="Logo">';
+    echo '<div class="membrete-texto">Parroquia Nuestra Señora del Carmen - Tres Arroyos</div>';
+    echo '</div>';
+
+    // Título y datos.
+    echo '<div class="titulo">';
+    echo '<h1>Informe de ventas</h1>';
+    echo '<div class="meta"><b>Solicitado por:</b> ' . htmlspecialchars($solicitante_nombre) . ' · <b>Fecha:</b> ' . htmlspecialchars($fecha_informe) . '</div>';
+    echo '</div>';
+
+    // Filtros.
+    echo '<div class="seccion">';
+    echo '<h2>Filtros aplicados</h2>';
+    echo '<ul class="filtros-lista">';
+    echo '<li><b>Dueño:</b> ' . htmlspecialchars($nombre_dueno_visible) . '</li>';
+    echo '<li><b>Viaje:</b> ' . htmlspecialchars($viaje_visible) . '</li>';
+    echo '<li><b>Vendedor:</b> ' . htmlspecialchars($nombre_vendedor_visible) . '</li>';
+    echo '<li><b>Estado:</b> ' . htmlspecialchars($estado_visible) . '</li>';
+    echo '</ul>';
+    echo '</div>';
+
+    // Tabla de saldos.
+    echo '<div class="seccion">';
+    echo '<h2>Saldos</h2>';
+    if (count($por_terminal) === 0) {
+        echo '<p class="sin-datos">Sin ventas para los filtros seleccionados.</p>';
+    } else {
+        echo '<table class="saldos">';
+        echo '<thead><tr>';
+        echo '<th>Terminal</th>';
+        echo '<th>Ventas</th>';
+        echo '<th>Valor</th>';
+        echo '<th>Efectivo</th>';
+        echo '<th>Banco</th>';
+        echo '<th>Le adeudan</th>';
+        echo '<th>A rendir</th>';
+        echo '<th>Total</th>';
+        echo '</tr></thead><tbody>';
+
+        $tot = ['cantidad'=>0, 'valor'=>0, 'efectivo'=>0, 'banco'=>0, 'adeudan'=>0, 'a_rendir'=>0];
+        foreach ($por_terminal as $t) {
+            $tot['cantidad'] += $t['cantidad'];
+            $tot['valor'] += $t['valor'];
+            $tot['efectivo'] += $t['efectivo'];
+            $tot['banco'] += $t['banco'];
+            $tot['adeudan'] += $t['adeudan'];
+            $tot['a_rendir'] += $t['a_rendir'];
+            $total_linea = $t['efectivo'] + $t['banco'];
+            echo '<tr>';
+            echo '<td>' . htmlspecialchars($t['nombre']) . '</td>';
+            echo '<td class="num">' . $t['cantidad'] . '</td>';
+            echo '<td class="num">$' . number_format($t['valor'], 2, '.', '') . '</td>';
+            echo '<td class="num">$' . number_format($t['efectivo'], 2, '.', '') . '</td>';
+            echo '<td class="num">$' . number_format($t['banco'], 2, '.', '') . '</td>';
+            echo '<td class="num">$' . number_format($t['adeudan'], 2, '.', '') . '</td>';
+            echo '<td class="num">$' . number_format($t['a_rendir'], 2, '.', '') . '</td>';
+            echo '<td class="num">$' . number_format($total_linea, 2, '.', '') . '</td>';
+            echo '</tr>';
+        }
+
+        // Fila de total: solo para admin/dueño.
+        if ($tipo_ventas === 'dueno') {
+            $total_general = $tot['efectivo'] + $tot['banco'];
+            echo '<tr class="total">';
+            echo '<td>TOTAL</td>';
+            echo '<td class="num">' . $tot['cantidad'] . '</td>';
+            echo '<td class="num">$' . number_format($tot['valor'], 2, '.', '') . '</td>';
+            echo '<td class="num">$' . number_format($tot['efectivo'], 2, '.', '') . '</td>';
+            echo '<td class="num">$' . number_format($tot['banco'], 2, '.', '') . '</td>';
+            echo '<td class="num">$' . number_format($tot['adeudan'], 2, '.', '') . '</td>';
+            echo '<td class="num">$' . number_format($tot['a_rendir'], 2, '.', '') . '</td>';
+            echo '<td class="num">$' . number_format($total_general, 2, '.', '') . '</td>';
+            echo '</tr>';
+        }
+
+        echo '</tbody></table>';
+    }
+    echo '</div>';
+
+    // Detalle de ventas.
+    echo '<div class="seccion">';
+    echo '<h2>Detalle de ventas</h2>';
+    if (count($ventas) === 0) {
+        echo '<p class="sin-datos">Sin ventas para los filtros seleccionados.</p>';
+    } else {
+        foreach ($ventas as $v) {
+            $vendedor_nombre = $v['terminal_nombre_real'] ?? $v['terminal'] ?? '';
+            $comprador = $v['comprador'] ?? null;
+            $viaje_txt = $v['viaje_visible'] ?? $v['viaje'] ?? '';
+            $micro_txt = $v['micro_nombre_visible'] ?? $v['micro'] ?? '';
+            $metodo_txt = ($v['metodo_pago'] ?? '') === 'transferencia' ? 'Transferencia' : 'Efectivo';
+            $cuotas_txt = $v['cuotas'] ?? '1';
+            $cuotas_restantes_txt = $v['cuotas_restantes'] ?? '0';
+
+            $asientos_nums = [];
+            foreach (($v['asientos'] ?? []) as $a) {
+                $asientos_nums[] = $a['numero'] ?? '';
+            }
+            $asientos_txt = implode(', ', $asientos_nums);
+
+            echo '<div class="venta-card">';
+            echo '<div class="venta-header">';
+            echo '<div class="id">Venta ' . htmlspecialchars($v['id_venta'] ?? '') . '</div>';
+            echo '<div class="vendedor">' . htmlspecialchars($vendedor_nombre) . '</div>';
+            echo '</div>';
+            echo '<div class="venta-body">';
+
+            echo '<div class="linea"><b>Viaje:</b> ' . htmlspecialchars($viaje_txt) . '</div>';
+            echo '<div class="linea"><b>Micro:</b> ' . htmlspecialchars($micro_txt) . '</div>';
+            echo '<div class="linea"><b>Fecha de compra:</b> ' . htmlspecialchars($v['fecha'] ?? '') . '</div>';
+
+            if ($comprador) {
+                $nombre_completo = $comprador['nombre_completo'] ?? '';
+                $celular = $comprador['celular'] ?? '';
+                $email = $comprador['email'] ?? '';
+                $dir = trim((($comprador['direccion'] ?? '') . ', ' . ($comprador['localidad'] ?? '')), ', ');
+                echo '<div class="linea"><b>Comprador:</b> ' . htmlspecialchars($nombre_completo) . '</div>';
+                if ($celular !== '') echo '<div class="linea"><b>Celular:</b> ' . htmlspecialchars($celular) . '</div>';
+                if ($email !== '') echo '<div class="linea"><b>Email:</b> ' . htmlspecialchars($email) . '</div>';
+                if ($dir !== '') echo '<div class="linea"><b>Dirección:</b> ' . htmlspecialchars($dir) . '</div>';
+            }
+
+            if ($asientos_txt !== '') echo '<div class="linea"><b>Asientos:</b> ' . htmlspecialchars($asientos_txt) . '</div>';
+
+            echo '<div class="totales">';
+            echo '<div class="linea"><b>Total:</b> $' . htmlspecialchars($v['total'] ?? '0') . ' &nbsp;|&nbsp; <b>Abonado:</b> $' . htmlspecialchars($v['pagado'] ?? '0') . ' &nbsp;|&nbsp; <b>Pendiente:</b> $' . htmlspecialchars($v['pendiente'] ?? '0') . '</div>';
+            echo '<div class="linea"><b>Método:</b> ' . htmlspecialchars($metodo_txt) . ' &nbsp;|&nbsp; <b>Cuotas:</b> ' . htmlspecialchars($cuotas_txt) . ' (' . htmlspecialchars($cuotas_restantes_txt) . ' restantes)</div>';
+            echo '</div>';
+
+            echo '</div>'; // cierre venta-body
+            echo '</div>'; // cierre venta-card
+        }
+    }
+    echo '</div>';
+
+    echo '</div>'; // cierre informe
 
     echo '<script>window.onload = function() { window.print(); }</script>';
     echo '</body></html>';

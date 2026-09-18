@@ -191,6 +191,14 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
     require_once __DIR__ . '/Aplicacion/Impresion/Impresion.php';
     $tipo = $_GET['tipo'] ?? '';
 
+    // Caso especial: informe de ventas de la pestaña Vendidos.
+    // Se pasa el tipo de solicitante, el nombre, los filtros aplicados
+    // y los datos del usuario que lo pide.
+    if ($tipo === 'informe_ventas') {
+        imprimir_informe_ventas($_GET);
+        exit;
+    }
+
     // Caso especial: pasaje de asiento reservado para el equipo (sin venta).
     // Se pasa dueño, viaje, micro, fila y columna por GET.
     if ($tipo === 'pasaje_reserva') {

@@ -2,10 +2,7 @@
 /**
  * Aplicador de cambios automáticos — proyecto Iteradores.
  *
- * Fix v1.5piloto.46c: los métodos de pago disponibles al pagar un cupón se
- * filtran también por el máximo de cuotas configurado por método. Si la venta
- * se pactó a más cuotas que el máximo permitido por ese método, ese método no
- * se ofrece.
+ * Fix v1.5piloto.48b: agregar use/include_once al principio de Impresion.php.
  */
 
 $modo_estricto = true;
@@ -14,106 +11,30 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // =========================================================
-    // 1. Venta.php — Bump de versión
+    // 1. Impresion.php — Agregar use y include_once al principio
     // =========================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Ventas/Venta.php',
-        'descripcion' => 'Venta.php: bump @version a 1.5piloto.46c',
+        'archivo' => 'Aplicacion/Impresion/Impresion.php',
+        'descripcion' => 'Impresion.php: agregar use e include_once al principio',
         'buscar' => [
-            ' * @version   1.5piloto.46',
+            ' * @since     1.5piloto.16',
+            ' * @version   1.5piloto.45',
+            ' */',
         ],
         'reemplazar' => [
-            ' * @version   1.5piloto.46c',
-        ],
-    ],
-
-    // =========================================================
-    // 2. Venta.php — Filtrar métodos por cuotas máximas
-    // =========================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Ventas/Venta.php',
-        'descripcion' => 'Venta.php: filtrar métodos por cuotas máximas',
-        'buscar' => [
-            'function _resolver_metodos_permitidos_venta(Nodo $nodo_venta): array {',
-            '    $nodo_viaje = $nodo_venta->adyacente(\'viaje\');',
-            '    $nodo_terminal = $nodo_venta->adyacente(\'terminal\');',
-            '    if (!$nodo_viaje || !$nodo_terminal) return [];',
+            ' * @since     1.5piloto.16',
+            ' * @version   1.5piloto.48',
+            ' */',
             '',
-            '    $nombre_viaje = $nodo_viaje->dato();',
-            '    $nombre_terminal = $nodo_terminal->dato();',
-            '    $nodo_dueno = $nodo_viaje->adyacente(\'dueno\');',
-            '    $nombre_dueno = $nodo_dueno ? $nodo_dueno->dato() : \'\';',
-            '    if ($nombre_dueno === \'\') return [];',
-            '',
-            '    $opciones_viaje = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);',
-            '    $opciones_terminal = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal);',
-            '',
-            '    $resolver = function(string $campo, string $default) use ($opciones_viaje, $opciones_terminal) {',
-            '        if (isset($opciones_terminal[$campo]) && trim((string)$opciones_terminal[$campo]) !== \'\') {',
-            '            return (string)$opciones_terminal[$campo];',
-            '        }',
-            '        if (isset($opciones_viaje[$campo]) && trim((string)$opciones_viaje[$campo]) !== \'\') {',
-            '            return (string)$opciones_viaje[$campo];',
-            '        }',
-            '        return $default;',
-            '    };',
-            '',
-            '    $metodos = [];',
-            '    if ($resolver(\'permite_efectivo\', \'1\') === \'1\') $metodos[] = \'efectivo\';',
-            '    if ($resolver(\'permite_transferencia\', \'1\') === \'1\') $metodos[] = \'transferencia\';',
-            '    return $metodos;',
-            '}',
-        ],
-        'reemplazar' => [
-            'function _resolver_metodos_permitidos_venta(Nodo $nodo_venta): array {',
-            '    $nodo_viaje = $nodo_venta->adyacente(\'viaje\');',
-            '    $nodo_terminal = $nodo_venta->adyacente(\'terminal\');',
-            '    if (!$nodo_viaje || !$nodo_terminal) return [];',
-            '',
-            '    $nombre_viaje = $nodo_viaje->dato();',
-            '    $nombre_terminal = $nodo_terminal->dato();',
-            '    $nodo_dueno = $nodo_viaje->adyacente(\'dueno\');',
-            '    $nombre_dueno = $nodo_dueno ? $nodo_dueno->dato() : \'\';',
-            '    if ($nombre_dueno === \'\') return [];',
-            '',
-            '    // Cuotas pactadas de la venta. Se usan para validar que el método',
-            '    // elegido soporte esa cantidad de cuotas según la configuración',
-            '    // del viaje o de la terminal.',
-            '    $cuotas_pactadas = (int)($nodo_venta->adyacente(\'cuotas\') ? $nodo_venta->adyacente(\'cuotas\')->dato() : \'1\');',
-            '    if ($cuotas_pactadas < 1) $cuotas_pactadas = 1;',
-            '',
-            '    $opciones_viaje = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);',
-            '    $opciones_terminal = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal);',
-            '',
-            '    $resolver = function(string $campo, string $default) use ($opciones_viaje, $opciones_terminal) {',
-            '        if (isset($opciones_terminal[$campo]) && trim((string)$opciones_terminal[$campo]) !== \'\') {',
-            '            return (string)$opciones_terminal[$campo];',
-            '        }',
-            '        if (isset($opciones_viaje[$campo]) && trim((string)$opciones_viaje[$campo]) !== \'\') {',
-            '            return (string)$opciones_viaje[$campo];',
-            '        }',
-            '        return $default;',
-            '    };',
-            '',
-            '    $metodos = [];',
-            '',
-            '    // Efectivo: se ofrece si está permitido y el máximo de cuotas',
-            '    // configurado alcanza para las cuotas pactadas.',
-            '    if ($resolver(\'permite_efectivo\', \'1\') === \'1\') {',
-            '        $max_efectivo = (int)$resolver(\'cuotas_efectivo_max\', \'3\');',
-            '        if ($max_efectivo >= $cuotas_pactadas) $metodos[] = \'efectivo\';',
-            '    }',
-            '',
-            '    // Transferencia: mismo criterio.',
-            '    if ($resolver(\'permite_transferencia\', \'1\') === \'1\') {',
-            '        $max_transferencia = (int)$resolver(\'cuotas_transferencia_max\', \'1\');',
-            '        if ($max_transferencia >= $cuotas_pactadas) $metodos[] = \'transferencia\';',
-            '    }',
-            '',
-            '    return $metodos;',
-            '}',
+            'use Iteradores\\Nodos\\Nodo;',
+            'use Iteradores\\Controlador\\Controlador;',
+            'use Iteradores\\Configuracion\\Conf;',
+            'include_once("./Configuracion/Configuracion.php");',
+            'include_once("./Nodos/Nodo.php");',
+            'include_once("./Controlador/Controlador.php");',
+            'include_once("./miscelaneas/Arbol.php");',
+            'include_once("./Aplicacion/Ventas/Venta.php");',
         ],
     ],
 

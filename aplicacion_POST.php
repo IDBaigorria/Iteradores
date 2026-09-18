@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.45)
+ * ## Estructura de nodos actual (v1.5piloto.47c)
  *
  * ### Nodos raíz especiales
  *
@@ -452,6 +452,7 @@
  *   | `estado`     | Nodo con dato string: `"pagado"` o `"pendiente"`.     |
  *   | `fecha_pago` | Nodo con dato string `"DD/MM/YYYY HH:MM"`. Solo existe si `estado` es `"pagado"`. |
  *   | `metodo_pago`| Nodo con dato string: `"efectivo"` o `"transferencia"`. **Opcional**. Solo se escribe cuando el método del pago concreto difiere del método de la venta. Si no existe, hereda el de la venta. |
+ *   | `rendido`    | Nodo con dato string: marca el cupón como rendido al dueño. Solo existe cuando el dueño ya rindió ese dinero. Se usa para calcular "A rendir" en la sección Saldos de la pestaña Vendidos. |
  *
  * **Nota (resumen en la venta):** Los enlaces `cuotas`, `pagado` y
  * `cuotas_restantes` del Nodo Venta Persistente se siguen escribiendo
@@ -505,7 +506,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.45
+ * @version   1.5piloto.47c
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.
