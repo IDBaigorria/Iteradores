@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.45e
+ * @version   1.5piloto.46c
  */
 
 
@@ -760,72 +760,254 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
 }
 
 /**
- * Cancela una venta, libera asientos y revierte montos.
+ * Busca una venta por ID y devuelve el nodo junto con el nombre del
+ * dueño. Devuelve [null, ''] si no la encuentra.
+ *
+ * @param string $id_venta
+ * @return array{0: ?Nodo, 1: string}
  */
-function cancelar_venta(string $id_venta): array {
+function _buscar_venta_por_id(string $id_venta): array {
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios'];
+    if (!$raiz_usuarios) return [null, ''];
 
     foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
-        $nodo_nivel = $nodo_dueno->adyacente('nivel');
-        if (!$nodo_nivel || $nodo_nivel->dato() !== 'dueno') continue;
-
-        $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
-        if (!$contenedor) continue;
-
-        $anterior = null;
-        $actual = hmi($contenedor);
-        while ($actual) {
+        $nivel = $nodo_dueno->adyacente('nivel');
+        if (!$nivel || $nivel->dato() !== 'dueno') continue;
+        $cont = obtener_contenedor_ventas_dueno($nombre_dueno);
+        if (!$cont) continue;
+        $actual = hmi($cont);
+        $seg = 0;
+        while ($actual && $seg < 1000) {
             if ($actual->dato() === $id_venta) {
-                // Liberar asientos
-                $cabeza_asientos = $actual->adyacente('asientos');
-                if ($cabeza_asientos) {
-                    $asiento_venta = $cabeza_asientos->adyacente('primer');
-                    $seguridad = 0;
-                    while ($asiento_venta && $seguridad < 100) {
-                        $nodo_asiento_real = $asiento_venta->adyacente('asiento');
-                        if ($nodo_asiento_real) {
-                            $nodo_asiento_real->adyacente('estado')?->_dato('libre');
-                            $nodo_asiento_real->eliminar_adyacente('seleccionado_por');
-                            $nodo_asiento_real->eliminar_adyacente('pasajero');
-                            $nodo_asiento_real->eliminar_adyacente('venta');
-                        }
-                        $asiento_venta = $asiento_venta->adyacente('siguiente');
-                        $seguridad++;
-                    }
-                }
+                return [$actual, $nombre_dueno];
+            }
+            $actual = hd($actual);
+            $seg++;
+        }
+    }
+    return [null, ''];
+}
 
-                // Revertir montos de terminal
-                $nodo_terminal = $actual->adyacente('terminal');
-                if ($nodo_terminal) {
-                    $metodo_pago = $actual->adyacente('metodo_pago') ? $actual->adyacente('metodo_pago')->dato() : '';
-                    $monto_pagado = $actual->adyacente('pagado') ? (float)$actual->adyacente('pagado')->dato() : 0;
-                    if ($metodo_pago === 'efectivo') {
-                        $nodo_efectivo = $nodo_terminal->adyacente('efectivo');
-                        if ($nodo_efectivo) {
-                            $nuevo = (float)$nodo_efectivo->dato() - $monto_pagado;
-                            $nodo_efectivo->_dato((string)max(0, $nuevo));
-                        }
-                    } else {
-                        $nodo_banco = $nodo_terminal->adyacente('banco');
-                        if ($nodo_banco) {
-                            $nuevo = (float)$nodo_banco->dato() - $monto_pagado;
-                            $nodo_banco->_dato((string)max(0, $nuevo));
-                        }
-                    }
-                }
+/**
+ * Calcula cuánto hay que devolver por cada método al cancelar una
+ * venta, leyendo los cupones pagados. Cada cupón aporta su monto al
+ * método que tenga asignado, o al de la venta si no tiene uno propio.
+ *
+ * @param Nodo $nodo_venta
+ * @return array{efectivo: float, banco: float, total: float}
+ */
+function _calcular_devolucion_venta(Nodo $nodo_venta): array {
+    $metodo_venta = $nodo_venta->adyacente('metodo_pago') ? $nodo_venta->adyacente('metodo_pago')->dato() : 'efectivo';
+    $efectivo = 0.0;
+    $banco = 0.0;
 
-                // Actualizar contadores del micro y viaje
-                $nodo_micro = $actual->adyacente('micro');
-                $nodo_viaje = $actual->adyacente('viaje');
-                if ($nodo_micro) actualizar_contadores_micro($nodo_micro);
-                if ($nodo_viaje && $nodo_micro) {
-                    $nombre_viaje = $nodo_viaje->dato();
-                    $nombre_dueno_actual = $nodo_dueno->dato();
-                    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno_actual);
+    $contenedor = $nodo_venta->adyacente('cupones');
+    if ($contenedor) {
+        $actual = hmi($contenedor);
+        $seg = 0;
+        while ($actual && $seg < 200) {
+            $estado = $actual->adyacente('estado') ? $actual->adyacente('estado')->dato() : 'pendiente';
+            if ($estado === 'pagado') {
+                $monto = (float)($actual->adyacente('monto') ? $actual->adyacente('monto')->dato() : '0');
+                $metodo_cupon = $actual->adyacente('metodo_pago') ? $actual->adyacente('metodo_pago')->dato() : $metodo_venta;
+                if ($metodo_cupon === 'transferencia') {
+                    $banco += $monto;
+                } else {
+                    $efectivo += $monto;
                 }
+            }
+            $actual = hd($actual);
+            $seg++;
+        }
+    } else {
+        // Venta sin contenedor de cupones: usar el pagado global.
+        $pagado = (float)($nodo_venta->adyacente('pagado') ? $nodo_venta->adyacente('pagado')->dato() : '0');
+        if ($metodo_venta === 'transferencia') {
+            $banco = $pagado;
+        } else {
+            $efectivo = $pagado;
+        }
+    }
 
-                // Eliminar la venta del árbol
+    return [
+        'efectivo' => $efectivo,
+        'banco' => $banco,
+        'total' => $efectivo + $banco,
+    ];
+}
+
+/**
+ * Devuelve la información necesaria para el modal de cancelación,
+ * sin modificar el grafo. Se usa para que el cajero vea el monto a
+ * devolver y en qué terminal está ese dinero antes de confirmar.
+ *
+ * @param string $id_venta
+ * @return array
+ */
+function obtener_info_cancelacion(string $id_venta): array {
+    [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta);
+    if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
+
+    // Datos de viaje y micro.
+    $nodo_viaje = $nodo_venta->adyacente('viaje');
+    $viaje_visible = '';
+    if ($nodo_viaje) {
+        $viaje_visible = $nodo_viaje->adyacente('nombre') ? $nodo_viaje->adyacente('nombre')->dato() : $nodo_viaje->dato();
+    }
+    $nodo_micro = $nodo_venta->adyacente('micro');
+    $micro_visible = '';
+    if ($nodo_micro) {
+        $copia = $nodo_micro->adyacente('vehiculo_copia');
+        if ($copia && $copia->adyacente('nombre')) {
+            $micro_visible = $copia->adyacente('nombre')->dato();
+        }
+    }
+
+    // Comprador.
+    $comprador = null;
+    $nodo_comprador = $nodo_venta->adyacente('comprador');
+    if ($nodo_comprador) {
+        $ap = $nodo_comprador->adyacente('apellido') ? $nodo_comprador->adyacente('apellido')->dato() : '';
+        $nom = $nodo_comprador->adyacente('nombres') ? $nodo_comprador->adyacente('nombres')->dato() : '';
+        $comprador = [
+            'nombre_completo' => formatear_nombre_completo($ap, $nom),
+            'celular' => $nodo_comprador->adyacente('celular') ? $nodo_comprador->adyacente('celular')->dato() : '',
+        ];
+    }
+
+    // Terminal que hizo la venta.
+    $nodo_terminal = $nodo_venta->adyacente('terminal');
+    $terminal_usuario = $nodo_terminal ? $nodo_terminal->dato() : '';
+    $terminal_visible = $terminal_usuario;
+    if ($nodo_terminal && $nodo_terminal->adyacente('nombre_real')) {
+        $terminal_visible = $nodo_terminal->adyacente('nombre_real')->dato();
+    }
+
+    // Montos.
+    $pagado = (float)($nodo_venta->adyacente('pagado') ? $nodo_venta->adyacente('pagado')->dato() : '0');
+    $devolucion = _calcular_devolucion_venta($nodo_venta);
+
+    // Fecha de compra.
+    $fecha_compra = $nodo_venta->adyacente('fecha_hora') ? $nodo_venta->adyacente('fecha_hora')->dato() : '';
+
+    // ¿La terminal tiene saldo suficiente para devolver?
+    $puede_cancelar = true;
+    if ($nodo_terminal) {
+        if ($devolucion['efectivo'] > 0) {
+            $saldo_ef = (float)($nodo_terminal->adyacente('efectivo') ? $nodo_terminal->adyacente('efectivo')->dato() : '0');
+            if ($saldo_ef + 0.001 < $devolucion['efectivo']) $puede_cancelar = false;
+        }
+        if ($devolucion['banco'] > 0) {
+            $saldo_banco = (float)($nodo_terminal->adyacente('banco') ? $nodo_terminal->adyacente('banco')->dato() : '0');
+            if ($saldo_banco + 0.001 < $devolucion['banco']) $puede_cancelar = false;
+        }
+    }
+
+    return [
+        'exito' => true,
+        'info' => [
+            'id_venta' => $id_venta,
+            'viaje_visible' => $viaje_visible,
+            'micro_visible' => $micro_visible,
+            'fecha_compra' => $fecha_compra,
+            'comprador' => $comprador,
+            'terminal_usuario' => $terminal_usuario,
+            'terminal_visible' => $terminal_visible,
+            'pagado' => number_format($pagado, 2, '.', ''),
+            'efectivo_a_devolver' => number_format($devolucion['efectivo'], 2, '.', ''),
+            'banco_a_devolver' => number_format($devolucion['banco'], 2, '.', ''),
+            'total_a_devolver' => number_format($devolucion['total'], 2, '.', ''),
+            'puede_cancelar' => $puede_cancelar,
+        ],
+    ];
+}
+
+/**
+ * Cancela una venta, libera asientos, elimina cupones y
+ * asientos-en-venta persistentes, y revierte los montos en la
+ * terminal según el método de cada cupón pagado.
+ *
+ * @param string $id_venta
+ * @return array
+ */
+function cancelar_venta(string $id_venta): array {
+    [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta);
+    if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
+
+    // 1. Revertir montos: calcular por método y restar de la terminal.
+    $devolucion = _calcular_devolucion_venta($nodo_venta);
+    $nodo_terminal = $nodo_venta->adyacente('terminal');
+    if ($nodo_terminal) {
+        if ($devolucion['efectivo'] > 0) {
+            $nodo_ef = $nodo_terminal->adyacente('efectivo');
+            if ($nodo_ef) {
+                $nuevo = max(0, (float)$nodo_ef->dato() - $devolucion['efectivo']);
+                $nodo_ef->_dato((string)$nuevo);
+            }
+        }
+        if ($devolucion['banco'] > 0) {
+            $nodo_banco = $nodo_terminal->adyacente('banco');
+            if ($nodo_banco) {
+                $nuevo = max(0, (float)$nodo_banco->dato() - $devolucion['banco']);
+                $nodo_banco->_dato((string)$nuevo);
+            }
+        }
+    }
+
+    // 2. Liberar asientos reales (en vehiculo_copia) y eliminar los
+    //    nodos asiento-en-venta persistentes de la lista.
+    $cabeza_asientos = $nodo_venta->adyacente('asientos');
+    if ($cabeza_asientos) {
+        $asiento_venta = $cabeza_asientos->adyacente('primer');
+        $seg = 0;
+        while ($asiento_venta && $seg < 200) {
+            $nodo_asiento_real = $asiento_venta->adyacente('asiento');
+            if ($nodo_asiento_real) {
+                $estado = $nodo_asiento_real->adyacente('estado');
+                if ($estado) $estado->_dato('libre');
+                $nodo_asiento_real->eliminar_adyacente('seleccionado_por');
+                $nodo_asiento_real->eliminar_adyacente('pasajero');
+                $nodo_asiento_real->eliminar_adyacente('venta');
+            }
+            $asiento_venta = $asiento_venta->adyacente('siguiente');
+            $seg++;
+        }
+        // Eliminar la lista de asientos-en-venta persistentes.
+        while ($asiento_a_borrar = eliminar_hmi($cabeza_asientos)) {
+            Nodo::eliminar($asiento_a_borrar);
+        }
+        // Ahora la cabeza no tiene hijos, se puede eliminar.
+        $nodo_venta->eliminar_adyacente('asientos');
+        Nodo::eliminar($cabeza_asientos);
+    }
+
+    // 3. Eliminar los cupones y su contenedor.
+    $contenedor_cupones = $nodo_venta->adyacente('cupones');
+    if ($contenedor_cupones) {
+        while ($cupon_a_borrar = eliminar_hmi($contenedor_cupones)) {
+            Nodo::eliminar($cupon_a_borrar);
+        }
+        $nodo_venta->eliminar_adyacente('cupones');
+        Nodo::eliminar($contenedor_cupones);
+    }
+
+    // 4. Actualizar contadores del micro y del viaje.
+    $nodo_micro = $nodo_venta->adyacente('micro');
+    $nodo_viaje = $nodo_venta->adyacente('viaje');
+    if ($nodo_micro) actualizar_contadores_micro($nodo_micro);
+    if ($nodo_viaje && $nodo_micro) {
+        $nombre_viaje = $nodo_viaje->dato();
+        actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
+    }
+
+    // 5. Desenlazar la venta del árbol del dueño.
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if ($contenedor_ventas) {
+        $anterior = null;
+        $actual = hmi($contenedor_ventas);
+        $seg = 0;
+        while ($actual && $seg < 1000) {
+            if ($actual->id() === $nodo_venta->id()) {
                 if ($anterior) {
                     $siguiente = hd($actual);
                     if ($siguiente) {
@@ -836,21 +1018,32 @@ function cancelar_venta(string $id_venta): array {
                 } else {
                     $siguiente = hd($actual);
                     if ($siguiente) {
-                        $contenedor->_adyacente_en($siguiente, 'hmi', true);
+                        $contenedor_ventas->_adyacente_en($siguiente, 'hmi', true);
                     } else {
-                        $contenedor->eliminar_adyacente('hmi');
+                        $contenedor_ventas->eliminar_adyacente('hmi');
                     }
                 }
-
-                Controlador::guardar(Conf::NOMBRE_APP);
-                return ['exito' => true];
+                break;
             }
             $anterior = $actual;
             $actual = hd($actual);
+            $seg++;
         }
     }
 
-    return ['exito' => false, 'error' => 'Venta no encontrada'];
+    // 6. Eliminar el nodo venta entero.
+    Nodo::eliminar($nodo_venta);
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+
+    return [
+        'exito' => true,
+        'devolucion' => [
+            'efectivo' => number_format($devolucion['efectivo'], 2, '.', ''),
+            'banco' => number_format($devolucion['banco'], 2, '.', ''),
+            'total' => number_format($devolucion['total'], 2, '.', ''),
+        ],
+    ];
 }
 
 /**
@@ -872,6 +1065,12 @@ function _resolver_metodos_permitidos_venta(Nodo $nodo_venta): array {
     $nombre_dueno = $nodo_dueno ? $nodo_dueno->dato() : '';
     if ($nombre_dueno === '') return [];
 
+    // Cuotas pactadas de la venta. Se usan para validar que el método
+    // elegido soporte esa cantidad de cuotas según la configuración
+    // del viaje o de la terminal.
+    $cuotas_pactadas = (int)($nodo_venta->adyacente('cuotas') ? $nodo_venta->adyacente('cuotas')->dato() : '1');
+    if ($cuotas_pactadas < 1) $cuotas_pactadas = 1;
+
     $opciones_viaje = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
     $opciones_terminal = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal);
 
@@ -886,8 +1085,20 @@ function _resolver_metodos_permitidos_venta(Nodo $nodo_venta): array {
     };
 
     $metodos = [];
-    if ($resolver('permite_efectivo', '1') === '1') $metodos[] = 'efectivo';
-    if ($resolver('permite_transferencia', '1') === '1') $metodos[] = 'transferencia';
+
+    // Efectivo: se ofrece si está permitido y el máximo de cuotas
+    // configurado alcanza para las cuotas pactadas.
+    if ($resolver('permite_efectivo', '1') === '1') {
+        $max_efectivo = (int)$resolver('cuotas_efectivo_max', '3');
+        if ($max_efectivo >= $cuotas_pactadas) $metodos[] = 'efectivo';
+    }
+
+    // Transferencia: mismo criterio.
+    if ($resolver('permite_transferencia', '1') === '1') {
+        $max_transferencia = (int)$resolver('cuotas_transferencia_max', '1');
+        if ($max_transferencia >= $cuotas_pactadas) $metodos[] = 'transferencia';
+    }
+
     return $metodos;
 }
 

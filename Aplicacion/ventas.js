@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.45d
+ * @version 1.5piloto.46b
  */
 
 // (aplicar_cambios.php funcionó)
@@ -1496,20 +1496,131 @@ async function ir_a_venta_en_vendidos(id_venta, nombre_dueno = '', nombre_viaje 
     }, 2600);
 }
 
+/**
+ * Abre el modal de cancelación de una venta. Primero pide la info
+ * de devolución al backend y muestra el detalle antes de confirmar.
+ *
+ * @param {string} id_venta
+ */
 async function cancelar_venta(id_venta) {
-    if (!confirm(`¿Cancelar venta ${id_venta}?`)) return;
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "ventas/cancelar", id_venta })
+        body: new URLSearchParams({ accion: "ventas/info_cancelacion", id_venta })
     });
-    const resultado = await respuesta.json();
-    if (resultado.exito) {
-        mostrar_aviso("Venta cancelada", 'exito');
-        cargar_ventas();
-    } else {
-        mostrar_aviso(resultado.error || "Error al cancelar", 'error');
+    const datos = await respuesta.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al obtener información de cancelación", 'error');
+        return;
     }
+
+    const info = datos.info;
+    const total_devolver = parseFloat(info.total_a_devolver || '0');
+    const efvo = parseFloat(info.efectivo_a_devolver || '0');
+    const banco = parseFloat(info.banco_a_devolver || '0');
+
+    // Bloque de datos generales.
+    const lineas_datos = [];
+    if (info.viaje_visible) lineas_datos.push(`<div class="cancelacion-dato-linea"><span>Viaje:</span><b>${info.viaje_visible}</b></div>`);
+    if (info.micro_visible) lineas_datos.push(`<div class="cancelacion-dato-linea"><span>Micro:</span><b>${info.micro_visible}</b></div>`);
+    if (info.fecha_compra) lineas_datos.push(`<div class="cancelacion-dato-linea"><span>Fecha de compra:</span><b>${info.fecha_compra}</b></div>`);
+    if (info.comprador && info.comprador.nombre_completo) lineas_datos.push(`<div class="cancelacion-dato-linea"><span>Comprador:</span><b>${info.comprador.nombre_completo}</b></div>`);
+    if (info.comprador && info.comprador.celular) lineas_datos.push(`<div class="cancelacion-dato-linea"><span>Celular:</span><b>${info.comprador.celular}</b></div>`);
+    if (info.terminal_visible) lineas_datos.push(`<div class="cancelacion-dato-linea"><span>Vendida por:</span><b>${info.terminal_visible}</b></div>`);
+
+    // Bloque de devolución.
+    let devolucion_html = '';
+    if (total_devolver > 0.001) {
+        // Desglose: solo mostrar métodos con monto > 0.
+        const partes = [];
+        if (efvo > 0.001) partes.push(`<span>Efectivo: <b>$${info.efectivo_a_devolver}</b></span>`);
+        if (banco > 0.001) partes.push(`<span>Banco: <b>$${info.banco_a_devolver}</b></span>`);
+        const desglose_html = partes.length > 0
+            ? `<div class="cancelacion-devolucion-desglose">${partes.join('<span class="cancelacion-sep">·</span>')}</div>`
+            : '';
+
+        // Ubicación: texto simple. Si hay un solo método, mencionarlo.
+        let ubicacion = '';
+        if (efvo > 0.001 && banco <= 0.001) {
+            ubicacion = `El dinero está en efectivo en la terminal <b>${info.terminal_visible}</b>.`;
+        } else if (banco > 0.001 && efvo <= 0.001) {
+            ubicacion = `El dinero está en el banco de la terminal <b>${info.terminal_visible}</b>.`;
+        } else {
+            ubicacion = `El dinero está en la terminal <b>${info.terminal_visible}</b>.`;
+        }
+
+        devolucion_html = `
+            <div class="cancelacion-devolucion">
+                <div class="cancelacion-devolucion-titulo">Debe devolver al comprador</div>
+                <div class="cancelacion-devolucion-monto">$${info.total_a_devolver}</div>
+                ${desglose_html}
+                <div class="cancelacion-devolucion-ubicacion">${ubicacion}</div>
+            </div>
+        `;
+    } else {
+        devolucion_html = `
+            <div class="cancelacion-sin-pagos">
+                Esta venta no tiene pagos registrados. Se cancelará sin devolución de dinero.
+            </div>
+        `;
+    }
+
+    // Advertencia si no alcanza el saldo.
+    const advertencia_html = (!info.puede_cancelar)
+        ? `<div class="cancelacion-advertencia">Atención: el saldo actual de la terminal es menor al monto a devolver.</div>`
+        : '';
+
+    const html = `
+        <div class="cancelacion-aviso">
+            <h4>Vas a cancelar la venta <strong>${info.id_venta}</strong></h4>
+            <p>Esta acción libera los asientos, elimina los cupones y quita la venta del listado. No se puede deshacer.</p>
+
+            <div class="cancelacion-datos">
+                ${lineas_datos.join('')}
+            </div>
+
+            ${devolucion_html}
+            ${advertencia_html}
+
+            <div class="cancelacion-acciones">
+                <button class="btn danger" id="btn_confirmar_cancelacion">Cancelar venta</button>
+                <button class="btn" id="btn_volver_cancelacion">Volver</button>
+            </div>
+        </div>
+    `;
+
+    abrir_modal_generico('Cancelar venta', html);
+
+    const contenedor = document.getElementById('modal_generico_contenido');
+
+    contenedor.querySelector('#btn_volver_cancelacion').addEventListener('click', cerrar_modal_generico);
+
+    contenedor.querySelector('#btn_confirmar_cancelacion').addEventListener('click', async () => {
+        // Confirm final, como último freno para el usuario despistado.
+        const monto_txt = total_devolver > 0.001
+            ? `Se deben devolver $${info.total_a_devolver} al comprador.\n\n`
+            : 'Esta venta no tiene pagos registrados, no hay devolución.\n\n';
+        const confirmacion = confirm(
+            `¿Confirmás la cancelación de la venta ${info.id_venta}?\n\n`
+            + monto_txt
+            + 'Esta acción no se puede deshacer.'
+        );
+        if (!confirmacion) return;
+
+        const resp2 = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ accion: "ventas/cancelar", id_venta })
+        });
+        const resultado = await resp2.json();
+        if (resultado.exito) {
+            mostrar_aviso("Venta cancelada", 'exito');
+            cerrar_modal_generico();
+            if (typeof cargar_ventas === 'function') cargar_ventas();
+        } else {
+            mostrar_aviso(resultado.error || "Error al cancelar", 'error');
+        }
+    });
 }
 
 function formatear_fecha_hora_actual() {

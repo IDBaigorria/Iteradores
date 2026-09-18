@@ -471,3 +471,136 @@
         align-items: flex-start;
     }
 }
+
+/* ===== v1.5piloto.46: modal de cancelación de venta ===== */
+
+.cancelacion-aviso {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cancelacion-aviso h4 {
+    margin: 0;
+    font-size: 16px;
+    color: #8a1e1e;
+}
+
+.cancelacion-aviso h4 strong {
+    color: #6b0e0e;
+}
+
+.cancelacion-aviso > p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.4;
+}
+
+.cancelacion-datos {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--panel-claro);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+}
+
+.cancelacion-dato-linea {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.cancelacion-dato-linea span {
+    color: var(--muted);
+    flex-shrink: 0;
+    min-width: 110px;
+}
+.cancelacion-dato-linea b {
+    color: var(--text);
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.cancelacion-devolucion {
+    border: 2px solid #d94a4a;
+    background: #fdecea;
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+}
+
+.cancelacion-devolucion-titulo {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8a1e1e;
+}
+
+.cancelacion-devolucion-monto {
+    font-size: 32px;
+    font-weight: 700;
+    color: #6b0e0e;
+    line-height: 1.1;
+}
+
+.cancelacion-devolucion-desglose {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: #8a1e1e;
+}
+.cancelacion-devolucion-desglose b {
+    color: #6b0e0e;
+    font-weight: 700;
+}
+
+.cancelacion-sep {
+    color: #d94a4a;
+    opacity: 0.6;
+    padding: 0 2px;
+}
+
+.cancelacion-devolucion-ubicacion {
+    font-size: 13px;
+    color: #8a1e1e;
+    border-top: 1px dashed #d94a4a;
+    padding-top: 8px;
+}
+
+.cancelacion-sin-pagos {
+    border: 1px solid var(--border);
+    background: var(--panel-claro);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+}
+
+.cancelacion-advertencia {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    color: #856404;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.cancelacion-acciones {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
