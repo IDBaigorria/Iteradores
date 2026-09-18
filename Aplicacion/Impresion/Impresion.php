@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.48b
+ * @version   1.5piloto.49
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -955,6 +955,11 @@ function imprimir_informe_ventas(array $params): void {
     $filtro_viaje = $params['viaje'] ?? 'todos';
     $filtro_vendedor = $params['vendedor'] ?? 'Todos';
     $filtro_estado = $params['estado'] ?? 'todos';
+    $filtro_codigo = $params['codigo'] ?? '';
+    $filtro_comprador = $params['comprador'] ?? '';
+    $filtro_fecha_desde = $params['fecha_desde'] ?? '';
+    $filtro_fecha_hasta = $params['fecha_hasta'] ?? '';
+    $filtro_rendido = $params['rendido'] ?? 'todos';
     $solicitante = $params['solicitante'] ?? '';
     $solicitante_nombre = $params['solicitante_nombre'] ?? $solicitante;
 
@@ -976,6 +981,52 @@ function imprimir_informe_ventas(array $params): void {
     if ($filtro_estado !== 'todos') {
         $ventas = array_filter($ventas, function($v) use ($filtro_estado) {
             return ($v['estado_pago'] ?? '') === $filtro_estado;
+        });
+    }
+    if ($filtro_codigo !== '') {
+        $buscar_cod = strtolower(trim($filtro_codigo));
+        $ventas = array_filter($ventas, function($v) use ($buscar_cod) {
+            return strpos(strtolower($v['id_venta'] ?? ''), $buscar_cod) !== false;
+        });
+    }
+    if ($filtro_comprador !== '') {
+        $t = strtolower(trim($filtro_comprador));
+        $t_dni = preg_replace('/\D+/', '', $filtro_comprador);
+        $ventas = array_filter($ventas, function($v) use ($t, $t_dni) {
+            $c = $v['comprador'] ?? null;
+            if (!$c) return false;
+            $nombre = strtolower(trim(
+                ($c['nombre_completo'] ?? '') . ' ' .
+                ($c['apellido'] ?? '') . ' ' .
+                ($c['nombres'] ?? '')
+            ));
+            if ($nombre !== '' && $t !== '' && strpos($nombre, $t) !== false) return true;
+            if ($t_dni !== '') {
+                $dni = preg_replace('/\D+/', '', (string)($c['dni'] ?? ''));
+                if ($dni !== '' && strpos($dni, $t_dni) !== false) return true;
+            }
+            return false;
+        });
+    }
+    if ($filtro_fecha_desde !== '') {
+        $ventas = array_filter($ventas, function($v) use ($filtro_fecha_desde) {
+            $fi = $v['fecha_iso'] ?? '';
+            return $fi !== '' && $fi >= $filtro_fecha_desde;
+        });
+    }
+    if ($filtro_fecha_hasta !== '') {
+        $ventas = array_filter($ventas, function($v) use ($filtro_fecha_hasta) {
+            $fi = $v['fecha_iso'] ?? '';
+            return $fi !== '' && $fi <= $filtro_fecha_hasta;
+        });
+    }
+    if ($filtro_rendido === 'rendido') {
+        $ventas = array_filter($ventas, function($v) {
+            return (int)($v['cupones_sin_rendir'] ?? 0) === 0;
+        });
+    } elseif ($filtro_rendido === 'falta_rendir') {
+        $ventas = array_filter($ventas, function($v) {
+            return (int)($v['cupones_sin_rendir'] ?? 0) > 0;
         });
     }
     $ventas = array_values($ventas);
@@ -1188,6 +1239,21 @@ function imprimir_informe_ventas(array $params): void {
     echo '<li><b>Viaje:</b> ' . htmlspecialchars($viaje_visible) . '</li>';
     echo '<li><b>Vendedor:</b> ' . htmlspecialchars($nombre_vendedor_visible) . '</li>';
     echo '<li><b>Estado:</b> ' . htmlspecialchars($estado_visible) . '</li>';
+    if ($filtro_codigo !== '') {
+        echo '<li><b>Código:</b> ' . htmlspecialchars($filtro_codigo) . '</li>';
+    }
+    if ($filtro_comprador !== '') {
+        echo '<li><b>Comprador:</b> ' . htmlspecialchars($filtro_comprador) . '</li>';
+    }
+    if ($filtro_fecha_desde !== '' || $filtro_fecha_hasta !== '') {
+        $desde_txt = $filtro_fecha_desde !== '' ? formatear_fecha_visible($filtro_fecha_desde) : 'sin límite';
+        $hasta_txt = $filtro_fecha_hasta !== '' ? formatear_fecha_visible($filtro_fecha_hasta) : 'sin límite';
+        echo '<li><b>Fecha de compra:</b> ' . htmlspecialchars($desde_txt . ' a ' . $hasta_txt) . '</li>';
+    }
+    if ($filtro_rendido !== 'todos') {
+        $rendido_txt = ($filtro_rendido === 'rendido') ? 'Rendido' : 'Falta rendir';
+        echo '<li><b>Rendición:</b> ' . htmlspecialchars($rendido_txt) . '</li>';
+    }
     echo '</ul>';
     echo '</div>';
 

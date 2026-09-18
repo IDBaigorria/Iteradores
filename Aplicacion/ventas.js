@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.48
+ * @version 1.5piloto.49d
  */
 
 // (aplicar_cambios.php funcionó)
@@ -1002,6 +1002,11 @@ function renderizar_ventas() {
     const filtroViaje = document.getElementById('selector_viaje_vendido').value;
     const filtroVendedor = document.getElementById('filtro_vendedor').value;
     const filtroEstado = document.getElementById('filtro_estado').value;
+    const filtroCodigo = (document.getElementById('filtro_codigo_venta')?.value || '').trim();
+    const filtroComprador = (document.getElementById('filtro_comprador')?.value || '').trim();
+    const filtroFechaDesde = document.getElementById('filtro_fecha_desde')?.value || '';
+    const filtroFechaHasta = document.getElementById('filtro_fecha_hasta')?.value || '';
+    const filtroRendido = document.getElementById('filtro_rendido')?.value || 'todos';
 
     let ventas_filtradas = ventas_actuales;
     if (filtroViaje !== 'todos') {
@@ -1013,12 +1018,50 @@ function renderizar_ventas() {
     if (filtroEstado !== 'todos') {
         ventas_filtradas = ventas_filtradas.filter(v => v.estado_pago === filtroEstado);
     }
+    if (filtroCodigo !== '') {
+        const t = filtroCodigo.toLowerCase();
+        ventas_filtradas = ventas_filtradas.filter(v => String(v.id_venta || '').toLowerCase().includes(t));
+    }
+    if (filtroComprador !== '') {
+        const t = filtroComprador.toLowerCase();
+        const t_dni = filtroComprador.replace(/\D+/g, '');
+        ventas_filtradas = ventas_filtradas.filter(v => {
+            const c = v.comprador;
+            if (!c) return false;
+            const nombre = ((c.nombre_completo || '') + ' ' + (c.apellido || '') + ' ' + (c.nombres || '')).toLowerCase();
+            if (nombre.trim() !== '' && nombre.includes(t)) return true;
+            if (t_dni !== '') {
+                const dni = String(c.dni || '').replace(/\D+/g, '');
+                if (dni !== '' && dni.includes(t_dni)) return true;
+            }
+            return false;
+        });
+    }
+    if (filtroFechaDesde !== '') {
+        ventas_filtradas = ventas_filtradas.filter(v => {
+            const fi = v.fecha_iso || '';
+            return fi !== '' && fi >= filtroFechaDesde;
+        });
+    }
+    if (filtroFechaHasta !== '') {
+        ventas_filtradas = ventas_filtradas.filter(v => {
+            const fi = v.fecha_iso || '';
+            return fi !== '' && fi <= filtroFechaHasta;
+        });
+    }
+    if (filtroRendido === 'rendido') {
+        ventas_filtradas = ventas_filtradas.filter(v => parseInt(v.cupones_sin_rendir || '0', 10) === 0);
+    } else if (filtroRendido === 'falta_rendir') {
+        ventas_filtradas = ventas_filtradas.filter(v => parseInt(v.cupones_sin_rendir || '0', 10) > 0);
+    }
 
     const lista = $("#lista_ventas");
     lista.innerHTML = '';
     if (ventas_filtradas.length === 0) {
         lista.innerHTML = '<p style="color:#888; margin:20px;">No hay ventas registradas para los filtros seleccionados.</p>';
         renderizar_saldos_vendidos(ventas_filtradas);
+        renderizar_chips_filtros_activos();
+        actualizar_contador_ventas(0);
         return;
     }
     ventas_filtradas.forEach(venta => {
@@ -1048,7 +1091,9 @@ function renderizar_ventas() {
             }
         }
 
-        // Comprador: se arma solo si hay datos.
+        // Comprador: se arma solo si hay datos. Formato horizontal con
+        // etiqueta por dato, separados por "·". Puede ocupar uno o dos
+        // renglones según el ancho disponible (flex-wrap).
         let comprador_html = '';
         const c = venta.comprador;
         if (c) {
@@ -1057,17 +1102,18 @@ function renderizar_ventas() {
             const email = c.email || '';
             const direccion_completa = [c.direccion, c.localidad].filter(v => v).join(', ');
 
-            const lineas = [];
-            if (nombre) lineas.push(`<div class="sale-comprador-linea"><span>Nombre:</span><b>${nombre}</b></div>`);
-            if (celular) lineas.push(`<div class="sale-comprador-linea"><span>Celular:</span><b>${celular}</b></div>`);
-            if (email) lineas.push(`<div class="sale-comprador-linea"><span>Email:</span><b>${email}</b></div>`);
-            if (direccion_completa) lineas.push(`<div class="sale-comprador-linea"><span>Dirección:</span><b>${direccion_completa}</b></div>`);
+            const datos = [];
+            if (nombre) datos.push(`<span class="sale-comprador-dato"><span class="sale-comprador-etiqueta">Nombre:</span> <b class="sale-comprador-nombre">${nombre}</b></span>`);
+            if (celular) datos.push(`<span class="sale-comprador-dato"><span class="sale-comprador-etiqueta">Celular:</span> <b>${celular}</b></span>`);
+            if (email) datos.push(`<span class="sale-comprador-dato"><span class="sale-comprador-etiqueta">Email:</span> <b>${email}</b></span>`);
+            if (direccion_completa) datos.push(`<span class="sale-comprador-dato"><span class="sale-comprador-etiqueta">Dirección:</span> <b>${direccion_completa}</b></span>`);
 
-            if (lineas.length > 0) {
+            if (datos.length > 0) {
+                const sep = '<span class="sale-sep">·</span>';
                 comprador_html = `
                     <div class="sale-comprador">
-                        <div class="sale-comprador-titulo">Comprador</div>
-                        ${lineas.join('')}
+                        <span class="sale-comprador-titulo">Comprador:</span>
+                        <span class="sale-comprador-datos">${datos.join(sep)}</span>
                     </div>
                 `;
             }
@@ -1120,6 +1166,8 @@ function renderizar_ventas() {
         tarjeta.querySelector('.cancelar_venta').addEventListener('click', () => cancelar_venta(venta.id_venta));
     });
     renderizar_saldos_vendidos(ventas_filtradas);
+    renderizar_chips_filtros_activos();
+    actualizar_contador_ventas(ventas_filtradas.length);
 }
 
 /**
@@ -1580,6 +1628,17 @@ async function ir_a_venta_en_vendidos(id_venta, nombre_dueno = '', nombre_viaje 
         if (select_viaje) select_viaje.value = 'todos';
         if (select_vendedor) select_vendedor.value = 'Todos';
         if (select_estado) select_estado.value = 'todos';
+        // Filtros extendidos (v1.5piloto.49)
+        const input_codigo = document.getElementById('filtro_codigo_venta');
+        const input_comprador = document.getElementById('filtro_comprador');
+        const input_fecha_desde = document.getElementById('filtro_fecha_desde');
+        const input_fecha_hasta = document.getElementById('filtro_fecha_hasta');
+        const sel_rendido = document.getElementById('filtro_rendido');
+        if (input_codigo) input_codigo.value = '';
+        if (input_comprador) input_comprador.value = '';
+        if (input_fecha_desde) input_fecha_desde.value = '';
+        if (input_fecha_hasta) input_fecha_hasta.value = '';
+        if (sel_rendido) sel_rendido.value = 'todos';
         renderizar_ventas();
         panel = document.querySelector(`.sale-card[data-id-venta="${id_venta}"]`);
     }
@@ -1813,6 +1872,172 @@ function validar_direccion_js(valor) {
     return null;
 }
 
+/**
+ * Arma la tira de chips con los filtros activos. Cada chip se puede
+ * cerrar con la X para desactivar ese filtro individual. Si no hay
+ * ningún filtro activo, el contenedor queda vacío.
+ */
+function renderizar_chips_filtros_activos() {
+    const contenedor = document.getElementById('chips_filtros_activos_vendidos');
+    if (!contenedor) return;
+
+    const chips = [];
+
+    const sel_dueno = document.getElementById('selector_dueno_vendidos');
+    if (sel_dueno && sel_dueno.value) {
+        const txt = sel_dueno.options[sel_dueno.selectedIndex]?.textContent || sel_dueno.value;
+        chips.push({ id: 'dueno', texto: `Dueño: ${txt}` });
+    }
+
+    const codigo = (document.getElementById('filtro_codigo_venta')?.value || '').trim();
+    if (codigo) chips.push({ id: 'codigo', texto: `Código: ${codigo}` });
+
+    const comprador = (document.getElementById('filtro_comprador')?.value || '').trim();
+    if (comprador) chips.push({ id: 'comprador', texto: `Comprador: ${comprador}` });
+
+    const sel_viaje = document.getElementById('selector_viaje_vendido');
+    if (sel_viaje && sel_viaje.value !== 'todos' && sel_viaje.value !== '') {
+        chips.push({ id: 'viaje', texto: `Viaje: ${sel_viaje.value}` });
+    }
+
+    const sel_vendedor = document.getElementById('filtro_vendedor');
+    if (sel_vendedor && sel_vendedor.value !== 'Todos' && sel_vendedor.value !== '') {
+        const txt = sel_vendedor.options[sel_vendedor.selectedIndex]?.textContent || sel_vendedor.value;
+        chips.push({ id: 'vendedor', texto: `Vendedor: ${txt}` });
+    }
+
+    const sel_estado = document.getElementById('filtro_estado');
+    if (sel_estado && sel_estado.value !== 'todos' && sel_estado.value !== '') {
+        const txt = sel_estado.options[sel_estado.selectedIndex]?.textContent || sel_estado.value;
+        chips.push({ id: 'estado', texto: `Estado: ${txt}` });
+    }
+
+    const sel_rendido = document.getElementById('filtro_rendido');
+    if (sel_rendido && sel_rendido.value !== 'todos' && sel_rendido.value !== '') {
+        const txt = sel_rendido.options[sel_rendido.selectedIndex]?.textContent || sel_rendido.value;
+        chips.push({ id: 'rendido', texto: `Rendición: ${txt}` });
+    }
+
+    const desde = document.getElementById('filtro_fecha_desde')?.value || '';
+    if (desde) {
+        const partes = desde.split('-');
+        const visible = partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : desde;
+        chips.push({ id: 'fecha_desde', texto: `Desde: ${visible}` });
+    }
+
+    const hasta = document.getElementById('filtro_fecha_hasta')?.value || '';
+    if (hasta) {
+        const partes = hasta.split('-');
+        const visible = partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : hasta;
+        chips.push({ id: 'fecha_hasta', texto: `Hasta: ${visible}` });
+    }
+
+    if (chips.length === 0) {
+        contenedor.innerHTML = '';
+        return;
+    }
+
+    contenedor.innerHTML = chips.map(c => (
+        `<span class="chip-filtro">${c.texto}<button type="button" class="chip-cerrar" data-chip="${c.id}" aria-label="Quitar filtro">✕</button></span>`
+    )).join('');
+
+    contenedor.querySelectorAll('.chip-cerrar').forEach(btn => {
+        btn.addEventListener('click', () => {
+            limpiar_filtro_individual(btn.dataset.chip);
+            renderizar_ventas();
+        });
+    });
+}
+
+/**
+ * Resetea un filtro individual por su id lógico.
+ *
+ * @param {string} id Identificador del filtro (dueno, codigo, comprador,
+ *                    viaje, vendedor, estado, rendido, fecha_desde, fecha_hasta).
+ */
+function limpiar_filtro_individual(id) {
+    switch (id) {
+        case 'dueno': {
+            const el = document.getElementById('selector_dueno_vendidos');
+            if (el) el.value = '';
+            break;
+        }
+        case 'codigo': {
+            const el = document.getElementById('filtro_codigo_venta');
+            if (el) el.value = '';
+            break;
+        }
+        case 'comprador': {
+            const el = document.getElementById('filtro_comprador');
+            if (el) el.value = '';
+            break;
+        }
+        case 'viaje': {
+            const el = document.getElementById('selector_viaje_vendido');
+            if (el) el.value = 'todos';
+            break;
+        }
+        case 'vendedor': {
+            const el = document.getElementById('filtro_vendedor');
+            if (el) el.value = 'Todos';
+            break;
+        }
+        case 'estado': {
+            const el = document.getElementById('filtro_estado');
+            if (el) el.value = 'todos';
+            break;
+        }
+        case 'rendido': {
+            const el = document.getElementById('filtro_rendido');
+            if (el) el.value = 'todos';
+            break;
+        }
+        case 'fecha_desde': {
+            const el = document.getElementById('filtro_fecha_desde');
+            if (el) el.value = '';
+            break;
+        }
+        case 'fecha_hasta': {
+            const el = document.getElementById('filtro_fecha_hasta');
+            if (el) el.value = '';
+            break;
+        }
+    }
+}
+
+/**
+ * Actualiza el contador de ventas visibles debajo de los chips.
+ *
+ * @param {number} cantidad
+ */
+function actualizar_contador_ventas(cantidad) {
+    const el = document.getElementById('contador_ventas_vendidos');
+    if (!el) return;
+    if (cantidad === 0) {
+        el.textContent = 'Sin ventas para los filtros seleccionados';
+    } else if (cantidad === 1) {
+        el.textContent = '1 venta';
+    } else {
+        el.textContent = `${cantidad} ventas`;
+    }
+}
+
+/**
+ * Limpia todos los filtros de la pestaña Vendidos (salvo el Dueño,
+ * que es selector de contexto, no filtro) y vuelve a renderizar.
+ */
+function limpiar_filtros_vendidos() {
+    limpiar_filtro_individual('codigo');
+    limpiar_filtro_individual('comprador');
+    limpiar_filtro_individual('viaje');
+    limpiar_filtro_individual('vendedor');
+    limpiar_filtro_individual('estado');
+    limpiar_filtro_individual('rendido');
+    limpiar_filtro_individual('fecha_desde');
+    limpiar_filtro_individual('fecha_hasta');
+    renderizar_ventas();
+}
+
 // ===== Inicialización de listeners del panel Vendidos =====
 // El select de Estado es estático (no se regenera), así que el listener
 // se conecta una sola vez al cargar el script.
@@ -1825,6 +2050,19 @@ function validar_direccion_js(valor) {
     if (btn_informe) {
         btn_informe.addEventListener('click', imprimir_informe_ventas);
     }
+    // Filtros extendidos (v1.5piloto.49)
+    const input_codigo = document.getElementById('filtro_codigo_venta');
+    if (input_codigo) input_codigo.addEventListener('input', renderizar_ventas);
+    const input_comprador = document.getElementById('filtro_comprador');
+    if (input_comprador) input_comprador.addEventListener('input', renderizar_ventas);
+    const input_fecha_desde = document.getElementById('filtro_fecha_desde');
+    if (input_fecha_desde) input_fecha_desde.addEventListener('change', renderizar_ventas);
+    const input_fecha_hasta = document.getElementById('filtro_fecha_hasta');
+    if (input_fecha_hasta) input_fecha_hasta.addEventListener('change', renderizar_ventas);
+    const sel_rendido = document.getElementById('filtro_rendido');
+    if (sel_rendido) sel_rendido.addEventListener('change', renderizar_ventas);
+    const btn_limpiar = document.getElementById('boton_limpiar_filtros_vendidos');
+    if (btn_limpiar) btn_limpiar.addEventListener('click', limpiar_filtros_vendidos);
 })();
 
 /**
@@ -1856,6 +2094,11 @@ function imprimir_informe_ventas() {
     const filtro_viaje = document.getElementById('selector_viaje_vendido').value;
     const filtro_vendedor = document.getElementById('filtro_vendedor').value;
     const filtro_estado = document.getElementById('filtro_estado').value;
+    const filtro_codigo = (document.getElementById('filtro_codigo_venta')?.value || '').trim();
+    const filtro_comprador = (document.getElementById('filtro_comprador')?.value || '').trim();
+    const filtro_fecha_desde = document.getElementById('filtro_fecha_desde')?.value || '';
+    const filtro_fecha_hasta = document.getElementById('filtro_fecha_hasta')?.value || '';
+    const filtro_rendido = document.getElementById('filtro_rendido')?.value || 'todos';
 
     const solicitante_nombre = usuario_actual.nombre_real || usuario_actual.nombre_usuario;
 
@@ -1867,6 +2110,11 @@ function imprimir_informe_ventas() {
         viaje: filtro_viaje,
         vendedor: filtro_vendedor,
         estado: filtro_estado,
+        codigo: filtro_codigo,
+        comprador: filtro_comprador,
+        fecha_desde: filtro_fecha_desde,
+        fecha_hasta: filtro_fecha_hasta,
+        rendido: filtro_rendido,
         solicitante: usuario_actual.nombre_usuario,
         solicitante_nombre: solicitante_nombre
     });

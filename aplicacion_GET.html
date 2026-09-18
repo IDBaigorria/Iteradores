@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="estilos.css?v=1.5piloto.38">
 <link rel="stylesheet" href="estilos-vehiculos.css?v=1.5piloto.38">
 <link rel="stylesheet" href="estilos-viajes.css?v=1.5piloto.40">
-<link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.47c">
+<link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.49e">
 </head>
 <body>
 <!-- Pantalla de login (código de acceso) -->
@@ -317,32 +317,79 @@
           <h2 style="margin:0;">Ventas realizadas</h2>
           <button class="btn primary" id="boton_imprimir_informe_ventas">Imprimir informe</button>
         </div>
-        <div class="row" style="flex-wrap:wrap; gap:10px;">
-          <div id="contenedor_filtro_dueno_vendidos" style="display:none;">
-            <label for="selector_dueno_vendidos">Dueño:</label>
-            <select id="selector_dueno_vendidos"><option value="">Seleccione dueño...</option></select>
-          </div>
-          <div id="contenedor_filtro_viaje_vendidos">
-            <label for="selector_viaje_vendido">Viaje:</label>
-            <select id="selector_viaje_vendido"><option value="todos">Todos</option></select>
-          </div>
-          <div id="contenedor_filtro_vendedor_vendidos">
-            <label for="filtro_vendedor">Vendedor:</label>
-            <select id="filtro_vendedor"><option value="Todos">Todos</option></select>
-          </div>
-          <div id="contenedor_filtro_estado_vendidos">
-            <label for="filtro_estado">Estado:</label>
-            <select id="filtro_estado">
-              <option value="todos">Todos</option>
-              <option value="pagado">Pagado</option>
-              <option value="cuotas_pendientes">Cuotas pendientes</option>
-            </select>
+
+        <!-- Selector de contexto (solo admin): a qué dueño mirar -->
+        <div id="contenedor_filtro_dueno_vendidos" style="display:none; margin-bottom:14px;">
+          <label for="selector_dueno_vendidos" style="font-weight:600;">Dueño:</label>
+          <select id="selector_dueno_vendidos"><option value="">Seleccione dueño...</option></select>
+        </div>
+
+        <div class="vendidos-layout">
+          <!-- Sidebar de filtros -->
+          <aside class="vendidos-sidebar">
+            <div class="filtros-grupo">
+              <div class="filtros-grupo-titulo">Buscar</div>
+              <div class="field">
+                <label for="filtro_codigo_venta">Código de venta</label>
+                <input type="text" id="filtro_codigo_venta" placeholder="Buscar código...">
+              </div>
+              <div class="field">
+                <label for="filtro_comprador">Comprador</label>
+                <input type="text" id="filtro_comprador" placeholder="DNI o nombre...">
+              </div>
+            </div>
+
+            <div class="filtros-grupo">
+              <div class="filtros-grupo-titulo">Venta</div>
+              <div class="field" id="contenedor_filtro_viaje_vendidos">
+                <label for="selector_viaje_vendido">Viaje</label>
+                <select id="selector_viaje_vendido"><option value="todos">Todos</option></select>
+              </div>
+              <div class="field" id="contenedor_filtro_vendedor_vendidos">
+                <label for="filtro_vendedor">Vendedor</label>
+                <select id="filtro_vendedor"><option value="Todos">Todos</option></select>
+              </div>
+              <div class="field" id="contenedor_filtro_estado_vendidos">
+                <label for="filtro_estado">Estado</label>
+                <select id="filtro_estado">
+                  <option value="todos">Todos</option>
+                  <option value="pagado">Pagado</option>
+                  <option value="cuotas_pendientes">Cuotas pendientes</option>
+                </select>
+              </div>
+              <div class="field" id="contenedor_filtro_rendido_vendidos">
+                <label for="filtro_rendido">Rendición</label>
+                <select id="filtro_rendido">
+                  <option value="todos">Todos</option>
+                  <option value="rendido">Rendido</option>
+                  <option value="falta_rendir">Falta rendir</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="filtros-grupo">
+              <div class="filtros-grupo-titulo">Fecha de compra</div>
+              <div class="field" id="contenedor_filtro_fecha_desde_vendidos">
+                <label for="filtro_fecha_desde">Desde</label>
+                <input type="date" id="filtro_fecha_desde">
+              </div>
+              <div class="field" id="contenedor_filtro_fecha_hasta_vendidos">
+                <label for="filtro_fecha_hasta">Hasta</label>
+                <input type="date" id="filtro_fecha_hasta">
+              </div>
+            </div>
+
+            <button class="btn" id="boton_limpiar_filtros_vendidos" style="width:100%;">Limpiar filtros</button>
+          </aside>
+
+          <!-- Columna principal -->
+          <div class="vendidos-contenido">
+            <div id="chips_filtros_activos_vendidos" class="chips-filtros"></div>
+            <div id="contador_ventas_vendidos" class="contador-ventas"></div>
+            <div id="saldos_vendidos"></div>
+            <div class="sales-list" id="lista_ventas"></div>
           </div>
         </div>
-        <div id="saldos_vendidos"></div>
-      </div>
-      <div class="panel">
-        <div class="sales-list" id="lista_ventas"></div>
       </div>
     </section>
 
@@ -438,7 +485,7 @@
 <script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.41b"></script>
 <script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.42"></script>
 <script src="Aplicacion/Viajes/viajes-opciones.js?v=1.5piloto.38"></script>
-<script src="Aplicacion/ventas.js?v=1.5piloto.48"></script>
+<script src="Aplicacion/ventas.js?v=1.5piloto.49d"></script>
 <script src="Aplicacion/pasajeros.js?v=1.5piloto.42"></script>
 </body>
 </html>

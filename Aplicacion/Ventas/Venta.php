@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.47b
+ * @version   1.5piloto.49
  */
 
 
@@ -550,12 +550,21 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
     $estado_pago = ((int)$cuotas_restantes > 0) ? 'cuotas_pendientes' : 'pagado';
 
     $fecha = '';
+    $fecha_iso = '';
     if ($nodo_fecha) {
         $valor_fecha = $nodo_fecha->dato();
         if (is_numeric($valor_fecha)) {
             $fecha = date('d/m/Y H:i', (int)$valor_fecha);
+            $fecha_iso = date('Y-m-d', (int)$valor_fecha);
         } else {
             $fecha = $valor_fecha;
+            // Intentar derivar la fecha ISO desde un string DD/MM/YYYY (HH:MM)
+            // o YYYY-MM-DD. Si no se puede, queda vacío.
+            if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})/', $valor_fecha, $m)) {
+                $fecha_iso = $m[3] . '-' . $m[2] . '-' . $m[1];
+            } elseif (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $valor_fecha, $m)) {
+                $fecha_iso = $m[1] . '-' . $m[2] . '-' . $m[3];
+            }
         }
     }
 
@@ -582,6 +591,7 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
     $pagado_efectivo = 0.0;
     $pagado_banco = 0.0;
     $a_rendir = 0.0;
+    $cupones_sin_rendir = 0;
     $contenedor_cupones_saldos = $nodo_venta->adyacente('cupones');
     if ($contenedor_cupones_saldos) {
         $cupon_actual = hmi($contenedor_cupones_saldos);
@@ -597,8 +607,11 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
 
                 // A rendir: si el cupón no tiene enlace `rendido`,
                 // significa que el dinero todavía está en la terminal.
+                // Además se cuentan los cupones pagados sin rendir, para
+                // el filtro Rendido / Falta rendir de la pestaña Vendidos.
                 if (!$cupon_actual->adyacente('rendido')) {
                     $a_rendir += $monto_cupon;
+                    $cupones_sin_rendir++;
                 }
             }
             $cupon_actual = hd($cupon_actual);
@@ -609,6 +622,9 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
         else $pagado_efectivo = (float)$pagado;
         // Sin cupones: todo lo pagado está aún sin rendir.
         $a_rendir = (float)$pagado;
+        // Fallback para ventas viejas sin migrar: si hay algo pagado,
+        // se cuenta como un cupón pagado sin rendir.
+        $cupones_sin_rendir = ((float)$pagado > 0.001) ? 1 : 0;
     }
 
     // Comprador: se arma un resumen con los campos que necesita la tarjeta
@@ -651,7 +667,9 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
         'cuotas_restantes' => $cuotas_restantes,
         'estado_pago' => $estado_pago,
         'fecha' => $fecha,
+        'fecha_iso' => $fecha_iso,
         'cantidad_asientos' => $cantidad_asientos,
+        'cupones_sin_rendir' => (string)$cupones_sin_rendir,
         'comprador' => $comprador,
     ];
 }

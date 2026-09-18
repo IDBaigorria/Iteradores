@@ -1,43 +1,197 @@
 <?php
 /**
- * Aplicador de cambios automáticos — proyecto Iteradores.
+ * Aplicador de cambios automáticos — Proyecto Iteradores + Pasajes.
  *
- * Fix v1.5piloto.48b: agregar use/include_once al principio de Impresion.php.
+ * v1.5piloto.49d: etiquetas en el bloque compacto del comprador.
+ * - Cada dato (Nombre, Celular, Email, Dirección) con su etiqueta.
+ * - Se mantiene el formato horizontal con separadores "·".
+ *
+ * Uso:
+ *   php aplicar_cambios.php
  */
+
+// ============================================================
+// Configuración
+// ============================================================
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
 
-$cambios = [
+// ============================================================
+// Cambios a aplicar
+// ============================================================
 
-    // =========================================================
-    // 1. Impresion.php — Agregar use y include_once al principio
-    // =========================================================
+$cambios = [
+    // --------------------------------------------------------
+    // ventas.js: bump de versión
+    // --------------------------------------------------------
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Impresion/Impresion.php',
-        'descripcion' => 'Impresion.php: agregar use e include_once al principio',
+        'archivo' => 'Aplicacion/ventas.js',
+        'descripcion' => 'ventas.js: bump @version a 1.5piloto.49d',
         'buscar' => [
-            ' * @since     1.5piloto.16',
-            ' * @version   1.5piloto.45',
-            ' */',
+            ' * @version 1.5piloto.49c',
         ],
         'reemplazar' => [
-            ' * @since     1.5piloto.16',
-            ' * @version   1.5piloto.48',
-            ' */',
-            '',
-            'use Iteradores\\Nodos\\Nodo;',
-            'use Iteradores\\Controlador\\Controlador;',
-            'use Iteradores\\Configuracion\\Conf;',
-            'include_once("./Configuracion/Configuracion.php");',
-            'include_once("./Nodos/Nodo.php");',
-            'include_once("./Controlador/Controlador.php");',
-            'include_once("./miscelaneas/Arbol.php");',
-            'include_once("./Aplicacion/Ventas/Venta.php");',
+            ' * @version 1.5piloto.49d',
         ],
     ],
 
+    // --------------------------------------------------------
+    // ventas.js: cada dato con su etiqueta
+    // --------------------------------------------------------
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/ventas.js',
+        'descripcion' => 'ventas.js: etiquetas en cada dato del comprador',
+        'buscar' => [
+            '        // Comprador: se arma solo si hay datos. Formato compacto:',
+            '        // "COMPRADOR  Pérez, Juan · 11 2233 4455 · juan@mail.com · Dirección"',
+            '        // en un solo renglón (con flex-wrap por si el contenido es muy largo).',
+            '        let comprador_html = \'\';',
+            '        const c = venta.comprador;',
+            '        if (c) {',
+            '            const nombre = c.nombre_completo || \'\';',
+            '            const celular = c.celular || \'\';',
+            '            const email = c.email || \'\';',
+            '            const direccion_completa = [c.direccion, c.localidad].filter(v => v).join(\', \');',
+            '',
+            '            const datos = [];',
+            '            if (nombre) datos.push(`<b class="sale-comprador-nombre">${nombre}</b>`);',
+            '            if (celular) datos.push(`<span>${celular}</span>`);',
+            '            if (email) datos.push(`<span>${email}</span>`);',
+            '            if (direccion_completa) datos.push(`<span>${direccion_completa}</span>`);',
+            '',
+            '            if (datos.length > 0) {',
+            '                const sep = \'<span class="sale-sep">·</span>\';',
+            '                comprador_html = `',
+            '                    <div class="sale-comprador">',
+            '                        <span class="sale-comprador-titulo">Comprador:</span>',
+            '                        <span class="sale-comprador-datos">${datos.join(sep)}</span>',
+            '                    </div>',
+            '                `;',
+            '            }',
+            '        }',
+        ],
+        'reemplazar' => [
+            '        // Comprador: se arma solo si hay datos. Formato horizontal con',
+            '        // etiqueta por dato, separados por "·". Puede ocupar uno o dos',
+            '        // renglones según el ancho disponible (flex-wrap).',
+            '        let comprador_html = \'\';',
+            '        const c = venta.comprador;',
+            '        if (c) {',
+            '            const nombre = c.nombre_completo || \'\';',
+            '            const celular = c.celular || \'\';',
+            '            const email = c.email || \'\';',
+            '            const direccion_completa = [c.direccion, c.localidad].filter(v => v).join(\', \');',
+            '',
+            '            const datos = [];',
+            '            if (nombre) datos.push(`<span class="sale-comprador-dato"><span class="sale-comprador-etiqueta">Nombre:</span> <b class="sale-comprador-nombre">${nombre}</b></span>`);',
+            '            if (celular) datos.push(`<span class="sale-comprador-dato"><span class="sale-comprador-etiqueta">Celular:</span> <b>${celular}</b></span>`);',
+            '            if (email) datos.push(`<span class="sale-comprador-dato"><span class="sale-comprador-etiqueta">Email:</span> <b>${email}</b></span>`);',
+            '            if (direccion_completa) datos.push(`<span class="sale-comprador-dato"><span class="sale-comprador-etiqueta">Dirección:</span> <b>${direccion_completa}</b></span>`);',
+            '',
+            '            if (datos.length > 0) {',
+            '                const sep = \'<span class="sale-sep">·</span>\';',
+            '                comprador_html = `',
+            '                    <div class="sale-comprador">',
+            '                        <span class="sale-comprador-titulo">Comprador:</span>',
+            '                        <span class="sale-comprador-datos">${datos.join(sep)}</span>',
+            '                    </div>',
+            '                `;',
+            '            }',
+            '        }',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // estilos-ventas.css: ajustar estilos del comprador
+    // --------------------------------------------------------
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'estilos-ventas.css',
+        'descripcion' => 'estilos-ventas.css: estilos para etiquetas del comprador',
+        'buscar' => [
+            '.sale-comprador-datos {',
+            '    display: flex;',
+            '    flex-wrap: wrap;',
+            '    align-items: baseline;',
+            '    gap: 2px 6px;',
+            '    color: var(--text);',
+            '    word-break: break-word;',
+            '}',
+            '',
+            '.sale-comprador-nombre {',
+            '    color: var(--primary-dark);',
+            '    font-weight: 700;',
+            '}',
+        ],
+        'reemplazar' => [
+            '.sale-comprador-datos {',
+            '    display: flex;',
+            '    flex-wrap: wrap;',
+            '    align-items: baseline;',
+            '    gap: 2px 8px;',
+            '    color: var(--text);',
+            '    word-break: break-word;',
+            '}',
+            '',
+            '/* Cada dato con su etiqueta. La etiqueta va en tono muted y el valor',
+            '   en bold, manteniendo el flujo horizontal. */',
+            '.sale-comprador-dato {',
+            '    display: inline-flex;',
+            '    align-items: baseline;',
+            '    gap: 4px;',
+            '    white-space: nowrap;',
+            '}',
+            '',
+            '.sale-comprador-etiqueta {',
+            '    color: var(--muted);',
+            '    font-size: 12px;',
+            '    flex-shrink: 0;',
+            '}',
+            '',
+            '.sale-comprador-dato b {',
+            '    color: var(--text);',
+            '    font-weight: 600;',
+            '}',
+            '',
+            '.sale-comprador-nombre {',
+            '    color: var(--primary-dark);',
+            '    font-weight: 700;',
+            '}',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // aplicacion_GET.html: bump de ventas.js a 49d
+    // --------------------------------------------------------
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_GET.html',
+        'descripcion' => 'aplicacion_GET.html: bump de ventas.js a ?v=1.5piloto.49d',
+        'buscar' => [
+            '<script src="Aplicacion/ventas.js?v=1.5piloto.49c"></script>',
+        ],
+        'reemplazar' => [
+            '<script src="Aplicacion/ventas.js?v=1.5piloto.49d"></script>',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // aplicacion_GET.html: bump de estilos-ventas.css a 49e
+    // --------------------------------------------------------
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_GET.html',
+        'descripcion' => 'aplicacion_GET.html: bump de estilos-ventas.css a ?v=1.5piloto.49e',
+        'buscar' => [
+            '<link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.49d">',
+        ],
+        'reemplazar' => [
+            '<link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.49e">',
+        ],
+    ],
 ];
 
 // ============================================================
