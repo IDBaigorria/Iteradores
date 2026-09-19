@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.55
+ * @version   1.5piloto.56
  */
 
 use Iteradores\Nodos\Nodo;
@@ -883,6 +883,18 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
         case 'cancelaciones':
             switch ($subaccion) {
+                case 'listar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $filtros = [
+                        'terminal' => $post['terminal'] ?? '',
+                    ];
+                    $cancelaciones = listar_cancelaciones_de_dueno($nombre_dueno, $filtros);
+                    responder_json(['exito' => true, 'cancelaciones' => $cancelaciones]);
+                    break;
+
                 case 'obtener':
                     $id_cancelacion = $post['id_cancelacion'] ?? '';
                     if (empty($id_cancelacion)) {

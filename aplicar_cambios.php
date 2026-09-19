@@ -2,9 +2,13 @@
 /**
  * Aplicador de cambios automáticos — Proyecto Iteradores + Pasajes.
  *
- * v1.5piloto.55c: cartel de ubicación del dinero en el modal de cancelar
- * venta. Ahora contempla los 4 lugares posibles: efectivo/banco en la
- * terminal y efectivo/banco ya rendidos al dueño.
+ * v1.5piloto.56 (doc): actualizar la documentación viva de nodos.
+ * - Bump de versión a 1.5piloto.56.
+ * - Observaciones del Nodo Usuario: agregar `cancelaciones` a la lista.
+ * - Nodo Rendición: reescribir la nota de desactualización para reflejar
+ *   la estructura nueva (contenedor con hijos).
+ * - Nodo Asiento: corregir `reservado_por` (es nodo con dato string, no
+ *   enlace al nodo usuario).
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -23,86 +27,93 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
     // ============================================================
-    // 1. ventas.js: bump
+    // 1. Bump @version
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/ventas.js',
-        'descripcion' => 'ventas.js: bump @version a 1.5piloto.55c',
+        'archivo' => 'aplicacion_POST.php',
+        'descripcion' => 'aplicacion_POST.php: bump @version a 1.5piloto.56',
         'buscar' => [
-            ' * @version 1.5piloto.55',
+            ' * @version   1.5piloto.55',
+            ' */',
         ],
         'reemplazar' => [
-            ' * @version 1.5piloto.55c',
+            ' * @version   1.5piloto.56',
+            ' */',
         ],
     ],
 
     // ============================================================
-    // 2. ventas.js: reemplazar el bloque de ubicación
+    // 2. Bump de la estructura
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/ventas.js',
-        'descripcion' => 'ventas.js: ubicación del dinero según dónde está cada peso',
+        'archivo' => 'aplicacion_POST.php',
+        'descripcion' => 'aplicacion_POST.php: bump de la version de la estructura',
         'buscar' => [
-            '        // Ubicación: texto simple. Si hay un solo método, mencionarlo.',
-            '        let ubicacion = \'\';',
-            '        if (efvo > 0.001 && banco <= 0.001) {',
-            '            ubicacion = `El dinero está en efectivo en la terminal <b>${info.terminal_visible}</b>.`;',
-            '        } else if (banco > 0.001 && efvo <= 0.001) {',
-            '            ubicacion = `El dinero está en el banco de la terminal <b>${info.terminal_visible}</b>.`;',
-            '        } else {',
-            '            ubicacion = `El dinero está en la terminal <b>${info.terminal_visible}</b>.`;',
-            '        }',
+            ' * ## Estructura de nodos actual (v1.5piloto.55)',
         ],
         'reemplazar' => [
-            '        // Ubicación: se arma una lista de fragmentos según dónde está',
-            '        // cada peso. Puede haber plata en 4 lugares distintos: efectivo',
-            '        // o banco, en la terminal o ya rendidos al dueño.',
-            '        const en_term_ef = parseFloat(info.en_terminal_efectivo || \'0\');',
-            '        const en_term_ba = parseFloat(info.en_terminal_banco || \'0\');',
-            '        const en_dueno_ef = parseFloat(info.cubierto_dueno_efectivo || \'0\');',
-            '        const en_dueno_ba = parseFloat(info.cubierto_dueno_banco || \'0\');',
-            '        const no_cub_ef = parseFloat(info.no_cubierto_efectivo || \'0\');',
-            '        const no_cub_ba = parseFloat(info.no_cubierto_banco || \'0\');',
-            '',
-            '        const partes_ubicacion = [];',
-            '        if (en_term_ef > 0.001) partes_ubicacion.push(`efectivo en la terminal <b>${info.terminal_visible}</b>`);',
-            '        if (en_term_ba > 0.001) partes_ubicacion.push(`banco en la terminal <b>${info.terminal_visible}</b>`);',
-            '        if (en_dueno_ef > 0.001) partes_ubicacion.push(`efectivo ya rendido al dueño`);',
-            '        if (en_dueno_ba > 0.001) partes_ubicacion.push(`banco ya rendido al dueño`);',
-            '',
-            '        let ubicacion = \'\';',
-            '        if (partes_ubicacion.length === 0) {',
-            '            ubicacion = \'No hay saldo para cubrir la devolución.\';',
-            '        } else if (partes_ubicacion.length === 1) {',
-            '            ubicacion = `El dinero está en ${partes_ubicacion[0]}.`;',
-            '        } else {',
-            '            ubicacion = `El dinero está distribuido así: ${partes_ubicacion.join(\' · \')}.`;',
-            '        }',
-            '',
-            '        // Aviso si algo no se pudo cubrir (el dueño no tenía saldo).',
-            '        if (no_cub_ef > 0.001 || no_cub_ba > 0.001) {',
-            '            const partes_falta = [];',
-            '            if (no_cub_ef > 0.001) partes_falta.push(`$${_formatear_monto_rendicion(no_cub_ef)} en efectivo`);',
-            '            if (no_cub_ba > 0.001) partes_falta.push(`$${_formatear_monto_rendicion(no_cub_ba)} en banco`);',
-            '            ubicacion += ` <b>Atención:</b> el dueño no tenía saldo suficiente para cubrir ${partes_falta.join(\' y \')}.`;',
-            '        }',
+            ' * ## Estructura de nodos actual (v1.5piloto.56)',
         ],
     ],
 
     // ============================================================
-    // 3. aplicacion_GET.html: bump de ventas.js
+    // 3. Observaciones del Nodo Usuario: agregar cancelaciones
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'aplicacion_GET.html: bump de ventas.js a 55c',
+        'archivo' => 'aplicacion_POST.php',
+        'descripcion' => 'aplicacion_POST.php: agregar cancelaciones a las observaciones',
         'buscar' => [
-            '<script src="Aplicacion/ventas.js?v=1.5piloto.55"></script>',
+            ' * - Los enlaces `terminales`, `empresas`, `viajes`, `pasajeros`, `ventas`, `rendiciones` y `liquidaciones` solo existen en nodos de nivel `dueno`.',
         ],
         'reemplazar' => [
-            '<script src="Aplicacion/ventas.js?v=1.5piloto.55c"></script>',
+            ' * - Los enlaces `terminales`, `empresas`, `viajes`, `pasajeros`, `ventas`, `rendiciones`, `liquidaciones` y `cancelaciones` solo existen en nodos de nivel `dueno`.',
+        ],
+    ],
+
+    // ============================================================
+    // 4. Nota (desactualización) del Nodo Rendición
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_POST.php',
+        'descripcion' => 'aplicacion_POST.php: reescribir la nota de desactualización',
+        'buscar' => [
+            ' * **Nota (desactualización):** Si se cancela una venta que tiene',
+            ' * cupones ya rendidos, la rendición no se modifica en sus totales',
+            ' * (es inmutable), pero se marca con un enlace `desactualizada` que',
+            ' * contiene el motivo (ej. `"Se canceló la venta venta_123 el',
+            ' * 17/05/2026 15:30"`). Si se acumulan varias cancelaciones, los',
+            ' * motivos se concatenan con `"; "`. La pestaña Rendiciones muestra',
+            ' * un badge de aviso cuando esto ocurre.',
+        ],
+        'reemplazar' => [
+            ' * **Nota (desactualización):** Si se cancela una venta que tiene',
+            ' * cupones ya rendidos, la rendición no se modifica en sus totales',
+            ' * (es inmutable), pero se le agrega un hijo nuevo al contenedor',
+            ' * `desactualizada` por cada cancelación. Cada hijo (Nodo Ajuste)',
+            ' * guarda los datos de la cancelación: la venta, el motivo, la',
+            ' * terminal, los montos que aporta cada cuenta (terminal vs dueño)',
+            ' * y, cuando el dueño lo marca, la fecha en que lo aceptó.',
+            ' * La pestaña Rendiciones muestra un badge de aviso mientras haya',
+            ' * ajustes pendientes de aceptar.',
+        ],
+    ],
+
+    // ============================================================
+    // 5. Nodo Asiento: corregir reservado_por
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_POST.php',
+        'descripcion' => 'aplicacion_POST.php: corregir reservado_por del Nodo Asiento',
+        'buscar' => [
+            ' *   | `reservado_por`    | Enlace directo al **nodo usuario** del dueño que reservó el asiento para el equipo. Solo existe si `estado` es `"reservado"`. |',
+        ],
+        'reemplazar' => [
+            ' *   | `reservado_por`    | Nodo con dato string: nombre de usuario del dueño que reservó el asiento para el equipo. Solo existe si `estado` es `"reservado"`. |',
         ],
     ],
 ];

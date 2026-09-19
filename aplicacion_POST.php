@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.55)
+ * ## Estructura de nodos actual (v1.5piloto.56)
  *
  * ### Nodos raíz especiales
  *
@@ -62,7 +62,7 @@
  * **Observaciones:**
  * - Los enlaces `dueno` y `venta_actual` solo existen en nodos de nivel `terminal`.
  * - Los enlaces `efectivo` y `banco` existen en nodos de nivel `terminal` y en nodos de nivel `dueno`. En `terminal` son el saldo en la caja y en el banco. En `dueno` son las cuentas acumuladas de las rendiciones.
- * - Los enlaces `terminales`, `empresas`, `viajes`, `pasajeros`, `ventas`, `rendiciones` y `liquidaciones` solo existen en nodos de nivel `dueno`.
+ * - Los enlaces `terminales`, `empresas`, `viajes`, `pasajeros`, `ventas`, `rendiciones`, `liquidaciones` y `cancelaciones` solo existen en nodos de nivel `dueno`.
  * - `contrasena`, `nombre_real` y `email` pueden no existir si no se proporcionaron.
  * - El monto en `efectivo` y en `banco` es automático (inicial `"0"`) y no se solicita al crear el usuario.
  * - El dato del nodo usuario es el nombre de usuario, lo que facilita la obtención
@@ -200,7 +200,7 @@
  *   | `siguiente`        | Nodo asiento siguiente en la lista circular, o la cabeza si es el último. |
  *   | `estado`           | Nodo con dato string: `"libre"`, `"seleccionado"`, `"reservado"`, `"vendido"` o `"no disponible"`. |
  *   | `seleccionado_por` | Enlace directo al **nodo usuario** de la terminal que seleccionó el asiento. Solo existe si `estado` es `"seleccionado"`. |
- *   | `reservado_por`    | Enlace directo al **nodo usuario** del dueño que reservó el asiento para el equipo. Solo existe si `estado` es `"reservado"`. |
+ *   | `reservado_por`    | Nodo con dato string: nombre de usuario del dueño que reservó el asiento para el equipo. Solo existe si `estado` es `"reservado"`. |
  *   | `pasajero`         | Enlace directo al **nodo pasajero** asociado. Puede estar presente en `"vendido"`, `"no disponible"`, o en un asiento `"reservado"` con pasajero ya asignado. |
  *   | `venta`            | Enlace directo al nodo **venta persistente** (si `estado` es `"vendido"`). |
  * 
@@ -513,11 +513,13 @@
  *
  * **Nota (desactualización):** Si se cancela una venta que tiene
  * cupones ya rendidos, la rendición no se modifica en sus totales
- * (es inmutable), pero se marca con un enlace `desactualizada` que
- * contiene el motivo (ej. `"Se canceló la venta venta_123 el
- * 17/05/2026 15:30"`). Si se acumulan varias cancelaciones, los
- * motivos se concatenan con `"; "`. La pestaña Rendiciones muestra
- * un badge de aviso cuando esto ocurre.
+ * (es inmutable), pero se le agrega un hijo nuevo al contenedor
+ * `desactualizada` por cada cancelación. Cada hijo (Nodo Ajuste)
+ * guarda los datos de la cancelación: la venta, el motivo, la
+ * terminal, los montos que aporta cada cuenta (terminal vs dueño)
+ * y, cuando el dueño lo marca, la fecha en que lo aceptó.
+ * La pestaña Rendiciones muestra un badge de aviso mientras haya
+ * ajustes pendientes de aceptar.
  *
  * **Nota (listado):** La pestaña Rendiciones permite filtrar por
  * código, rango de fecha de la rendición y terminal. El orden por
@@ -637,7 +639,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.55
+ * @version   1.5piloto.56
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

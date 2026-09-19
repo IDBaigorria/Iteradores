@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.55c
+ * @version 1.5piloto.56
  */
 
 // (aplicar_cambios.php funcionó)
@@ -835,6 +835,32 @@ function configurar_filtros_vendidos() {
     if (btn_rendir) {
         btn_rendir.style.display = (usuario_actual.nivel === 'dueno') ? '' : 'none';
     }
+
+    // El botón "Ver cancelaciones" se muestra a dueño y terminal, y
+    // a admin solo cuando hay un dueño seleccionado.
+    actualizar_visibilidad_boton_cancelaciones();
+}
+
+/**
+ * Muestra u oculta el botón "Ver cancelaciones" según el rol.
+ * - Dueño y terminal: siempre visible.
+ * - Admin: visible solo si hay un dueño seleccionado.
+ */
+function actualizar_visibilidad_boton_cancelaciones() {
+    const btn = document.getElementById('boton_ver_cancelaciones');
+    if (!btn) return;
+    if (!usuario_actual) {
+        btn.style.display = 'none';
+        return;
+    }
+    if (usuario_actual.nivel === 'admin') {
+        const sel = document.getElementById('selector_dueno_vendidos');
+        btn.style.display = (sel && sel.value) ? '' : 'none';
+    } else if (usuario_actual.nivel === 'dueno' || usuario_actual.nivel === 'terminal') {
+        btn.style.display = '';
+    } else {
+        btn.style.display = 'none';
+    }
 }
 
 /**
@@ -898,12 +924,14 @@ async function cargar_duenos_en_select_vendidos() {
         if (!select.value) {
             ventas_actuales = [];
             mostrar_filtros_secundarios_vendidos(false);
+            actualizar_visibilidad_boton_cancelaciones();
             const lista = document.getElementById('lista_ventas');
             if (lista) lista.innerHTML = '<p style="color:#888; margin:20px;">Seleccione un dueño para ver las ventas.</p>';
             return;
         }
 
         mostrar_filtros_secundarios_vendidos(true);
+        actualizar_visibilidad_boton_cancelaciones();
         _cargar_ventas_con_parametros('dueno', select.value);
     };
 }
@@ -2513,6 +2541,8 @@ function mostrar_modal_chico_impresion_rendicion(id_rendicion) {
     if (btn_limpiar) btn_limpiar.addEventListener('click', limpiar_filtros_vendidos);
     const btn_rendir = document.getElementById('boton_cerrar_rendicion');
     if (btn_rendir) btn_rendir.addEventListener('click', cerrar_rendicion);
+    const btn_cancelaciones = document.getElementById('boton_ver_cancelaciones');
+    if (btn_cancelaciones) btn_cancelaciones.addEventListener('click', ver_cancelaciones);
 })();
 
 /**
@@ -2570,4 +2600,127 @@ function imprimir_informe_ventas() {
     });
 
     window.open(`index.php?${params.toString()}`, '_blank');
+}
+
+/**
+ * Trunca un texto a `max` caracteres, agregando "..." si lo supera.
+ * Se usa para el motivo en la tabla del modal de cancelaciones.
+ *
+ * @param {string} texto
+ * @param {number} max
+ * @returns {string}
+ */
+function _truncar_motivo_cancelacion(texto, max) {
+    const t = (texto || '').trim();
+    if (t.length <= max) return t;
+    return t.substring(0, max) + '...';
+}
+
+/**
+ * Abre el modal con la lista de cancelaciones. Filtra por rol:
+ *  - Dueño: todas las cancelaciones del dueño.
+ *  - Terminal: solo las de su propia terminal.
+ *  - Admin: las del dueño seleccionado en el filtro.
+ */
+async function ver_cancelaciones() {
+    if (!usuario_actual) return;
+
+    let nombre_dueno = '';
+    let filtro_terminal = '';
+
+    if (usuario_actual.nivel === 'admin') {
+        const sel = document.getElementById('selector_dueno_vendidos');
+        nombre_dueno = sel ? sel.value : '';
+        if (!nombre_dueno) {
+            mostrar_aviso('Seleccione un dueño primero', 'error');
+            return;
+        }
+    } else if (usuario_actual.nivel === 'dueno') {
+        nombre_dueno = usuario_actual.nombre_usuario;
+    } else if (usuario_actual.nivel === 'terminal') {
+        nombre_dueno = usuario_actual.dueno || '';
+        filtro_terminal = usuario_actual.nombre_usuario;
+        if (!nombre_dueno) {
+            mostrar_aviso('No se pudo determinar el dueño de la terminal', 'error');
+            return;
+        }
+    } else {
+        return;
+    }
+
+    const params = {
+        accion: 'cancelaciones/listar',
+        nombre_dueno,
+    };
+    if (filtro_terminal !== '') params.terminal = filtro_terminal;
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(params)
+    });
+    const datos = await respuesta.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || 'Error al cargar cancelaciones', 'error');
+        return;
+    }
+
+    const cancelaciones = Array.isArray(datos.cancelaciones) ? datos.cancelaciones : [];
+    _renderizar_modal_cancelaciones(cancelaciones);
+}
+
+/**
+ * Renderiza (o re-renderiza) el modal de cancelaciones.
+ *
+ * @param {Array} cancelaciones
+ */
+function _renderizar_modal_cancelaciones(cancelaciones) {
+    if (!cancelaciones || cancelaciones.length === 0) {
+        const html_vacio = '<p style="color:#888; margin:20px;">Sin cancelaciones registradas.</p>';
+        abrir_modal_generico('Cancelaciones', html_vacio);
+        return;
+    }
+
+    let html = '<div class="table-wrap"><table class="data-table cancelaciones-tabla">';
+    html += '<thead><tr>';
+    html += '<th>Código</th>';
+    html += '<th>Fecha</th>';
+    html += '<th>Venta</th>';
+    html += '<th>Terminal</th>';
+    html += '<th>Comprador</th>';
+    html += '<th>Efectivo</th>';
+    html += '<th>Banco</th>';
+    html += '<th>Motivo</th>';
+    html += '<th></th>';
+    html += '</tr></thead><tbody>';
+
+    cancelaciones.forEach(c => {
+        const motivo = _truncar_motivo_cancelacion(c.motivo, 60);
+        const nombre_terminal = c.terminal_nombre_real || c.terminal || '—';
+        const comprador = c.comprador_nombre_completo || '—';
+        html += '<tr>';
+        html += `<td><strong>${c.id_cancelacion}</strong></td>`;
+        html += `<td>${c.fecha_hora}</td>`;
+        html += `<td>${c.id_venta}</td>`;
+        html += `<td>${nombre_terminal}</td>`;
+        html += `<td>${comprador}</td>`;
+        html += `<td class="num">$${_formatear_monto_rendicion(c.devuelto_efectivo)}</td>`;
+        html += `<td class="num">$${_formatear_monto_rendicion(c.devuelto_banco)}</td>`;
+        html += `<td>${motivo || '—'}</td>`;
+        html += `<td><button class="btn ver_cancelacion_detalle" data-id="${c.id_cancelacion}">Ver informe</button></td>`;
+        html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+
+    abrir_modal_generico('Cancelaciones', html);
+
+    const cont = document.getElementById('modal_generico_contenido');
+    if (!cont) return;
+    cont.querySelectorAll('.ver_cancelacion_detalle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const url = `index.php?imprimir=1&tipo=informe_cancelacion&id_cancelacion=${encodeURIComponent(btn.dataset.id)}`;
+            window.open(url, '_blank');
+        });
+    });
 }

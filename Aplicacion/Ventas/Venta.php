@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.55
+ * @version   1.5piloto.56
  */
 
 
@@ -1974,5 +1974,46 @@ function _marcar_rendiciones_afectadas(Nodo $nodo_venta, string $id_venta): void
         }
         $cupon = hd($cupon);
     }
+}
+
+/**
+ * Lista las cancelaciones de un dueño. Cada elemento se devuelve
+ * con el mismo formato que `formatear_cancelacion_completa`.
+ *
+ * Acepta un filtro opcional por terminal (nombre de usuario), que
+ * se usa cuando el que consulta es rol terminal y solo debe ver
+ * las cancelaciones de su propia terminal.
+ *
+ * El orden es el natural del contenedor: la última cancelación
+ * agregada queda primero, porque se inserta con `_hmi`.
+ *
+ * @param string $nombre_dueno
+ * @param array  $filtros { terminal?: string }
+ * @return array
+ */
+function listar_cancelaciones_de_dueno(string $nombre_dueno, array $filtros = []): array {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return [];
+    $nodo_dueno = $raiz->adyacente($nombre_dueno);
+    if (!$nodo_dueno) return [];
+    $cont = $nodo_dueno->adyacente('cancelaciones');
+    if (!$cont) return [];
+
+    $f_terminal = trim((string)($filtros['terminal'] ?? ''));
+
+    $cancelaciones = [];
+    $actual = hmi($cont);
+    $seg = 0;
+    while ($actual && $seg < 2000) {
+        $seg++;
+        $formateada = formatear_cancelacion_completa($actual);
+        if ($f_terminal !== '' && ($formateada['terminal'] ?? '') !== $f_terminal) {
+            $actual = hd($actual);
+            continue;
+        }
+        $cancelaciones[] = $formateada;
+        $actual = hd($actual);
+    }
+    return $cancelaciones;
 }
 
