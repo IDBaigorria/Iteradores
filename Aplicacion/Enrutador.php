@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.50
+ * @version   1.5piloto.51
  */
 
 use Iteradores\Nodos\Nodo;
@@ -781,6 +781,34 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     ];
                     $resultado = confirmar_rendicion($nombre_dueno, $ventas_sel, $filtros);
                     responder_json($resultado);
+                    break;
+
+                case 'listar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $filtros = [
+                        'codigo' => $post['codigo'] ?? '',
+                        'fecha_desde' => $post['fecha_desde'] ?? '',
+                        'fecha_hasta' => $post['fecha_hasta'] ?? '',
+                        'terminal' => $post['terminal'] ?? '',
+                    ];
+                    $rendiciones = listar_rendiciones_de_dueno($nombre_dueno, $filtros);
+                    responder_json(['exito' => true, 'rendiciones' => $rendiciones]);
+                    break;
+
+                case 'obtener':
+                    $id_rendicion = $post['id_rendicion'] ?? '';
+                    if (empty($id_rendicion)) {
+                        responder_json(['exito' => false, 'error' => 'ID de rendición no especificado']);
+                    }
+                    $rendicion = obtener_rendicion_por_id($id_rendicion);
+                    if ($rendicion) {
+                        responder_json(['exito' => true, 'rendicion' => $rendicion]);
+                    } else {
+                        responder_json(['exito' => false, 'error' => 'Rendición no encontrada']);
+                    }
                     break;
 
                 default:

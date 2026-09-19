@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="estilos-vehiculos.css?v=1.5piloto.38">
 <link rel="stylesheet" href="estilos-viajes.css?v=1.5piloto.40">
 <link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.50">
+<link rel="stylesheet" href="estilos-rendiciones.css?v=1.5piloto.51">
 </head>
 <body>
 <!-- Pantalla de login (código de acceso) -->
@@ -396,6 +397,61 @@
       </div>
     </section>
 
+    <!-- Sección Rendiciones -->
+    <section id="rendiciones" class="tab-content hidden">
+      <div class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+          <h2 style="margin:0;">Rendiciones</h2>
+        </div>
+
+        <!-- Selector de dueño (solo admin) -->
+        <div id="contenedor_filtro_dueno_rendiciones" style="display:none; margin-bottom:14px;">
+          <label for="selector_dueno_rendiciones" style="font-weight:600;">Dueño:</label>
+          <select id="selector_dueno_rendiciones"><option value="">Seleccione dueño...</option></select>
+        </div>
+
+        <div class="rendiciones-layout">
+          <aside class="rendiciones-sidebar">
+            <div class="filtros-grupo">
+              <div class="filtros-grupo-titulo">Buscar</div>
+              <div class="field">
+                <label for="rendicion_filtro_codigo">Código</label>
+                <input type="text" id="rendicion_filtro_codigo" placeholder="Buscar código...">
+              </div>
+            </div>
+
+            <div class="filtros-grupo">
+              <div class="filtros-grupo-titulo">Fecha</div>
+              <div class="field">
+                <label for="rendicion_filtro_desde">Desde</label>
+                <input type="date" id="rendicion_filtro_desde">
+              </div>
+              <div class="field">
+                <label for="rendicion_filtro_hasta">Hasta</label>
+                <input type="date" id="rendicion_filtro_hasta">
+              </div>
+            </div>
+
+            <div class="filtros-grupo">
+              <div class="filtros-grupo-titulo">Terminal</div>
+              <div class="field">
+                <label for="rendicion_filtro_terminal">Terminal</label>
+                <select id="rendicion_filtro_terminal"><option value="">Todas</option></select>
+              </div>
+            </div>
+
+            <button class="btn" id="boton_limpiar_filtros_rendiciones" style="width:100%;">Limpiar filtros</button>
+          </aside>
+
+          <div class="rendiciones-contenido">
+            <div id="chips_filtros_activos_rendiciones" class="chips-filtros"></div>
+            <div id="resumen_rendiciones" class="resumen-rendiciones"></div>
+            <div id="tabla_rendiciones_container"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Sección Pasajeros -->
     <section id="pasajeros" class="tab-content hidden">
       <div class="panel">
@@ -480,7 +536,7 @@
     <div class="modal-body" id="modal_apilado_contenido"></div>
   </div>
 </div>
-<script src="aplicacion.js?v=1.5piloto.45"></script>
+<script src="aplicacion.js?v=1.5piloto.51"></script>
 <script src="Aplicacion/admin.js?v=1.5piloto.41"></script>
 <script src="Aplicacion/terminales.js?v=1.5piloto.38"></script>
 <script src="Aplicacion/micros.js?v=1.5piloto.38a"></script>
@@ -489,6 +545,7 @@
 <script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.42"></script>
 <script src="Aplicacion/Viajes/viajes-opciones.js?v=1.5piloto.38"></script>
 <script src="Aplicacion/ventas.js?v=1.5piloto.50"></script>
+<script src="Aplicacion/rendiciones.js?v=1.5piloto.51"></script>
 <script src="Aplicacion/pasajeros.js?v=1.5piloto.42"></script>
 </body>
 </html>

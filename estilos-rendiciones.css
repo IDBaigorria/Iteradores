@@ -1,0 +1,130 @@
+/* ===== Rendiciones: layout, tabla, badge de desactualizada, modal ===== */
+/* Los estilos base (panel, field, btn, etc.) están en estilos.css. */
+/* Los estilos de sidebar y chips se reutilizan de estilos-ventas.css. */
+
+/* Grilla principal: sidebar 260px + contenido. */
+.rendiciones-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+/* Sidebar: mismo look que el de Vendidos. */
+.rendiciones-sidebar {
+    position: sticky;
+    top: 125px;
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #fffbe6;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+}
+
+/* Contenido principal. */
+.rendiciones-contenido {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+
+/* Resumen arriba de la tabla. */
+.resumen-rendiciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: baseline;
+    background: var(--panel-claro);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 14px;
+}
+.resumen-rendiciones-item { color: var(--text); }
+.resumen-rendiciones-item b { color: var(--primary-dark); }
+.resumen-rendiciones-sep { color: var(--muted); opacity: 0.6; }
+
+/* Tabla de rendiciones. */
+.rendiciones-tabla th,
+.rendiciones-tabla td {
+    vertical-align: middle;
+}
+.rendiciones-tabla td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Badge de estado. */
+.badge-vigente {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    background: #e7f4ea;
+    color: #28713b;
+}
+.badge-desactualizada {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    background: #fff2d7;
+    color: #8a6500;
+    cursor: help;
+}
+
+/* Modal de detalle. */
+.rendicion-detalle {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.rendicion-detalle-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+.rendicion-detalle-titulo {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary-dark);
+}
+.rendicion-detalle-fecha {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+/* Cartel de desactualizada. */
+.rendicion-desactualizada-aviso {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    color: #856404;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+.rendicion-desactualizada-aviso strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+/* Responsive: en pantallas chicas el sidebar pasa arriba. */
+@media (max-width: 950px) {
+    .rendiciones-layout {
+        grid-template-columns: 1fr;
+    }
+    .rendiciones-sidebar {
+        position: static;
+        max-height: none;
+    }
+}

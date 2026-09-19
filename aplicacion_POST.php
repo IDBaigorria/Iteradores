@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.50)
+ * ## Estructura de nodos actual (v1.5piloto.51)
  *
  * ### Nodos raíz especiales
  *
@@ -488,6 +488,7 @@
  *   |                        | └─ Cada hijo: `terminal`, `terminal_nombre_real`, `total`, `efectivo`, `banco`, `cantidad_cupones`. |
  *   | `detalle_cupones`      | Nodo contenedor con hijos en lista árbol (hmi/hd).    |
  *   |                        | └─ Cada hijo: `venta_id`, `numero_cupon`, `monto`, `metodo_pago`, `terminal`, `terminal_nombre_real`. |
+ *   | `desactualizada`       | Nodo con dato string: motivo de desactualización. **Opcional**. Solo existe si se canceló una venta con cupones rendidos en esta rendición. |
  *
  * **Nota (enlace `rendido` en cupones):** Al confirmar la rendición,
  * cada cupón incluido recibe un enlace `rendido` que apunta al Nodo
@@ -501,6 +502,18 @@
  * (un cupón se rindió, se canceló la venta, se pagó un cupón nuevo
  * fuera de la lista), la confirmación aborta con un mensaje genérico
  * y no se escribe nada en el grafo.
+ *
+ * **Nota (desactualización):** Si se cancela una venta que tiene
+ * cupones ya rendidos, la rendición no se modifica en sus totales
+ * (es inmutable), pero se marca con un enlace `desactualizada` que
+ * contiene el motivo (ej. `"Se canceló la venta venta_123 el
+ * 17/05/2026 15:30"`). Si se acumulan varias cancelaciones, los
+ * motivos se concatenan con `"; "`. La pestaña Rendiciones muestra
+ * un badge de aviso cuando esto ocurre.
+ *
+ * **Nota (listado):** La pestaña Rendiciones permite filtrar por
+ * código, rango de fecha de la rendición y terminal. El orden por
+ * defecto es el más reciente primero (el contenedor usa `_hmi`).
  *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
@@ -541,7 +554,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.50
+ * @version   1.5piloto.51
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

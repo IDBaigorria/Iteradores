@@ -13,7 +13,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.50
- * @version   1.5piloto.50
+ * @version   1.5piloto.51
  */
 
 use Iteradores\Nodos\Nodo;
@@ -481,4 +481,220 @@ function confirmar_rendicion(string $nombre_dueno, array $ventas_seleccionadas, 
         'total' => number_format($total, 2, '.', ''),
         'cantidad_cupones' => count($cupones_a_rendir),
     ];
+}
+
+/**
+ * Convierte una fecha visible "DD/MM/YYYY HH:MM" a ISO (YYYY-MM-DD).
+ * Devuelve cadena vacía si no matchea el formato.
+ */
+function _fecha_rendicion_a_iso(string $fecha_visible): string {
+    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})/', $fecha_visible, $m)) {
+        return $m[3] . '-' . $m[2] . '-' . $m[1];
+    }
+    return '';
+}
+
+/**
+ * Formatea una rendición con los datos mínimos para la tabla.
+ *
+ * Devuelve: id_rendicion, fecha_hora, fecha_iso, total,
+ * total_efectivo, total_banco, cantidad_cupones, cantidad_ventas,
+ * terminales (array {terminal, terminal_nombre_real}),
+ * desactualizada (bool) y motivo_desactualizada (string).
+ *
+ * @param Nodo $nodo_rendicion
+ * @return array
+ */
+function formatear_rendicion_resumida(Nodo $nodo_rendicion): array {
+    $id_rendicion = $nodo_rendicion->dato();
+    $nodo_fecha = $nodo_rendicion->adyacente('fecha_hora');
+    $fecha_hora = $nodo_fecha ? $nodo_fecha->dato() : '';
+
+    $terminales = [];
+    $cont_term = $nodo_rendicion->adyacente('detalle_terminales');
+    if ($cont_term) {
+        $t = hmi($cont_term);
+        $seg_t = 0;
+        while ($t && $seg_t < 200) {
+            $seg_t++;
+            $terminales[] = [
+                'terminal' => $t->adyacente('terminal') ? $t->adyacente('terminal')->dato() : '',
+                'terminal_nombre_real' => $t->adyacente('terminal_nombre_real') ? $t->adyacente('terminal_nombre_real')->dato() : '',
+            ];
+            $t = hd($t);
+        }
+    }
+
+    $nodo_desact = $nodo_rendicion->adyacente('desactualizada');
+    $desactualizada = ($nodo_desact !== null);
+    $motivo = $nodo_desact ? $nodo_desact->dato() : '';
+
+    return [
+        'id_rendicion' => $id_rendicion,
+        'fecha_hora' => $fecha_hora,
+        'fecha_iso' => _fecha_rendicion_a_iso($fecha_hora),
+        'total' => $nodo_rendicion->adyacente('total') ? $nodo_rendicion->adyacente('total')->dato() : '0',
+        'total_efectivo' => $nodo_rendicion->adyacente('total_efectivo') ? $nodo_rendicion->adyacente('total_efectivo')->dato() : '0',
+        'total_banco' => $nodo_rendicion->adyacente('total_banco') ? $nodo_rendicion->adyacente('total_banco')->dato() : '0',
+        'cantidad_cupones' => $nodo_rendicion->adyacente('cantidad_cupones') ? $nodo_rendicion->adyacente('cantidad_cupones')->dato() : '0',
+        'cantidad_ventas' => $nodo_rendicion->adyacente('cantidad_ventas') ? $nodo_rendicion->adyacente('cantidad_ventas')->dato() : '0',
+        'terminales' => $terminales,
+        'desactualizada' => $desactualizada,
+        'motivo_desactualizada' => $motivo,
+    ];
+}
+
+/**
+ * Formatea una rendición con el detalle completo (terminales y cupones).
+ *
+ * @param Nodo $nodo_rendicion
+ * @return array
+ */
+function formatear_rendicion_completa(Nodo $nodo_rendicion): array {
+    $datos = formatear_rendicion_resumida($nodo_rendicion);
+
+    // Detalle por terminal
+    $detalle_terminales = [];
+    $cont_term = $nodo_rendicion->adyacente('detalle_terminales');
+    if ($cont_term) {
+        $t = hmi($cont_term);
+        $seg_t = 0;
+        while ($t && $seg_t < 200) {
+            $seg_t++;
+            $detalle_terminales[] = [
+                'terminal' => $t->adyacente('terminal') ? $t->adyacente('terminal')->dato() : '',
+                'terminal_nombre_real' => $t->adyacente('terminal_nombre_real') ? $t->adyacente('terminal_nombre_real')->dato() : '',
+                'total' => $t->adyacente('total') ? $t->adyacente('total')->dato() : '0',
+                'efectivo' => $t->adyacente('efectivo') ? $t->adyacente('efectivo')->dato() : '0',
+                'banco' => $t->adyacente('banco') ? $t->adyacente('banco')->dato() : '0',
+                'cantidad_cupones' => $t->adyacente('cantidad_cupones') ? $t->adyacente('cantidad_cupones')->dato() : '0',
+            ];
+            $t = hd($t);
+        }
+    }
+
+    // Detalle de cupones
+    $detalle_cupones = [];
+    $cont_cup = $nodo_rendicion->adyacente('detalle_cupones');
+    if ($cont_cup) {
+        $c = hmi($cont_cup);
+        $seg_c = 0;
+        while ($c && $seg_c < 1000) {
+            $seg_c++;
+            $detalle_cupones[] = [
+                'venta_id' => $c->adyacente('venta_id') ? $c->adyacente('venta_id')->dato() : '',
+                'numero_cupon' => $c->adyacente('numero_cupon') ? $c->adyacente('numero_cupon')->dato() : '',
+                'monto' => $c->adyacente('monto') ? $c->adyacente('monto')->dato() : '0',
+                'metodo_pago' => $c->adyacente('metodo_pago') ? $c->adyacente('metodo_pago')->dato() : '',
+                'terminal' => $c->adyacente('terminal') ? $c->adyacente('terminal')->dato() : '',
+                'terminal_nombre_real' => $c->adyacente('terminal_nombre_real') ? $c->adyacente('terminal_nombre_real')->dato() : '',
+            ];
+            $c = hd($c);
+        }
+    }
+
+    $datos['detalle_terminales'] = $detalle_terminales;
+    $datos['detalle_cupones'] = $detalle_cupones;
+    return $datos;
+}
+
+/**
+ * Evalúa si una rendición formateada pasa los filtros del panel.
+ *
+ * Filtros soportados:
+ *  - codigo: string a buscar en id_rendicion (contains, case-insensitive).
+ *  - fecha_desde: 'YYYY-MM-DD' (o vacío).
+ *  - fecha_hasta: 'YYYY-MM-DD' (o vacío).
+ *  - terminal: nombre de usuario de terminal. Filtra las rendiciones
+ *    que la incluyen en su detalle.
+ *
+ * @param array $rendicion
+ * @param array $filtros
+ * @return bool
+ */
+function _rendicion_pasa_filtros(array $rendicion, array $filtros): bool {
+    $f_codigo = trim((string)($filtros['codigo'] ?? ''));
+    if ($f_codigo !== '' && stripos((string)($rendicion['id_rendicion'] ?? ''), $f_codigo) === false) return false;
+
+    $f_desde = trim((string)($filtros['fecha_desde'] ?? ''));
+    if ($f_desde !== '') {
+        $fi = $rendicion['fecha_iso'] ?? '';
+        if ($fi === '' || $fi < $f_desde) return false;
+    }
+
+    $f_hasta = trim((string)($filtros['fecha_hasta'] ?? ''));
+    if ($f_hasta !== '') {
+        $fi = $rendicion['fecha_iso'] ?? '';
+        if ($fi === '' || $fi > $f_hasta) return false;
+    }
+
+    $f_terminal = trim((string)($filtros['terminal'] ?? ''));
+    if ($f_terminal !== '') {
+        $encontrada = false;
+        foreach (($rendicion['terminales'] ?? []) as $t) {
+            if (($t['terminal'] ?? '') === $f_terminal) {
+                $encontrada = true;
+                break;
+            }
+        }
+        if (!$encontrada) return false;
+    }
+
+    return true;
+}
+
+/**
+ * Lista las rendiciones de un dueño, aplicando filtros.
+ *
+ * Devuelve las rendiciones ordenadas por más reciente primero (el
+ * contenedor usa _hmi, que inserta al inicio).
+ *
+ * @param string $nombre_dueno
+ * @param array  $filtros
+ * @return array
+ */
+function listar_rendiciones_de_dueno(string $nombre_dueno, array $filtros = []): array {
+    $contenedor = obtener_contenedor_rendiciones_dueno($nombre_dueno);
+    if (!$contenedor) return [];
+
+    $rendiciones = [];
+    $actual = hmi($contenedor);
+    $seg = 0;
+    while ($actual && $seg < 2000) {
+        $seg++;
+        $resumen = formatear_rendicion_resumida($actual);
+        if (_rendicion_pasa_filtros($resumen, $filtros)) {
+            $rendiciones[] = $resumen;
+        }
+        $actual = hd($actual);
+    }
+    return $rendiciones;
+}
+
+/**
+ * Busca una rendición por su id en todos los dueños.
+ *
+ * @param string $id_rendicion
+ * @return array|null
+ */
+function obtener_rendicion_por_id(string $id_rendicion): ?array {
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_usuarios) return null;
+
+    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nivel = $nodo_dueno->adyacente('nivel');
+        if (!$nivel || $nivel->dato() !== 'dueno') continue;
+        $contenedor = $nodo_dueno->adyacente('rendiciones');
+        if (!$contenedor) continue;
+        $actual = hmi($contenedor);
+        $seg = 0;
+        while ($actual && $seg < 2000) {
+            $seg++;
+            if ($actual->dato() === $id_rendicion) {
+                return formatear_rendicion_completa($actual);
+            }
+            $actual = hd($actual);
+        }
+    }
+    return null;
 }

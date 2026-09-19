@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.49
+ * @version   1.5piloto.51
  */
 
 
@@ -944,6 +944,22 @@ function obtener_info_cancelacion(string $id_venta): array {
         $terminal_visible = $nodo_terminal->adyacente('nombre_real')->dato();
     }
 
+    // Cupones rendidos: si los hay, se avisa en el modal de cancelación.
+    $cupones_rendidos = 0;
+    $contenedor_cupones_info = $nodo_venta->adyacente('cupones');
+    if ($contenedor_cupones_info) {
+        $cupon_info = hmi($contenedor_cupones_info);
+        $seg_info = 0;
+        while ($cupon_info && $seg_info < 200) {
+            $seg_info++;
+            $estado_info = $cupon_info->adyacente('estado') ? $cupon_info->adyacente('estado')->dato() : '';
+            if ($estado_info === 'pagado' && $cupon_info->adyacente('rendido')) {
+                $cupones_rendidos++;
+            }
+            $cupon_info = hd($cupon_info);
+        }
+    }
+
     // Montos.
     $pagado = (float)($nodo_venta->adyacente('pagado') ? $nodo_venta->adyacente('pagado')->dato() : '0');
     $devolucion = _calcular_devolucion_venta($nodo_venta);
@@ -979,6 +995,7 @@ function obtener_info_cancelacion(string $id_venta): array {
             'banco_a_devolver' => number_format($devolucion['banco'], 2, '.', ''),
             'total_a_devolver' => number_format($devolucion['total'], 2, '.', ''),
             'puede_cancelar' => $puede_cancelar,
+            'cupones_rendidos' => $cupones_rendidos,
         ],
     ];
 }
@@ -1041,6 +1058,12 @@ function cancelar_venta(string $id_venta): array {
         $nodo_venta->eliminar_adyacente('asientos');
         Nodo::eliminar($cabeza_asientos);
     }
+
+    // Marcar rendiciones afectadas antes de borrar los cupones.
+    // Si algún cupón de esta venta ya fue rendido, la rendición queda
+    // marcada como desactualizada con el motivo. No se aborta la
+    // cancelación: es solo un aviso histórico para auditoría.
+    _marcar_rendiciones_afectadas($nodo_venta, $id_venta);
 
     // 3. Eliminar los cupones y su contenedor.
     $contenedor_cupones = $nodo_venta->adyacente('cupones');
@@ -1550,5 +1573,47 @@ function _construir_cupones_derivados(Nodo $nodo_venta): array {
         ];
     }
     return $cupones;
+}
+
+/**
+ * Marca como desactualizadas las rendiciones afectadas por la
+ * cancelación de una venta. Recorre los cupones de la venta y, para
+ * cada uno que tenga enlace `rendido`, agrega o concatena el motivo
+ * en el Nodo Rendición correspondiente.
+ *
+ * Se procesa cada Nodo Rendición una sola vez, incluso si varios de
+ * sus cupones pertenecen a la misma venta.
+ *
+ * @param Nodo   $nodo_venta
+ * @param string $id_venta
+ * @return void
+ */
+function _marcar_rendiciones_afectadas(Nodo $nodo_venta, string $id_venta): void {
+    $contenedor_cupones = $nodo_venta->adyacente('cupones');
+    if (!$contenedor_cupones) return;
+
+    $motivo = 'Se canceló la venta ' . $id_venta . ' el ' . date('d/m/Y H:i');
+    $procesadas = [];
+
+    $cupon = hmi($contenedor_cupones);
+    $seg = 0;
+    while ($cupon && $seg < 200) {
+        $seg++;
+        $nodo_rendicion = $cupon->adyacente('rendido');
+        if ($nodo_rendicion) {
+            $id_rend = $nodo_rendicion->id();
+            if (!isset($procesadas[$id_rend])) {
+                $procesadas[$id_rend] = true;
+                $nodo_desact = $nodo_rendicion->adyacente('desactualizada');
+                if ($nodo_desact) {
+                    $actual = $nodo_desact->dato();
+                    $nodo_desact->_dato($actual . '; ' . $motivo);
+                } else {
+                    $nodo_rendicion->_adyacente_en(Nodo::crear_con_dato($motivo), 'desactualizada');
+                }
+            }
+        }
+        $cupon = hd($cupon);
+    }
 }
 

@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.45
+ * @version 1.5piloto.51
  */
 
 // Utilidades
@@ -70,8 +70,8 @@ function mostrar_aviso(mensaje, tipo = 'info') {
 // Configuración de pestañas según nivel de usuario
 function configurar_pestanas_segun_nivel(nivel) {
     const pestanas_permitidas = {
-        admin: ['admin', 'micros', 'viajes', 'vendidos', 'pasajeros'],
-        dueno: ['terminales', 'micros', 'viajes', 'vendidos', 'pasajeros'],
+        admin: ['admin', 'micros', 'viajes', 'vendidos', 'rendiciones', 'pasajeros'],
+        dueno: ['terminales', 'micros', 'viajes', 'vendidos', 'rendiciones', 'pasajeros'],
         terminal: ['viajes', 'vendidos', 'pasajeros']
     };
     const permitidas = pestanas_permitidas[nivel] || [];
@@ -82,6 +82,7 @@ function configurar_pestanas_segun_nivel(nivel) {
         micros: 'Empresas/Micros',
         viajes: 'Viajes',
         vendidos: 'Vendidos',
+        rendiciones: 'Rendiciones',
         pasajeros: 'Pasajeros/Clientes',
         terminales: 'Puntos de venta'
     };
@@ -119,6 +120,7 @@ function activar_pestana(id_pestana) {
     if (id_pestana === 'micros') return cargar_datos_micros();
     if (id_pestana === 'viajes') return cargar_viajes();
     if (id_pestana === 'vendidos') return cargar_ventas();
+    if (id_pestana === 'rendiciones') return cargar_rendiciones();
     if (id_pestana === 'pasajeros') return cargar_pasajeros();
     if (id_pestana === 'admin') return cargar_datos_admin();
     if (id_pestana === 'terminales') return cargar_datos_terminales();
