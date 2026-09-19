@@ -13,7 +13,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.50
- * @version   1.5piloto.52
+ * @version   1.5piloto.53
  */
 
 use Iteradores\Nodos\Nodo;
@@ -575,8 +575,12 @@ function formatear_rendicion_resumida(Nodo $nodo_rendicion): array {
     $desactualizada = ($nodo_desact !== null);
     $motivo = $nodo_desact ? $nodo_desact->dato() : '';
 
+    $nodo_dueno = $nodo_rendicion->adyacente('dueno');
+    $nombre_dueno = $nodo_dueno ? $nodo_dueno->dato() : '';
+
     return [
         'id_rendicion' => $id_rendicion,
+        'dueno' => $nombre_dueno,
         'fecha_hora' => $fecha_hora,
         'fecha_iso' => _fecha_rendicion_a_iso($fecha_hora),
         'total' => $nodo_rendicion->adyacente('total') ? $nodo_rendicion->adyacente('total')->dato() : '0',

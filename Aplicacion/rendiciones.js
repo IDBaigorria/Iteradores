@@ -1,6 +1,6 @@
 /***
  * Funciones de la pestaña Rendiciones.
- * @version 1.5piloto.51
+ * @version 1.5piloto.53
  */
 
 let rendiciones_actuales = [];
@@ -358,6 +358,7 @@ async function ver_detalle_rendicion(id_rendicion) {
             </div>
 
             <div class="rendicion-acciones">
+                <button class="btn primary" id="btn_imprimir_detalle_rendicion">Imprimir informe de rendición</button>
                 <button class="btn" id="btn_cerrar_detalle_rendicion">Cerrar</button>
             </div>
         </div>
@@ -367,6 +368,10 @@ async function ver_detalle_rendicion(id_rendicion) {
 
     const cont = document.getElementById('modal_generico_contenido');
     cont.querySelector('#btn_cerrar_detalle_rendicion').addEventListener('click', cerrar_modal_generico);
+    cont.querySelector('#btn_imprimir_detalle_rendicion').addEventListener('click', () => {
+        const url = `index.php?imprimir=1&tipo=informe_rendicion&id_rendicion=${encodeURIComponent(r.id_rendicion)}`;
+        window.open(url, '_blank');
+    });
 
     cont.querySelectorAll('.ver_compra_desde_rendicion').forEach(btn => {
         btn.addEventListener('click', () => {

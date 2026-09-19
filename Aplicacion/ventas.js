@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.50
+ * @version 1.5piloto.53
  */
 
 // (aplicar_cambios.php funcionó)
@@ -2380,6 +2380,37 @@ async function confirmar_rendicion_modal() {
     // Refrescar la lista de ventas para que las tarjetas reflejen
     // el nuevo estado (a_rendir actualizado).
     if (typeof cargar_ventas === 'function') cargar_ventas();
+
+    // Mostrar el modal chico para ofrecer la impresión del informe.
+    mostrar_modal_chico_impresion_rendicion(resultado.id_rendicion);
+}
+
+/**
+ * Muestra el modal chico flotante para imprimir el informe de una
+ * rendición recién cerrada. Se cierra solo con el botón "Cerrar" o
+ * al apretar "Imprimir informe de rendición".
+ *
+ * @param {string} id_rendicion
+ */
+function mostrar_modal_chico_impresion_rendicion(id_rendicion) {
+    const contenedor = document.getElementById('modal_chico_impresion_rendicion');
+    const titulo = document.getElementById('modal_chico_impresion_rendicion_titulo');
+    const btnImprimir = document.getElementById('btn_modal_chico_imprimir_rendicion');
+    const btnCerrar = document.getElementById('btn_modal_chico_cerrar_rendicion');
+    if (!contenedor || !titulo || !btnImprimir || !btnCerrar) return;
+
+    titulo.textContent = `Rendición ${id_rendicion} cerrada`;
+
+    btnImprimir.onclick = () => {
+        const url = `index.php?imprimir=1&tipo=informe_rendicion&id_rendicion=${encodeURIComponent(id_rendicion)}`;
+        window.open(url, '_blank');
+    };
+
+    btnCerrar.onclick = () => {
+        contenedor.classList.add('hidden');
+    };
+
+    contenedor.classList.remove('hidden');
 }
 
 // ===== Inicialización de listeners del panel Vendidos =====

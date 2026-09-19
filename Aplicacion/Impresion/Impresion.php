@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.49
+ * @version   1.5piloto.53
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -14,6 +14,7 @@ include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./miscelaneas/Arbol.php");
 include_once("./Aplicacion/Ventas/Venta.php");
+include_once("./Aplicacion/Rendiciones/Rendicion.php");
 function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = '', string $numero_cupon = ''): void {
     if ($tipo === 'ficha_salud') {
         // Para ficha de salud, id_venta contendrá el nombre_dueno y dni_filtro el dni
@@ -1369,6 +1370,159 @@ function imprimir_informe_ventas(array $params): void {
             echo '</div>'; // cierre venta-card
         }
     }
+    echo '</div>';
+
+    echo '</div>'; // cierre informe
+
+    echo '<script>window.onload = function() { window.print(); }</script>';
+    echo '</body></html>';
+}
+
+/**
+ * Imprime el informe completo de una rendición.
+ *
+ * Incluye membrete, datos generales, resumen, tabla por punto de
+ * venta y detalle de los cupones rendidos. Si la rendición está
+ * marcada como desactualizada, se agrega un aviso.
+ *
+ * @param string $id_rendicion
+ */
+function imprimir_informe_rendicion(string $id_rendicion): void {
+    if ($id_rendicion === '') {
+        echo "ID de rendición no especificado";
+        return;
+    }
+
+    $r = obtener_rendicion_por_id($id_rendicion);
+    if (!$r) {
+        echo "Rendición no encontrada";
+        return;
+    }
+
+    $nombre_dueno = $r['dueno'] ?? '';
+    $nombre_dueno_visible = $nombre_dueno !== '' ? _nombre_real_usuario($nombre_dueno) : '—';
+    $fecha_informe = date('d/m/Y H:i');
+    $logo_ruta = './Aplicacion/LogoPeque.png';
+
+    // Cartel de desactualizada.
+    $aviso_desact = '';
+    if (!empty($r['desactualizada'])) {
+        $aviso_desact = '<div class="aviso-desactualizada"><strong>Rendición desactualizada.</strong> '
+            . htmlspecialchars($r['motivo_desactualizada'] ?? '') . '</div>';
+    }
+
+    // Tabla por terminal.
+    $terminales = $r['detalle_terminales'] ?? [];
+    $terminales_html = '';
+    foreach ($terminales as $t) {
+        $nombre_term = $t['terminal_nombre_real'] !== '' ? $t['terminal_nombre_real'] : $t['terminal'];
+        $terminales_html .= '<tr>';
+        $terminales_html .= '<td>' . htmlspecialchars($nombre_term) . '</td>';
+        $terminales_html .= '<td class="num">' . htmlspecialchars($t['cantidad_cupones']) . '</td>';
+        $terminales_html .= '<td class="num">$' . htmlspecialchars($t['efectivo']) . '</td>';
+        $terminales_html .= '<td class="num">$' . htmlspecialchars($t['banco']) . '</td>';
+        $terminales_html .= '<td class="num"><b>$' . htmlspecialchars($t['total']) . '</b></td>';
+        $terminales_html .= '</tr>';
+    }
+    if ($terminales_html === '') {
+        $terminales_html = '<tr><td colspan="5" style="text-align:center;color:#666;">Sin datos</td></tr>';
+    }
+
+    // Tabla de cupones.
+    $cupones = $r['detalle_cupones'] ?? [];
+    $cupones_html = '';
+    foreach ($cupones as $c) {
+        $metodo = ($c['metodo_pago'] === 'transferencia') ? 'Transferencia' : 'Efectivo';
+        $nombre_term_c = $c['terminal_nombre_real'] !== '' ? $c['terminal_nombre_real'] : $c['terminal'];
+        $cupones_html .= '<tr>';
+        $cupones_html .= '<td>' . htmlspecialchars($c['venta_id']) . '</td>';
+        $cupones_html .= '<td class="num">' . htmlspecialchars($c['numero_cupon']) . '</td>';
+        $cupones_html .= '<td class="num">$' . htmlspecialchars($c['monto']) . '</td>';
+        $cupones_html .= '<td>' . htmlspecialchars($metodo) . '</td>';
+        $cupones_html .= '<td>' . htmlspecialchars($nombre_term_c) . '</td>';
+        $cupones_html .= '</tr>';
+    }
+    if ($cupones_html === '') {
+        $cupones_html = '<tr><td colspan="5" style="text-align:center;color:#666;">Sin datos</td></tr>';
+    }
+
+    echo '<!DOCTYPE html>';
+    echo '<html lang="es">';
+    echo '<head><meta charset="UTF-8"><title>Informe de rendición</title>';
+    echo '<style>
+        body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 20px; background: white; color: black; font-size: 12px; }
+        .informe { max-width: 1000px; margin: 0 auto; }
+        .membrete { display: flex; align-items: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px; }
+        .membrete img { width: 60px; height: 60px; object-fit: contain; filter: grayscale(100%); margin-right: 15px; }
+        .membrete-texto { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+        .titulo { text-align: center; margin-bottom: 20px; }
+        .titulo h1 { margin: 0 0 6px 0; font-size: 22px; }
+        .titulo .meta { font-size: 13px; color: #333; }
+        .titulo .meta b { color: black; }
+        .seccion { border: 1px solid black; border-radius: 6px; padding: 14px 16px; margin-bottom: 18px; }
+        .seccion h2 { margin: 0 0 12px 0; border-bottom: 1px solid black; padding-bottom: 6px; font-size: 16px; }
+        .datos-lista { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.7; }
+        .datos-lista b { display: inline-block; min-width: 110px; }
+        .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+        .resumen-item { border: 1px solid #ccc; border-radius: 6px; padding: 10px; text-align: center; }
+        .resumen-item span { display: block; font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .resumen-item b { display: block; font-size: 18px; }
+        table.tabla { width: 100%; border-collapse: collapse; font-size: 12px; }
+        table.tabla th, table.tabla td { border: 1px solid black; padding: 6px 8px; text-align: left; }
+        table.tabla th { background: #f0f0f0; font-weight: 700; }
+        table.tabla td.num { text-align: right; }
+        .aviso-desactualizada { background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 13px; }
+        .aviso-desactualizada strong { display: block; margin-bottom: 4px; }
+        @media print { body { padding: 10px; } .informe { max-width: 100%; } }
+    </style>';
+    echo '</head><body>';
+
+    echo '<div class="informe">';
+
+    echo '<div class="membrete">';
+    echo '<img src="' . htmlspecialchars($logo_ruta) . '" alt="Logo">';
+    echo '<div class="membrete-texto">Parroquia Nuestra Señora del Carmen - Tres Arroyos</div>';
+    echo '</div>';
+
+    echo '<div class="titulo">';
+    echo '<h1>Informe de rendición</h1>';
+    echo '<div class="meta"><b>Código:</b> ' . htmlspecialchars($r['id_rendicion']) . ' · <b>Fecha:</b> ' . htmlspecialchars($r['fecha_hora']) . ' · <b>Impreso:</b> ' . htmlspecialchars($fecha_informe) . '</div>';
+    echo '</div>';
+
+    echo $aviso_desact;
+
+    echo '<div class="seccion">';
+    echo '<h2>Datos generales</h2>';
+    echo '<ul class="datos-lista">';
+    echo '<li><b>Dueño:</b> ' . htmlspecialchars($nombre_dueno_visible) . '</li>';
+    echo '<li><b>Cupones rendidos:</b> ' . htmlspecialchars($r['cantidad_cupones']) . '</li>';
+    echo '<li><b>Ventas incluidas:</b> ' . htmlspecialchars($r['cantidad_ventas']) . '</li>';
+    echo '</ul>';
+    echo '</div>';
+
+    echo '<div class="seccion">';
+    echo '<h2>Resumen</h2>';
+    echo '<div class="resumen-grid">';
+    echo '<div class="resumen-item"><span>Total</span><b>$' . htmlspecialchars($r['total']) . '</b></div>';
+    echo '<div class="resumen-item"><span>Efectivo</span><b>$' . htmlspecialchars($r['total_efectivo']) . '</b></div>';
+    echo '<div class="resumen-item"><span>Banco</span><b>$' . htmlspecialchars($r['total_banco']) . '</b></div>';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="seccion">';
+    echo '<h2>Por punto de venta</h2>';
+    echo '<table class="tabla">';
+    echo '<thead><tr><th>Terminal</th><th>Cupones</th><th>Efectivo</th><th>Banco</th><th>Total</th></tr></thead>';
+    echo '<tbody>' . $terminales_html . '</tbody>';
+    echo '</table>';
+    echo '</div>';
+
+    echo '<div class="seccion">';
+    echo '<h2>Cupones rendidos</h2>';
+    echo '<table class="tabla">';
+    echo '<thead><tr><th>Venta</th><th>Cupón</th><th>Monto</th><th>Método</th><th>Terminal</th></tr></thead>';
+    echo '<tbody>' . $cupones_html . '</tbody>';
+    echo '</table>';
     echo '</div>';
 
     echo '</div>'; // cierre informe

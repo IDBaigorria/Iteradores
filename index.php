@@ -18,7 +18,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.50
+ * @version   1.5piloto.53
  */
 
 // --- Utilidades base ----------------------------------
@@ -219,6 +219,13 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
             $_GET['dueno'] ?? '',
             $_GET['dni'] ?? ''
         );
+        exit;
+    }
+
+    // Caso especial: informe imprimible de una rendición.
+    // Se pasa el id_rendicion por GET.
+    if ($tipo === 'informe_rendicion') {
+        imprimir_informe_rendicion($_GET['id_rendicion'] ?? '');
         exit;
     }
     $dni_filtro = $_GET['dni'] ?? '';
