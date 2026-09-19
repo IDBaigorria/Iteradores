@@ -13,7 +13,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.50
- * @version   1.5piloto.51
+ * @version   1.5piloto.52
  */
 
 use Iteradores\Nodos\Nodo;
@@ -468,6 +468,52 @@ function confirmar_rendicion(string $nombre_dueno, array $ventas_seleccionadas, 
     foreach ($cupones_a_rendir as $c) {
         $nodo_cupon = $c['nodo_cupon'];
         $nodo_cupon->_adyacente_en($nodo_rendicion, 'rendido');
+    }
+
+    // Mover el dinero: se descuenta del saldo de cada terminal y se
+    // suma a las cuentas del dueño. Al descontar de la terminal se usa
+    // max(0, ...) para no dejar saldos negativos si algo quedó desfasado.
+    $raiz_usuarios_mov = Nodo::nodo_por_id('usuarios');
+    $nodo_dueno_mov = $raiz_usuarios_mov ? $raiz_usuarios_mov->adyacente($nombre_dueno) : null;
+
+    if ($nodo_dueno_mov) {
+        // Descontar de cada terminal involucrada.
+        foreach (array_values($por_terminal) as $t) {
+            $nodo_term = $raiz_usuarios_mov->adyacente($t['terminal']);
+            if (!$nodo_term) continue;
+
+            if ($t['efectivo'] > 0.001) {
+                $nodo_ef_t = $nodo_term->adyacente('efectivo');
+                if ($nodo_ef_t) {
+                    $nuevo = max(0, (float)$nodo_ef_t->dato() - $t['efectivo']);
+                    $nodo_ef_t->_dato((string)$nuevo);
+                }
+            }
+            if ($t['banco'] > 0.001) {
+                $nodo_ba_t = $nodo_term->adyacente('banco');
+                if ($nodo_ba_t) {
+                    $nuevo = max(0, (float)$nodo_ba_t->dato() - $t['banco']);
+                    $nodo_ba_t->_dato((string)$nuevo);
+                }
+            }
+        }
+
+        // Sumar a las cuentas del dueño.
+        $nodo_ef_d = $nodo_dueno_mov->adyacente('efectivo');
+        if (!$nodo_ef_d) {
+            $nodo_ef_d = Nodo::crear_con_dato('0');
+            $nodo_dueno_mov->_adyacente_en($nodo_ef_d, 'efectivo');
+        }
+        $nuevo_ef_d = (float)$nodo_ef_d->dato() + $total_efectivo;
+        $nodo_ef_d->_dato((string)$nuevo_ef_d);
+
+        $nodo_ba_d = $nodo_dueno_mov->adyacente('banco');
+        if (!$nodo_ba_d) {
+            $nodo_ba_d = Nodo::crear_con_dato('0');
+            $nodo_dueno_mov->_adyacente_en($nodo_ba_d, 'banco');
+        }
+        $nuevo_ba_d = (float)$nodo_ba_d->dato() + $total_banco;
+        $nodo_ba_d->_dato((string)$nuevo_ba_d);
     }
 
     // Insertar la rendición al inicio del contenedor del dueño.

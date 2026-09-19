@@ -1,7 +1,7 @@
 /***
  * Funciones de administración de usuarios.
  * @since 1.5piloto.15
- * @version 1.5piloto.41
+ * @version 1.5piloto.52b
  */
 
 async function cargar_datos_admin() {
@@ -193,8 +193,10 @@ async function iniciar_edicion_usuario(nombre_usuario) {
 
     function actualizar_visibilidad() {
         const es_terminal = select_nivel.value === 'terminal';
-        campo_banco_nombre.style.display = es_terminal ? '' : 'none';
-        campo_banco_cuenta.style.display = es_terminal ? '' : 'none';
+        const es_dueno = select_nivel.value === 'dueno';
+        const tiene_banco = es_terminal || es_dueno;
+        campo_banco_nombre.style.display = tiene_banco ? '' : 'none';
+        campo_banco_cuenta.style.display = tiene_banco ? '' : 'none';
         if (campo_dueno) {
             campo_dueno.style.display = es_terminal ? '' : 'none';
         }
@@ -272,9 +274,12 @@ async function eliminar_usuario_confirmado(nombre_usuario) {
 // Eventos del formulario de nuevo usuario
 $("#nuevo_nivel").addEventListener("change", function() {
     const es_terminal = this.value === "terminal";
-    document.getElementById("campo_dueno").style.display = es_terminal ? "block" : "none";
-    document.getElementById("campo_banco_nombre").style.display = es_terminal ? "block" : "none";
-    document.getElementById("campo_banco_cuenta").style.display = es_terminal ? "block" : "none";
+    const es_dueno = this.value === "dueno";
+    const tiene_banco = es_terminal || es_dueno;
+    // Se usa "" en vez de "block" para no pisar el display: flex del CSS.
+    document.getElementById("campo_dueno").style.display = es_terminal ? "" : "none";
+    document.getElementById("campo_banco_nombre").style.display = tiene_banco ? "" : "none";
+    document.getElementById("campo_banco_cuenta").style.display = tiene_banco ? "" : "none";
 });
 
 $("#boton_agregar_usuario").addEventListener("click", async () => {
@@ -302,6 +307,7 @@ $("#boton_agregar_usuario").addEventListener("click", async () => {
         mostrar_aviso("Error al cargar dueños", 'error');
     }
     $("#formulario_nuevo_usuario").classList.remove("hidden");
+    $("#nuevo_nivel").dispatchEvent(new Event("change"));
 });
 
 $("#boton_cancelar_nuevo_usuario").addEventListener("click", () => {
@@ -319,8 +325,8 @@ $("#boton_guardar_usuario").addEventListener("click", async () => {
         codigo_acceso: $("#nuevo_codigo_acceso").value.trim(),
         nivel: nivel,
         dueno: nivel === "terminal" ? $("#nuevo_dueno_select").value : "",
-        banco_nombre: nivel === "terminal" ? $("#nuevo_banco_nombre").value.trim() : "",
-        banco_cuenta: nivel === "terminal" ? $("#nuevo_banco_cuenta").value.trim() : ""
+        banco_nombre: (nivel === "terminal" || nivel === "dueno") ? $("#nuevo_banco_nombre").value.trim() : "",
+        banco_cuenta: (nivel === "terminal" || nivel === "dueno") ? $("#nuevo_banco_cuenta").value.trim() : ""
     };
 
     if (!datos_usuario.nombre_usuario || !datos_usuario.codigo_acceso) {

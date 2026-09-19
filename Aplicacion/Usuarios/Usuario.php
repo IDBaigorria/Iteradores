@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.4
+ * @version   1.5piloto.52
  */
 
 use Iteradores\Nodos\Nodo;
@@ -206,6 +206,19 @@ function agregar_usuario(array $datos): array {
         $nodo_terminales->_adyacente_en($nodo_usuario, $nombre_usuario);
     }
 
+    if ($nivel === 'dueno') {
+        // Crear cuenta de efectivo. El banco se crea solo si el admin
+        // lo cargó al momento del alta; si no, se crea más adelante
+        // cuando haga falta (por ejemplo, al cerrar una rendición).
+        $nodo_usuario->_adyacente_en(Nodo::crear_con_dato('0'), 'efectivo');
+        if ($banco_nombre !== '' && $banco_cuenta !== '') {
+            $nodo_banco = Nodo::crear_con_dato('0');
+            $nodo_banco->_adyacente_en(Nodo::crear_con_dato($banco_nombre), 'nombre');
+            $nodo_banco->_adyacente_en(Nodo::crear_con_dato($banco_cuenta), 'cuenta');
+            $nodo_usuario->_adyacente_en($nodo_banco, 'banco');
+        }
+    }
+
     $raiz->_adyacente_en($nodo_usuario, $nombre_usuario);
     Controlador::guardar(Conf::NOMBRE_APP);
 
@@ -273,9 +286,12 @@ function actualizar_usuario(array $datos): array {
     else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($nivel), 'nivel');
 
     if ($nivel_actual !== $nivel) {
-        if ($nivel !== 'terminal') {
+        if ($nivel === 'admin') {
             $nodo_usuario->eliminar_adyacente('efectivo');
             $nodo_usuario->eliminar_adyacente('banco');
+            $nodo_usuario->eliminar_adyacente('dueno');
+        }
+        if ($nivel === 'dueno') {
             $nodo_usuario->eliminar_adyacente('dueno');
         }
         if ($nivel_actual === 'dueno' && $nivel !== 'dueno') {
@@ -283,11 +299,19 @@ function actualizar_usuario(array $datos): array {
         }
     }
 
-    if ($nivel === 'terminal') {
+    // Asegurar que el dueño tenga cuenta de efectivo.
+    if ($nivel === 'dueno' && !$nodo_usuario->adyacente('efectivo')) {
+        $nodo_usuario->_adyacente_en(Nodo::crear_con_dato('0'), 'efectivo');
+    }
+
+    if ($nivel === 'terminal' || $nivel === 'dueno') {
         $banco_nombre = trim($datos['banco_nombre'] ?? '');
         $banco_cuenta = trim($datos['banco_cuenta'] ?? '');
-        if (empty($banco_nombre) || empty($banco_cuenta)) {
-            return ['exito' => false, 'error' => 'Banco y cuenta son obligatorios para terminales'];
+
+        if ($nivel === 'terminal') {
+            if (empty($banco_nombre) || empty($banco_cuenta)) {
+                return ['exito' => false, 'error' => 'Banco y cuenta son obligatorios para terminales'];
+            }
         }
 
         $nodo_banco = $nodo_usuario->adyacente('banco');
@@ -295,22 +319,34 @@ function actualizar_usuario(array $datos): array {
             $nodo_banco = Nodo::crear_con_dato('0');
             $nodo_usuario->_adyacente_en($nodo_banco, 'banco');
         }
-        $nodo_banco_nombre = $nodo_banco->adyacente('nombre');
-        if ($nodo_banco_nombre) $nodo_banco_nombre->_dato($banco_nombre);
-        else $nodo_banco->_adyacente_en(Nodo::crear_con_dato($banco_nombre), 'nombre');
-        $nodo_banco_cuenta = $nodo_banco->adyacente('cuenta');
-        if ($nodo_banco_cuenta) $nodo_banco_cuenta->_dato($banco_cuenta);
-        else $nodo_banco->_adyacente_en(Nodo::crear_con_dato($banco_cuenta), 'cuenta');
 
-        $dueno = trim($datos['dueno'] ?? '');
-        if (empty($dueno)) return ['exito' => false, 'error' => 'Debe seleccionar un dueño'];
-        $nodo_dueno = $raiz->adyacente($dueno);
-        if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no existe'];
-        $nodo_nivel_dueno = $nodo_dueno->adyacente('nivel');
-        if (!$nodo_nivel_dueno || $nodo_nivel_dueno->dato() !== 'dueno') return ['exito' => false, 'error' => 'El usuario indicado no es un dueño'];
+        if ($banco_nombre !== '') {
+            $nodo_banco_nombre = $nodo_banco->adyacente('nombre');
+            if ($nodo_banco_nombre) $nodo_banco_nombre->_dato($banco_nombre);
+            else $nodo_banco->_adyacente_en(Nodo::crear_con_dato($banco_nombre), 'nombre');
+        } else if ($nivel === 'dueno') {
+            $nodo_banco->eliminar_adyacente('nombre');
+        }
 
-        $nodo_usuario->eliminar_adyacente('dueno');
-        $nodo_usuario->_adyacente_en($nodo_dueno, 'dueno');
+        if ($banco_cuenta !== '') {
+            $nodo_banco_cuenta = $nodo_banco->adyacente('cuenta');
+            if ($nodo_banco_cuenta) $nodo_banco_cuenta->_dato($banco_cuenta);
+            else $nodo_banco->_adyacente_en(Nodo::crear_con_dato($banco_cuenta), 'cuenta');
+        } else if ($nivel === 'dueno') {
+            $nodo_banco->eliminar_adyacente('cuenta');
+        }
+
+        if ($nivel === 'terminal') {
+            $dueno = trim($datos['dueno'] ?? '');
+            if (empty($dueno)) return ['exito' => false, 'error' => 'Debe seleccionar un dueño'];
+            $nodo_dueno = $raiz->adyacente($dueno);
+            if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no existe'];
+            $nodo_nivel_dueno = $nodo_dueno->adyacente('nivel');
+            if (!$nodo_nivel_dueno || $nodo_nivel_dueno->dato() !== 'dueno') return ['exito' => false, 'error' => 'El usuario indicado no es un dueño'];
+
+            $nodo_usuario->eliminar_adyacente('dueno');
+            $nodo_usuario->_adyacente_en($nodo_dueno, 'dueno');
+        }
     }
 
     Controlador::guardar(Conf::NOMBRE_APP);
