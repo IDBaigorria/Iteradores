@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.52
+ * @version   1.5piloto.54
  */
 
 use Iteradores\Nodos\Nodo;
@@ -126,6 +126,34 @@ function listar_duenos(): array {
         }
     }
     return $duenos;
+}
+
+/**
+ * Devuelve los saldos actuales de un dueño (efectivo, banco, total).
+ *
+ * Se usa tanto en la pestaña Rendiciones como en Liquidaciones para
+ * mostrar el saldo disponible antes de mover dinero.
+ *
+ * @param string $nombre_dueno
+ * @return array{efectivo: string, banco: string, total: string}
+ */
+function obtener_saldos_dueno(string $nombre_dueno): array {
+    $defaults = ['efectivo' => '0.00', 'banco' => '0.00', 'total' => '0.00'];
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return $defaults;
+    $nodo = $raiz->adyacente($nombre_dueno);
+    if (!$nodo) return $defaults;
+
+    $ef = $nodo->adyacente('efectivo');
+    $ba = $nodo->adyacente('banco');
+    $efectivo = $ef ? (float)$ef->dato() : 0.0;
+    $banco = $ba ? (float)$ba->dato() : 0.0;
+
+    return [
+        'efectivo' => number_format($efectivo, 2, '.', ''),
+        'banco' => number_format($banco, 2, '.', ''),
+        'total' => number_format($efectivo + $banco, 2, '.', ''),
+    ];
 }
 
 /**

@@ -18,7 +18,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.53
+ * @version   1.5piloto.54c
  */
 
 // --- Utilidades base ----------------------------------
@@ -84,6 +84,7 @@ require_once __DIR__ . '/Aplicacion/Viajes/Viaje.php';
 require_once __DIR__ . '/Aplicacion/Ventas/Venta.php';
 require_once __DIR__ . '/Aplicacion/Pasajeros/Pasajero.php';
 require_once __DIR__ . '/Aplicacion/Rendiciones/Rendicion.php';
+require_once __DIR__ . '/Aplicacion/Liquidaciones/Liquidacion.php';
 require_once __DIR__ . '/Aplicacion/Enrutador.php';
 
 
@@ -226,6 +227,15 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
     // Se pasa el id_rendicion por GET.
     if ($tipo === 'informe_rendicion') {
         imprimir_informe_rendicion($_GET['id_rendicion'] ?? '');
+        exit;
+    }
+
+    // Caso especial: informe imprimible de una liquidación.
+    // Si el dueño es quien imprime, el frontend manda
+    // ocultar_datos_generales=1 para no mostrarle su propio nombre.
+    if ($tipo === 'informe_liquidacion') {
+        $ocultar_datos = ($_GET['ocultar_datos_generales'] ?? '0') === '1';
+        imprimir_informe_liquidacion($_GET['id_liquidacion'] ?? '', $ocultar_datos);
         exit;
     }
     $dni_filtro = $_GET['dni'] ?? '';

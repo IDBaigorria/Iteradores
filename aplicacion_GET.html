@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="estilos-vehiculos.css?v=1.5piloto.38">
 <link rel="stylesheet" href="estilos-viajes.css?v=1.5piloto.40">
 <link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.50">
-<link rel="stylesheet" href="estilos-rendiciones.css?v=1.5piloto.51">
+<link rel="stylesheet" href="estilos-rendiciones.css?v=1.5piloto.54">
 </head>
 <body>
 <!-- Pantalla de login (código de acceso) -->
@@ -445,8 +445,59 @@
 
           <div class="rendiciones-contenido">
             <div id="chips_filtros_activos_rendiciones" class="chips-filtros"></div>
-            <div id="resumen_rendiciones" class="resumen-rendiciones"></div>
+            <div class="encabezado-saldos">
+              <div id="resumen_rendiciones" class="resumen-rendiciones"></div>
+              <button class="btn primary" id="boton_liquidar" style="display:none;">Liquidar</button>
+            </div>
             <div id="tabla_rendiciones_container"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sección Liquidaciones -->
+    <section id="liquidaciones" class="tab-content hidden">
+      <div class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+          <h2 style="margin:0;">Liquidaciones</h2>
+        </div>
+
+        <div id="contenedor_filtro_dueno_liquidaciones" style="display:none; margin-bottom:14px;">
+          <label for="selector_dueno_liquidaciones" style="font-weight:600;">Dueño:</label>
+          <select id="selector_dueno_liquidaciones"><option value="">Seleccione dueño...</option></select>
+        </div>
+
+        <div class="rendiciones-layout">
+          <aside class="rendiciones-sidebar">
+            <div class="filtros-grupo">
+              <div class="filtros-grupo-titulo">Buscar</div>
+              <div class="field">
+                <label for="liquidacion_filtro_codigo">Código</label>
+                <input type="text" id="liquidacion_filtro_codigo" placeholder="Buscar código...">
+              </div>
+            </div>
+
+            <div class="filtros-grupo">
+              <div class="filtros-grupo-titulo">Fecha</div>
+              <div class="field">
+                <label for="liquidacion_filtro_desde">Desde</label>
+                <input type="date" id="liquidacion_filtro_desde">
+              </div>
+              <div class="field">
+                <label for="liquidacion_filtro_hasta">Hasta</label>
+                <input type="date" id="liquidacion_filtro_hasta">
+              </div>
+            </div>
+
+            <button class="btn" id="boton_limpiar_filtros_liquidaciones" style="width:100%;">Limpiar filtros</button>
+          </aside>
+
+          <div class="rendiciones-contenido">
+            <div id="chips_filtros_activos_liquidaciones" class="chips-filtros"></div>
+            <div class="encabezado-saldos">
+              <div id="resumen_liquidaciones" class="resumen-rendiciones"></div>
+            </div>
+            <div id="tabla_liquidaciones_container"></div>
           </div>
         </div>
       </div>
@@ -518,6 +569,13 @@
         <button class="btn" id="btn_modal_chico_cerrar_rendicion">Cerrar</button>
     </div>
 </div>
+<div id="modal_chico_impresion_liquidacion" class="modal-chico hidden">
+    <strong id="modal_chico_impresion_liquidacion_titulo">Liquidación registrada</strong>
+    <div style="margin-top:10px;">
+        <button class="btn primary" id="btn_modal_chico_imprimir_liquidacion">Imprimir informe de liquidación</button>
+        <button class="btn" id="btn_modal_chico_cerrar_liquidacion">Cerrar</button>
+    </div>
+</div>
 <!-- Modal genérico -->
 <div id="modal_generico" class="modal hidden">
   <div class="modal-content modal-grande">
@@ -543,7 +601,7 @@
     <div class="modal-body" id="modal_apilado_contenido"></div>
   </div>
 </div>
-<script src="aplicacion.js?v=1.5piloto.51"></script>
+<script src="aplicacion.js?v=1.5piloto.54b"></script>
 <script src="Aplicacion/admin.js?v=1.5piloto.52b"></script>
 <script src="Aplicacion/terminales.js?v=1.5piloto.38"></script>
 <script src="Aplicacion/micros.js?v=1.5piloto.38a"></script>
@@ -552,7 +610,8 @@
 <script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.42"></script>
 <script src="Aplicacion/Viajes/viajes-opciones.js?v=1.5piloto.38"></script>
 <script src="Aplicacion/ventas.js?v=1.5piloto.53"></script>
-<script src="Aplicacion/rendiciones.js?v=1.5piloto.53"></script>
+<script src="Aplicacion/rendiciones.js?v=1.5piloto.54"></script>
+<script src="Aplicacion/liquidaciones.js?v=1.5piloto.54d"></script>
 <script src="Aplicacion/pasajeros.js?v=1.5piloto.42"></script>
 </body>
 </html>

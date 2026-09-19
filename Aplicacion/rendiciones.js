@@ -1,6 +1,6 @@
 /***
  * Funciones de la pestaña Rendiciones.
- * @version 1.5piloto.53
+ * @version 1.5piloto.54
  */
 
 let rendiciones_actuales = [];
@@ -125,8 +125,14 @@ async function _cargar_rendiciones_con_dueno(nombre_dueno) {
     rendiciones_actuales = datos.rendiciones || [];
     await cargar_terminales_en_filtro_rendiciones(nombre_dueno);
     renderizar_tabla_rendiciones(rendiciones_actuales);
-    renderizar_resumen_rendiciones(rendiciones_actuales);
+    renderizar_resumen_rendiciones(datos.saldos_dueno || null);
     renderizar_chips_rendiciones();
+
+    // Mostrar el botón Liquidar solo al dueño.
+    const btn_liquidar = document.getElementById('boton_liquidar');
+    if (btn_liquidar) {
+        btn_liquidar.style.display = (usuario_actual && usuario_actual.nivel === 'dueno') ? '' : 'none';
+    }
 }
 
 /**
@@ -172,23 +178,34 @@ function _recolectar_filtros_rendiciones() {
 }
 
 /**
- * Renderiza el resumen arriba de la tabla: total rendido y cantidad.
+ * Renderiza el header de la pestaña con los saldos actuales del
+ * dueño (efectivo, banco, total). Se usa tanto en Rendiciones
+ * como en Liquidaciones.
+ *
+ * @param {object} saldos {efectivo, banco, total}
+ * @param {string} etiqueta Texto que precede a los montos (ej. "Saldo actual del dueño")
  */
-function renderizar_resumen_rendiciones(rendiciones) {
+function renderizar_resumen_saldos_dueno(saldos, etiqueta) {
+    if (!saldos) saldos = { efectivo: '0.00', banco: '0.00', total: '0.00' };
+    const etq = etiqueta || 'Saldo actual del dueño';
+    return `
+        <span class="resumen-rendiciones-item"><b>${etq}:</b></span>
+        <span class="resumen-rendiciones-item">Efectivo $${_formatear_monto_rendiciones(saldos.efectivo)}</span>
+        <span class="resumen-rendiciones-sep">·</span>
+        <span class="resumen-rendiciones-item">Banco $${_formatear_monto_rendiciones(saldos.banco)}</span>
+        <span class="resumen-rendiciones-sep">·</span>
+        <span class="resumen-rendiciones-item"><b>Total $${_formatear_monto_rendiciones(saldos.total)}</b></span>
+    `;
+}
+
+/**
+ * Actualiza el resumen de la pestaña Rendiciones con los saldos
+ * actuales del dueño. Recibe los saldos por parámetro.
+ */
+function renderizar_resumen_rendiciones(saldos) {
     const contenedor = document.getElementById('resumen_rendiciones');
     if (!contenedor) return;
-
-    let total = 0;
-    rendiciones.forEach(r => { total += parseFloat(r.total) || 0; });
-
-    const cant = rendiciones.length;
-    const txt_cant = cant === 1 ? '1 rendición' : `${cant} rendiciones`;
-
-    contenedor.innerHTML = `
-        <span class="resumen-rendiciones-item"><b>Total rendido:</b> $${_formatear_monto_rendiciones(total)}</span>
-        <span class="resumen-rendiciones-sep">·</span>
-        <span class="resumen-rendiciones-item">${txt_cant}</span>
-    `;
+    contenedor.innerHTML = renderizar_resumen_saldos_dueno(saldos, 'Saldo actual del dueño');
 }
 
 /**
@@ -510,4 +527,12 @@ function limpiar_filtros_rendiciones() {
     });
     const btn_limpiar = document.getElementById('boton_limpiar_filtros_rendiciones');
     if (btn_limpiar) btn_limpiar.addEventListener('click', limpiar_filtros_rendiciones);
+    const btn_liquidar = document.getElementById('boton_liquidar');
+    if (btn_liquidar) {
+        // La función abrir_modal_liquidar vive en liquidaciones.js, que
+        // se carga después. Se resuelve al hacer click.
+        btn_liquidar.addEventListener('click', () => {
+            if (typeof abrir_modal_liquidar === 'function') abrir_modal_liquidar();
+        });
+    }
 })();

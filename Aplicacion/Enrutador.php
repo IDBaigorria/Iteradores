@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.51
+ * @version   1.5piloto.54
  */
 
 use Iteradores\Nodos\Nodo;
@@ -795,7 +795,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         'terminal' => $post['terminal'] ?? '',
                     ];
                     $rendiciones = listar_rendiciones_de_dueno($nombre_dueno, $filtros);
-                    responder_json(['exito' => true, 'rendiciones' => $rendiciones]);
+                    $saldos = obtener_saldos_dueno($nombre_dueno);
+                    responder_json(['exito' => true, 'rendiciones' => $rendiciones, 'saldos_dueno' => $saldos]);
                     break;
 
                 case 'obtener':
@@ -813,6 +814,62 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de rendiciones no válida']);
+            }
+            break;
+
+        case 'liquidaciones':
+            switch ($subaccion) {
+                case 'previsualizar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado = previsualizar_liquidacion($nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                case 'confirmar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $monto_efectivo = $post['monto_efectivo'] ?? '0';
+                    $monto_banco = $post['monto_banco'] ?? '0';
+                    $observaciones = $post['observaciones'] ?? '';
+                    $resultado = confirmar_liquidacion($nombre_dueno, $monto_efectivo, $monto_banco, $observaciones);
+                    responder_json($resultado);
+                    break;
+
+                case 'listar':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $filtros = [
+                        'codigo' => $post['codigo'] ?? '',
+                        'fecha_desde' => $post['fecha_desde'] ?? '',
+                        'fecha_hasta' => $post['fecha_hasta'] ?? '',
+                    ];
+                    $liquidaciones = listar_liquidaciones_de_dueno($nombre_dueno, $filtros);
+                    $saldos = obtener_saldos_dueno($nombre_dueno);
+                    responder_json(['exito' => true, 'liquidaciones' => $liquidaciones, 'saldos_dueno' => $saldos]);
+                    break;
+
+                case 'obtener':
+                    $id_liquidacion = $post['id_liquidacion'] ?? '';
+                    if (empty($id_liquidacion)) {
+                        responder_json(['exito' => false, 'error' => 'ID de liquidación no especificado']);
+                    }
+                    $liq = obtener_liquidacion_por_id($id_liquidacion);
+                    if ($liq) {
+                        responder_json(['exito' => true, 'liquidacion' => $liq]);
+                    } else {
+                        responder_json(['exito' => false, 'error' => 'Liquidación no encontrada']);
+                    }
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de liquidaciones no válida']);
             }
             break;
 

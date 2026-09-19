@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.51
+ * @version 1.5piloto.54b
  */
 
 // Utilidades
@@ -70,8 +70,8 @@ function mostrar_aviso(mensaje, tipo = 'info') {
 // Configuración de pestañas según nivel de usuario
 function configurar_pestanas_segun_nivel(nivel) {
     const pestanas_permitidas = {
-        admin: ['admin', 'micros', 'viajes', 'vendidos', 'rendiciones', 'pasajeros'],
-        dueno: ['terminales', 'micros', 'viajes', 'vendidos', 'rendiciones', 'pasajeros'],
+        admin: ['admin', 'micros', 'viajes', 'vendidos', 'pasajeros', 'rendiciones', 'liquidaciones'],
+        dueno: ['terminales', 'micros', 'viajes', 'vendidos', 'pasajeros', 'rendiciones', 'liquidaciones'],
         terminal: ['viajes', 'vendidos', 'pasajeros']
     };
     const permitidas = pestanas_permitidas[nivel] || [];
@@ -82,8 +82,9 @@ function configurar_pestanas_segun_nivel(nivel) {
         micros: 'Empresas/Micros',
         viajes: 'Viajes',
         vendidos: 'Vendidos',
-        rendiciones: 'Rendiciones',
         pasajeros: 'Pasajeros/Clientes',
+        rendiciones: 'Rendiciones',
+        liquidaciones: 'Liquidaciones',
         terminales: 'Puntos de venta'
     };
     permitidas.forEach(id_pestana => {
@@ -121,6 +122,7 @@ function activar_pestana(id_pestana) {
     if (id_pestana === 'viajes') return cargar_viajes();
     if (id_pestana === 'vendidos') return cargar_ventas();
     if (id_pestana === 'rendiciones') return cargar_rendiciones();
+    if (id_pestana === 'liquidaciones') return cargar_liquidaciones();
     if (id_pestana === 'pasajeros') return cargar_pasajeros();
     if (id_pestana === 'admin') return cargar_datos_admin();
     if (id_pestana === 'terminales') return cargar_datos_terminales();
@@ -254,6 +256,15 @@ function abrir_modal_generico(titulo, contenido_html, on_volver = null) {
     const botonVolver = document.getElementById('volver_modal_generico');
 
     if (!tituloEl || !contenidoEl || !modalEl) return;
+
+    // Resetear el ancho del modal, por si un flujo anterior lo modificó
+    // (ej. el modal de liquidación lo achica). Cada apertura arranca
+    // con el ancho por defecto del CSS.
+    const contentReset = modalEl.querySelector('.modal-content');
+    if (contentReset) {
+        contentReset.style.maxWidth = '';
+        contentReset.style.width = '';
+    }
 
     on_volver_modal = (typeof on_volver === 'function') ? on_volver : null;
 

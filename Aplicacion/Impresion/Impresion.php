@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.53
+ * @version   1.5piloto.54c
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -15,6 +15,7 @@ include_once("./Controlador/Controlador.php");
 include_once("./miscelaneas/Arbol.php");
 include_once("./Aplicacion/Ventas/Venta.php");
 include_once("./Aplicacion/Rendiciones/Rendicion.php");
+include_once("./Aplicacion/Liquidaciones/Liquidacion.php");
 function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = '', string $numero_cupon = ''): void {
     if ($tipo === 'ficha_salud') {
         // Para ficha de salud, id_venta contendrá el nombre_dueno y dni_filtro el dni
@@ -1371,6 +1372,117 @@ function imprimir_informe_ventas(array $params): void {
         }
     }
     echo '</div>';
+
+    echo '</div>'; // cierre informe
+
+    echo '<script>window.onload = function() { window.print(); }</script>';
+    echo '</body></html>';
+}
+
+/**
+ * Imprime el informe completo de una liquidación.
+ *
+ * Incluye membrete, datos generales, resumen de lo extraído,
+ * saldos posteriores a la liquidación y observaciones (si las hay).
+ *
+ * @param string $id_liquidacion
+ * @param bool   $ocultar_datos_generales Si es true, no se imprime la
+ *                                         sección "Datos generales"
+ *                                         (se usa cuando el que imprime
+ *                                         es el propio dueño).
+ */
+function imprimir_informe_liquidacion(string $id_liquidacion, bool $ocultar_datos_generales = false): void {
+    if ($id_liquidacion === '') {
+        echo "ID de liquidación no especificado";
+        return;
+    }
+
+    $liq = obtener_liquidacion_por_id($id_liquidacion);
+    if (!$liq) {
+        echo "Liquidación no encontrada";
+        return;
+    }
+
+    $nombre_dueno = $liq['dueno'] ?? '';
+    $nombre_dueno_visible = $nombre_dueno !== '' ? _nombre_real_usuario($nombre_dueno) : '—';
+    $fecha_informe = date('d/m/Y H:i');
+    $logo_ruta = './Aplicacion/LogoPeque.png';
+
+    $obs = trim((string)($liq['observaciones'] ?? ''));
+    $obs_html = '';
+    if ($obs !== '') {
+        $obs_html = '<div class="seccion"><h2>Observaciones</h2><p style="font-size:13px;line-height:1.6;">'
+            . nl2br(htmlspecialchars($obs)) . '</p></div>';
+    }
+
+    // La sección "Datos generales" solo se muestra cuando el que
+    // imprime no es el propio dueño (típicamente el admin).
+    $datos_generales_html = '';
+    if (!$ocultar_datos_generales) {
+        $datos_generales_html = '<div class="seccion">'
+            . '<h2>Datos generales</h2>'
+            . '<ul class="datos-lista">'
+            . '<li><b>Dueño:</b> ' . htmlspecialchars($nombre_dueno_visible) . '</li>'
+            . '</ul>'
+            . '</div>';
+    }
+
+    echo '<!DOCTYPE html>';
+    echo '<html lang="es">';
+    echo '<head><meta charset="UTF-8"><title>Informe de liquidación</title>';
+    echo '<style>
+        body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 20px; background: white; color: black; font-size: 12px; }
+        .informe { max-width: 1000px; margin: 0 auto; }
+        .membrete { display: flex; align-items: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px; }
+        .membrete img { width: 60px; height: 60px; object-fit: contain; filter: grayscale(100%); margin-right: 15px; }
+        .membrete-texto { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+        .titulo { text-align: center; margin-bottom: 20px; }
+        .titulo h1 { margin: 0 0 6px 0; font-size: 22px; }
+        .titulo .meta { font-size: 13px; color: #333; }
+        .titulo .meta b { color: black; }
+        .seccion { border: 1px solid black; border-radius: 6px; padding: 14px 16px; margin-bottom: 18px; }
+        .seccion h2 { margin: 0 0 12px 0; border-bottom: 1px solid black; padding-bottom: 6px; font-size: 16px; }
+        .datos-lista { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.7; }
+        .datos-lista b { display: inline-block; min-width: 110px; }
+        .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+        .resumen-item { border: 1px solid #ccc; border-radius: 6px; padding: 10px; text-align: center; }
+        .resumen-item span { display: block; font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .resumen-item b { display: block; font-size: 18px; }
+        @media print { body { padding: 10px; } .informe { max-width: 100%; } }
+    </style>';
+    echo '</head><body>';
+
+    echo '<div class="informe">';
+    echo '<div class="membrete">';
+    echo '<img src="' . htmlspecialchars($logo_ruta) . '" alt="Logo">';
+    echo '<div class="membrete-texto">Parroquia Nuestra Señora del Carmen - Tres Arroyos</div>';
+    echo '</div>';
+
+    echo '<div class="titulo">';
+    echo '<h1>Informe de liquidación</h1>';
+    echo '<div class="meta"><b>Código:</b> ' . htmlspecialchars($liq['id_liquidacion']) . ' · <b>Fecha:</b> ' . htmlspecialchars($liq['fecha_hora']) . ' · <b>Impreso:</b> ' . htmlspecialchars($fecha_informe) . '</div>';
+    echo '</div>';
+
+    echo $datos_generales_html;
+
+    echo '<div class="seccion">';
+    echo '<h2>Monto liquidado</h2>';
+    echo '<div class="resumen-grid">';
+    echo '<div class="resumen-item"><span>Total</span><b>$' . htmlspecialchars($liq['total']) . '</b></div>';
+    echo '<div class="resumen-item"><span>De efectivo</span><b>$' . htmlspecialchars($liq['monto_efectivo']) . '</b></div>';
+    echo '<div class="resumen-item"><span>Del banco</span><b>$' . htmlspecialchars($liq['monto_banco']) . '</b></div>';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="seccion">';
+    echo '<h2>Saldos posteriores</h2>';
+    echo '<div class="resumen-grid">';
+    echo '<div class="resumen-item"><span>Efectivo restante</span><b>$' . htmlspecialchars($liq['efectivo_restante']) . '</b></div>';
+    echo '<div class="resumen-item"><span>Banco restante</span><b>$' . htmlspecialchars($liq['banco_restante']) . '</b></div>';
+    echo '</div>';
+    echo '</div>';
+
+    echo $obs_html;
 
     echo '</div>'; // cierre informe
 

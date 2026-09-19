@@ -13,7 +13,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.50
- * @version   1.5piloto.53
+ * @version   1.5piloto.54
  */
 
 use Iteradores\Nodos\Nodo;

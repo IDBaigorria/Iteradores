@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.51)
+ * ## Estructura de nodos actual (v1.5piloto.54)
  *
  * ### Nodos raíz especiales
  *
@@ -34,11 +34,11 @@
  * | `contrasena`    | Nodo con dato string: hash de contraseña (opcional).                                  |
  * | `nombre_real`   | Nodo con dato string: nombre real o visible (opcional).                               |
  * | `email`         | Nodo con dato string: correo electrónico (opcional).                                  |
- * | `efectivo`      | Nodo con dato string numérico: monto en efectivo (solo para `terminal`). Inicia en `"0"`. |
- * | `banco`         | Nodo con dato string numérico: monto en cuenta bancaria (solo para `terminal`). Inicia en `"0"`. |
+ * | `efectivo`      | Nodo con dato string numérico: monto en efectivo. Para `terminal`, es el saldo en la caja de la terminal. Para `dueno`, es la cuenta de efectivo acumulada de las rendiciones. Inicia en `"0"`. |
+ * | `banco`         | Nodo con dato string numérico: monto en cuenta bancaria. Para `terminal`, es el saldo bancarizado de la terminal. Para `dueno`, es la cuenta bancaria acumulada de las rendiciones. Inicia en `"0"`. |
  * |                 | Este nodo tiene además enlaces salientes:                                               |
- * |                 | ├─ `nombre` → Nodo con dato string: nombre del banco.                                  |
- * |                 | └─ `cuenta` → Nodo con dato string: número de cuenta bancaria.                         |
+ * |                 | ├─ `nombre` → Nodo con dato string: nombre del banco. Para `dueno` es opcional.        |
+ * |                 | └─ `cuenta` → Nodo con dato string: número de cuenta bancaria. Para `dueno` es opcional. |
  * | `dueno`         | Enlace directo al nodo del usuario dueño (solo para `terminal`).                       |
  * |                 | El nodo destino tiene como dato el nombre del dueño (string).                          |
  * | `terminales`    | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
@@ -51,11 +51,16 @@
  * |                 | └─ Enlaces salientes con nombre = **DNI** del pasajero apuntando a su nodo pasajero.   |
  * | `ventas`        | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
  * |                 | └─ Enlaces salientes: utiliza árbol (hmi/hd) para almacenar las ventas. El primer hijo es `hmi`, los siguientes hermanos se acceden con `hd`. |
+ * | `rendiciones`   | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
+ * |                 | └─ Enlaces salientes: utiliza árbol (hmi/hd) para almacenar las rendiciones. Ver Nodo Rendición. |
+ * | `liquidaciones` | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
+ * |                 | └─ Enlaces salientes: utiliza árbol (hmi/hd) para almacenar las liquidaciones. Ver Nodo Liquidación. |
  * | `venta_actual`  | Enlace a un nodo venta actual (solo para `terminal`). Si no existe venta activa, el enlace no existe. |
  *
  * **Observaciones:**
- * - Los enlaces `efectivo`, `banco`, `dueno` y `venta_actual` solo existen en nodos de nivel `terminal`.
- * - Los enlaces `terminales`, `empresas`, `viajes`, `pasajeros` y `ventas` solo existen en nodos de nivel `dueno`.
+ * - Los enlaces `dueno` y `venta_actual` solo existen en nodos de nivel `terminal`.
+ * - Los enlaces `efectivo` y `banco` existen en nodos de nivel `terminal` y en nodos de nivel `dueno`. En `terminal` son el saldo en la caja y en el banco. En `dueno` son las cuentas acumuladas de las rendiciones.
+ * - Los enlaces `terminales`, `empresas`, `viajes`, `pasajeros`, `ventas`, `rendiciones` y `liquidaciones` solo existen en nodos de nivel `dueno`.
  * - `contrasena`, `nombre_real` y `email` pueden no existir si no se proporcionaron.
  * - El monto en `efectivo` y en `banco` es automático (inicial `"0"`) y no se solicita al crear el usuario.
  * - El dato del nodo usuario es el nombre de usuario, lo que facilita la obtención
@@ -452,7 +457,7 @@
  *   | `estado`     | Nodo con dato string: `"pagado"` o `"pendiente"`.     |
  *   | `fecha_pago` | Nodo con dato string `"DD/MM/YYYY HH:MM"`. Solo existe si `estado` es `"pagado"`. |
  *   | `metodo_pago`| Nodo con dato string: `"efectivo"` o `"transferencia"`. **Opcional**. Solo se escribe cuando el método del pago concreto difiere del método de la venta. Si no existe, hereda el de la venta. |
- *   | `rendido`    | Nodo con dato string: marca el cupón como rendido al dueño. Solo existe cuando el dueño ya rindió ese dinero. Se usa para calcular "A rendir" en la sección Saldos de la pestaña Vendidos. |
+ *   | `rendido`    | Enlace al Nodo Rendición que incluyó este cupón. Solo existe cuando el dueño ya rindió ese dinero. Se usa para calcular "A rendir" en la sección Saldos de la pestaña Vendidos. |
  *
  * **Nota (resumen en la venta):** Los enlaces `cuotas`, `pagado` y
  * `cuotas_restantes` del Nodo Venta Persistente se siguen escribiendo
@@ -515,6 +520,35 @@
  * código, rango de fecha de la rendición y terminal. El orden por
  * defecto es el más reciente primero (el contenedor usa `_hmi`).
  *
+ * ### Nodo Liquidación (dato del nodo: `id_liquidacion`)
+ *
+ * A partir de v1.5piloto.54. Cuelga del contenedor `liquidaciones` del
+ * usuario dueño, en lista tipo árbol (hmi/hd). Representa un hecho
+ * inmutable: la salida de dinero del sistema, es decir, el retiro del
+ * dueño desde sus cuentas.
+ *
+ * - Dato del nodo: `id_liquidacion` (string único, ej. `liquidacion_1747526400`).
+ * - Enlaces salientes:
+ *   | Enlace                 | Nodo destino y dato esperado                          |
+ *   |------------------------|-------------------------------------------------------|
+ *   | `dueno`                | Nodo con dato string: nombre de usuario del dueño.    |
+ *   | `fecha_hora`           | Nodo con dato string `"DD/MM/YYYY HH:MM"`.            |
+ *   | `total`                | Nodo con dato string numérico: total liquidado.       |
+ *   | `monto_efectivo`       | Nodo con dato string numérico: monto extraído de la cuenta de efectivo. |
+ *   | `monto_banco`          | Nodo con dato string numérico: monto extraído de la cuenta bancaria. |
+ *   | `efectivo_restante`    | Nodo con dato string numérico: saldo de efectivo después de la liquidación. |
+ *   | `banco_restante`       | Nodo con dato string numérico: saldo bancario después de la liquidación. |
+ *   | `observaciones`        | Nodo con dato string: texto libre. **Opcional**. Se guarda solo si el dueño escribió algo. |
+ *
+ * **Nota (inmutabilidad):** Al confirmar la liquidación se valida que
+ * los montos no superen el saldo actual del dueño. Si cambió desde que
+ * se abrió el modal, la confirmación aborta con un mensaje genérico y
+ * no se escribe nada en el grafo.
+ *
+ * **Nota (listado):** La pestaña Liquidaciones permite filtrar por
+ * código y rango de fecha. El orden por defecto es el más reciente
+ * primero.
+ *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
  * | Enlace      | Nodo destino y dato esperado                          |
@@ -554,7 +588,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.51
+ * @version   1.5piloto.54
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.
