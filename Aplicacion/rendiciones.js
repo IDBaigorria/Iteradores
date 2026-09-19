@@ -1,6 +1,6 @@
 /***
  * Funciones de la pestaña Rendiciones.
- * @version 1.5piloto.54
+ * @version 1.5piloto.55b
  */
 
 let rendiciones_actuales = [];
@@ -127,6 +127,7 @@ async function _cargar_rendiciones_con_dueno(nombre_dueno) {
     renderizar_tabla_rendiciones(rendiciones_actuales);
     renderizar_resumen_rendiciones(datos.saldos_dueno || null);
     renderizar_chips_rendiciones();
+    renderizar_aviso_rendiciones_desactualizadas();
 
     // Mostrar el botón Liquidar solo al dueño.
     const btn_liquidar = document.getElementById('boton_liquidar');
@@ -234,9 +235,18 @@ function renderizar_tabla_rendiciones(rendiciones) {
     html += '</tr></thead><tbody>';
 
     rendiciones.forEach(r => {
-        const badge = r.desactualizada
-            ? '<span class="badge-desactualizada" title="' + (r.motivo_desactualizada || '') + '">Desactualizada</span>'
-            : '<span class="badge-vigente">Vigente</span>';
+        // El badge refleja tres estados:
+        //  - Vigente: sin ajustes.
+        //  - Desactualizada: con ajustes pendientes de aceptar.
+        //  - Ajustada: con ajustes, pero todos ya aceptados.
+        let badge;
+        if (!r.desactualizada) {
+            badge = '<span class="badge-vigente">Vigente</span>';
+        } else if (r.pendiente_aceptar) {
+            badge = '<span class="badge-desactualizada" title="' + (r.motivo_desactualizada || '') + '">Desactualizada</span>';
+        } else {
+            badge = '<span class="badge-ajustada" title="' + (r.motivo_desactualizada || '') + '">Ajustada</span>';
+        }
 
         const terminales = (r.terminales || []).map(t => t.terminal_nombre_real || t.terminal);
         let terminales_txt = '';
@@ -286,13 +296,73 @@ async function ver_detalle_rendicion(id_rendicion) {
 
     const r = datos.rendicion;
 
-    // Cartel de desactualizada.
+    // Cartel de desactualizada + sección de ajustes.
+    const ajustes = Array.isArray(r.ajustes) ? r.ajustes : [];
+    const pendientes = ajustes.filter(a => !a.aceptada);
+
     let cartel_desact = '';
     if (r.desactualizada) {
+        const texto_principal = pendientes.length > 0
+            ? 'Rendición con ajustes pendientes de aceptar.'
+            : 'Rendición ajustada (todos los ajustes fueron aceptados).';
         cartel_desact = `
             <div class="rendicion-desactualizada-aviso">
-                <strong>Rendición desactualizada.</strong>
-                <div>${r.motivo_desactualizada}</div>
+                <strong>${texto_principal}</strong>
+                <div>${r.motivo_desactualizada || ''}</div>
+            </div>
+        `;
+    }
+
+    // Sección de ajustes (uno por cancelación que afectó a esta rendición).
+    let ajustes_html = '';
+    if (ajustes.length > 0) {
+        ajustes_html = ajustes.map(a => {
+            const terminal_aj = a.terminal_nombre_real || a.terminal || '—';
+            const monto_dueno = (parseFloat(a.monto_dueno_efectivo) || 0) + (parseFloat(a.monto_dueno_banco) || 0);
+            const monto_terminal = (parseFloat(a.monto_terminal_efectivo) || 0) + (parseFloat(a.monto_terminal_banco) || 0);
+            const no_cubierto = (parseFloat(a.monto_no_cubierto_efectivo) || 0) + (parseFloat(a.monto_no_cubierto_banco) || 0);
+
+            const aceptado = !!a.aceptada;
+            const boton_aceptar = (!aceptado && a.id_cancelacion)
+                ? `<button class="btn primary btn_aceptar_ajuste" data-id-cancelacion="${a.id_cancelacion}" data-id-rendicion="${r.id_rendicion}">Aceptar ajuste</button>`
+                : '';
+            const boton_imprimir = a.id_cancelacion
+                ? `<button class="btn btn_imprimir_cancelacion" data-id-cancelacion="${a.id_cancelacion}">Imprimir informe de cancelación</button>`
+                : '';
+            const badge = aceptado
+                ? '<span class="badge-ajustada">Aceptado</span>'
+                : '<span class="badge-desactualizada">Pendiente</span>';
+            const motivo_txt = a.motivo ? `<div class="ajuste-motivo">Motivo: ${a.motivo}</div>` : '';
+
+            return `
+                <div class="ajuste-rendicion-bloque">
+                    <div class="ajuste-header">
+                        <div>
+                            <strong>Venta ${a.id_venta}</strong>
+                            <span class="ajuste-fecha">${a.fecha_hora}</span>
+                        </div>
+                        ${badge}
+                    </div>
+                    ${motivo_txt}
+                    <div class="ajuste-lineas">
+                        <div class="ajuste-linea"><span>Terminal:</span><b>${terminal_aj}</b></div>
+                        <div class="ajuste-linea"><span>Devuelto desde la terminal:</span><b>$${_formatear_monto_rendiciones(monto_terminal)}</b></div>
+                        <div class="ajuste-linea"><span>Devuelto desde el dueño:</span><b>$${_formatear_monto_rendiciones(monto_dueno)}</b></div>
+                        ${no_cubierto > 0.001 ? `<div class="ajuste-linea ajuste-linea-alerta"><span>No cubierto:</span><b>$${_formatear_monto_rendiciones(no_cubierto)}</b></div>` : ''}
+                        ${aceptado ? `<div class="ajuste-linea"><span>Aceptado el:</span><b>${a.aceptada_en}</b></div>` : ''}
+                    </div>
+                    <div class="ajuste-acciones">
+                        ${boton_aceptar}
+                        ${boton_imprimir}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        ajustes_html = `
+            <div class="rendicion-seccion">
+                <div class="rendicion-seccion-titulo">Ajustes por cancelaciones</div>
+                <div class="ajustes-lista">${ajustes_html}</div>
             </div>
         `;
     }
@@ -342,6 +412,8 @@ async function ver_detalle_rendicion(id_rendicion) {
             </div>
 
             ${cartel_desact}
+
+            ${ajustes_html}
 
             <div class="rendicion-resumen">
                 <div class="rendicion-resumen-titulo">Resumen</div>
@@ -397,6 +469,58 @@ async function ver_detalle_rendicion(id_rendicion) {
             ir_a_venta_en_vendidos(id_venta, nombre_dueno);
         });
     });
+
+    cont.querySelectorAll('.btn_aceptar_ajuste').forEach(btn => {
+        btn.addEventListener('click', () => {
+            aceptar_ajuste_rendicion_ui(btn.dataset.idRendicion, btn.dataset.idCancelacion);
+        });
+    });
+
+    cont.querySelectorAll('.btn_imprimir_cancelacion').forEach(btn => {
+        btn.addEventListener('click', () => {
+            window.open(_url_informe_cancelacion(btn.dataset.idCancelacion), '_blank');
+        });
+    });
+}
+
+/**
+ * Acepta un ajuste de rendición: manda al backend y refresca el
+ * detalle de la rendición para reflejar el cambio.
+ *
+ * @param {string} id_rendicion
+ * @param {string} id_cancelacion
+ */
+async function aceptar_ajuste_rendicion_ui(id_rendicion, id_cancelacion) {
+    const confirmacion = confirm(
+        'Vas a marcar este ajuste como aceptado.\n\n' +
+        'Los saldos ya fueron ajustados al cancelar la venta; aceptar es solo dejar registro de que lo revisaste.\n\n' +
+        '¿Confirmás?'
+    );
+    if (!confirmacion) return;
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "rendiciones/aceptar_ajuste",
+            id_rendicion,
+            id_cancelacion
+        })
+    });
+    const resultado = await respuesta.json();
+    if (!resultado.exito) {
+        mostrar_aviso(resultado.error || 'No se pudo aceptar el ajuste', 'error');
+        return;
+    }
+
+    mostrar_aviso('Ajuste aceptado', 'exito');
+
+    // Refrescar el listado y reabrir el detalle para que se vea actualizado.
+    const nombre_dueno = obtener_nombre_dueno_rendiciones();
+    if (nombre_dueno) {
+        await _cargar_rendiciones_con_dueno(nombre_dueno);
+        ver_detalle_rendicion(id_rendicion);
+    }
 }
 
 /**
@@ -501,6 +625,44 @@ function limpiar_filtros_rendiciones() {
     if (nombre_dueno) {
         _cargar_rendiciones_con_dueno(nombre_dueno);
     }
+}
+
+/**
+ * Arma la URL del informe de cancelación.
+ *
+ * @param {string} id_cancelacion
+ * @returns {string}
+ */
+function _url_informe_cancelacion(id_cancelacion) {
+    return `index.php?imprimir=1&tipo=informe_cancelacion&id_cancelacion=${encodeURIComponent(id_cancelacion)}`;
+}
+
+/**
+ * Renderiza el cartel de notificación arriba de la tabla si hay
+ * rendiciones con ajustes pendientes de aceptar.
+ */
+function renderizar_aviso_rendiciones_desactualizadas() {
+    const contenedor = document.getElementById('aviso_rendiciones_desactualizadas');
+    if (!contenedor) return;
+
+    const pendientes = (rendiciones_actuales || []).filter(r => r.pendiente_aceptar);
+    if (pendientes.length === 0) {
+        contenedor.innerHTML = '';
+        return;
+    }
+
+    const texto = pendientes.length === 1
+        ? 'Tenés 1 rendición con ajustes pendientes de aceptar.'
+        : `Tenés ${pendientes.length} rendiciones con ajustes pendientes de aceptar.`;
+
+    contenedor.innerHTML = `
+        <div class="aviso-rendiciones-desactualizadas">
+            <div class="aviso-rendiciones-texto">
+                <strong>Aviso:</strong> ${texto}
+                <div class="aviso-rendiciones-detalle">Se canceló una o más ventas cuyos cupones ya habían sido rendidos. Entrá al detalle de cada rendición para aceptar el ajuste.</div>
+            </div>
+        </div>
+    `;
 }
 
 // ===== Inicialización de listeners =====

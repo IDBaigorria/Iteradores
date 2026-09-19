@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.54c
+ * @version   1.5piloto.55
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -1372,6 +1372,130 @@ function imprimir_informe_ventas(array $params): void {
         }
     }
     echo '</div>';
+
+    echo '</div>'; // cierre informe
+
+    echo '<script>window.onload = function() { window.print(); }</script>';
+    echo '</body></html>';
+}
+
+/**
+ * Imprime el informe de cancelación de una compra.
+ *
+ * Muestra: datos de la venta, motivo de la cancelación, devolución
+ * al comprador (por método), origen de los fondos (terminal vs
+ * dueño), monto no cubierto (si lo hubo), asientos liberados y la
+ * fecha de emisión.
+ *
+ * @param string $id_cancelacion
+ */
+function imprimir_informe_cancelacion(string $id_cancelacion): void {
+    if ($id_cancelacion === '') {
+        echo "ID de cancelación no especificado";
+        return;
+    }
+
+    $c = obtener_cancelacion_por_id($id_cancelacion);
+    if (!$c) {
+        echo "Cancelación no encontrada";
+        return;
+    }
+
+    $nombre_dueno_visible = $c['dueno'] !== '' ? _nombre_real_usuario($c['dueno']) : '—';
+    $terminal_visible = $c['terminal_nombre_real'] !== '' ? $c['terminal_nombre_real'] : $c['terminal'];
+    $fecha_informe = date('d/m/Y H:i');
+    $logo_ruta = './Aplicacion/LogoPeque.png';
+
+    $motivo_html = '';
+    if (trim($c['motivo']) !== '') {
+        $motivo_html = '<div class="seccion"><h2>Motivo de la cancelación</h2><p style="font-size:13px;line-height:1.6;white-space:pre-wrap;">'
+            . nl2br(htmlspecialchars($c['motivo'])) . '</p></div>';
+    }
+
+    $no_cubierto_html = '';
+    $no_cub_ef = (float)$c['no_cubierto_efectivo'];
+    $no_cub_ba = (float)$c['no_cubierto_banco'];
+    if ($no_cub_ef > 0.001 || $no_cub_ba > 0.001) {
+        $no_cubierto_html = '<div class="seccion"><h2>Monto no cubierto por el dueño</h2>'
+            . '<p style="font-size:13px;">El dueño no tenía saldo suficiente para cubrir la devolución de la parte ya rendida. Quedó pendiente:</p>'
+            . '<div class="resumen-grid">'
+            . '<div class="resumen-item"><span>Efectivo</span><b>$' . htmlspecialchars($c['no_cubierto_efectivo']) . '</b></div>'
+            . '<div class="resumen-item"><span>Banco</span><b>$' . htmlspecialchars($c['no_cubierto_banco']) . '</b></div>'
+            . '</div></div>';
+    }
+
+    echo '<!DOCTYPE html>';
+    echo '<html lang="es">';
+    echo '<head><meta charset="UTF-8"><title>Informe de cancelación</title>';
+    echo '<style>
+        body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 20px; background: white; color: black; font-size: 12px; }
+        .informe { max-width: 1000px; margin: 0 auto; }
+        .membrete { display: flex; align-items: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px; }
+        .membrete img { width: 60px; height: 60px; object-fit: contain; filter: grayscale(100%); margin-right: 15px; }
+        .membrete-texto { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+        .titulo { text-align: center; margin-bottom: 20px; }
+        .titulo h1 { margin: 0 0 6px 0; font-size: 22px; }
+        .titulo .meta { font-size: 13px; color: #333; }
+        .titulo .meta b { color: black; }
+        .seccion { border: 1px solid black; border-radius: 6px; padding: 14px 16px; margin-bottom: 18px; }
+        .seccion h2 { margin: 0 0 12px 0; border-bottom: 1px solid black; padding-bottom: 6px; font-size: 16px; }
+        .datos-lista { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.7; }
+        .datos-lista b { display: inline-block; min-width: 130px; }
+        .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+        .resumen-item { border: 1px solid #ccc; border-radius: 6px; padding: 10px; text-align: center; }
+        .resumen-item span { display: block; font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .resumen-item b { display: block; font-size: 18px; }
+        @media print { body { padding: 10px; } .informe { max-width: 100%; } }
+    </style>';
+    echo '</head><body>';
+
+    echo '<div class="informe">';
+    echo '<div class="membrete">';
+    echo '<img src="' . htmlspecialchars($logo_ruta) . '" alt="Logo">';
+    echo '<div class="membrete-texto">Parroquia Nuestra Señora del Carmen - Tres Arroyos</div>';
+    echo '</div>';
+
+    echo '<div class="titulo">';
+    echo '<h1>Informe de cancelación de compra</h1>';
+    echo '<div class="meta"><b>Cancelación:</b> ' . htmlspecialchars($c['id_cancelacion']) . ' · <b>Venta:</b> ' . htmlspecialchars($c['id_venta']) . ' · <b>Fecha:</b> ' . htmlspecialchars($c['fecha_hora']) . ' · <b>Impreso:</b> ' . htmlspecialchars($fecha_informe) . '</div>';
+    echo '</div>';
+
+    echo '<div class="seccion">';
+    echo '<h2>Datos de la venta</h2>';
+    echo '<ul class="datos-lista">';
+    echo '<li><b>Dueño:</b> ' . htmlspecialchars($nombre_dueno_visible) . '</li>';
+    echo '<li><b>Terminal:</b> ' . htmlspecialchars($terminal_visible) . '</li>';
+    if ($c['viaje_visible'] !== '') echo '<li><b>Viaje:</b> ' . htmlspecialchars($c['viaje_visible']) . '</li>';
+    if ($c['micro_visible'] !== '') echo '<li><b>Micro:</b> ' . htmlspecialchars($c['micro_visible']) . '</li>';
+    if ($c['comprador_nombre_completo'] !== '') echo '<li><b>Comprador:</b> ' . htmlspecialchars($c['comprador_nombre_completo']) . '</li>';
+    if ($c['comprador_dni'] !== '') echo '<li><b>DNI:</b> ' . htmlspecialchars(formatear_dni_con_puntos($c['comprador_dni'])) . '</li>';
+    echo '<li><b>Total de la venta:</b> $' . htmlspecialchars($c['total_venta']) . '</li>';
+    echo '<li><b>Asientos liberados:</b> ' . htmlspecialchars($c['asientos_liberados']) . '</li>';
+    echo '</ul>';
+    echo '</div>';
+
+    echo $motivo_html;
+
+    echo '<div class="seccion">';
+    echo '<h2>Devolución al comprador</h2>';
+    echo '<div class="resumen-grid">';
+    echo '<div class="resumen-item"><span>Efectivo</span><b>$' . htmlspecialchars($c['devuelto_efectivo']) . '</b></div>';
+    echo '<div class="resumen-item"><span>Banco</span><b>$' . htmlspecialchars($c['devuelto_banco']) . '</b></div>';
+    echo '<div class="resumen-item"><span>Total</span><b>$' . number_format((float)$c['devuelto_efectivo'] + (float)$c['devuelto_banco'], 2, '.', '') . '</b></div>';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="seccion">';
+    echo '<h2>Origen de los fondos devueltos</h2>';
+    echo '<ul class="datos-lista">';
+    echo '<li><b>Desde la terminal (efectivo):</b> $' . htmlspecialchars($c['cubierto_terminal_efectivo']) . '</li>';
+    echo '<li><b>Desde la terminal (banco):</b> $' . htmlspecialchars($c['cubierto_terminal_banco']) . '</li>';
+    echo '<li><b>Desde el dueño (efectivo):</b> $' . htmlspecialchars($c['cubierto_dueno_efectivo']) . '</li>';
+    echo '<li><b>Desde el dueño (banco):</b> $' . htmlspecialchars($c['cubierto_dueno_banco']) . '</li>';
+    echo '</ul>';
+    echo '</div>';
+
+    echo $no_cubierto_html;
 
     echo '</div>'; // cierre informe
 

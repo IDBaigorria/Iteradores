@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.54)
+ * ## Estructura de nodos actual (v1.5piloto.55)
  *
  * ### Nodos raíz especiales
  *
@@ -55,6 +55,8 @@
  * |                 | └─ Enlaces salientes: utiliza árbol (hmi/hd) para almacenar las rendiciones. Ver Nodo Rendición. |
  * | `liquidaciones` | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
  * |                 | └─ Enlaces salientes: utiliza árbol (hmi/hd) para almacenar las liquidaciones. Ver Nodo Liquidación. |
+ * | `cancelaciones` | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
+ * |                 | └─ Enlaces salientes: utiliza árbol (hmi/hd) para almacenar las cancelaciones. Ver Nodo Cancelación. |
  * | `venta_actual`  | Enlace a un nodo venta actual (solo para `terminal`). Si no existe venta activa, el enlace no existe. |
  *
  * **Observaciones:**
@@ -493,7 +495,8 @@
  *   |                        | └─ Cada hijo: `terminal`, `terminal_nombre_real`, `total`, `efectivo`, `banco`, `cantidad_cupones`. |
  *   | `detalle_cupones`      | Nodo contenedor con hijos en lista árbol (hmi/hd).    |
  *   |                        | └─ Cada hijo: `venta_id`, `numero_cupon`, `monto`, `metodo_pago`, `terminal`, `terminal_nombre_real`. |
- *   | `desactualizada`       | Nodo con dato string: motivo de desactualización. **Opcional**. Solo existe si se canceló una venta con cupones rendidos en esta rendición. |
+ *   | `desactualizada`       | Nodo contenedor con hijos en lista árbol (hmi/hd). **Opcional**. Solo existe si se canceló alguna venta con cupones rendidos en esta rendición. |
+ *   |                        | └─ Cada hijo (Nodo Ajuste): `id_cancelacion`, `id_venta`, `fecha_hora`, `motivo`, `terminal`, `terminal_nombre_real`, `monto_terminal_efectivo`, `monto_terminal_banco`, `monto_dueno_efectivo`, `monto_dueno_banco`, `monto_no_cubierto_efectivo`, `monto_no_cubierto_banco`, `aceptada_en` (opcional). |
  *
  * **Nota (enlace `rendido` en cupones):** Al confirmar la rendición,
  * cada cupón incluido recibe un enlace `rendido` que apunta al Nodo
@@ -549,6 +552,52 @@
  * código y rango de fecha. El orden por defecto es el más reciente
  * primero.
  *
+ * ### Nodo Cancelación (dato del nodo: `id_cancelacion`)
+ *
+ * A partir de v1.5piloto.55. Cuelga del contenedor `cancelaciones` del
+ * usuario dueño, en lista tipo árbol (hmi/hd). Representa un hecho
+ * inmutable: la cancelación de una compra, con el ajuste de saldos
+ * que eso implicó, incluso si parte del dinero ya había sido rendido
+ * o liquidado por el dueño.
+ *
+ * - Dato del nodo: `id_cancelacion` (string único, ej. `cancelacion_1747526400`).
+ * - Enlaces salientes:
+ *   | Enlace                       | Nodo destino y dato esperado                          |
+ *   |------------------------------|-------------------------------------------------------|
+ *   | `dueno`                      | Nodo con dato string: nombre de usuario del dueño.    |
+ *   | `id_venta`                   | Nodo con dato string: ID de la venta cancelada.       |
+ *   | `fecha_hora`                 | Nodo con dato string `"DD/MM/YYYY HH:MM"`.            |
+ *   | `motivo`                     | Nodo con dato string. **Opcional**.                   |
+ *   | `terminal`                   | Enlace al Nodo Usuario de la terminal.                |
+ *   | `terminal_nombre_real`       | Nodo con dato string: nombre visible de la terminal.  |
+ *   | `viaje_visible`              | Nodo con dato string: nombre visible del viaje.       |
+ *   | `micro_visible`              | Nodo con dato string: nombre visible del micro.       |
+ *   | `comprador_dni`              | Nodo con dato string: DNI del comprador.              |
+ *   | `comprador_nombre_completo`  | Nodo con dato string: nombre completo del comprador.  |
+ *   | `total_venta`                | Nodo con dato string numérico: total original de la venta. |
+ *   | `devuelto_efectivo`          | Nodo con dato string numérico: devuelto al comprador en efectivo. |
+ *   | `devuelto_banco`             | Nodo con dato string numérico: devuelto al comprador por transferencia. |
+ *   | `cubierto_terminal_efectivo` | Nodo con dato string numérico: parte del devuelto que salió de la terminal en efectivo. |
+ *   | `cubierto_terminal_banco`    | Nodo con dato string numérico: parte del devuelto que salió de la terminal en banco. |
+ *   | `cubierto_dueno_efectivo`    | Nodo con dato string numérico: parte del devuelto que salió del dueño en efectivo. |
+ *   | `cubierto_dueno_banco`       | Nodo con dato string numérico: parte del devuelto que salió del dueño en banco. |
+ *   | `no_cubierto_efectivo`       | Nodo con dato string numérico: parte del devuelto que no pudo cubrirse (el dueño no tenía saldo). |
+ *   | `no_cubierto_banco`          | Nodo con dato string numérico: idem, en banco. |
+ *   | `asientos_liberados`         | Nodo con dato string numérico: cantidad de asientos liberados. |
+ *
+ * **Nota (ajuste al cancelar):** Al cancelar una venta se calcula cuánto
+ * del total devuelto estaba en la terminal (cupones sin rendir) y cuánto
+ * ya había sido rendido (cupones con enlace `rendido`). La parte en la
+ * terminal se descuenta de la terminal. La parte rendida se descuenta
+ * del dueño con `max(0, ...)`, y lo que no alcance a cubrirse se
+ * registra en `no_cubierto_*`.
+ *
+ * **Nota (rendiciones afectadas):** Cada rendición que incluía cupones
+ * de la venta cancelada recibe un ajuste nuevo en su enlace
+ * `desactualizada` (que pasa de string a contenedor con hijos). El
+ * dueño puede marcar cada ajuste como aceptado con la subacción
+ * `rendiciones/aceptar_ajuste`, que escribe `aceptada_en`.
+ *
  * ### Nodo Sesión (dato del nodo: `""`)
  *
  * | Enlace      | Nodo destino y dato esperado                          |
@@ -588,7 +637,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.54
+ * @version   1.5piloto.55
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.51
+ * @version   1.5piloto.55
  */
 
 
@@ -944,21 +944,14 @@ function obtener_info_cancelacion(string $id_venta): array {
         $terminal_visible = $nodo_terminal->adyacente('nombre_real')->dato();
     }
 
-    // Cupones rendidos: si los hay, se avisa en el modal de cancelación.
-    $cupones_rendidos = 0;
-    $contenedor_cupones_info = $nodo_venta->adyacente('cupones');
-    if ($contenedor_cupones_info) {
-        $cupon_info = hmi($contenedor_cupones_info);
-        $seg_info = 0;
-        while ($cupon_info && $seg_info < 200) {
-            $seg_info++;
-            $estado_info = $cupon_info->adyacente('estado') ? $cupon_info->adyacente('estado')->dato() : '';
-            if ($estado_info === 'pagado' && $cupon_info->adyacente('rendido')) {
-                $cupones_rendidos++;
-            }
-            $cupon_info = hd($cupon_info);
-        }
-    }
+    // Desglose: parte en terminal vs parte ya rendida.
+    $desglose_info = _calcular_devolucion_desglosada($nodo_venta);
+    $cubierto_info = _calcular_cobertura_dueno(
+        $nombre_dueno,
+        $desglose_info['rendido_efectivo'],
+        $desglose_info['rendido_banco']
+    );
+    $cupones_rendidos = $desglose_info['cantidad_cupones_rendidos'];
 
     // Montos.
     $pagado = (float)($nodo_venta->adyacente('pagado') ? $nodo_venta->adyacente('pagado')->dato() : '0');
@@ -996,6 +989,17 @@ function obtener_info_cancelacion(string $id_venta): array {
             'total_a_devolver' => number_format($devolucion['total'], 2, '.', ''),
             'puede_cancelar' => $puede_cancelar,
             'cupones_rendidos' => $cupones_rendidos,
+            // Montos que estaban en la terminal (cupones sin rendir).
+            'en_terminal_efectivo' => number_format($desglose_info['en_terminal_efectivo'], 2, '.', ''),
+            'en_terminal_banco' => number_format($desglose_info['en_terminal_banco'], 2, '.', ''),
+            // Montos que estaban ya rendidos (cupones con enlace rendido).
+            'rendido_efectivo' => number_format($desglose_info['rendido_efectivo'], 2, '.', ''),
+            'rendido_banco' => number_format($desglose_info['rendido_banco'], 2, '.', ''),
+            // Cuánto de lo rendido puede cubrir el dueño con su saldo.
+            'cubierto_dueno_efectivo' => number_format($cubierto_info['cubierto_ef'], 2, '.', ''),
+            'cubierto_dueno_banco' => number_format($cubierto_info['cubierto_ba'], 2, '.', ''),
+            'no_cubierto_efectivo' => number_format($cubierto_info['no_cubierto_ef'], 2, '.', ''),
+            'no_cubierto_banco' => number_format($cubierto_info['no_cubierto_ba'], 2, '.', ''),
         ],
     ];
 }
@@ -1008,32 +1012,61 @@ function obtener_info_cancelacion(string $id_venta): array {
  * @param string $id_venta
  * @return array
  */
-function cancelar_venta(string $id_venta): array {
+function cancelar_venta(string $id_venta, string $motivo = ''): array {
     [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta);
     if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
 
-    // 1. Revertir montos: calcular por método y restar de la terminal.
-    $devolucion = _calcular_devolucion_venta($nodo_venta);
+    // Desglose: parte en terminal vs parte ya rendida.
+    $desglose = _calcular_devolucion_desglosada($nodo_venta);
+
+    // Cuánto del rendido puede cubrir el dueño con su saldo actual.
+    $cubierto = _calcular_cobertura_dueno(
+        $nombre_dueno,
+        $desglose['rendido_efectivo'],
+        $desglose['rendido_banco']
+    );
+
+    // 1. Revertir montos de la terminal (parte no rendida).
     $nodo_terminal = $nodo_venta->adyacente('terminal');
     if ($nodo_terminal) {
-        if ($devolucion['efectivo'] > 0) {
+        if ($desglose['en_terminal_efectivo'] > 0) {
             $nodo_ef = $nodo_terminal->adyacente('efectivo');
             if ($nodo_ef) {
-                $nuevo = max(0, (float)$nodo_ef->dato() - $devolucion['efectivo']);
+                $nuevo = max(0, (float)$nodo_ef->dato() - $desglose['en_terminal_efectivo']);
                 $nodo_ef->_dato((string)$nuevo);
             }
         }
-        if ($devolucion['banco'] > 0) {
+        if ($desglose['en_terminal_banco'] > 0) {
             $nodo_banco = $nodo_terminal->adyacente('banco');
             if ($nodo_banco) {
-                $nuevo = max(0, (float)$nodo_banco->dato() - $devolucion['banco']);
+                $nuevo = max(0, (float)$nodo_banco->dato() - $desglose['en_terminal_banco']);
                 $nodo_banco->_dato((string)$nuevo);
             }
         }
     }
 
-    // 2. Liberar asientos reales (en vehiculo_copia) y eliminar los
-    //    nodos asiento-en-venta persistentes de la lista.
+    // 1b. Revertir montos del dueño (parte rendida que puede cubrir).
+    $raiz_usuarios_c = Nodo::nodo_por_id('usuarios');
+    $nodo_dueno_c = $raiz_usuarios_c ? $raiz_usuarios_c->adyacente($nombre_dueno) : null;
+    if ($nodo_dueno_c) {
+        if ($cubierto['cubierto_ef'] > 0) {
+            $nodo_ef_d = $nodo_dueno_c->adyacente('efectivo');
+            if ($nodo_ef_d) {
+                $nuevo = max(0, (float)$nodo_ef_d->dato() - $cubierto['cubierto_ef']);
+                $nodo_ef_d->_dato((string)$nuevo);
+            }
+        }
+        if ($cubierto['cubierto_ba'] > 0) {
+            $nodo_ba_d = $nodo_dueno_c->adyacente('banco');
+            if ($nodo_ba_d) {
+                $nuevo = max(0, (float)$nodo_ba_d->dato() - $cubierto['cubierto_ba']);
+                $nodo_ba_d->_dato((string)$nuevo);
+            }
+        }
+    }
+
+    // 2. Liberar asientos reales y eliminar los asientos-en-venta.
+    $asientos_liberados = 0;
     $cabeza_asientos = $nodo_venta->adyacente('asientos');
     if ($cabeza_asientos) {
         $asiento_venta = $cabeza_asientos->adyacente('primer');
@@ -1046,26 +1079,44 @@ function cancelar_venta(string $id_venta): array {
                 $nodo_asiento_real->eliminar_adyacente('seleccionado_por');
                 $nodo_asiento_real->eliminar_adyacente('pasajero');
                 $nodo_asiento_real->eliminar_adyacente('venta');
+                $asientos_liberados++;
             }
             $asiento_venta = $asiento_venta->adyacente('siguiente');
             $seg++;
         }
-        // Eliminar la lista de asientos-en-venta persistentes.
         while ($asiento_a_borrar = eliminar_hmi($cabeza_asientos)) {
             Nodo::eliminar($asiento_a_borrar);
         }
-        // Ahora la cabeza no tiene hijos, se puede eliminar.
         $nodo_venta->eliminar_adyacente('asientos');
         Nodo::eliminar($cabeza_asientos);
     }
 
-    // Marcar rendiciones afectadas antes de borrar los cupones.
-    // Si algún cupón de esta venta ya fue rendido, la rendición queda
-    // marcada como desactualizada con el motivo. No se aborta la
-    // cancelación: es solo un aviso histórico para auditoría.
-    _marcar_rendiciones_afectadas($nodo_venta, $id_venta);
+    // 3. Crear el Nodo Cancelación ANTES de borrar cupones (necesita
+    //    leer los datos históricos de la venta).
+    $id_cancelacion = _crear_nodo_cancelacion(
+        $nombre_dueno,
+        $id_venta,
+        $motivo,
+        $nodo_venta,
+        $desglose,
+        $cubierto,
+        $asientos_liberados
+    );
 
-    // 3. Eliminar los cupones y su contenedor.
+    // 4. Agregar un ajuste a cada rendición afectada.
+    foreach ($desglose['rendiciones_afectadas'] as $nodo_rendicion) {
+        _agregar_ajuste_a_rendicion(
+            $nodo_rendicion,
+            $id_cancelacion,
+            $id_venta,
+            $motivo,
+            $nodo_terminal,
+            $desglose,
+            $cubierto
+        );
+    }
+
+    // 5. Eliminar los cupones y su contenedor.
     $contenedor_cupones = $nodo_venta->adyacente('cupones');
     if ($contenedor_cupones) {
         while ($cupon_a_borrar = eliminar_hmi($contenedor_cupones)) {
@@ -1075,7 +1126,7 @@ function cancelar_venta(string $id_venta): array {
         Nodo::eliminar($contenedor_cupones);
     }
 
-    // 4. Actualizar contadores del micro y del viaje.
+    // 6. Actualizar contadores del micro y del viaje.
     $nodo_micro = $nodo_venta->adyacente('micro');
     $nodo_viaje = $nodo_venta->adyacente('viaje');
     if ($nodo_micro) actualizar_contadores_micro($nodo_micro);
@@ -1084,7 +1135,7 @@ function cancelar_venta(string $id_venta): array {
         actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
     }
 
-    // 5. Desenlazar la venta del árbol del dueño.
+    // 7. Desenlazar la venta del árbol del dueño.
     $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
     if ($contenedor_ventas) {
         $anterior = null;
@@ -1115,17 +1166,21 @@ function cancelar_venta(string $id_venta): array {
         }
     }
 
-    // 6. Eliminar el nodo venta entero.
+    // 8. Eliminar el nodo venta entero.
     Nodo::eliminar($nodo_venta);
 
     Controlador::guardar(Conf::NOMBRE_APP);
 
+    $dev_ef_total = $desglose['en_terminal_efectivo'] + $desglose['rendido_efectivo'];
+    $dev_ba_total = $desglose['en_terminal_banco'] + $desglose['rendido_banco'];
+
     return [
         'exito' => true,
+        'id_cancelacion' => $id_cancelacion,
         'devolucion' => [
-            'efectivo' => number_format($devolucion['efectivo'], 2, '.', ''),
-            'banco' => number_format($devolucion['banco'], 2, '.', ''),
-            'total' => number_format($devolucion['total'], 2, '.', ''),
+            'efectivo' => number_format($dev_ef_total, 2, '.', ''),
+            'banco' => number_format($dev_ba_total, 2, '.', ''),
+            'total' => number_format($dev_ef_total + $dev_ba_total, 2, '.', ''),
         ],
     ];
 }
@@ -1573,6 +1628,310 @@ function _construir_cupones_derivados(Nodo $nodo_venta): array {
         ];
     }
     return $cupones;
+}
+
+/**
+ * Calcula cuánto del total devuelto al comprador estaba en la
+ * terminal (cupones pagados sin rendido) y cuánto ya había sido
+ * rendido (cupones pagados con enlace rendido).
+ *
+ * Devuelve también los IDs de las rendiciones afectadas (nodos, no
+ * solo strings) y la cantidad de cupones rendidos.
+ *
+ * @param Nodo $nodo_venta
+ * @return array
+ */
+function _calcular_devolucion_desglosada(Nodo $nodo_venta): array {
+    $metodo_venta = $nodo_venta->adyacente('metodo_pago') ? $nodo_venta->adyacente('metodo_pago')->dato() : 'efectivo';
+    $en_terminal_ef = 0.0;
+    $en_terminal_ba = 0.0;
+    $rendido_ef = 0.0;
+    $rendido_ba = 0.0;
+    $cupones_rendidos = 0;
+    $rendiciones_afectadas = []; // id_rendicion => Nodo
+
+    $contenedor = $nodo_venta->adyacente('cupones');
+    if ($contenedor) {
+        $actual = hmi($contenedor);
+        $seg = 0;
+        while ($actual && $seg < 200) {
+            $estado = $actual->adyacente('estado') ? $actual->adyacente('estado')->dato() : 'pendiente';
+            if ($estado === 'pagado') {
+                $monto = (float)($actual->adyacente('monto') ? $actual->adyacente('monto')->dato() : '0');
+                $metodo_cupon = $actual->adyacente('metodo_pago') ? $actual->adyacente('metodo_pago')->dato() : $metodo_venta;
+                $es_transf = ($metodo_cupon === 'transferencia');
+                $nodo_rend = $actual->adyacente('rendido');
+                if ($nodo_rend) {
+                    if ($es_transf) $rendido_ba += $monto;
+                    else $rendido_ef += $monto;
+                    $cupones_rendidos++;
+                    $rendiciones_afectadas[$nodo_rend->id()] = $nodo_rend;
+                } else {
+                    if ($es_transf) $en_terminal_ba += $monto;
+                    else $en_terminal_ef += $monto;
+                }
+            }
+            $actual = hd($actual);
+            $seg++;
+        }
+    } else {
+        // Venta sin contenedor de cupones: no hay enlace rendido posible.
+        $pagado = (float)($nodo_venta->adyacente('pagado') ? $nodo_venta->adyacente('pagado')->dato() : '0');
+        if ($metodo_venta === 'transferencia') $en_terminal_ba = $pagado;
+        else $en_terminal_ef = $pagado;
+    }
+
+    return [
+        'en_terminal_efectivo' => $en_terminal_ef,
+        'en_terminal_banco' => $en_terminal_ba,
+        'rendido_efectivo' => $rendido_ef,
+        'rendido_banco' => $rendido_ba,
+        'cantidad_cupones_rendidos' => $cupones_rendidos,
+        'rendiciones_afectadas' => array_values($rendiciones_afectadas),
+    ];
+}
+
+/**
+ * Calcula cuánto de un monto rendido puede cubrir el dueño con su
+ * saldo actual. Si el saldo no alcanza, la diferencia queda como
+ * "no cubierta" y se registra en el ajuste para auditoría.
+ *
+ * @param string $nombre_dueno
+ * @param float  $monto_ef
+ * @param float  $monto_ba
+ * @return array{cubierto_ef: float, cubierto_ba: float, no_cubierto_ef: float, no_cubierto_ba: float}
+ */
+function _calcular_cobertura_dueno(string $nombre_dueno, float $monto_ef, float $monto_ba): array {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return ['cubierto_ef' => 0.0, 'cubierto_ba' => 0.0, 'no_cubierto_ef' => $monto_ef, 'no_cubierto_ba' => $monto_ba];
+    $nodo = $raiz->adyacente($nombre_dueno);
+    if (!$nodo) return ['cubierto_ef' => 0.0, 'cubierto_ba' => 0.0, 'no_cubierto_ef' => $monto_ef, 'no_cubierto_ba' => $monto_ba];
+
+    $nodo_ef = $nodo->adyacente('efectivo');
+    $nodo_ba = $nodo->adyacente('banco');
+    $saldo_ef = $nodo_ef ? (float)$nodo_ef->dato() : 0.0;
+    $saldo_ba = $nodo_ba ? (float)$nodo_ba->dato() : 0.0;
+
+    $cubierto_ef = min($monto_ef, $saldo_ef);
+    $cubierto_ba = min($monto_ba, $saldo_ba);
+    return [
+        'cubierto_ef' => $cubierto_ef,
+        'cubierto_ba' => $cubierto_ba,
+        'no_cubierto_ef' => max(0.0, $monto_ef - $cubierto_ef),
+        'no_cubierto_ba' => max(0.0, $monto_ba - $cubierto_ba),
+    ];
+}
+
+/**
+ * Verifica si ya existe una cancelación con ese id en el contenedor.
+ */
+function _existe_cancelacion(Nodo $contenedor, string $id): bool {
+    $actual = hmi($contenedor);
+    $seg = 0;
+    while ($actual && $seg < 1000) {
+        if ($actual->dato() === $id) return true;
+        $actual = hd($actual);
+        $seg++;
+    }
+    return false;
+}
+
+/**
+ * Crea el Nodo Cancelación y lo enlaza al contenedor del dueño.
+ * Devuelve el id_cancelacion o cadena vacía si algo falló.
+ *
+ * @param string $nombre_dueno
+ * @param string $id_venta
+ * @param string $motivo
+ * @param Nodo   $nodo_venta
+ * @param array  $desglose
+ * @param array  $cubierto
+ * @param int    $asientos_liberados
+ * @return string
+ */
+function _crear_nodo_cancelacion(string $nombre_dueno, string $id_venta, string $motivo, Nodo $nodo_venta, array $desglose, array $cubierto, int $asientos_liberados): string {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return '';
+    $nodo_dueno = $raiz->adyacente($nombre_dueno);
+    if (!$nodo_dueno) return '';
+
+    $contenedor = $nodo_dueno->adyacente('cancelaciones');
+    if (!$contenedor) {
+        $contenedor = Nodo::crear_con_dato('');
+        $nodo_dueno->_adyacente_en($contenedor, 'cancelaciones');
+    }
+
+    $id_cancelacion = 'cancelacion_' . time();
+    $intentos = 0;
+    while (_existe_cancelacion($contenedor, $id_cancelacion) && $intentos < 5) {
+        $id_cancelacion = 'cancelacion_' . time() . '_' . rand(100, 999);
+        $intentos++;
+    }
+
+    $nodo_canc = Nodo::crear_con_dato($id_cancelacion);
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato($nombre_dueno), 'dueno');
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato($id_venta), 'id_venta');
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato(date('d/m/Y H:i')), 'fecha_hora');
+    if (trim($motivo) !== '') {
+        $nodo_canc->_adyacente_en(Nodo::crear_con_dato(trim($motivo)), 'motivo');
+    }
+
+    // Datos de contexto (histórico)
+    $nodo_terminal = $nodo_venta->adyacente('terminal');
+    if ($nodo_terminal) {
+        $nodo_canc->_adyacente_en($nodo_terminal, 'terminal');
+        $nr = $nodo_terminal->adyacente('nombre_real');
+        if ($nr) $nodo_canc->_adyacente_en(Nodo::crear_con_dato($nr->dato()), 'terminal_nombre_real');
+    }
+    $nodo_viaje = $nodo_venta->adyacente('viaje');
+    if ($nodo_viaje) {
+        $vv = $nodo_viaje->adyacente('nombre') ? $nodo_viaje->adyacente('nombre')->dato() : $nodo_viaje->dato();
+        $nodo_canc->_adyacente_en(Nodo::crear_con_dato($vv), 'viaje_visible');
+    }
+    $nodo_micro = $nodo_venta->adyacente('micro');
+    if ($nodo_micro) {
+        $copia = $nodo_micro->adyacente('vehiculo_copia');
+        $mv = ($copia && $copia->adyacente('nombre')) ? $copia->adyacente('nombre')->dato() : '';
+        if ($mv !== '') $nodo_canc->_adyacente_en(Nodo::crear_con_dato($mv), 'micro_visible');
+    }
+    $nodo_comprador = $nodo_venta->adyacente('comprador');
+    if ($nodo_comprador) {
+        $nodo_canc->_adyacente_en(Nodo::crear_con_dato($nodo_comprador->dato()), 'comprador_dni');
+        $ap = $nodo_comprador->adyacente('apellido') ? $nodo_comprador->adyacente('apellido')->dato() : '';
+        $nom = $nodo_comprador->adyacente('nombres') ? $nodo_comprador->adyacente('nombres')->dato() : '';
+        $nodo_canc->_adyacente_en(Nodo::crear_con_dato(formatear_nombre_completo($ap, $nom)), 'comprador_nombre_completo');
+    }
+
+    $total_venta = $nodo_venta->adyacente('total') ? $nodo_venta->adyacente('total')->dato() : '0';
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato($total_venta), 'total_venta');
+
+    // Montos: lo devuelto al comprador (total).
+    $dev_ef = $desglose['en_terminal_efectivo'] + $desglose['rendido_efectivo'];
+    $dev_ba = $desglose['en_terminal_banco'] + $desglose['rendido_banco'];
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato(number_format($dev_ef, 2, '.', '')), 'devuelto_efectivo');
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato(number_format($dev_ba, 2, '.', '')), 'devuelto_banco');
+
+    // Cubierto por terminal (parte que estaba en la terminal).
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato(number_format($desglose['en_terminal_efectivo'], 2, '.', '')), 'cubierto_terminal_efectivo');
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato(number_format($desglose['en_terminal_banco'], 2, '.', '')), 'cubierto_terminal_banco');
+
+    // Cubierto por dueño (parte rendida que el dueño pudo cubrir).
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato(number_format($cubierto['cubierto_ef'], 2, '.', '')), 'cubierto_dueno_efectivo');
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato(number_format($cubierto['cubierto_ba'], 2, '.', '')), 'cubierto_dueno_banco');
+
+    // No cubierto (parte rendida que el dueño no pudo cubrir).
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato(number_format($cubierto['no_cubierto_ef'], 2, '.', '')), 'no_cubierto_efectivo');
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato(number_format($cubierto['no_cubierto_ba'], 2, '.', '')), 'no_cubierto_banco');
+
+    $nodo_canc->_adyacente_en(Nodo::crear_con_dato((string)$asientos_liberados), 'asientos_liberados');
+
+    _hmi($contenedor, $nodo_canc);
+    return $id_cancelacion;
+}
+
+/**
+ * Agrega un ajuste al enlace `desactualizada` de una rendición.
+ * El enlace pasa a ser un contenedor con hijos (lista árbol). Cada
+ * hijo representa una cancelación que afectó a esa rendición.
+ *
+ * @param Nodo   $nodo_rendicion
+ * @param string $id_cancelacion
+ * @param string $id_venta
+ * @param string $motivo
+ * @param Nodo|null $nodo_terminal
+ * @param array  $desglose
+ * @param array  $cubierto
+ * @return void
+ */
+function _agregar_ajuste_a_rendicion(Nodo $nodo_rendicion, string $id_cancelacion, string $id_venta, string $motivo, $nodo_terminal, array $desglose, array $cubierto): void {
+    $contenedor = $nodo_rendicion->adyacente('desactualizada');
+    if (!$contenedor) {
+        $contenedor = Nodo::crear_con_dato('');
+        $nodo_rendicion->_adyacente_en($contenedor, 'desactualizada');
+    }
+
+    $ajuste = Nodo::crear_con_dato('');
+    $ajuste->_adyacente_en(Nodo::crear_con_dato($id_cancelacion), 'id_cancelacion');
+    $ajuste->_adyacente_en(Nodo::crear_con_dato($id_venta), 'id_venta');
+    $ajuste->_adyacente_en(Nodo::crear_con_dato(date('d/m/Y H:i')), 'fecha_hora');
+    if (trim($motivo) !== '') {
+        $ajuste->_adyacente_en(Nodo::crear_con_dato(trim($motivo)), 'motivo');
+    }
+    if ($nodo_terminal) {
+        $ajuste->_adyacente_en(Nodo::crear_con_dato($nodo_terminal->dato()), 'terminal');
+        $nr = $nodo_terminal->adyacente('nombre_real');
+        if ($nr) $ajuste->_adyacente_en(Nodo::crear_con_dato($nr->dato()), 'terminal_nombre_real');
+    }
+
+    $ajuste->_adyacente_en(Nodo::crear_con_dato(number_format($desglose['en_terminal_efectivo'], 2, '.', '')), 'monto_terminal_efectivo');
+    $ajuste->_adyacente_en(Nodo::crear_con_dato(number_format($desglose['en_terminal_banco'], 2, '.', '')), 'monto_terminal_banco');
+    $ajuste->_adyacente_en(Nodo::crear_con_dato(number_format($cubierto['cubierto_ef'], 2, '.', '')), 'monto_dueno_efectivo');
+    $ajuste->_adyacente_en(Nodo::crear_con_dato(number_format($cubierto['cubierto_ba'], 2, '.', '')), 'monto_dueno_banco');
+    $ajuste->_adyacente_en(Nodo::crear_con_dato(number_format($cubierto['no_cubierto_ef'], 2, '.', '')), 'monto_no_cubierto_efectivo');
+    $ajuste->_adyacente_en(Nodo::crear_con_dato(number_format($cubierto['no_cubierto_ba'], 2, '.', '')), 'monto_no_cubierto_banco');
+
+    _hmi($contenedor, $ajuste);
+}
+
+/**
+ * Busca una cancelación por su id en todos los dueños.
+ *
+ * @param string $id_cancelacion
+ * @return array|null
+ */
+function obtener_cancelacion_por_id(string $id_cancelacion): ?array {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return null;
+    foreach ($raiz->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nivel = $nodo_dueno->adyacente('nivel');
+        if (!$nivel || $nivel->dato() !== 'dueno') continue;
+        $cont = $nodo_dueno->adyacente('cancelaciones');
+        if (!$cont) continue;
+        $actual = hmi($cont);
+        $seg = 0;
+        while ($actual && $seg < 2000) {
+            $seg++;
+            if ($actual->dato() === $id_cancelacion) {
+                return formatear_cancelacion_completa($actual);
+            }
+            $actual = hd($actual);
+        }
+    }
+    return null;
+}
+
+/**
+ * Formatea el nodo Cancelación en un array plano para el frontend
+ * y para la impresión.
+ *
+ * @param Nodo $nodo_canc
+ * @return array
+ */
+function formatear_cancelacion_completa(Nodo $nodo_canc): array {
+    $nd = $nodo_canc->adyacente('dueno');
+    return [
+        'id_cancelacion' => $nodo_canc->dato(),
+        'dueno' => $nd ? $nd->dato() : '',
+        'id_venta' => $nodo_canc->adyacente('id_venta') ? $nodo_canc->adyacente('id_venta')->dato() : '',
+        'fecha_hora' => $nodo_canc->adyacente('fecha_hora') ? $nodo_canc->adyacente('fecha_hora')->dato() : '',
+        'motivo' => $nodo_canc->adyacente('motivo') ? $nodo_canc->adyacente('motivo')->dato() : '',
+        'terminal' => $nodo_canc->adyacente('terminal') ? $nodo_canc->adyacente('terminal')->dato() : '',
+        'terminal_nombre_real' => $nodo_canc->adyacente('terminal_nombre_real') ? $nodo_canc->adyacente('terminal_nombre_real')->dato() : '',
+        'viaje_visible' => $nodo_canc->adyacente('viaje_visible') ? $nodo_canc->adyacente('viaje_visible')->dato() : '',
+        'micro_visible' => $nodo_canc->adyacente('micro_visible') ? $nodo_canc->adyacente('micro_visible')->dato() : '',
+        'comprador_dni' => $nodo_canc->adyacente('comprador_dni') ? $nodo_canc->adyacente('comprador_dni')->dato() : '',
+        'comprador_nombre_completo' => $nodo_canc->adyacente('comprador_nombre_completo') ? $nodo_canc->adyacente('comprador_nombre_completo')->dato() : '',
+        'total_venta' => $nodo_canc->adyacente('total_venta') ? $nodo_canc->adyacente('total_venta')->dato() : '0.00',
+        'devuelto_efectivo' => $nodo_canc->adyacente('devuelto_efectivo') ? $nodo_canc->adyacente('devuelto_efectivo')->dato() : '0.00',
+        'devuelto_banco' => $nodo_canc->adyacente('devuelto_banco') ? $nodo_canc->adyacente('devuelto_banco')->dato() : '0.00',
+        'cubierto_terminal_efectivo' => $nodo_canc->adyacente('cubierto_terminal_efectivo') ? $nodo_canc->adyacente('cubierto_terminal_efectivo')->dato() : '0.00',
+        'cubierto_terminal_banco' => $nodo_canc->adyacente('cubierto_terminal_banco') ? $nodo_canc->adyacente('cubierto_terminal_banco')->dato() : '0.00',
+        'cubierto_dueno_efectivo' => $nodo_canc->adyacente('cubierto_dueno_efectivo') ? $nodo_canc->adyacente('cubierto_dueno_efectivo')->dato() : '0.00',
+        'cubierto_dueno_banco' => $nodo_canc->adyacente('cubierto_dueno_banco') ? $nodo_canc->adyacente('cubierto_dueno_banco')->dato() : '0.00',
+        'no_cubierto_efectivo' => $nodo_canc->adyacente('no_cubierto_efectivo') ? $nodo_canc->adyacente('no_cubierto_efectivo')->dato() : '0.00',
+        'no_cubierto_banco' => $nodo_canc->adyacente('no_cubierto_banco') ? $nodo_canc->adyacente('no_cubierto_banco')->dato() : '0.00',
+        'asientos_liberados' => $nodo_canc->adyacente('asientos_liberados') ? $nodo_canc->adyacente('asientos_liberados')->dato() : '0',
+    ];
 }
 
 /**

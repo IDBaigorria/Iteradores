@@ -13,7 +13,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.50
- * @version   1.5piloto.54
+ * @version   1.5piloto.55
  */
 
 use Iteradores\Nodos\Nodo;
@@ -551,6 +551,71 @@ function _fecha_rendicion_a_iso(string $fecha_visible): string {
  * @param Nodo $nodo_rendicion
  * @return array
  */
+/**
+ * Lee los ajustes de una rendición desde su enlace `desactualizada`.
+ *
+ * Acepta la estructura nueva (contenedor con hijos en lista árbol)
+ * y un fallback para la estructura vieja (string suelto).
+ *
+ * @param Nodo $nodo_rendicion
+ * @return array
+ */
+function _leer_ajustes_rendicion(Nodo $nodo_rendicion): array {
+    $ajustes = [];
+    $contenedor = $nodo_rendicion->adyacente('desactualizada');
+    if (!$contenedor) return $ajustes;
+
+    $hijo = hmi($contenedor);
+    if (!$hijo) {
+        // Fallback: string viejo. Devolver un ajuste sin id_cancelacion.
+        $motivo = $contenedor->dato();
+        if ($motivo !== '') {
+            $ajustes[] = [
+                'id_cancelacion' => '',
+                'id_venta' => '',
+                'fecha_hora' => '',
+                'motivo' => $motivo,
+                'terminal' => '',
+                'terminal_nombre_real' => '',
+                'monto_terminal_efectivo' => '0.00',
+                'monto_terminal_banco' => '0.00',
+                'monto_dueno_efectivo' => '0.00',
+                'monto_dueno_banco' => '0.00',
+                'monto_no_cubierto_efectivo' => '0.00',
+                'monto_no_cubierto_banco' => '0.00',
+                'aceptada_en' => '',
+                'aceptada' => false,
+            ];
+        }
+        return $ajustes;
+    }
+
+    $actual = $hijo;
+    $seg = 0;
+    while ($actual && $seg < 500) {
+        $seg++;
+        $ac = $actual->adyacente('aceptada_en');
+        $ajustes[] = [
+            'id_cancelacion' => $actual->adyacente('id_cancelacion') ? $actual->adyacente('id_cancelacion')->dato() : '',
+            'id_venta' => $actual->adyacente('id_venta') ? $actual->adyacente('id_venta')->dato() : '',
+            'fecha_hora' => $actual->adyacente('fecha_hora') ? $actual->adyacente('fecha_hora')->dato() : '',
+            'motivo' => $actual->adyacente('motivo') ? $actual->adyacente('motivo')->dato() : '',
+            'terminal' => $actual->adyacente('terminal') ? $actual->adyacente('terminal')->dato() : '',
+            'terminal_nombre_real' => $actual->adyacente('terminal_nombre_real') ? $actual->adyacente('terminal_nombre_real')->dato() : '',
+            'monto_terminal_efectivo' => $actual->adyacente('monto_terminal_efectivo') ? $actual->adyacente('monto_terminal_efectivo')->dato() : '0.00',
+            'monto_terminal_banco' => $actual->adyacente('monto_terminal_banco') ? $actual->adyacente('monto_terminal_banco')->dato() : '0.00',
+            'monto_dueno_efectivo' => $actual->adyacente('monto_dueno_efectivo') ? $actual->adyacente('monto_dueno_efectivo')->dato() : '0.00',
+            'monto_dueno_banco' => $actual->adyacente('monto_dueno_banco') ? $actual->adyacente('monto_dueno_banco')->dato() : '0.00',
+            'monto_no_cubierto_efectivo' => $actual->adyacente('monto_no_cubierto_efectivo') ? $actual->adyacente('monto_no_cubierto_efectivo')->dato() : '0.00',
+            'monto_no_cubierto_banco' => $actual->adyacente('monto_no_cubierto_banco') ? $actual->adyacente('monto_no_cubierto_banco')->dato() : '0.00',
+            'aceptada_en' => $ac ? $ac->dato() : '',
+            'aceptada' => ($ac !== null),
+        ];
+        $actual = hd($actual);
+    }
+    return $ajustes;
+}
+
 function formatear_rendicion_resumida(Nodo $nodo_rendicion): array {
     $id_rendicion = $nodo_rendicion->dato();
     $nodo_fecha = $nodo_rendicion->adyacente('fecha_hora');
@@ -571,9 +636,15 @@ function formatear_rendicion_resumida(Nodo $nodo_rendicion): array {
         }
     }
 
-    $nodo_desact = $nodo_rendicion->adyacente('desactualizada');
-    $desactualizada = ($nodo_desact !== null);
-    $motivo = $nodo_desact ? $nodo_desact->dato() : '';
+    $ajustes = _leer_ajustes_rendicion($nodo_rendicion);
+    $desactualizada = !empty($ajustes);
+    $pendiente_aceptar = false;
+    $motivos = [];
+    foreach ($ajustes as $aj) {
+        if (!$aj['aceptada']) $pendiente_aceptar = true;
+        if ($aj['motivo'] !== '') $motivos[] = $aj['motivo'];
+    }
+    $motivo = implode('; ', $motivos);
 
     $nodo_dueno = $nodo_rendicion->adyacente('dueno');
     $nombre_dueno = $nodo_dueno ? $nodo_dueno->dato() : '';
@@ -591,6 +662,8 @@ function formatear_rendicion_resumida(Nodo $nodo_rendicion): array {
         'terminales' => $terminales,
         'desactualizada' => $desactualizada,
         'motivo_desactualizada' => $motivo,
+        'ajustes' => $ajustes,
+        'pendiente_aceptar' => $pendiente_aceptar,
     ];
 }
 
@@ -646,6 +719,61 @@ function formatear_rendicion_completa(Nodo $nodo_rendicion): array {
     $datos['detalle_terminales'] = $detalle_terminales;
     $datos['detalle_cupones'] = $detalle_cupones;
     return $datos;
+}
+
+/**
+ * Marca un ajuste como aceptado por el dueño. No modifica saldos
+ * (ya se ajustaron al cancelar la venta). Solo agrega el enlace
+ * `aceptada_en` en el nodo del ajuste.
+ *
+ * @param string $id_rendicion
+ * @param string $id_cancelacion
+ * @return array
+ */
+function aceptar_ajuste_rendicion(string $id_rendicion, string $id_cancelacion): array {
+    if ($id_rendicion === '' || $id_cancelacion === '') {
+        return ['exito' => false, 'error' => 'Parámetros incompletos'];
+    }
+
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return ['exito' => false, 'error' => 'No hay usuarios'];
+
+    $nodo_rendicion = null;
+    foreach ($raiz->adyacentes() as $nd => $nodo_dueno) {
+        $nivel = $nodo_dueno->adyacente('nivel');
+        if (!$nivel || $nivel->dato() !== 'dueno') continue;
+        $cont = $nodo_dueno->adyacente('rendiciones');
+        if (!$cont) continue;
+        $actual = hmi($cont);
+        $seg = 0;
+        while ($actual && $seg < 2000) {
+            $seg++;
+            if ($actual->dato() === $id_rendicion) { $nodo_rendicion = $actual; break 2; }
+            $actual = hd($actual);
+        }
+    }
+    if (!$nodo_rendicion) return ['exito' => false, 'error' => 'Rendición no encontrada'];
+
+    $contenedor = $nodo_rendicion->adyacente('desactualizada');
+    if (!$contenedor) return ['exito' => false, 'error' => 'La rendición no tiene ajustes'];
+
+    $ajuste = null;
+    $actual = hmi($contenedor);
+    $seg = 0;
+    while ($actual && $seg < 500) {
+        $seg++;
+        $id_c = $actual->adyacente('id_cancelacion');
+        if ($id_c && $id_c->dato() === $id_cancelacion) { $ajuste = $actual; break; }
+        $actual = hd($actual);
+    }
+    if (!$ajuste) return ['exito' => false, 'error' => 'Ajuste no encontrado'];
+
+    $acept = $ajuste->adyacente('aceptada_en');
+    if ($acept) return ['exito' => false, 'error' => 'Este ajuste ya fue aceptado'];
+    $ajuste->_adyacente_en(Nodo::crear_con_dato(date('d/m/Y H:i')), 'aceptada_en');
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+    return ['exito' => true];
 }
 
 /**

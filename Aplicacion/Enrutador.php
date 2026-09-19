@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.54
+ * @version   1.5piloto.55
  */
 
 use Iteradores\Nodos\Nodo;
@@ -618,10 +618,11 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
                 case 'cancelar':
                     $id_venta = $post['id_venta'] ?? '';
+                    $motivo = $post['motivo'] ?? '';
                     if (empty($id_venta)) {
                         responder_json(['exito' => false, 'error' => 'ID de venta no especificado']);
                     }
-                    $resultado = cancelar_venta($id_venta);
+                    $resultado = cancelar_venta($id_venta, $motivo);
                     responder_json($resultado);
                     break;
                 case 'pagar_cupon':
@@ -812,6 +813,13 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     break;
 
+                case 'aceptar_ajuste':
+                    $id_rendicion = $post['id_rendicion'] ?? '';
+                    $id_cancelacion = $post['id_cancelacion'] ?? '';
+                    $resultado = aceptar_ajuste_rendicion($id_rendicion, $id_cancelacion);
+                    responder_json($resultado);
+                    break;
+
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de rendiciones no válida']);
             }
@@ -870,6 +878,26 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de liquidaciones no válida']);
+            }
+            break;
+
+        case 'cancelaciones':
+            switch ($subaccion) {
+                case 'obtener':
+                    $id_cancelacion = $post['id_cancelacion'] ?? '';
+                    if (empty($id_cancelacion)) {
+                        responder_json(['exito' => false, 'error' => 'ID de cancelación no especificado']);
+                    }
+                    $canc = obtener_cancelacion_por_id($id_cancelacion);
+                    if ($canc) {
+                        responder_json(['exito' => true, 'cancelacion' => $canc]);
+                    } else {
+                        responder_json(['exito' => false, 'error' => 'Cancelación no encontrada']);
+                    }
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de cancelaciones no válida']);
             }
             break;
 

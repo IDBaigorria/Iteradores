@@ -2,9 +2,9 @@
 /**
  * Aplicador de cambios automáticos — Proyecto Iteradores + Pasajes.
  *
- * v1.5piloto.54d: ajustes del flujo de liquidación.
- * - Modal de detalle de liquidación más angosto (560px).
- * - Botón "Usar máximo" en el modal de liquidar.
+ * v1.5piloto.55c: cartel de ubicación del dinero en el modal de cancelar
+ * venta. Ahora contempla los 4 lugares posibles: efectivo/banco en la
+ * terminal y efectivo/banco ya rendidos al dueño.
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -23,133 +23,86 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
     // ============================================================
-    // 1. liquidaciones.js: bump
+    // 1. ventas.js: bump
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/liquidaciones.js',
-        'descripcion' => 'liquidaciones.js: bump @version a 1.5piloto.54d',
+        'archivo' => 'Aplicacion/ventas.js',
+        'descripcion' => 'ventas.js: bump @version a 1.5piloto.55c',
         'buscar' => [
-            ' * @version 1.5piloto.54c',
+            ' * @version 1.5piloto.55',
         ],
         'reemplazar' => [
-            ' * @version 1.5piloto.54d',
+            ' * @version 1.5piloto.55c',
         ],
     ],
 
     // ============================================================
-    // 2. liquidaciones.js: modal de detalle más angosto
+    // 2. ventas.js: reemplazar el bloque de ubicación
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/liquidaciones.js',
-        'descripcion' => 'liquidaciones.js: achicar modal de detalle de liquidación',
+        'archivo' => 'Aplicacion/ventas.js',
+        'descripcion' => 'ventas.js: ubicación del dinero según dónde está cada peso',
         'buscar' => [
-            '    abrir_modal_generico(\'Detalle de liquidación\', html);',
-            '',
-            '    const cont = document.getElementById(\'modal_generico_contenido\');',
-            '    cont.querySelector(\'#btn_cerrar_detalle_liquidacion\').addEventListener(\'click\', cerrar_modal_generico);',
+            '        // Ubicación: texto simple. Si hay un solo método, mencionarlo.',
+            '        let ubicacion = \'\';',
+            '        if (efvo > 0.001 && banco <= 0.001) {',
+            '            ubicacion = `El dinero está en efectivo en la terminal <b>${info.terminal_visible}</b>.`;',
+            '        } else if (banco > 0.001 && efvo <= 0.001) {',
+            '            ubicacion = `El dinero está en el banco de la terminal <b>${info.terminal_visible}</b>.`;',
+            '        } else {',
+            '            ubicacion = `El dinero está en la terminal <b>${info.terminal_visible}</b>.`;',
+            '        }',
         ],
         'reemplazar' => [
-            '    abrir_modal_generico(\'Detalle de liquidación\', html);',
+            '        // Ubicación: se arma una lista de fragmentos según dónde está',
+            '        // cada peso. Puede haber plata en 4 lugares distintos: efectivo',
+            '        // o banco, en la terminal o ya rendidos al dueño.',
+            '        const en_term_ef = parseFloat(info.en_terminal_efectivo || \'0\');',
+            '        const en_term_ba = parseFloat(info.en_terminal_banco || \'0\');',
+            '        const en_dueno_ef = parseFloat(info.cubierto_dueno_efectivo || \'0\');',
+            '        const en_dueno_ba = parseFloat(info.cubierto_dueno_banco || \'0\');',
+            '        const no_cub_ef = parseFloat(info.no_cubierto_efectivo || \'0\');',
+            '        const no_cub_ba = parseFloat(info.no_cubierto_banco || \'0\');',
             '',
-            '    // El detalle de liquidación tiene menos contenido que otros modales,',
-            '    // así que se achica el ancho.',
-            '    const contentEl = document.querySelector(\'#modal_generico .modal-content\');',
-            '    if (contentEl) {',
-            '        contentEl.style.maxWidth = \'560px\';',
-            '        contentEl.style.width = \'560px\';',
-            '    }',
+            '        const partes_ubicacion = [];',
+            '        if (en_term_ef > 0.001) partes_ubicacion.push(`efectivo en la terminal <b>${info.terminal_visible}</b>`);',
+            '        if (en_term_ba > 0.001) partes_ubicacion.push(`banco en la terminal <b>${info.terminal_visible}</b>`);',
+            '        if (en_dueno_ef > 0.001) partes_ubicacion.push(`efectivo ya rendido al dueño`);',
+            '        if (en_dueno_ba > 0.001) partes_ubicacion.push(`banco ya rendido al dueño`);',
             '',
-            '    const cont = document.getElementById(\'modal_generico_contenido\');',
-            '    cont.querySelector(\'#btn_cerrar_detalle_liquidacion\').addEventListener(\'click\', cerrar_modal_generico);',
+            '        let ubicacion = \'\';',
+            '        if (partes_ubicacion.length === 0) {',
+            '            ubicacion = \'No hay saldo para cubrir la devolución.\';',
+            '        } else if (partes_ubicacion.length === 1) {',
+            '            ubicacion = `El dinero está en ${partes_ubicacion[0]}.`;',
+            '        } else {',
+            '            ubicacion = `El dinero está distribuido así: ${partes_ubicacion.join(\' · \')}.`;',
+            '        }',
+            '',
+            '        // Aviso si algo no se pudo cubrir (el dueño no tenía saldo).',
+            '        if (no_cub_ef > 0.001 || no_cub_ba > 0.001) {',
+            '            const partes_falta = [];',
+            '            if (no_cub_ef > 0.001) partes_falta.push(`$${_formatear_monto_rendicion(no_cub_ef)} en efectivo`);',
+            '            if (no_cub_ba > 0.001) partes_falta.push(`$${_formatear_monto_rendicion(no_cub_ba)} en banco`);',
+            '            ubicacion += ` <b>Atención:</b> el dueño no tenía saldo suficiente para cubrir ${partes_falta.join(\' y \')}.`;',
+            '        }',
         ],
     ],
 
     // ============================================================
-    // 3. liquidaciones.js: botón "Usar máximo" en el modal de liquidar
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/liquidaciones.js',
-        'descripcion' => 'liquidaciones.js: agregar botón Usar máximo',
-        'buscar' => [
-            '            <div class="rendicion-seccion">',
-            '                <div class="rendicion-seccion-titulo">Monto a extraer</div>',
-            '                <div class="form-grid">',
-            '                    <div class="field">',
-            '                        <label>De efectivo (máx $${_formatear_monto_rendiciones(ef)})</label>',
-            '                        <input type="number" id="liquidacion_monto_efectivo" step="1000" min="0" max="${ef.toFixed(2)}" value="" placeholder="0.00">',
-            '                    </div>',
-            '                    <div class="field">',
-            '                        <label>Del banco (máx $${_formatear_monto_rendiciones(ba)})</label>',
-            '                        <input type="number" id="liquidacion_monto_banco" step="1000" min="0" max="${ba.toFixed(2)}" value="" placeholder="0.00">',
-            '                    </div>',
-            '                </div>',
-            '            </div>',
-        ],
-        'reemplazar' => [
-            '            <div class="rendicion-seccion">',
-            '                <div class="rendicion-seccion-titulo" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">',
-            '                    <span>Monto a extraer</span>',
-            '                    <button type="button" class="btn" id="liquidacion_usar_maximo" style="font-size:12px; padding:4px 10px;">Usar máximo</button>',
-            '                </div>',
-            '                <div class="form-grid">',
-            '                    <div class="field">',
-            '                        <label>De efectivo (máx $${_formatear_monto_rendiciones(ef)})</label>',
-            '                        <input type="number" id="liquidacion_monto_efectivo" step="1000" min="0" max="${ef.toFixed(2)}" value="" placeholder="0.00">',
-            '                    </div>',
-            '                    <div class="field">',
-            '                        <label>Del banco (máx $${_formatear_monto_rendiciones(ba)})</label>',
-            '                        <input type="number" id="liquidacion_monto_banco" step="1000" min="0" max="${ba.toFixed(2)}" value="" placeholder="0.00">',
-            '                    </div>',
-            '                </div>',
-            '            </div>',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/liquidaciones.js',
-        'descripcion' => 'liquidaciones.js: listener del botón Usar máximo',
-        'buscar' => [
-            '    const actualizar = () => _actualizar_totales_liquidacion();',
-            '    input_ef.addEventListener(\'input\', actualizar);',
-            '    input_ba.addEventListener(\'input\', actualizar);',
-            '',
-            '    cont.querySelector(\'#btn_cerrar_liquidacion_modal\').addEventListener(\'click\', cerrar_modal_generico);',
-        ],
-        'reemplazar' => [
-            '    const actualizar = () => _actualizar_totales_liquidacion();',
-            '    input_ef.addEventListener(\'input\', actualizar);',
-            '    input_ba.addEventListener(\'input\', actualizar);',
-            '',
-            '    // Botón "Usar máximo": llena cada input con su tope respectivo.',
-            '    const btn_max = cont.querySelector(\'#liquidacion_usar_maximo\');',
-            '    if (btn_max) {',
-            '        btn_max.addEventListener(\'click\', () => {',
-            '            input_ef.value = ef.toFixed(2);',
-            '            input_ba.value = ba.toFixed(2);',
-            '            _actualizar_totales_liquidacion();',
-            '        });',
-            '    }',
-            '',
-            '    cont.querySelector(\'#btn_cerrar_liquidacion_modal\').addEventListener(\'click\', cerrar_modal_generico);',
-        ],
-    ],
-
-    // ============================================================
-    // 4. aplicacion_GET.html: bump de liquidaciones.js
+    // 3. aplicacion_GET.html: bump de ventas.js
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'aplicacion_GET.html: bump de liquidaciones.js a 54d',
+        'descripcion' => 'aplicacion_GET.html: bump de ventas.js a 55c',
         'buscar' => [
-            '<script src="Aplicacion/liquidaciones.js?v=1.5piloto.54c"></script>',
+            '<script src="Aplicacion/ventas.js?v=1.5piloto.55"></script>',
         ],
         'reemplazar' => [
-            '<script src="Aplicacion/liquidaciones.js?v=1.5piloto.54d"></script>',
+            '<script src="Aplicacion/ventas.js?v=1.5piloto.55c"></script>',
         ],
     ],
 ];

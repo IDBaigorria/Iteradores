@@ -216,3 +216,107 @@
     font-weight: 700;
 }
 
+/* ===== v1.5piloto.55: aviso de rendiciones desactualizadas y ajustes ===== */
+
+/* Cartel de notificación arriba de la tabla de rendiciones. */
+.aviso-rendiciones-desactualizadas {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    color: #856404;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+.aviso-rendiciones-texto strong {
+    display: inline;
+}
+.aviso-rendiciones-detalle {
+    margin-top: 4px;
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+/* Badge de ajustada (gris). */
+.badge-ajustada {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    background: #ececec;
+    color: #666;
+}
+
+/* Lista de ajustes en el modal de detalle. */
+.ajustes-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ajuste-rendicion-bloque {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    background: #fffbe6;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ajuste-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.ajuste-header strong {
+    color: var(--primary-dark);
+    font-size: 14px;
+}
+.ajuste-fecha {
+    color: var(--muted);
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.ajuste-motivo {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+    padding: 6px 10px;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid #f0e5b8;
+}
+
+.ajuste-lineas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    font-size: 13px;
+}
+.ajuste-linea {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+}
+.ajuste-linea span {
+    color: var(--muted);
+}
+.ajuste-linea b {
+    color: var(--text);
+    font-weight: 700;
+}
+.ajuste-linea-alerta b {
+    color: #b03a2e;
+}
+
+.ajuste-acciones {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+

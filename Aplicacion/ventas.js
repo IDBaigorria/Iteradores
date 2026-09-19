@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.53
+ * @version 1.5piloto.55c
  */
 
 // (aplicar_cambios.php funcionó)
@@ -1712,14 +1712,37 @@ async function cancelar_venta(id_venta) {
             ? `<div class="cancelacion-devolucion-desglose">${partes.join('<span class="cancelacion-sep">·</span>')}</div>`
             : '';
 
-        // Ubicación: texto simple. Si hay un solo método, mencionarlo.
+        // Ubicación: se arma una lista de fragmentos según dónde está
+        // cada peso. Puede haber plata en 4 lugares distintos: efectivo
+        // o banco, en la terminal o ya rendidos al dueño.
+        const en_term_ef = parseFloat(info.en_terminal_efectivo || '0');
+        const en_term_ba = parseFloat(info.en_terminal_banco || '0');
+        const en_dueno_ef = parseFloat(info.cubierto_dueno_efectivo || '0');
+        const en_dueno_ba = parseFloat(info.cubierto_dueno_banco || '0');
+        const no_cub_ef = parseFloat(info.no_cubierto_efectivo || '0');
+        const no_cub_ba = parseFloat(info.no_cubierto_banco || '0');
+
+        const partes_ubicacion = [];
+        if (en_term_ef > 0.001) partes_ubicacion.push(`efectivo en la terminal <b>${info.terminal_visible}</b>`);
+        if (en_term_ba > 0.001) partes_ubicacion.push(`banco en la terminal <b>${info.terminal_visible}</b>`);
+        if (en_dueno_ef > 0.001) partes_ubicacion.push(`efectivo ya rendido al dueño`);
+        if (en_dueno_ba > 0.001) partes_ubicacion.push(`banco ya rendido al dueño`);
+
         let ubicacion = '';
-        if (efvo > 0.001 && banco <= 0.001) {
-            ubicacion = `El dinero está en efectivo en la terminal <b>${info.terminal_visible}</b>.`;
-        } else if (banco > 0.001 && efvo <= 0.001) {
-            ubicacion = `El dinero está en el banco de la terminal <b>${info.terminal_visible}</b>.`;
+        if (partes_ubicacion.length === 0) {
+            ubicacion = 'No hay saldo para cubrir la devolución.';
+        } else if (partes_ubicacion.length === 1) {
+            ubicacion = `El dinero está en ${partes_ubicacion[0]}.`;
         } else {
-            ubicacion = `El dinero está en la terminal <b>${info.terminal_visible}</b>.`;
+            ubicacion = `El dinero está distribuido así: ${partes_ubicacion.join(' · ')}.`;
+        }
+
+        // Aviso si algo no se pudo cubrir (el dueño no tenía saldo).
+        if (no_cub_ef > 0.001 || no_cub_ba > 0.001) {
+            const partes_falta = [];
+            if (no_cub_ef > 0.001) partes_falta.push(`$${_formatear_monto_rendicion(no_cub_ef)} en efectivo`);
+            if (no_cub_ba > 0.001) partes_falta.push(`$${_formatear_monto_rendicion(no_cub_ba)} en banco`);
+            ubicacion += ` <b>Atención:</b> el dueño no tenía saldo suficiente para cubrir ${partes_falta.join(' y ')}.`;
         }
 
         devolucion_html = `
@@ -1755,6 +1778,11 @@ async function cancelar_venta(id_venta) {
             ${devolucion_html}
             ${advertencia_html}
 
+            <div class="field">
+                <label>Motivo de la cancelación (opcional)</label>
+                <textarea id="cancelacion_motivo" rows="3" placeholder="Ej.: el pasajero se enfermó, suspendió el viaje, error de carga..."></textarea>
+            </div>
+
             <div class="cancelacion-acciones">
                 <button class="btn danger" id="btn_confirmar_cancelacion">Cancelar venta</button>
                 <button class="btn" id="btn_volver_cancelacion">Volver</button>
@@ -1763,6 +1791,13 @@ async function cancelar_venta(id_venta) {
     `;
 
     abrir_modal_generico('Cancelar venta', html);
+
+    // El modal de cancelación es más angosto que el genérico.
+    const contentEl = document.querySelector('#modal_generico .modal-content');
+    if (contentEl) {
+        contentEl.style.maxWidth = '560px';
+        contentEl.style.width = '560px';
+    }
 
     const contenedor = document.getElementById('modal_generico_contenido');
 
@@ -1780,20 +1815,58 @@ async function cancelar_venta(id_venta) {
         );
         if (!confirmacion) return;
 
+        const motivo = (contenedor.querySelector('#cancelacion_motivo')?.value || '').trim();
+
         const resp2 = await fetch("index.php", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({ accion: "ventas/cancelar", id_venta })
+            body: new URLSearchParams({ accion: "ventas/cancelar", id_venta, motivo })
         });
         const resultado = await resp2.json();
         if (resultado.exito) {
             mostrar_aviso("Venta cancelada", 'exito');
             cerrar_modal_generico();
             if (typeof cargar_ventas === 'function') cargar_ventas();
+
+            // Modal chico para ofrecer la impresión del informe.
+            if (resultado.id_cancelacion) {
+                mostrar_modal_chico_impresion_cancelacion(resultado.id_cancelacion);
+            }
         } else {
             mostrar_aviso(resultado.error || "Error al cancelar", 'error');
         }
     });
+}
+
+/**
+ * Muestra el modal chico flotante para imprimir el informe de una
+ * cancelación recién confirmada.
+ *
+ * @param {string} id_cancelacion
+ */
+function mostrar_modal_chico_impresion_cancelacion(id_cancelacion) {
+    const contenedor = document.getElementById('modal_chico_impresion_cancelacion');
+    const titulo = document.getElementById('modal_chico_impresion_cancelacion_titulo');
+    const btnImprimir = document.getElementById('btn_modal_chico_imprimir_cancelacion');
+    const btnCerrar = document.getElementById('btn_modal_chico_cerrar_cancelacion');
+    if (!contenedor || !titulo || !btnImprimir || !btnCerrar) return;
+
+    // Este modal es más ancho que los otros porque el botón tiene un
+    // texto largo.
+    contenedor.style.maxWidth = '440px';
+
+    titulo.textContent = `Cancelación ${id_cancelacion} registrada`;
+
+    btnImprimir.onclick = () => {
+        const url = `index.php?imprimir=1&tipo=informe_cancelacion&id_cancelacion=${encodeURIComponent(id_cancelacion)}`;
+        window.open(url, '_blank');
+    };
+
+    btnCerrar.onclick = () => {
+        contenedor.classList.add('hidden');
+    };
+
+    contenedor.classList.remove('hidden');
 }
 
 function formatear_fecha_hora_actual() {

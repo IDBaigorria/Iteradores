@@ -18,7 +18,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.54c
+ * @version   1.5piloto.55
  */
 
 // --- Utilidades base ----------------------------------
@@ -236,6 +236,12 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
     if ($tipo === 'informe_liquidacion') {
         $ocultar_datos = ($_GET['ocultar_datos_generales'] ?? '0') === '1';
         imprimir_informe_liquidacion($_GET['id_liquidacion'] ?? '', $ocultar_datos);
+        exit;
+    }
+
+    // Caso especial: informe imprimible de una cancelación de compra.
+    if ($tipo === 'informe_cancelacion') {
+        imprimir_informe_cancelacion($_GET['id_cancelacion'] ?? '');
         exit;
     }
     $dni_filtro = $_GET['dni'] ?? '';
