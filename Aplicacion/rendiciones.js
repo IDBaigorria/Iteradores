@@ -1,6 +1,6 @@
 /***
  * Funciones de la pestaña Rendiciones.
- * @version 1.5piloto.55b
+ * @version 1.5piloto.57b
  */
 
 let rendiciones_actuales = [];
@@ -326,8 +326,8 @@ async function ver_detalle_rendicion(id_rendicion) {
             const boton_aceptar = (!aceptado && a.id_cancelacion)
                 ? `<button class="btn primary btn_aceptar_ajuste" data-id-cancelacion="${a.id_cancelacion}" data-id-rendicion="${r.id_rendicion}">Aceptar ajuste</button>`
                 : '';
-            const boton_imprimir = a.id_cancelacion
-                ? `<button class="btn btn_imprimir_cancelacion" data-id-cancelacion="${a.id_cancelacion}">Imprimir informe de cancelación</button>`
+            const boton_ver_informe = a.id_cancelacion
+                ? `<button class="btn btn_ver_informe_cancelacion" data-id-cancelacion="${a.id_cancelacion}">Ver informe de cancelación</button>`
                 : '';
             const badge = aceptado
                 ? '<span class="badge-ajustada">Aceptado</span>'
@@ -353,7 +353,7 @@ async function ver_detalle_rendicion(id_rendicion) {
                     </div>
                     <div class="ajuste-acciones">
                         ${boton_aceptar}
-                        ${boton_imprimir}
+                        ${boton_ver_informe}
                     </div>
                 </div>
             `;
@@ -476,9 +476,13 @@ async function ver_detalle_rendicion(id_rendicion) {
         });
     });
 
-    cont.querySelectorAll('.btn_imprimir_cancelacion').forEach(btn => {
+    cont.querySelectorAll('.btn_ver_informe_cancelacion').forEach(btn => {
         btn.addEventListener('click', () => {
-            window.open(_url_informe_cancelacion(btn.dataset.idCancelacion), '_blank');
+            // Abre el modal apilado de detalle de cancelación que ya existe
+            // en ventas.js. Adentro de ese modal está el botón "Imprimir informe".
+            if (typeof ver_detalle_cancelacion === 'function') {
+                ver_detalle_cancelacion(btn.dataset.idCancelacion);
+            }
         });
     });
 }

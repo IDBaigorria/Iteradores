@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.42
+ * @version 1.5piloto.57
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -1108,6 +1108,43 @@ function renderizar_pasaje_micro(micro) {
         </div>
     `;
     contenedorCroquis.insertAdjacentHTML('beforeend', leyendaHTML);
+
+    // Botones de impresión: solo dueño y admin.
+    if (usuario_actual.nivel === 'dueno' || usuario_actual.nivel === 'admin') {
+        const nombre_dueno_imp = obtener_dueno_viaje_seleccionado();
+        const nombre_viaje_imp = viaje_seleccionado ? viaje_seleccionado.nombre_viaje : '';
+        const nombre_micro_imp = micro.nombre_micro;
+
+        const botonesHTML = `
+            <div class="acciones-impresion-micro" style="margin-top:12px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                <button class="btn" id="btn_imprimir_croquis_micro">Imprimir Croquis</button>
+                <button class="btn primary" id="btn_imprimir_planilla_micro">Imprimir Planilla</button>
+            </div>
+        `;
+        contenedorCroquis.insertAdjacentHTML('beforeend', botonesHTML);
+
+        const btn_croquis = document.getElementById('btn_imprimir_croquis_micro');
+        if (btn_croquis) {
+            btn_croquis.addEventListener('click', () => {
+                const url = `index.php?imprimir=1&tipo=croquis_micro`
+                    + `&dueno=${encodeURIComponent(nombre_dueno_imp)}`
+                    + `&viaje=${encodeURIComponent(nombre_viaje_imp)}`
+                    + `&micro=${encodeURIComponent(nombre_micro_imp)}`;
+                window.open(url, '_blank');
+            });
+        }
+
+        const btn_planilla = document.getElementById('btn_imprimir_planilla_micro');
+        if (btn_planilla) {
+            btn_planilla.addEventListener('click', () => {
+                const url = `index.php?imprimir=1&tipo=planilla_pasajeros_micro`
+                    + `&dueno=${encodeURIComponent(nombre_dueno_imp)}`
+                    + `&viaje=${encodeURIComponent(nombre_viaje_imp)}`
+                    + `&micro=${encodeURIComponent(nombre_micro_imp)}`;
+                window.open(url, '_blank');
+            });
+        }
+    }
 }
 
 /**

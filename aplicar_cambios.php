@@ -2,13 +2,9 @@
 /**
  * Aplicador de cambios automáticos — Proyecto Iteradores + Pasajes.
  *
- * v1.5piloto.56 (doc): actualizar la documentación viva de nodos.
- * - Bump de versión a 1.5piloto.56.
- * - Observaciones del Nodo Usuario: agregar `cancelaciones` a la lista.
- * - Nodo Rendición: reescribir la nota de desactualización para reflejar
- *   la estructura nueva (contenedor con hijos).
- * - Nodo Asiento: corregir `reservado_por` (es nodo con dato string, no
- *   enlace al nodo usuario).
+ * v1.5piloto.57k: croquis del micro.
+ * - Asientos más bajos (min-height 44px).
+ * - Salto de página entre pisos cuando el micro es de dos pisos.
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -27,93 +23,106 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
     // ============================================================
-    // 1. Bump @version
+    // 1. Impresion.php: bump
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_POST.php',
-        'descripcion' => 'aplicacion_POST.php: bump @version a 1.5piloto.56',
+        'archivo' => 'Aplicacion/Impresion/Impresion.php',
+        'descripcion' => 'Impresion.php: bump @version a 1.5piloto.57k',
         'buscar' => [
-            ' * @version   1.5piloto.55',
-            ' */',
+            ' * @version   1.5piloto.57j',
         ],
         'reemplazar' => [
-            ' * @version   1.5piloto.56',
-            ' */',
+            ' * @version   1.5piloto.57k',
         ],
     ],
 
     // ============================================================
-    // 2. Bump de la estructura
+    // 2. Impresion.php: asiento más bajo + reglas de salto de piso
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_POST.php',
-        'descripcion' => 'aplicacion_POST.php: bump de la version de la estructura',
+        'archivo' => 'Aplicacion/Impresion/Impresion.php',
+        'descripcion' => 'Impresion.php: asiento más bajo y reglas de salto de piso',
         'buscar' => [
-            ' * ## Estructura de nodos actual (v1.5piloto.55)',
+            '        .seat { border: 1px solid black; border-radius: 4px; padding: 3px 2px; min-height: 68px; text-align: center; font-size: 10px; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }',
+            '        .seat .num { font-size: 14px; font-weight: 700; line-height: 1.1; margin-bottom: 1px; }',
+            '        .seat .nombre { font-size: 8px; font-weight: 700; line-height: 1.1; margin-top: 1px; word-break: break-word; }',
+            '        .seat .dato { font-size: 7.5px; line-height: 1.1; margin-top: 1px; word-break: break-word; }',
+            '        .seat.vendido { background: #e8e8e8; border: 2px solid black; }',
+            '        .seat.reservado { background: white; border: 2px solid black; }',
+            '        .seat.no-disponible { background: #d0d0d0; border: 2px solid black; }',
+            '        .seat.libre { border: 1px solid black; }',
+            '        .leyenda { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: 11px; margin-top: 14px; }',
         ],
         'reemplazar' => [
-            ' * ## Estructura de nodos actual (v1.5piloto.56)',
+            '        .seat { border: 1px solid black; border-radius: 4px; padding: 2px 2px; min-height: 44px; text-align: center; font-size: 10px; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }',
+            '        .seat .num { font-size: 14px; font-weight: 700; line-height: 1.1; margin-bottom: 1px; }',
+            '        .seat .nombre { font-size: 8px; font-weight: 700; line-height: 1.1; margin-top: 1px; word-break: break-word; }',
+            '        .seat .dato { font-size: 7.5px; line-height: 1.1; margin-top: 1px; word-break: break-word; }',
+            '        .seat.vendido { background: #e8e8e8; border: 2px solid black; }',
+            '        .seat.reservado { background: white; border: 2px solid black; }',
+            '        .seat.no-disponible { background: #d0d0d0; border: 2px solid black; }',
+            '        .seat.libre { border: 1px solid black; }',
+            '        .piso-hoja { page-break-inside: avoid; }',
+            '        .piso-hoja + .piso-hoja { page-break-before: always; }',
+            '        .leyenda { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: 11px; margin-top: 14px; }',
         ],
     ],
 
     // ============================================================
-    // 3. Observaciones del Nodo Usuario: agregar cancelaciones
+    // 3. Impresion.php: abrir .piso-hoja al inicio de cada piso
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_POST.php',
-        'descripcion' => 'aplicacion_POST.php: agregar cancelaciones a las observaciones',
+        'archivo' => 'Aplicacion/Impresion/Impresion.php',
+        'descripcion' => 'Impresion.php: abrir piso-hoja al inicio de cada piso',
         'buscar' => [
-            ' * - Los enlaces `terminales`, `empresas`, `viajes`, `pasajeros`, `ventas`, `rendiciones` y `liquidaciones` solo existen en nodos de nivel `dueno`.',
+            '        $hay_piso_2 = $nodo_asientos_copia->adyacente(\'piso_2\') !== null;',
+            '        if ($hay_piso_2) {',
+            '            echo \'<div class="piso-titulo">Piso \' . $i . \'</div>\';',
+            '        }',
+            '',
+            '        echo \'<div class="bus">\';',
+            '        echo \'<div class="bus-front">FRENTE · CONDUCTOR</div>\';',
         ],
         'reemplazar' => [
-            ' * - Los enlaces `terminales`, `empresas`, `viajes`, `pasajeros`, `ventas`, `rendiciones`, `liquidaciones` y `cancelaciones` solo existen en nodos de nivel `dueno`.',
+            '        // Cada piso va envuelto en un contenedor que fuerza salto de',
+            '        // página a partir del segundo piso, para que no se imprima todo',
+            '        // amontonado en la misma hoja.',
+            '        echo \'<div class="piso-hoja">\';',
+            '',
+            '        $hay_piso_2 = $nodo_asientos_copia->adyacente(\'piso_2\') !== null;',
+            '        if ($hay_piso_2) {',
+            '            echo \'<div class="piso-titulo">Piso \' . $i . \'</div>\';',
+            '        }',
+            '',
+            '        echo \'<div class="bus">\';',
+            '        echo \'<div class="bus-front">FRENTE · CONDUCTOR</div>\';',
         ],
     ],
 
     // ============================================================
-    // 4. Nota (desactualización) del Nodo Rendición
+    // 4. Impresion.php: cerrar .piso-hoja al final de cada piso
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_POST.php',
-        'descripcion' => 'aplicacion_POST.php: reescribir la nota de desactualización',
+        'archivo' => 'Aplicacion/Impresion/Impresion.php',
+        'descripcion' => 'Impresion.php: cerrar piso-hoja al final de cada piso',
         'buscar' => [
-            ' * **Nota (desactualización):** Si se cancela una venta que tiene',
-            ' * cupones ya rendidos, la rendición no se modifica en sus totales',
-            ' * (es inmutable), pero se marca con un enlace `desactualizada` que',
-            ' * contiene el motivo (ej. `"Se canceló la venta venta_123 el',
-            ' * 17/05/2026 15:30"`). Si se acumulan varias cancelaciones, los',
-            ' * motivos se concatenan con `"; "`. La pestaña Rendiciones muestra',
-            ' * un badge de aviso cuando esto ocurre.',
+            '        echo \'<div class="bus-back">PARTE TRASERA</div>\';',
+            '        echo \'</div>\';',
+            '    }',
+            '',
+            '    echo \'<div class="leyenda">\';',
         ],
         'reemplazar' => [
-            ' * **Nota (desactualización):** Si se cancela una venta que tiene',
-            ' * cupones ya rendidos, la rendición no se modifica en sus totales',
-            ' * (es inmutable), pero se le agrega un hijo nuevo al contenedor',
-            ' * `desactualizada` por cada cancelación. Cada hijo (Nodo Ajuste)',
-            ' * guarda los datos de la cancelación: la venta, el motivo, la',
-            ' * terminal, los montos que aporta cada cuenta (terminal vs dueño)',
-            ' * y, cuando el dueño lo marca, la fecha en que lo aceptó.',
-            ' * La pestaña Rendiciones muestra un badge de aviso mientras haya',
-            ' * ajustes pendientes de aceptar.',
-        ],
-    ],
-
-    // ============================================================
-    // 5. Nodo Asiento: corregir reservado_por
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_POST.php',
-        'descripcion' => 'aplicacion_POST.php: corregir reservado_por del Nodo Asiento',
-        'buscar' => [
-            ' *   | `reservado_por`    | Enlace directo al **nodo usuario** del dueño que reservó el asiento para el equipo. Solo existe si `estado` es `"reservado"`. |',
-        ],
-        'reemplazar' => [
-            ' *   | `reservado_por`    | Nodo con dato string: nombre de usuario del dueño que reservó el asiento para el equipo. Solo existe si `estado` es `"reservado"`. |',
+            '        echo \'<div class="bus-back">PARTE TRASERA</div>\';',
+            '        echo \'</div>\'; // cierre .bus',
+            '        echo \'</div>\'; // cierre .piso-hoja',
+            '    }',
+            '',
+            '    echo \'<div class="leyenda">\';',
         ],
     ],
 ];

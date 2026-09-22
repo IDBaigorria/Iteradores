@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.55
+ * @version   1.5piloto.57k
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -1609,6 +1609,514 @@ function imprimir_informe_liquidacion(string $id_liquidacion, bool $ocultar_dato
     echo $obs_html;
 
     echo '</div>'; // cierre informe
+
+    echo '<script>window.onload = function() { window.print(); }</script>';
+    echo '</body></html>';
+}
+
+/**
+ * Recolecta los asientos de un micro que tienen pasajero asignado.
+ *
+ * Incluye asientos vendidos y asientos reservados con pasajero.
+ * No incluye libres, seleccionados, reservados sin pasajero, ni
+ * no disponibles. El orden es por número de asiento ascendente.
+ *
+ * Devuelve un array de elementos:
+ *   [
+ *     'numero' => string,
+ *     'fila' => string,
+ *     'columna' => string,
+ *     'piso' => int (1 o 2),
+ *     'estado' => string,
+ *     'pasajero' => [
+ *       'dni' => string,
+ *       'dni_visible' => string,
+ *       'apellido' => string,
+ *       'nombres' => string,
+ *       'nombre_completo' => string,
+ *       'celular' => string,
+ *       'celular_emergencia' => string,
+ *       'fecha_nacimiento' => string,
+ *       'fecha_nacimiento_visible' => string,
+ *       'direccion' => string,
+ *       'localidad' => string,
+ *     ],
+ *   ]
+ *
+ * @param Nodo $nodo_micro
+ * @return array
+ */
+function _recolectar_asientos_con_pasajero_de_micro(Nodo $nodo_micro): array {
+    $resultado = [];
+
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) return $resultado;
+
+    $nodo_asientos = $nodo_copia->adyacente('asientos');
+    if (!$nodo_asientos) return $resultado;
+
+    for ($i = 1; $i <= 2; $i++) {
+        $piso = $nodo_asientos->adyacente("piso_$i");
+        if (!$piso) continue;
+        $cabeza = $piso->adyacente('asientos');
+        if (!$cabeza) continue;
+        $actual = $cabeza->adyacente('primer');
+        $seg = 0;
+        while ($actual && $actual->id() !== $cabeza->id() && $seg < 200) {
+            $seg++;
+            $nodo_pasajero = $actual->adyacente('pasajero');
+            if ($nodo_pasajero) {
+                $fila = $actual->adyacente('fila');
+                $columna = $actual->adyacente('columna');
+                $estado = $actual->adyacente('estado');
+
+                $p_dni = $nodo_pasajero->dato();
+                $p_apellido = $nodo_pasajero->adyacente('apellido') ? $nodo_pasajero->adyacente('apellido')->dato() : '';
+                $p_nombres = $nodo_pasajero->adyacente('nombres') ? $nodo_pasajero->adyacente('nombres')->dato() : '';
+                $p_fecha_nac = $nodo_pasajero->adyacente('fecha_nacimiento') ? $nodo_pasajero->adyacente('fecha_nacimiento')->dato() : '';
+
+                $resultado[] = [
+                    'numero' => $actual->dato(),
+                    'fila' => $fila ? $fila->dato() : '',
+                    'columna' => $columna ? $columna->dato() : '',
+                    'piso' => $i,
+                    'estado' => $estado ? $estado->dato() : 'libre',
+                    'pasajero' => [
+                        'dni' => $p_dni,
+                        'dni_visible' => normalizar_dni($p_dni),
+                        'apellido' => $p_apellido,
+                        'nombres' => $p_nombres,
+                        'nombre_completo' => formatear_nombre_completo($p_apellido, $p_nombres),
+                        'celular' => $nodo_pasajero->adyacente('celular') ? $nodo_pasajero->adyacente('celular')->dato() : '',
+                        'celular_emergencia' => $nodo_pasajero->adyacente('celular_emergencia') ? $nodo_pasajero->adyacente('celular_emergencia')->dato() : '',
+                        'fecha_nacimiento' => $p_fecha_nac,
+                        'fecha_nacimiento_visible' => formatear_fecha_visible($p_fecha_nac),
+                        'direccion' => $nodo_pasajero->adyacente('direccion') ? $nodo_pasajero->adyacente('direccion')->dato() : '',
+                        'localidad' => $nodo_pasajero->adyacente('localidad') ? $nodo_pasajero->adyacente('localidad')->dato() : '',
+                    ],
+                ];
+            }
+            $actual = $actual->adyacente('siguiente');
+        }
+    }
+
+    // Ordenar por número de asiento ascendente. El número es string;
+    // se compara numéricamente si es posible.
+    usort($resultado, function($a, $b) {
+        $na = (int)$a['numero'];
+        $nb = (int)$b['numero'];
+        if ($na === $nb) return strcmp($a['numero'], $b['numero']);
+        return $na - $nb;
+    });
+
+    return $resultado;
+}
+
+/**
+ * Recolecta TODOS los asientos de un micro, tengan o no pasajero.
+ *
+ * Devuelve el mismo formato que `_recolectar_asientos_con_pasajero_de_micro`,
+ * pero con todos los asientos. Los que no tienen pasajero traen
+ * `pasajero` en null. Ordenados por número de asiento ascendente.
+ *
+ * @param Nodo $nodo_micro
+ * @return array
+ */
+function _recolectar_todos_los_asientos_de_micro(Nodo $nodo_micro): array {
+    $resultado = [];
+
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) return $resultado;
+
+    $nodo_asientos = $nodo_copia->adyacente('asientos');
+    if (!$nodo_asientos) return $resultado;
+
+    for ($i = 1; $i <= 2; $i++) {
+        $piso = $nodo_asientos->adyacente("piso_$i");
+        if (!$piso) continue;
+        $cabeza = $piso->adyacente('asientos');
+        if (!$cabeza) continue;
+        $actual = $cabeza->adyacente('primer');
+        $seg = 0;
+        while ($actual && $actual->id() !== $cabeza->id() && $seg < 200) {
+            $seg++;
+            $fila = $actual->adyacente('fila');
+            $columna = $actual->adyacente('columna');
+            $estado = $actual->adyacente('estado');
+            $nodo_pasajero = $actual->adyacente('pasajero');
+
+            $pasajero = null;
+            if ($nodo_pasajero) {
+                $p_dni = $nodo_pasajero->dato();
+                $p_apellido = $nodo_pasajero->adyacente('apellido') ? $nodo_pasajero->adyacente('apellido')->dato() : '';
+                $p_nombres = $nodo_pasajero->adyacente('nombres') ? $nodo_pasajero->adyacente('nombres')->dato() : '';
+                $p_fecha_nac = $nodo_pasajero->adyacente('fecha_nacimiento') ? $nodo_pasajero->adyacente('fecha_nacimiento')->dato() : '';
+
+                $pasajero = [
+                    'dni' => $p_dni,
+                    'dni_visible' => normalizar_dni($p_dni),
+                    'apellido' => $p_apellido,
+                    'nombres' => $p_nombres,
+                    'nombre_completo' => formatear_nombre_completo($p_apellido, $p_nombres),
+                    'celular' => $nodo_pasajero->adyacente('celular') ? $nodo_pasajero->adyacente('celular')->dato() : '',
+                    'celular_emergencia' => $nodo_pasajero->adyacente('celular_emergencia') ? $nodo_pasajero->adyacente('celular_emergencia')->dato() : '',
+                    'fecha_nacimiento' => $p_fecha_nac,
+                    'fecha_nacimiento_visible' => formatear_fecha_visible($p_fecha_nac),
+                    'direccion' => $nodo_pasajero->adyacente('direccion') ? $nodo_pasajero->adyacente('direccion')->dato() : '',
+                    'localidad' => $nodo_pasajero->adyacente('localidad') ? $nodo_pasajero->adyacente('localidad')->dato() : '',
+                ];
+            }
+
+            $resultado[] = [
+                'numero' => $actual->dato(),
+                'fila' => $fila ? $fila->dato() : '',
+                'columna' => $columna ? $columna->dato() : '',
+                'piso' => $i,
+                'estado' => $estado ? $estado->dato() : 'libre',
+                'pasajero' => $pasajero,
+            ];
+
+            $actual = $actual->adyacente('siguiente');
+        }
+    }
+
+    // Ordenar por número de asiento ascendente.
+    usort($resultado, function($a, $b) {
+        $na = (int)$a['numero'];
+        $nb = (int)$b['numero'];
+        if ($na === $nb) return strcmp($a['numero'], $b['numero']);
+        return $na - $nb;
+    });
+
+    return $resultado;
+}
+
+/**
+ * Imprime el croquis del micro con los pasajeros en cada asiento.
+ *
+ * El croquis es en blanco y negro. Cada asiento muestra su número
+ * grande y, si tiene pasajero, el nombre completo abajo. También
+ * lleva el estado (VENDIDO / RESERVADO) en texto chico.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $nombre_micro
+ */
+function imprimir_croquis_micro(string $nombre_dueno, string $nombre_viaje, string $nombre_micro): void {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) { echo "Dueño no encontrado"; return; }
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) { echo "Viaje no encontrado"; return; }
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) { echo "No hay micros en el viaje"; return; }
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) { echo "Micro no encontrado"; return; }
+
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) { echo "No existe copia del vehículo"; return; }
+
+    $nombre_viaje_visible = $nodo_viaje->adyacente('nombre') ? $nodo_viaje->adyacente('nombre')->dato() : $nombre_viaje;
+    $fecha_viaje_iso = $nodo_viaje->adyacente('fecha') ? $nodo_viaje->adyacente('fecha')->dato() : '';
+    $hora_viaje = $nodo_viaje->adyacente('hora') ? $nodo_viaje->adyacente('hora')->dato() : '';
+    $origen = $nodo_viaje->adyacente('origen') ? $nodo_viaje->adyacente('origen')->dato() : '';
+    $destino = $nodo_viaje->adyacente('destino') ? $nodo_viaje->adyacente('destino')->dato() : '';
+
+    $nombre_micro_visible = $nodo_copia->adyacente('nombre') ? $nodo_copia->adyacente('nombre')->dato() : '';
+    $patente = $nodo_copia->dato();
+
+    // Mapa de pasajeros por fila-columna para lookup rápido.
+    $pasajeros = _recolectar_asientos_con_pasajero_de_micro($nodo_micro);
+    $por_fc = [];
+    foreach ($pasajeros as $p) {
+        $por_fc[$p['fila'] . '-' . $p['columna']] = $p;
+    }
+
+    $logo_ruta = './Aplicacion/LogoPeque.png';
+
+    echo '<!DOCTYPE html>';
+    echo '<html lang="es">';
+    echo '<head><meta charset="UTF-8"><title>Croquis del micro</title>';
+    echo '<style>
+        body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 15px; background: white; color: black; font-size: 12px; }
+        .hoja { max-width: 900px; margin: 0 auto; }
+        .membrete { display: flex; align-items: center; border-bottom: 2px solid black; padding-bottom: 8px; margin-bottom: 14px; }
+        .membrete img { width: 50px; height: 50px; object-fit: contain; filter: grayscale(100%); margin-right: 12px; }
+        .membrete-texto { font-size: 15px; font-weight: bold; }
+        .datos-viaje { font-size: 12px; line-height: 1.5; margin-bottom: 12px; }
+        .datos-viaje b { display: inline-block; min-width: 70px; }
+        .titulo { text-align: center; margin: 8px 0 14px 0; }
+        .titulo h1 { margin: 0 0 4px 0; font-size: 17px; }
+        .titulo .sub { font-size: 12px; color: #333; }
+        .piso-titulo { font-size: 13px; font-weight: 700; margin: 14px 0 6px 0; text-align: center; }
+        .bus { border: 2px solid black; border-radius: 14px; padding: 10px; max-width: 470px; margin: 0 auto; }
+        .bus-front, .bus-back { text-align: center; font-size: 10px; letter-spacing: 1px; border: 1px solid black; border-radius: 6px; padding: 4px; margin: 4px 0; }
+        .seat-row { display: grid; grid-template-columns: 1fr 1fr 20px 1fr 1fr; gap: 4px; margin: 3px 0; }
+        .aisle { grid-column: 3; }
+        .seat { border: 1px solid black; border-radius: 4px; padding: 2px 2px; min-height: 44px; text-align: center; font-size: 10px; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .seat .num { font-size: 14px; font-weight: 700; line-height: 1.1; margin-bottom: 1px; }
+        .seat .nombre { font-size: 8px; font-weight: 700; line-height: 1.1; margin-top: 1px; word-break: break-word; }
+        .seat .dato { font-size: 7.5px; line-height: 1.1; margin-top: 1px; word-break: break-word; }
+        .seat.vendido { background: #e8e8e8; border: 2px solid black; }
+        .seat.reservado { background: white; border: 2px solid black; }
+        .seat.no-disponible { background: #d0d0d0; border: 2px solid black; }
+        .seat.libre { border: 1px solid black; }
+        .piso-hoja { page-break-inside: avoid; }
+        .piso-hoja + .piso-hoja { page-break-before: always; }
+        .leyenda { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: 11px; margin-top: 14px; }
+        .leyenda .item { display: inline-flex; align-items: center; gap: 4px; }
+        .leyenda .sw { display: inline-block; width: 14px; height: 14px; border: 1px solid black; }
+        .leyenda .sw-ocupado { background: #eeeeee; }
+        .leyenda .sw-reservado { border-width: 2px; }
+        @media print { body { padding: 10px; } }
+    </style>';
+    echo '</head><body>';
+
+    echo '<div class="hoja">';
+
+    echo '<div class="membrete">';
+    echo '<img src="' . htmlspecialchars($logo_ruta) . '" alt="Logo">';
+    echo '<div class="membrete-texto">Parroquia Nuestra Señora del Carmen - Tres Arroyos</div>';
+    echo '</div>';
+
+    echo '<div class="datos-viaje">';
+    echo '<div><b>Viaje:</b> ' . htmlspecialchars($nombre_viaje_visible) . '</div>';
+    echo '<div><b>Micro:</b> ' . htmlspecialchars($nombre_micro_visible) . ' ' . ($patente !== '' ? '(' . htmlspecialchars($patente) . ')' : '') . '</div>';
+    echo '<div><b>Ruta:</b> ' . htmlspecialchars($origen) . ' → ' . htmlspecialchars($destino) . '</div>';
+    echo '<div><b>Fecha:</b> ' . htmlspecialchars(formatear_fecha_visible($fecha_viaje_iso)) . ' &nbsp; <b>Hora:</b> ' . htmlspecialchars($hora_viaje) . '</div>';
+    echo '</div>';
+
+    echo '<div class="titulo"><h1>Croquis del micro</h1><div class="sub">Pasajeros por asiento</div></div>';
+
+    // Dibujar cada piso.
+    for ($i = 1; $i <= 2; $i++) {
+        $piso = $nodo_asientos = null;
+        $nodo_asientos_copia = $nodo_copia->adyacente('asientos');
+        if ($nodo_asientos_copia) {
+            $piso = $nodo_asientos_copia->adyacente("piso_$i");
+        }
+        if (!$piso) continue;
+
+        $filas_nodo = $piso->adyacente('filas');
+        $columnas_nodo = $piso->adyacente('columnas');
+        $filas = $filas_nodo ? (int)$filas_nodo->dato() : 0;
+        $columnas = $columnas_nodo ? (int)$columnas_nodo->dato() : 0;
+        if ($filas <= 0 || $columnas <= 0) continue;
+
+        $cabeza = $piso->adyacente('asientos');
+        if (!$cabeza) continue;
+
+        // Mapa fila-columna => asiento real del piso.
+        $por_asiento = [];
+        $actual = $cabeza->adyacente('primer');
+        $seg = 0;
+        while ($actual && $actual->id() !== $cabeza->id() && $seg < 200) {
+            $seg++;
+            $f = $actual->adyacente('fila');
+            $c = $actual->adyacente('columna');
+            if ($f && $c) {
+                $por_asiento[$f->dato() . '-' . $c->dato()] = $actual;
+            }
+            $actual = $actual->adyacente('siguiente');
+        }
+
+        // Cada piso va envuelto en un contenedor que fuerza salto de
+        // página a partir del segundo piso, para que no se imprima todo
+        // amontonado en la misma hoja.
+        echo '<div class="piso-hoja">';
+
+        $hay_piso_2 = $nodo_asientos_copia->adyacente('piso_2') !== null;
+        if ($hay_piso_2) {
+            echo '<div class="piso-titulo">Piso ' . $i . '</div>';
+        }
+
+        echo '<div class="bus">';
+        echo '<div class="bus-front">FRENTE · CONDUCTOR</div>';
+
+        for ($fila = 1; $fila <= $filas; $fila++) {
+            echo '<div class="seat-row">';
+            for ($col = 1; $col <= $columnas; $col++) {
+                $clave_fc = $fila . '-' . $col;
+                if (!isset($por_asiento[$clave_fc])) {
+                    // Celda vacía.
+                    if ($col === 3 && $columnas >= 5) {
+                        echo '<div class="aisle"></div>';
+                    } else {
+                        echo '<div></div>';
+                    }
+                    continue;
+                }
+                $nodo_asiento = $por_asiento[$clave_fc];
+                $numero = $nodo_asiento->dato();
+                $estado = $nodo_asiento->adyacente('estado') ? $nodo_asiento->adyacente('estado')->dato() : 'libre';
+
+                // Clase según estado. Los estados se distinguen por el borde,
+                // no solo por el color, para que el croquis se vea bien aunque
+                // la impresión no tenga activada la opción de "Gráficos en
+                // segundo plano".
+                $clase_seat = 'seat';
+                if ($estado === 'vendido') {
+                    $clase_seat .= ' vendido';
+                } else if ($estado === 'no disponible') {
+                    $clase_seat .= ' no-disponible';
+                } else if ($estado === 'reservado') {
+                    $clase_seat .= ' reservado';
+                } else {
+                    $clase_seat .= ' libre';
+                }
+
+                $info_pas = $por_fc[$clave_fc] ?? null;
+
+                echo '<div class="' . $clase_seat . '">';
+                echo '<div class="num">' . htmlspecialchars($numero) . '</div>';
+                if ($info_pas && $info_pas['pasajero'] !== null && $info_pas['pasajero']['nombre_completo'] !== '') {
+                    $pa = $info_pas['pasajero'];
+                    echo '<div class="nombre">' . htmlspecialchars($pa['nombre_completo']) . '</div>';
+                    if ($pa['dni'] !== '') {
+                        echo '<div class="dato">DNI ' . htmlspecialchars(formatear_dni_con_puntos($pa['dni'])) . '</div>';
+                    }
+                }
+                echo '</div>';
+            }
+            echo '</div>';
+        }
+
+        echo '<div class="bus-back">PARTE TRASERA</div>';
+        echo '</div>'; // cierre .bus
+        echo '</div>'; // cierre .piso-hoja
+    }
+
+    echo '<div class="leyenda">';
+    echo '<div class="item"><span class="sw"></span> Libre</div>';
+    echo '<div class="item"><span class="sw sw-ocupado"></span> Vendido</div>';
+    echo '<div class="item"><span class="sw sw-reservado"></span> Reservado</div>';
+    echo '</div>';
+
+    echo '</div>'; // cierre hoja
+
+    echo '<script>window.onload = function() { window.print(); }</script>';
+    echo '</body></html>';
+}
+
+/**
+ * Imprime la planilla de pasajeros del micro, en A4 horizontal.
+ *
+ * Header: logo a la izquierda, dirección y teléfono al lado, y a
+ * la derecha DESTINO, FECHA y HORA del viaje.
+ * Cuerpo: tabla con 7 columnas.
+ *   1. 😊 (header) — en cada fila va el número de asiento. Columna
+ *      fina, sin título de texto.
+ *   2. APELLIDO Y NOMBRES
+ *   3. NACIMIENTO
+ *   4. DNI
+ *   5. TELEFONO
+ *   6. TEL. FAMILIAR
+ *   7. DOMICILIO
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $nombre_micro
+ */
+function imprimir_planilla_pasajeros_micro(string $nombre_dueno, string $nombre_viaje, string $nombre_micro): void {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) { echo "Dueño no encontrado"; return; }
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) { echo "Viaje no encontrado"; return; }
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) { echo "No hay micros en el viaje"; return; }
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) { echo "Micro no encontrado"; return; }
+
+    $destino = $nodo_viaje->adyacente('destino') ? $nodo_viaje->adyacente('destino')->dato() : '';
+    $fecha_viaje_iso = $nodo_viaje->adyacente('fecha') ? $nodo_viaje->adyacente('fecha')->dato() : '';
+    $hora_viaje = $nodo_viaje->adyacente('hora') ? $nodo_viaje->adyacente('hora')->dato() : '';
+
+    $asientos = _recolectar_todos_los_asientos_de_micro($nodo_micro);
+
+    $logo_ruta = './Aplicacion/LogoPeque.png';
+
+    echo '<!DOCTYPE html>';
+    echo '<html lang="es">';
+    echo '<head><meta charset="UTF-8"><title>Planilla de pasajeros</title>';
+    echo '<style>
+        @page { size: A4 landscape; margin: 12mm; }
+        body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 0 10px 10px 10px; background: white; color: black; font-size: 12px; }
+        .hoja { max-width: 1100px; margin: 0 auto; }
+        .header { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 12px; align-items: center; padding: 0; margin: 0; }
+        .header .logo img { width: 80px; height: 80px; object-fit: contain; filter: grayscale(100%); }
+        .header .contacto { font-size: 12px; line-height: 1.5; }
+        .header .contacto .pquia { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+        .header .contacto .dir { font-weight: 700; }
+        .header .datos-viaje { text-align: right; font-size: 17px; line-height: 1.4; font-weight: 600; white-space: nowrap; }
+        .header .datos-viaje .sep { display: inline-block; padding: 0 6px; opacity: 0.6; }
+        table.planilla { width: 100%; border-collapse: collapse; font-size: 11px; }
+        table.planilla th, table.planilla td { border: 1px solid black; padding: 3px 6px; vertical-align: top; }
+        table.planilla th { background: #f0f0f0; font-weight: 700; font-size: 10px; letter-spacing: 0.5px; }
+        table.planilla td.num { width: 28px; text-align: center; font-weight: 700; font-size: 12px; }
+        table.planilla td.fecha { white-space: nowrap; width: 90px; }
+        table.planilla td.dni { white-space: nowrap; width: 90px; }
+        table.planilla td.tel { white-space: nowrap; width: 100px; }
+        .sin-datos { text-align: center; color: #666; font-size: 13px; padding: 20px; }
+        @media print { body { padding: 0; } .hoja { max-width: 100%; } }
+    </style>';
+    echo '</head><body>';
+
+    echo '<div class="hoja">';
+
+    // Header: logo + contacto + datos del viaje.
+    echo '<div class="header">';
+    echo '<div class="logo"><img src="' . htmlspecialchars($logo_ruta) . '" alt="Logo"></div>';
+    echo '<div class="contacto">';
+    echo '<div class="pquia">Pquia. Nuestra Sra. del Carmen</div>';
+    echo '<div class="dir">Av. Rivadavia 79, Tres Arroyos</div>';
+    echo '<div>Tel: 2983 423824</div>';
+    echo '</div>';
+    echo '<div class="datos-viaje">';
+    echo '<span><b>DESTINO:</b> ' . htmlspecialchars($destino) . '</span>';
+    echo '<span class="sep">·</span>';
+    echo '<span><b>FECHA:</b> ' . htmlspecialchars(formatear_fecha_visible($fecha_viaje_iso)) . '</span>';
+    echo '<span class="sep">·</span>';
+    echo '<span><b>HORA:</b> ' . htmlspecialchars($hora_viaje) . '</span>';
+    echo '</div>';
+    echo '</div>';
+
+    // Tabla.
+    if (empty($asientos)) {
+        echo '<div class="sin-datos">Este micro no tiene asientos configurados.</div>';
+    } else {
+        echo '<table class="planilla">';
+        echo '<thead><tr>';
+        echo '<th>😊</th>';
+        echo '<th>APELLIDO Y NOMBRES</th>';
+        echo '<th>NACIMIENTO</th>';
+        echo '<th>DNI</th>';
+        echo '<th>TELEFONO</th>';
+        echo '<th>TEL. FAMILIAR</th>';
+        echo '<th>DOMICILIO</th>';
+        echo '</tr></thead><tbody>';
+
+        foreach ($asientos as $a) {
+            $pa = $a['pasajero'];
+            $tiene_pas = ($pa !== null && ($pa['nombre_completo'] !== '' || $pa['dni_visible'] !== ''));
+            echo '<tr>';
+            echo '<td class="num">' . htmlspecialchars($a['numero']) . '</td>';
+            if ($tiene_pas) {
+                $dir_completa = trim(($pa['direccion'] ?? '') . (($pa['localidad'] ?? '') !== '' ? ', ' . $pa['localidad'] : ''));
+                echo '<td>' . htmlspecialchars($pa['nombre_completo']) . '</td>';
+                echo '<td class="fecha">' . htmlspecialchars($pa['fecha_nacimiento_visible']) . '</td>';
+                echo '<td class="dni">' . htmlspecialchars(formatear_dni_con_puntos($pa['dni'])) . '</td>';
+                echo '<td class="tel">' . htmlspecialchars($pa['celular']) . '</td>';
+                echo '<td class="tel">' . htmlspecialchars($pa['celular_emergencia']) . '</td>';
+                echo '<td>' . htmlspecialchars($dir_completa) . '</td>';
+            } else {
+                echo '<td></td><td></td><td></td><td></td><td></td><td></td>';
+            }
+            echo '</tr>';
+        }
+
+        echo '</tbody></table>';
+    }
+
+    echo '</div>'; // cierre hoja
 
     echo '<script>window.onload = function() { window.print(); }</script>';
     echo '</body></html>';

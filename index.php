@@ -244,6 +244,26 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
         imprimir_informe_cancelacion($_GET['id_cancelacion'] ?? '');
         exit;
     }
+
+    // Caso especial: croquis del micro con los pasajeros.
+    if ($tipo === 'croquis_micro') {
+        imprimir_croquis_micro(
+            $_GET['dueno'] ?? '',
+            $_GET['viaje'] ?? '',
+            $_GET['micro'] ?? ''
+        );
+        exit;
+    }
+
+    // Caso especial: planilla de pasajeros del micro.
+    if ($tipo === 'planilla_pasajeros_micro') {
+        imprimir_planilla_pasajeros_micro(
+            $_GET['dueno'] ?? '',
+            $_GET['viaje'] ?? '',
+            $_GET['micro'] ?? ''
+        );
+        exit;
+    }
     $dni_filtro = $_GET['dni'] ?? '';
     $numero_cupon = $_GET['numero_cupon'] ?? '';
     generar_impresion($tipo, $_GET['id_venta'] ?? '', $dni_filtro, $numero_cupon);

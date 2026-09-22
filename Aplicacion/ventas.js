@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.56
+ * @version 1.5piloto.57c
  */
 
 // (aplicar_cambios.php funcionó)
@@ -2707,7 +2707,7 @@ function _renderizar_modal_cancelaciones(cancelaciones) {
         html += `<td class="num">$${_formatear_monto_rendicion(c.devuelto_efectivo)}</td>`;
         html += `<td class="num">$${_formatear_monto_rendicion(c.devuelto_banco)}</td>`;
         html += `<td>${motivo || '—'}</td>`;
-        html += `<td><button class="btn ver_cancelacion_detalle" data-id="${c.id_cancelacion}">Ver informe</button></td>`;
+        html += `<td><button class="btn ver_cancelacion_detalle" data-id="${c.id_cancelacion}">Ver detalle</button></td>`;
         html += '</tr>';
     });
 
@@ -2719,8 +2719,136 @@ function _renderizar_modal_cancelaciones(cancelaciones) {
     if (!cont) return;
     cont.querySelectorAll('.ver_cancelacion_detalle').forEach(btn => {
         btn.addEventListener('click', () => {
-            const url = `index.php?imprimir=1&tipo=informe_cancelacion&id_cancelacion=${encodeURIComponent(btn.dataset.id)}`;
-            window.open(url, '_blank');
+            ver_detalle_cancelacion(btn.dataset.id);
         });
+    });
+}
+
+/**
+ * Abre el modal apilado con el detalle completo de una cancelación.
+ * Adentro tiene el botón "Imprimir informe" que dispara la impresión
+ * en una pestaña nueva.
+ *
+ * @param {string} id_cancelacion
+ */
+async function ver_detalle_cancelacion(id_cancelacion) {
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "cancelaciones/obtener", id_cancelacion })
+    });
+    const datos = await respuesta.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || 'Error al obtener la cancelación', 'error');
+        return;
+    }
+
+    const c = datos.cancelacion;
+
+    // Devolución al comprador.
+    const dev_ef = parseFloat(c.devuelto_efectivo) || 0;
+    const dev_ba = parseFloat(c.devuelto_banco) || 0;
+    const dev_total = dev_ef + dev_ba;
+
+    // Origen de los fondos.
+    const ct_ef = parseFloat(c.cubierto_terminal_efectivo) || 0;
+    const ct_ba = parseFloat(c.cubierto_terminal_banco) || 0;
+    const cd_ef = parseFloat(c.cubierto_dueno_efectivo) || 0;
+    const cd_ba = parseFloat(c.cubierto_dueno_banco) || 0;
+    const nc_ef = parseFloat(c.no_cubierto_efectivo) || 0;
+    const nc_ba = parseFloat(c.no_cubierto_banco) || 0;
+    const total_no_cubierto = nc_ef + nc_ba;
+
+    // Bloque de motivo (si lo hay).
+    const motivo = (c.motivo || '').trim();
+    const motivo_html = motivo !== ''
+        ? `<div class="rendicion-seccion">
+                <div class="rendicion-seccion-titulo">Motivo de la cancelación</div>
+                <p style="font-size:13px;line-height:1.6;white-space:pre-wrap;margin:0;">${motivo}</p>
+            </div>`
+        : '';
+
+    // Bloque de monto no cubierto (si aplica).
+    const no_cubierto_html = total_no_cubierto > 0.001
+        ? `<div class="rendicion-seccion">
+                <div class="rendicion-seccion-titulo">Monto no cubierto por el dueño</div>
+                <p style="font-size:13px;line-height:1.5;margin:0 0 8px 0;">El dueño no tenía saldo suficiente para cubrir la parte ya rendida. Quedó pendiente:</p>
+                <div class="rendicion-resumen-grid">
+                    <div class="rendicion-resumen-item"><span>Efectivo</span><b>$${_formatear_monto_rendicion(nc_ef)}</b></div>
+                    <div class="rendicion-resumen-item"><span>Banco</span><b>$${_formatear_monto_rendicion(nc_ba)}</b></div>
+                </div>
+            </div>`
+        : '';
+
+    const dni_txt = c.comprador_dni ? c.comprador_dni : '—';
+
+    const html = `
+        <div class="rendicion-detalle">
+            <div class="rendicion-detalle-header">
+                <div class="rendicion-detalle-titulo">Cancelación ${c.id_cancelacion}</div>
+                <div class="rendicion-detalle-fecha">Registrada el ${c.fecha_hora}</div>
+            </div>
+
+            <div class="rendicion-seccion">
+                <div class="rendicion-seccion-titulo">Venta original</div>
+                <div class="ajuste-lineas">
+                    <div class="ajuste-linea"><span>Venta:</span><b>${c.id_venta}</b></div>
+                    <div class="ajuste-linea"><span>Terminal:</span><b>${c.terminal_nombre_real || c.terminal || '—'}</b></div>
+                    ${c.viaje_visible ? `<div class="ajuste-linea"><span>Viaje:</span><b>${c.viaje_visible}</b></div>` : ''}
+                    ${c.micro_visible ? `<div class="ajuste-linea"><span>Micro:</span><b>${c.micro_visible}</b></div>` : ''}
+                    <div class="ajuste-linea"><span>Comprador:</span><b>${c.comprador_nombre_completo || '—'}</b></div>
+                    <div class="ajuste-linea"><span>DNI:</span><b>${dni_txt}</b></div>
+                    <div class="ajuste-linea"><span>Total de la venta:</span><b>$${_formatear_monto_rendicion(c.total_venta)}</b></div>
+                    <div class="ajuste-linea"><span>Asientos liberados:</span><b>${c.asientos_liberados}</b></div>
+                </div>
+            </div>
+
+            ${motivo_html}
+
+            <div class="rendicion-resumen">
+                <div class="rendicion-resumen-titulo">Devolución al comprador</div>
+                <div class="rendicion-resumen-grid">
+                    <div class="rendicion-resumen-item"><span>Efectivo</span><b>$${_formatear_monto_rendicion(dev_ef)}</b></div>
+                    <div class="rendicion-resumen-item"><span>Banco</span><b>$${_formatear_monto_rendicion(dev_ba)}</b></div>
+                    <div class="rendicion-resumen-item"><span>Total</span><b>$${_formatear_monto_rendicion(dev_total)}</b></div>
+                </div>
+            </div>
+
+            <div class="rendicion-seccion">
+                <div class="rendicion-seccion-titulo">Origen de los fondos</div>
+                <div class="ajuste-lineas">
+                    <div class="ajuste-linea"><span>De la terminal (efectivo):</span><b>$${_formatear_monto_rendicion(ct_ef)}</b></div>
+                    <div class="ajuste-linea"><span>De la terminal (banco):</span><b>$${_formatear_monto_rendicion(ct_ba)}</b></div>
+                    <div class="ajuste-linea"><span>Del dueño (efectivo):</span><b>$${_formatear_monto_rendicion(cd_ef)}</b></div>
+                    <div class="ajuste-linea"><span>Del dueño (banco):</span><b>$${_formatear_monto_rendicion(cd_ba)}</b></div>
+                </div>
+            </div>
+
+            ${no_cubierto_html}
+
+            <div class="rendicion-acciones">
+                <button class="btn primary" id="btn_imprimir_cancelacion_desde_detalle">Imprimir informe</button>
+                <button class="btn" id="btn_cerrar_detalle_cancelacion">Cerrar</button>
+            </div>
+        </div>
+    `;
+
+    abrir_modal_apilado('Informe de cancelación', html);
+
+    // El modal apilado hereda el ancho grande. Lo achicamos un poco
+    // para que el detalle no quede desparramado.
+    const contentEl = document.querySelector('#modal_apilado .modal-content');
+    if (contentEl) {
+        contentEl.style.maxWidth = '720px';
+        contentEl.style.width = '720px';
+    }
+
+    const cont = document.getElementById('modal_apilado_contenido');
+    if (!cont) return;
+
+    cont.querySelector('#btn_cerrar_detalle_cancelacion').addEventListener('click', cerrar_modal_apilado);
+    cont.querySelector('#btn_imprimir_cancelacion_desde_detalle').addEventListener('click', () => {
+        const url = `index.php?imprimir=1&tipo=informe_cancelacion&id_cancelacion=${encodeURIComponent(c.id_cancelacion)}`;
+        window.open(url, '_blank');
     });
 }
