@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.57c
+ * @version 1.5piloto.59f
  */
 
 // (aplicar_cambios.php funcionó)
@@ -34,6 +34,9 @@ function tiene_asientos_seleccionados_propios() {
 // Abrir formulario de venta
 async function abrir_modal_confirmacion_venta() {
     if (!microSyncActual || !viaje_seleccionado) return;
+
+    // Resetear el estado de atadura por si quedo de una apertura previa.
+    window.atadura_actual = null;
 
     const asientos_seleccionados = estados_asientos_actuales.filter(a => a.estado === 'seleccionado' && a.seleccionado_por === usuario_actual.nombre_usuario);
     if (asientos_seleccionados.length === 0) {
@@ -112,7 +115,8 @@ async function abrir_modal_confirmacion_venta() {
             </div>
         </div>
         <div id="datos_comprador" style="margin-top:15px;">
-            <h4>Comprador</h4>
+            <h4>Comprador <span class="badge-atadura hidden" id="badge_atadura_comprador">Vinculado</span></h4>
+            <div class="aviso-autocompletado gris" id="comprador_aviso_autocompletado">Ingrese el DNI para autocompletar los datos del comprador.</div>
             <div class="form-grid">
                 <div class="field"><label>DNI *</label><input id="comprador_dni"></div>
                 <div class="field"><label>Apellido *</label><input id="comprador_apellido"></div>
@@ -140,11 +144,16 @@ async function abrir_modal_confirmacion_venta() {
 
     generar_formularios_pasajeros(asientos_seleccionados);
 
+    // Conectar los listeners de atadura del comprador (una sola vez
+    // por apertura del modal).
+    _conectar_listeners_atadura_comprador();
+
     $("#metodo_pago").disabled = false;
     venta_form_abierto = true;
     $("#contenedor_boton_confirmar_venta").classList.add("hidden");
 
     actualizar_visibilidad_cuotas();
+    _notificar_cambio_venta_en_curso();
 
     $("#metodo_pago").addEventListener("change", function() {
         regenerar_select_cuotas(this.value);
@@ -154,22 +163,75 @@ async function abrir_modal_confirmacion_venta() {
         actualizar_visibilidad_cuotas();
     });
 
-    $("#usar_pasajero_como_comprador").addEventListener("click", () => {
-        const primerDni = $("#pasajero_dni_0").value.trim();
-        const primerApellido = $("#pasajero_apellido_0").value.trim();
-        const primerNombres = $("#pasajero_nombres_0").value.trim();
-        const primerEmail = $("#pasajero_email_0").value.trim();
-        const primerCelular = $("#pasajero_celular_0").value.trim();
-        if (primerDni) {
-            $("#comprador_dni").value = primerDni;
-            $("#comprador_apellido").value = primerApellido;
-            $("#comprador_nombres").value = primerNombres;
-            $("#comprador_email").value = primerEmail;
-            $("#comprador_celular").value = primerCelular;
-        } else {
-            mostrar_aviso("Complete al menos el DNI del primer pasajero", 'error');
+    $("#usar_pasajero_como_comprador").addEventListener("click", async () => {
+        const r = recolectar_datos_pasajero(0, {
+            incluir_selector_sb: true,
+            incluir_ficha: false
+        });
+        if (!r.ok) {
+            mostrar_aviso(r.error, 'error');
+            return;
         }
+        const datos_pas = r.datos;
+
+        // Guardar el pasajero 0 en el sistema. Si ya existe, no
+        // pasa nada (el error de DNI duplicado se ignora).
+        const nombre_dueno_pas = (usuario_actual.nivel === 'terminal')
+            ? viaje_seleccionado.dueno
+            : obtener_nombre_dueno_actual();
+        try {
+            const resp = await fetch("index.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    accion: "pasajeros/crear",
+                    nombre_dueno: nombre_dueno_pas,
+                    dni: datos_pas.dni,
+                    apellido: datos_pas.apellido,
+                    nombres: datos_pas.nombres,
+                    email: datos_pas.email,
+                    celular: datos_pas.celular,
+                    celular_emergencia: datos_pas.celular_emergencia,
+                    fecha_nacimiento: datos_pas.fecha_nacimiento,
+                    direccion: datos_pas.direccion,
+                    localidad: datos_pas.localidad
+                })
+            });
+            const resultado = await resp.json();
+            if (!resultado.exito && !/ya existe/i.test(resultado.error || '')) {
+                mostrar_aviso(resultado.error || "Error al guardar el pasajero", 'error');
+                return;
+            }
+        } catch (e) {
+            mostrar_aviso("Error de comunicacion al guardar el pasajero", 'error');
+            return;
+        }
+
+        // Copiar solo el DNI al comprador y disparar la busqueda.
+        const input_dni_comp = $("#comprador_dni");
+        input_dni_comp.value = datos_pas.dni;
+        await _buscar_comprador_por_dni(true);
     });
+
+    // Listener del DNI del comprador: mismo comportamiento que los
+    // formularios de pasajeros.
+    const input_dni_comp_el = document.getElementById('comprador_dni');
+    if (input_dni_comp_el) {
+        input_dni_comp_el.addEventListener('input', function() {
+            const dni_norm = _normalizar_dni_input(this.value);
+            if (dni_norm.length >= 7 && dni_norm.length <= 8) {
+                if (window.comprador_autocompletado_dni !== dni_norm) {
+                    _buscar_comprador_por_dni();
+                } else {
+                    _verificar_atadura_por_dni();
+                }
+            } else {
+                window.comprador_autocompletado_dni = null;
+                _limpiar_aviso_comprador();
+                _verificar_atadura_por_dni();
+            }
+        });
+    }
 
     $("#confirmar_venta").addEventListener("click", confirmar_venta_modal);
 
@@ -178,6 +240,7 @@ async function abrir_modal_confirmacion_venta() {
         $("#info_asiento_viaje").classList.remove("hidden");
         venta_form_abierto = false;
         mostrar_boton_confirmar_venta();
+        _notificar_cambio_venta_en_curso();
     });
 }
 
@@ -333,16 +396,17 @@ function construir_html_formulario_pasajero(index, opciones = {}) {
     const incluir_ficha = opciones.incluir_ficha === true;
 
     let html = `
+        <div class="aviso-autocompletado gris" id="pasajero_aviso_${index}">Ingrese el DNI para buscar.</div>
         <div class="form-grid">
-            <div class="field"><label>DNI *</label><input id="pasajero_dni_${index}" value=""></div>
-            <div class="field"><label>Apellido *</label><input id="pasajero_apellido_${index}" value=""></div>
-            <div class="field full"><label>Nombres *</label><input id="pasajero_nombres_${index}" value=""></div>
-            <div class="field"><label>Email</label><input id="pasajero_email_${index}" value=""></div>
-            <div class="field"><label>Celular *</label><input id="pasajero_celular_${index}" value=""></div>
-            <div class="field"><label>Celular Emergencia *</label><input id="pasajero_emergencia_${index}" value=""></div>
-            <div class="field"><label>Fecha de nacimiento *</label><input type="date" id="pasajero_fecha_nacimiento_${index}" value=""></div>
-            <div class="field"><label>Dirección *</label><input id="pasajero_direccion_${index}" value=""></div>
-            <div class="field"><label>Localidad *</label><input id="pasajero_localidad_${index}" value=""></div>
+            <div class="field"><label>DNI *</label><input id="pasajero_dni_${index}" value="" autocomplete="off"></div>
+            <div class="field"><label>Apellido *</label><input id="pasajero_apellido_${index}" value="" disabled></div>
+            <div class="field full"><label>Nombres *</label><input id="pasajero_nombres_${index}" value="" disabled></div>
+            <div class="field"><label>Email</label><input id="pasajero_email_${index}" value="" disabled></div>
+            <div class="field"><label>Celular *</label><input id="pasajero_celular_${index}" value="" disabled></div>
+            <div class="field"><label>Celular Emergencia *</label><input id="pasajero_emergencia_${index}" value="" disabled></div>
+            <div class="field"><label>Fecha de nacimiento *</label><input type="date" id="pasajero_fecha_nacimiento_${index}" value="" disabled></div>
+            <div class="field"><label>Dirección *</label><input id="pasajero_direccion_${index}" value="" disabled></div>
+            <div class="field"><label>Localidad *</label><input id="pasajero_localidad_${index}" value="" disabled></div>
         </div>
     `;
 
@@ -504,6 +568,14 @@ function conectar_listeners_formulario_pasajero(contenedor, index) {
             this.dataset.completado = 'true';
         });
     }
+
+    // Listener del campo DNI: dispara la busqueda por conteo de digitos.
+    const inputDni = contenedor.querySelector(`#pasajero_dni_${index}`);
+    if (inputDni) {
+        inputDni.addEventListener('input', function() {
+            _disparar_busqueda_por_dni(this.value, index);
+        });
+    }
 }
 
 /**
@@ -629,7 +701,7 @@ function generar_formularios_pasajeros(asientos) {
         div.className = 'panel';
         div.style.marginTop = '10px';
 
-        const titulo = `<h5>Asiento ${asiento.numero} (F${asiento.fila}, C${asiento.columna})</h5>`;
+        const titulo = `<h5>Asiento ${asiento.numero} <span class="badge-atadura hidden" id="badge_atadura_pasajero_${index}">Vinculado</span></h5>`;
         const html_campos = construir_html_formulario_pasajero(index, {
             incluir_selector_sb: true,
             incluir_ficha: mostrarFichaMedica
@@ -639,6 +711,7 @@ function generar_formularios_pasajeros(asientos) {
         contenedor.appendChild(div);
 
         conectar_listeners_formulario_pasajero(div, index);
+        _conectar_listeners_atadura_pasajero(index);
     });
 }
 
@@ -780,6 +853,7 @@ async function confirmar_venta_modal() {
             $("#formulario_confirmacion_venta").classList.add("hidden");
             $("#info_asiento_viaje").classList.remove("hidden");
             venta_form_abierto = false;
+            _notificar_cambio_venta_en_curso();
             await solicitar_estado_asientos();
             mostrar_boton_confirmar_venta();
             // Refrescar contadores sin reconstruir el modal: así no parpadea
@@ -2851,4 +2925,548 @@ async function ver_detalle_cancelacion(id_cancelacion) {
         const url = `index.php?imprimir=1&tipo=informe_cancelacion&id_cancelacion=${encodeURIComponent(c.id_cancelacion)}`;
         window.open(url, '_blank');
     });
+}
+
+// ============================================================
+// Autocompletado de pasajeros por DNI.
+//
+// El campo DNI es el unico habilitado al abrir el formulario.
+// Cuando el operador tipea 7 u 8 digitos, se dispara la busqueda
+// en el sistema. Si el pasajero existe, se completan los campos
+// y se muestra un cartel con la antiguedad de los datos. Si no
+// existe, se habilitan los campos vacios para carga manual.
+// ============================================================
+
+if (!window.pasajeros_autocompletado_estado) {
+    window.pasajeros_autocompletado_estado = {};
+}
+window.comprador_autocompletado_dni = null;
+
+/**
+ * Normaliza un DNI dejando solo digitos.
+ */
+function _normalizar_dni_input(valor) {
+    return String(valor || '').replace(/\D+/g, '');
+}
+
+/**
+ * Habilita o deshabilita los campos no-DNI de un formulario de
+ * pasajero. El campo DNI queda siempre habilitado.
+ */
+function _habilitar_campos_pasajero(index, habilitar) {
+    const ids = [
+        `pasajero_apellido_${index}`,
+        `pasajero_nombres_${index}`,
+        `pasajero_email_${index}`,
+        `pasajero_celular_${index}`,
+        `pasajero_emergencia_${index}`,
+        `pasajero_fecha_nacimiento_${index}`,
+        `pasajero_direccion_${index}`,
+        `pasajero_localidad_${index}`
+    ];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !habilitar;
+    });
+}
+
+/**
+ * Limpia los campos no-DNI de un formulario de pasajero.
+ */
+function _limpiar_campos_pasajero(index) {
+    const ids = [
+        `pasajero_apellido_${index}`,
+        `pasajero_nombres_${index}`,
+        `pasajero_email_${index}`,
+        `pasajero_celular_${index}`,
+        `pasajero_emergencia_${index}`,
+        `pasajero_fecha_nacimiento_${index}`,
+        `pasajero_direccion_${index}`,
+        `pasajero_localidad_${index}`
+    ];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+}
+
+/**
+ * Resetea los campos no-DNI y los vuelve a dejar deshabilitados.
+ */
+function _resetear_campos_pasajero(index) {
+    _limpiar_campos_pasajero(index);
+    _habilitar_campos_pasajero(index, false);
+}
+
+/**
+ * Resetea por completo el estado de autocompletado de un
+ * formulario de pasajero.
+ */
+function _resetear_autocompletado_pasajero(index) {
+    _resetear_campos_pasajero(index);
+    _limpiar_aviso_en_formulario(index);
+    delete window.pasajeros_autocompletado_estado[index];
+}
+
+/**
+ * Muestra un cartel de estado en el formulario del pasajero.
+ */
+function _mostrar_aviso_en_formulario(index, texto, clase) {
+    const aviso = document.getElementById(`pasajero_aviso_${index}`);
+    if (!aviso) return;
+    aviso.textContent = texto;
+    aviso.className = `aviso-autocompletado ${clase || ''}`;
+}
+
+/**
+ * Limpia el cartel de estado del formulario del pasajero.
+ */
+function _limpiar_aviso_en_formulario(index) {
+    const aviso = document.getElementById(`pasajero_aviso_${index}`);
+    if (!aviso) return;
+    aviso.textContent = 'Ingrese el DNI para buscar.';
+    aviso.className = 'aviso-autocompletado gris';
+}
+
+/**
+ * Calcula la antiguedad de los datos a partir de la fecha ISO
+ * de ultima modificacion. Devuelve un objeto { texto, clase }.
+ */
+function _calcular_antiguedad_datos(fecha_iso) {
+    const fecha = String(fecha_iso || '').trim();
+    if (fecha === '' || fecha === '2000-01-01') {
+        return { texto: 'Sin registro de actualizacion', clase: 'gris' };
+    }
+    const partes = fecha.split('-');
+    if (partes.length !== 3) {
+        return { texto: 'Sin registro de actualizacion', clase: 'gris' };
+    }
+    const anio = parseInt(partes[0], 10);
+    const mes = parseInt(partes[1], 10) - 1;
+    const dia = parseInt(partes[2], 10);
+    const fecha_datos = new Date(anio, mes, dia);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    fecha_datos.setHours(0, 0, 0, 0);
+    const diff_ms = hoy.getTime() - fecha_datos.getTime();
+    const diff_dias = Math.floor(diff_ms / (1000 * 60 * 60 * 24));
+
+    if (diff_dias < 0) {
+        return { texto: 'Fecha de actualizacion invalida', clase: 'gris' };
+    }
+    if (diff_dias === 0) return { texto: 'Datos actualizados hoy', clase: 'verde' };
+    if (diff_dias === 1) return { texto: 'Datos actualizados ayer', clase: 'verde' };
+    if (diff_dias < 30) return { texto: `Datos actualizados hace ${diff_dias} dias`, clase: 'verde' };
+
+    if (diff_dias < 365) {
+        const meses = Math.floor(diff_dias / 30);
+        return { texto: `Datos actualizados hace ${meses} ${meses === 1 ? 'mes' : 'meses'}`, clase: 'amarillo' };
+    }
+
+    const anios = Math.floor(diff_dias / 365);
+    return { texto: `Datos actualizados hace ${anios} ${anios === 1 ? 'anio' : 'anios'}`, clase: 'amarillo' };
+}
+
+/**
+ * Aplica los datos de un pasajero existente a los campos del
+ * formulario y muestra el cartel de antiguedad.
+ */
+function _aplicar_datos_pasajero(index, datos) {
+    const set = (id, valor) => {
+        const el = document.getElementById(id);
+        if (el) el.value = valor || '';
+    };
+    set(`pasajero_apellido_${index}`, datos.apellido);
+    set(`pasajero_nombres_${index}`, datos.nombres);
+    set(`pasajero_email_${index}`, datos.email);
+    set(`pasajero_celular_${index}`, datos.celular);
+    set(`pasajero_emergencia_${index}`, datos.celular_emergencia);
+    set(`pasajero_fecha_nacimiento_${index}`, datos.fecha_nacimiento);
+    set(`pasajero_direccion_${index}`, datos.direccion);
+    set(`pasajero_localidad_${index}`, datos.localidad);
+
+    _habilitar_campos_pasajero(index, true);
+
+    const antiguedad = _calcular_antiguedad_datos(datos.fecha_ultima_modificacion);
+    _mostrar_aviso_en_formulario(index, antiguedad.texto, antiguedad.clase);
+}
+
+/**
+ * Verifica si el DNI ya esta cargado en otro formulario de
+ * pasajero del mismo lote.
+ */
+function _dni_duplicado_en_otros_formularios(index, dni_norm) {
+    const total = document.querySelectorAll('[id^="pasajero_dni_"]').length;
+    for (let i = 0; i < total; i++) {
+        if (i === index) continue;
+        const otro = document.getElementById(`pasajero_dni_${i}`);
+        if (!otro) continue;
+        if (_normalizar_dni_input(otro.value) === dni_norm) return true;
+    }
+    return false;
+}
+
+/**
+ * Verifica si el DNI ya esta asignado a un asiento vendido o
+ * reservado del micro actual.
+ */
+function _dni_en_asientos_actuales(dni_norm) {
+    if (typeof estados_asientos_actuales === 'undefined' || !Array.isArray(estados_asientos_actuales)) return false;
+    for (const a of estados_asientos_actuales) {
+        if (!a.pasajero) continue;
+        const dni_pas = _normalizar_dni_input(a.pasajero.dni || '');
+        if (dni_pas !== '' && dni_pas === dni_norm) return true;
+    }
+    return false;
+}
+
+/**
+ * Dispara la busqueda si el valor del input DNI tiene 7 u 8
+ * digitos. Si el valor cambio y dejo de tener 7-8 digitos,
+ * resetea los campos y el estado.
+ */
+function _disparar_busqueda_por_dni(valor, index) {
+    const dni_norm = _normalizar_dni_input(valor);
+    const estado = window.pasajeros_autocompletado_estado[index];
+
+    if (dni_norm.length < 7 || dni_norm.length > 8) {
+        if (estado && estado.dni_buscado && estado.dni_buscado !== dni_norm) {
+            _resetear_autocompletado_pasajero(index);
+        }
+        _verificar_atadura_por_dni();
+        return;
+    }
+
+    if (estado && estado.dni_buscado === dni_norm) return;
+
+    _buscar_pasajero_por_dni(index);
+}
+
+/**
+ * Busca un pasajero por DNI en el backend y aplica el resultado.
+ */
+async function _buscar_pasajero_por_dni(index) {
+    const inputDni = document.getElementById(`pasajero_dni_${index}`);
+    if (!inputDni) return;
+
+    const dni_norm = _normalizar_dni_input(inputDni.value);
+    if (dni_norm.length < 7 || dni_norm.length > 8) return;
+
+    // Chequeo local de duplicados.
+    if (_dni_duplicado_en_otros_formularios(index, dni_norm)) {
+        _mostrar_aviso_en_formulario(index, 'Ese DNI ya esta cargado en otro pasajero de esta venta.', 'rojo');
+        _resetear_campos_pasajero(index);
+        window.pasajeros_autocompletado_estado[index] = { dni_buscado: dni_norm, duplicado: true };
+        mostrar_aviso('DNI duplicado en otro pasajero de esta venta', 'error');
+        return;
+    }
+
+    if (_dni_en_asientos_actuales(dni_norm)) {
+        _mostrar_aviso_en_formulario(index, 'Ese DNI ya esta asignado a otro asiento de este viaje.', 'rojo');
+        _resetear_campos_pasajero(index);
+        window.pasajeros_autocompletado_estado[index] = { dni_buscado: dni_norm, duplicado: true };
+        mostrar_aviso('DNI ya asignado a otro asiento de este viaje', 'error');
+        return;
+    }
+
+    _mostrar_aviso_en_formulario(index, 'Buscando...', 'gris');
+
+    const nombre_dueno = (usuario_actual.nivel === 'terminal')
+        ? viaje_seleccionado.dueno
+        : obtener_nombre_dueno_actual();
+
+    try {
+        const resp = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "pasajeros/obtener",
+                dni: dni_norm,
+                nombre_dueno
+            })
+        });
+        const datos = await resp.json();
+
+        if (datos.exito && datos.pasajero) {
+            _aplicar_datos_pasajero(index, datos.pasajero);
+            window.pasajeros_autocompletado_estado[index] = {
+                dni_buscado: dni_norm,
+                encontrado: true,
+                fecha_modificacion: datos.pasajero.fecha_ultima_modificacion || ''
+            };
+        } else {
+            _habilitar_campos_pasajero(index, true);
+            _mostrar_aviso_en_formulario(index, 'DNI no registrado. Complete los datos.', 'gris');
+            window.pasajeros_autocompletado_estado[index] = {
+                dni_buscado: dni_norm,
+                encontrado: false,
+                fecha_modificacion: ''
+            };
+        }
+    } catch (e) {
+        console.error("Error buscando pasajero:", e);
+        _limpiar_aviso_en_formulario(index);
+    }
+
+    _verificar_atadura_por_dni();
+}
+
+/**
+ * Busca el comprador por DNI y aplica el resultado.
+ */
+async function _buscar_comprador_por_dni(forzar = false) {
+    const input = document.getElementById('comprador_dni');
+    if (!input) return;
+
+    const dni_norm = _normalizar_dni_input(input.value);
+    if (dni_norm.length < 7 || dni_norm.length > 8) return;
+
+    if (!forzar && window.comprador_autocompletado_dni === dni_norm) return;
+    window.comprador_autocompletado_dni = dni_norm;
+
+    const nombre_dueno = (usuario_actual.nivel === 'terminal')
+        ? viaje_seleccionado.dueno
+        : obtener_nombre_dueno_actual();
+
+    _mostrar_aviso_comprador('Buscando...', 'gris');
+
+    try {
+        const resp = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "pasajeros/obtener",
+                dni: dni_norm,
+                nombre_dueno
+            })
+        });
+        const datos = await resp.json();
+
+        if (datos.exito && datos.pasajero) {
+            _aplicar_datos_comprador(datos.pasajero);
+            const antiguedad = _calcular_antiguedad_datos(datos.pasajero.fecha_ultima_modificacion);
+            _mostrar_aviso_comprador(antiguedad.texto, antiguedad.clase);
+        } else {
+            _mostrar_aviso_comprador('DNI no registrado. Complete los datos.', 'gris');
+        }
+    } catch (e) {
+        console.error("Error buscando comprador:", e);
+        _limpiar_aviso_comprador();
+    }
+
+    _verificar_atadura_por_dni();
+}
+
+/**
+ * Aplica los datos de un pasajero existente a los campos del
+ * comprador.
+ */
+function _aplicar_datos_comprador(datos) {
+    const set = (id, valor) => {
+        const el = document.getElementById(id);
+        if (el) el.value = valor || '';
+    };
+    set('comprador_apellido', datos.apellido);
+    set('comprador_nombres', datos.nombres);
+    set('comprador_email', datos.email);
+    set('comprador_celular', datos.celular);
+}
+
+/**
+ * Muestra un cartel de estado en el bloque del comprador.
+ */
+function _mostrar_aviso_comprador(texto, clase) {
+    const aviso = document.getElementById('comprador_aviso_autocompletado');
+    if (!aviso) return;
+    aviso.textContent = texto;
+    aviso.className = `aviso-autocompletado ${clase || ''}`;
+}
+
+/**
+ * Limpia el cartel de estado del comprador.
+ */
+function _limpiar_aviso_comprador() {
+    const aviso = document.getElementById('comprador_aviso_autocompletado');
+    if (!aviso) return;
+    aviso.textContent = 'Ingrese el DNI para autocompletar los datos del comprador.';
+    aviso.className = 'aviso-autocompletado gris';
+}
+
+// ============================================================
+// Atadura comprador-pasajero por DNI coincidente.
+//
+// Cuando el DNI del comprador coincide con el DNI de algun
+// pasajero, los formularios quedan vinculados: cualquier
+// cambio en un campo comun de uno se refleja en el otro.
+//
+// Campos comunes (los que existen en ambos): apellido, nombres,
+// email, celular. El pasajero tiene ademas celular_emergencia,
+// fecha_nacimiento, direccion y localidad, que no se
+// sincronizan porque el comprador no los tiene. Esos datos se
+// guardan en el nodo pasajero y el comprador los ve por el
+// enlace al mismo nodo.
+//
+// Al activarse se copian los campos comunes del pasajero al
+// comprador. Al romperse (porque cambia alguno de los dos DNI
+// y dejan de coincidir) los datos quedan como estan.
+// ============================================================
+
+if (!window.atadura_actual) window.atadura_actual = null;
+
+/**
+ * Conecta los listeners de atadura en los campos comunes del
+ * comprador. Se llama una sola vez al abrir el modal.
+ */
+function _conectar_listeners_atadura_comprador() {
+    const pares = [
+        ['comprador_apellido', 'apellido'],
+        ['comprador_nombres', 'nombres'],
+        ['comprador_email', 'email'],
+        ['comprador_celular', 'celular']
+    ];
+    pares.forEach(([id_comp, campo]) => {
+        const el = document.getElementById(id_comp);
+        if (!el) return;
+        el.addEventListener('input', function() {
+            if (!window.atadura_actual) return;
+            const idx = window.atadura_actual.indice_pasajero;
+            const el_pas = document.getElementById(`pasajero_${campo}_${idx}`);
+            if (el_pas && el_pas.value !== this.value) {
+                el_pas.value = this.value;
+            }
+        });
+    });
+}
+
+/**
+ * Conecta los listeners de atadura en los campos comunes de un
+ * pasajero. Se llama una vez por cada formulario de pasajero.
+ */
+function _conectar_listeners_atadura_pasajero(index) {
+    const pares = [
+        [`pasajero_apellido_${index}`, 'comprador_apellido'],
+        [`pasajero_nombres_${index}`, 'comprador_nombres'],
+        [`pasajero_email_${index}`, 'comprador_email'],
+        [`pasajero_celular_${index}`, 'comprador_celular']
+    ];
+    pares.forEach(([id_pas, id_comp]) => {
+        const el = document.getElementById(id_pas);
+        if (!el) return;
+        el.addEventListener('input', function() {
+            if (!window.atadura_actual) return;
+            if (window.atadura_actual.indice_pasajero !== index) return;
+            const el_comp = document.getElementById(id_comp);
+            if (el_comp && el_comp.value !== this.value) {
+                el_comp.value = this.value;
+            }
+        });
+    });
+}
+
+/**
+ * Verifica si el DNI del comprador coincide con el de algun
+ * pasajero y activa, mantiene o rompe la atadura segun
+ * corresponda.
+ */
+function _verificar_atadura_por_dni() {
+    const el_comp = document.getElementById('comprador_dni');
+    if (!el_comp) return;
+    const comp_dni = _normalizar_dni_input(el_comp.value);
+
+    let indice_coincidente = null;
+    if (comp_dni.length >= 7 && comp_dni.length <= 8) {
+        const total = document.querySelectorAll('[id^="pasajero_dni_"]').length;
+        for (let i = 0; i < total; i++) {
+            const el = document.getElementById(`pasajero_dni_${i}`);
+            if (!el) continue;
+            const dni_pas = _normalizar_dni_input(el.value);
+            if (dni_pas === comp_dni) {
+                indice_coincidente = i;
+                break;
+            }
+        }
+    }
+
+    if (indice_coincidente === null) {
+        if (window.atadura_actual) _romper_atadura();
+        return;
+    }
+
+    if (window.atadura_actual && window.atadura_actual.indice_pasajero === indice_coincidente) {
+        return;
+    }
+
+    if (window.atadura_actual) _romper_atadura();
+    _activar_atadura(indice_coincidente);
+}
+
+/**
+ * Activa la atadura entre el comprador y el pasajero indicado.
+ * Copia los campos comunes del pasajero al comprador y muestra
+ * los badges en ambos titulos.
+ */
+function _activar_atadura(index_pasajero) {
+    window.atadura_actual = { indice_pasajero: index_pasajero };
+
+    // Copia inicial: del pasajero al comprador. Solo los campos
+    // comunes (los que existen en ambos formularios).
+    const pares = [
+        [`pasajero_apellido_${index_pasajero}`, 'comprador_apellido'],
+        [`pasajero_nombres_${index_pasajero}`, 'comprador_nombres'],
+        [`pasajero_email_${index_pasajero}`, 'comprador_email'],
+        [`pasajero_celular_${index_pasajero}`, 'comprador_celular']
+    ];
+    pares.forEach(([id_pas, id_comp]) => {
+        const el_pas = document.getElementById(id_pas);
+        const el_comp = document.getElementById(id_comp);
+        if (el_pas && el_comp) el_comp.value = el_pas.value;
+    });
+
+    // Badges.
+    const badge_comp = document.getElementById('badge_atadura_comprador');
+    if (badge_comp) badge_comp.classList.remove('hidden');
+    const badge_pas = document.getElementById(`badge_atadura_pasajero_${index_pasajero}`);
+    if (badge_pas) badge_pas.classList.remove('hidden');
+}
+
+/**
+ * Rompe la atadura y oculta los badges. Los datos de cada
+ * formulario quedan como estan.
+ */
+function _romper_atadura() {
+    if (!window.atadura_actual) return;
+    const idx = window.atadura_actual.indice_pasajero;
+    window.atadura_actual = null;
+
+    const badge_comp = document.getElementById('badge_atadura_comprador');
+    if (badge_comp) badge_comp.classList.add('hidden');
+    const badge_pas = document.getElementById(`badge_atadura_pasajero_${idx}`);
+    if (badge_pas) badge_pas.classList.add('hidden');
+}
+
+// ============================================================
+// Puente con viajes-asientos.js.
+//
+// Expone si hay una venta en curso para que otros modulos
+// puedan bloquear acciones. Tambien notifica a la grilla de
+// asientos cuando el estado cambia, para que re-aplique los
+// disabled de los botones sin tener que re-renderizar.
+// ============================================================
+
+window.venta_en_curso = function() {
+    try {
+        return venta_form_abierto === true;
+    } catch (e) {
+        return false;
+    }
+};
+
+function _notificar_cambio_venta_en_curso() {
+    if (typeof window.actualizar_bloqueo_botones_asientos === 'function') {
+        try {
+            window.actualizar_bloqueo_botones_asientos();
+        } catch (e) {
+            console.error('Error notificando cambio de venta en curso:', e);
+        }
+    }
 }

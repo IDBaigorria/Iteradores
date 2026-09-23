@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.56
+ * @version   1.5piloto.57
  */
 
 use Iteradores\Nodos\Nodo;
@@ -668,6 +668,26 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
         case 'pasajeros':
             switch ($subaccion) {
+                case 'crear':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueno no especificado']);
+                    }
+                    $datos = [
+                        'dni' => $post['dni'] ?? '',
+                        'nombres' => $post['nombres'] ?? '',
+                        'apellido' => $post['apellido'] ?? '',
+                        'email' => $post['email'] ?? '',
+                        'celular' => $post['celular'] ?? '',
+                        'celular_emergencia' => $post['celular_emergencia'] ?? '',
+                        'fecha_nacimiento' => $post['fecha_nacimiento'] ?? '',
+                        'direccion' => $post['direccion'] ?? '',
+                        'localidad' => $post['localidad'] ?? '',
+                    ];
+                    $resultado = crear_pasajero($nombre_dueno, $datos);
+                    responder_json($resultado);
+                    break;
+
                 case 'listar':
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
                     if (empty($nombre_dueno)) {

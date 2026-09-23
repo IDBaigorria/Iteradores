@@ -18,7 +18,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.55
+ * @version   1.5piloto.58
  */
 
 // --- Utilidades base ----------------------------------
@@ -168,6 +168,24 @@ if (isset($_GET['migrar_nombres_pasajeros'])) {
     echo "Sin cambio:           {$res['sin_cambio']}\n";
     echo "Sin nombre:           {$res['sin_nombre']}\n";
     echo "Sin apellido:         {$res['sin_apellido']}\n";
+    exit;
+}
+
+// ==== Bloque temporal para migración de fecha_ultima_modificacion de pasajeros (v1.5piloto.58) ====
+// Siembra el enlace `fecha_ultima_modificacion` en los pasajeros existentes.
+// Los que aparecen en alguna venta toman la fecha de la venta más reciente
+// (formato ISO). Los que no, quedan con "2000-01-01".
+// Es idempotente: si un pasajero ya tiene el enlace, lo saltea.
+if (isset($_GET['migrar_fecha_ultima_modificacion_pasajeros'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_fecha_ultima_modificacion_pasajeros.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_fecha_ultima_modificacion_pasajeros();
+    echo "Migración de fecha_ultima_modificacion de pasajeros completada.\n";
+    echo "Dueños procesados:      {$res['duenos_procesados']}\n";
+    echo "Pasajeros procesados:   {$res['pasajeros_procesados']}\n";
+    echo "Migrados con venta:     {$res['migrados_con_venta']}\n";
+    echo "Migrados fecha vieja:   {$res['migrados_con_fecha_vieja']}\n";
+    echo "Ya migrados:            {$res['ya_migrados']}\n";
     exit;
 }
 

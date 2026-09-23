@@ -339,6 +339,61 @@
 }
 
 /* Totales en una sola línea, sin cajas. */
+/* Aviso de autocompletado de pasajeros por DNI. */
+.aviso-autocompletado {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    background: #f0f0f0;
+    color: #555;
+    border-left: 3px solid #999;
+    min-height: 28px;
+    line-height: 1.4;
+    box-sizing: border-box;
+}
+.aviso-autocompletado.verde {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-left-color: #4caf50;
+}
+.aviso-autocompletado.amarillo {
+    background: #fff8e1;
+    color: #856404;
+    border-left-color: #ffc107;
+}
+.aviso-autocompletado.gris {
+    background: #f0f0f0;
+    color: #555;
+    border-left-color: #999;
+}
+.aviso-autocompletado.rojo {
+    background: #fdecea;
+    color: #b71c1c;
+    border-left-color: #c62828;
+}
+.aviso-autocompletado.hidden {
+    display: none;
+}
+
+/* Badge de atadura comprador-pasajero por DNI coincidente. */
+.badge-atadura {
+    display: inline-block;
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.badge-atadura.hidden {
+    display: none;
+}
+
 .cuponera-totales-linea {
     display: flex;
     flex-wrap: wrap;

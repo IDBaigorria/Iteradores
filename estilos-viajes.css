@@ -184,6 +184,14 @@
     padding: 5px 10px;
 }
 
+/* v1.5piloto.59f: botones de tarjetas de asiento bloqueados
+   mientras hay una venta en curso. */
+.asiento-card-acciones .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+}
+
 @media (max-width: 800px) {
     .pasaje-layout {
         flex-direction: column;

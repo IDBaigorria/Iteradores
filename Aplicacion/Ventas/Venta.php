@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.56
+ * @version   1.5piloto.58
  */
 
 
@@ -46,22 +46,93 @@ function obtener_o_crear_pasajero(string $nombre_dueno, string $dni, array $dato
     if (!$contenedor) return null;
 
     $nodo_pasajero = $contenedor->adyacente($dni);
+    $es_nuevo = false;
     if (!$nodo_pasajero) {
         $nodo_pasajero = Nodo::crear_con_dato($dni);
         $contenedor->_adyacente_en($nodo_pasajero, $dni);
+        $es_nuevo = true;
     }
 
-    // Actualizar datos si se proporcionan
-    $campos = ['nombres', 'apellido', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento', 'localidad', 'direccion'];    
+    // Actualizar datos si se proporcionan. Se registra si hubo cambios
+    // reales (valor nuevo distinto del actual) para decidir si hay que
+    // actualizar la fecha_ultima_modificacion.
+    $campos = ['nombres', 'apellido', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento', 'localidad', 'direccion'];
+    $hubo_cambios = false;
     foreach ($campos as $campo) {
         if (isset($datos_pasajero[$campo]) && $datos_pasajero[$campo] !== '') {
             $nodo_campo = $nodo_pasajero->adyacente($campo);
+            $valor_actual = $nodo_campo ? $nodo_campo->dato() : '';
+            if ($valor_actual === $datos_pasajero[$campo]) continue;
+
+            $hubo_cambios = true;
             if ($nodo_campo) $nodo_campo->_dato($datos_pasajero[$campo]);
             else $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato($datos_pasajero[$campo]), $campo);
         }
     }
 
+    // Si el pasajero es nuevo o hubo cambios reales, actualizamos la
+    // fecha de ultima modificacion (se usa para el autocompletado).
+    if ($es_nuevo || $hubo_cambios) {
+        $hoy = date('Y-m-d');
+        $nodo_fecha = $nodo_pasajero->adyacente('fecha_ultima_modificacion');
+        if ($nodo_fecha) $nodo_fecha->_dato($hoy);
+        else $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato($hoy), 'fecha_ultima_modificacion');
+    }
+
     return $nodo_pasajero;
+}
+
+/**
+ * Verifica si un DNI ya esta asignado a algun asiento del viaje.
+ *
+ * Version local de la funcion homonima en ViajeAsientos.php. Se
+ * duplica aca para evitar la dependencia circular (ViajeAsientos
+ * incluye a Venta.php).
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $dni
+ * @return bool
+ */
+function _dni_asignado_en_viaje_venta(string $nombre_dueno, string $nombre_viaje, string $dni): bool {
+    $dni_norm = normalizar_dni($dni);
+    if ($dni_norm === '') return false;
+
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return false;
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return false;
+
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) return false;
+
+    $adyacentes_micros = (array) $nodo_micros->adyacentes();
+    foreach ($adyacentes_micros as $nodo_micro) {
+        $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+        if (!$nodo_copia) continue;
+        $nodo_asientos = $nodo_copia->adyacente('asientos');
+        if (!$nodo_asientos) continue;
+
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$piso) continue;
+            $cabeza = $piso->adyacente('asientos');
+            if (!$cabeza) continue;
+            $actual = $cabeza->adyacente('primer');
+            $seg = 0;
+            while ($actual && $actual->id() !== $cabeza->id() && $seg < 200) {
+                $nodo_pasajero = $actual->adyacente('pasajero');
+                if ($nodo_pasajero && normalizar_dni($nodo_pasajero->dato()) === $dni_norm) {
+                    return true;
+                }
+                $actual = $actual->adyacente('siguiente');
+                $seg++;
+            }
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -366,6 +437,58 @@ function confirmar_venta_actual(
 
         if (empty($datos_pasajero['localidad']) || empty($datos_pasajero['direccion'])) {
             return ['exito' => false, 'error' => 'Faltan datos obligatorios del pasajero ' . ($indice_asiento + 1) . ': localidad y dirección'];
+        }
+
+        // Verificar que el DNI no este duplicado en este mismo lote
+        // (mismo formulario de venta).
+        $dni_norm_actual = normalizar_dni($dni_pasajero);
+        if ($dni_norm_actual !== '') {
+            foreach ($pasajeros_por_asiento as $idx_otro => $datos_otro) {
+                if ($idx_otro <= $indice_asiento) continue;
+                $dni_otro = normalizar_dni($datos_otro['dni'] ?? '');
+                if ($dni_otro !== '' && $dni_otro === $dni_norm_actual) {
+                    return [
+                        'exito' => false,
+                        'error' => "El DNI $dni_norm_actual esta repetido entre los pasajeros de esta venta"
+                    ];
+                }
+            }
+
+            // Verificar que el DNI no este ya asignado a otro asiento
+            // del mismo viaje (vendido o reservado en otro micro).
+            if (_dni_asignado_en_viaje_venta($nombre_dueno, $nombre_viaje, $dni_pasajero)) {
+                return [
+                    'exito' => false,
+                    'error' => "El DNI $dni_norm_actual ya esta asignado a otro asiento de este viaje"
+                ];
+            }
+
+            // Si el DNI coincide con el del comprador, verificar que los
+            // datos comunes tambien coincidan. Es una red de seguridad por
+            // si alguien fuerza el POST desde la consola salteando la
+            // atadura del frontend.
+            $dni_norm_comprador = normalizar_dni($comprador_dni);
+            if ($dni_norm_comprador !== '' && $dni_norm_actual === $dni_norm_comprador) {
+                $comprador_valores = [
+                    'apellido' => trim($comprador_apellido),
+                    'nombres' => trim($comprador_nombres),
+                    'email' => trim($comprador_email),
+                    'celular' => trim($comprador_celular),
+                ];
+                $en_conflicto = [];
+                foreach ($comprador_valores as $campo => $valor_comp) {
+                    $valor_pas = trim((string)($datos_pasajero[$campo] ?? ''));
+                    if ($valor_pas !== $valor_comp) {
+                        $en_conflicto[] = $campo;
+                    }
+                }
+                if (!empty($en_conflicto)) {
+                    return [
+                        'exito' => false,
+                        'error' => "El DNI $dni_norm_actual aparece como comprador y como pasajero con datos distintos en: " . implode(', ', $en_conflicto)
+                    ];
+                }
+            }
         }
 
         $nodo_pasajero = obtener_o_crear_pasajero($nombre_dueno, $dni_pasajero, $datos_pasajero);

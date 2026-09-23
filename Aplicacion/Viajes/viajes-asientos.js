@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.57
+ * @version 1.5piloto.59f
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -18,6 +18,23 @@ function obtener_dueno_viaje_seleccionado() {
         return viaje_seleccionado.dueno;
     }
     return obtener_nombre_dueno_actual();
+}
+
+/**
+ * Devuelve true si hay una venta en curso. Se apoya en el hook
+ * expuesto por ventas.js para no acceder directamente a la
+ * variable venta_form_abierto (que es un let de scope global y
+ * podria dar TDZ si se la lee muy temprano).
+ */
+function _venta_en_curso() {
+    if (typeof window.venta_en_curso === 'function') {
+        try {
+            return window.venta_en_curso() === true;
+        } catch (e) {
+            return false;
+        }
+    }
+    return false;
 }
 
 function iniciar_sync_asientos() {
@@ -196,6 +213,10 @@ async function seleccionar_asiento_pasaje(fila, columna) {
 async function deseleccionar_asiento_pasaje(fila, columna) {
     if (!micro_seleccionado || !viaje_seleccionado) return;
     if (operacion_asiento_en_curso) return;
+    if (_venta_en_curso()) {
+        mostrar_aviso('Hay una venta en curso. Termínala o cancelala antes de liberar el asiento.', 'error');
+        return;
+    }
 
     operacion_asiento_en_curso = true;
 
@@ -404,20 +425,25 @@ function construir_html_tarjeta_asiento(asiento) {
     // Botones
     const botones = [];
 
+    // Si hay una venta en curso, los botones que modifican el asiento
+    // arrancan deshabilitados. Los de lectura (Ver pasaje / Ver compra)
+    // siguen activos.
+    const bloqueo_venta = _venta_en_curso() ? ' disabled' : '';
+
     if (es_dueno_o_admin && asiento.estado === 'libre') {
-        botones.push(`<button class="btn primary btn-reservar-asiento" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Reservar para equipo</button>`);
+        botones.push(`<button class="btn primary btn-reservar-asiento"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}">Reservar para equipo</button>`);
     }
 
     if (es_terminal && es_propio) {
-        botones.push(`<button class="btn danger btn-liberar-seleccion" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Liberar</button>`);
+        botones.push(`<button class="btn danger btn-liberar-seleccion"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}">Liberar</button>`);
     }
 
     if (es_dueno_o_admin && asiento.estado === 'reservado' && !asiento.tiene_pasajero) {
-        botones.push(`<button class="btn primary btn-asignar-pasajero" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Asignar pasajero</button>`);
+        botones.push(`<button class="btn primary btn-asignar-pasajero"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}">Asignar pasajero</button>`);
     }
 
     if (es_dueno_o_admin && asiento.estado === 'reservado') {
-        botones.push(`<button class="btn danger btn-liberar-reserva" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Liberar reserva</button>`);
+        botones.push(`<button class="btn danger btn-liberar-reserva"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}">Liberar reserva</button>`);
     }
 
     // Ver pasaje: disponible en reservado con pasajero o vendido
@@ -489,6 +515,10 @@ function renderizar_tarjetas_asientos(asientos, titulo, modo) {
     panel.querySelectorAll('.btn-ver-compra-asiento').forEach(btn => {
         btn.addEventListener('click', () => ver_compra_asiento(btn.dataset.ventaId));
     });
+
+    // Re-aplicar el estado de bloqueo por si la grilla se dibujo
+    // durante una venta en curso.
+    actualizar_bloqueo_botones_asientos();
 }
 
 function refrescar_info_asientos_propios(forzar = false) {
@@ -531,6 +561,10 @@ function mostrar_info_asiento(asiento) {
  * Incluye un checkbox para asignar los datos del pasajero en el mismo paso.
  */
 function abrir_modal_reservar_asiento(fila, columna) {
+    if (_venta_en_curso()) {
+        mostrar_aviso('Hay una venta en curso. Termínala o cancelala antes de reservar un asiento.', 'error');
+        return;
+    }
     const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
     if (!asiento) {
         mostrar_aviso("Asiento no encontrado", 'error');
@@ -644,6 +678,10 @@ function abrir_modal_reservar_asiento(fila, columna) {
  *    chico de impresión por encima.
  */
 function abrir_modal_asignar_pasajero(fila, columna) {
+    if (_venta_en_curso()) {
+        mostrar_aviso('Hay una venta en curso. Termínala o cancelala antes de asignar un pasajero.', 'error');
+        return;
+    }
     const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
     if (!asiento) {
         mostrar_aviso("Asiento no encontrado", 'error');
@@ -886,6 +924,10 @@ function mostrar_modal_chico_impresion_reserva(nombre_dueno, nombre_viaje, nombr
 async function liberar_reserva_equipo(fila, columna) {
     if (!micro_seleccionado || !viaje_seleccionado) return;
     if (operacion_asiento_en_curso) return;
+    if (_venta_en_curso()) {
+        mostrar_aviso('Hay una venta en curso. Termínala o cancelala antes de liberar la reserva.', 'error');
+        return;
+    }
 
     const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
     if (!asiento) {
@@ -1204,3 +1246,29 @@ document.addEventListener('mousemove', registrar_actividad_usuario);
 document.addEventListener('keydown', registrar_actividad_usuario);
 document.addEventListener('click', registrar_actividad_usuario);
 document.addEventListener('touchstart', registrar_actividad_usuario);
+
+/**
+ * Aplica o quita el disabled de los botones que modifican el
+ * asiento (Reservar, Liberar, Asignar, Liberar reserva) segun
+ * si hay una venta en curso. Los botones de lectura (Ver pasaje,
+ * Ver compra) quedan siempre activos.
+ *
+ * Se llama desde renderizar_tarjetas_asientos y desde el hook
+ * que expone ventas.js al abrir/cerrar el modal de venta.
+ */
+function actualizar_bloqueo_botones_asientos() {
+    const bloqueado = _venta_en_curso();
+    const selectores = [
+        '.btn-reservar-asiento',
+        '.btn-liberar-seleccion',
+        '.btn-asignar-pasajero',
+        '.btn-liberar-reserva'
+    ];
+    selectores.forEach(sel => {
+        document.querySelectorAll(sel).forEach(btn => {
+            btn.disabled = bloqueado;
+        });
+    });
+}
+
+window.actualizar_bloqueo_botones_asientos = actualizar_bloqueo_botones_asientos;

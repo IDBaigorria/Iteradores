@@ -1,6 +1,6 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.42
+ * @version 1.5piloto.59
  */
 /**
  * Normaliza un DNI dejando solo dígitos.
@@ -795,3 +795,94 @@ function agregarInputSalud(contenedor, tipo, index, valorInicial = '', esUltimo 
     div.appendChild(boton);
     contenedor.appendChild(div);
 }
+
+/**
+ * Abre el modal para agregar un pasajero/cliente nuevo. Reutiliza
+ * los helpers construir_html_formulario_pasajero,
+ * conectar_listeners_formulario_pasajero y recolectar_datos_pasajero
+ * de ventas.js.
+ *
+ * Los campos obligatorios coinciden con los del formulario de venta:
+ * DNI, apellido, nombres, celular, celular de emergencia, fecha de
+ * nacimiento, direccion y localidad. El email es opcional.
+ */
+function abrir_modal_agregar_pasajero() {
+    const nombre_dueno = obtener_nombre_dueno_pasajeros();
+    if (!nombre_dueno) {
+        mostrar_aviso('Seleccione un dueno primero', 'error');
+        return;
+    }
+
+    const html_campos = construir_html_formulario_pasajero(0, {
+        incluir_selector_sb: false,
+        incluir_ficha: false
+    });
+
+    const contenido = `
+        <p class="muted" style="margin-top:0;">Complete los datos del nuevo pasajero. El DNI no puede coincidir con uno existente.</p>
+        ${html_campos}
+        <div class="actions" style="margin-top:15px;">
+            <button class="btn primary" id="boton_guardar_nuevo_pasajero">Guardar pasajero</button>
+            <button class="btn" id="boton_cancelar_nuevo_pasajero">Cancelar</button>
+        </div>
+    `;
+
+    abrir_modal_generico('Agregar pasajero/cliente', contenido);
+
+    const contenedor = document.getElementById('modal_generico_contenido');
+    if (!contenedor) return;
+
+    conectar_listeners_formulario_pasajero(contenedor, 0);
+
+    const btn_cancelar = contenedor.querySelector('#boton_cancelar_nuevo_pasajero');
+    if (btn_cancelar) {
+        btn_cancelar.addEventListener('click', cerrar_modal_generico);
+    }
+
+    const btn_guardar = contenedor.querySelector('#boton_guardar_nuevo_pasajero');
+    if (btn_guardar) {
+        btn_guardar.addEventListener('click', async () => {
+            const r = recolectar_datos_pasajero(0, {
+                incluir_selector_sb: false,
+                incluir_ficha: false
+            });
+            if (!r.ok) {
+                mostrar_aviso(r.error, 'error');
+                return;
+            }
+            const datos = r.datos;
+
+            const respuesta = await fetch("index.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    accion: "pasajeros/crear",
+                    nombre_dueno,
+                    dni: datos.dni,
+                    apellido: datos.apellido,
+                    nombres: datos.nombres,
+                    email: datos.email,
+                    celular: datos.celular,
+                    celular_emergencia: datos.celular_emergencia,
+                    fecha_nacimiento: datos.fecha_nacimiento,
+                    direccion: datos.direccion,
+                    localidad: datos.localidad
+                })
+            });
+            const resultado = await respuesta.json();
+            if (resultado.exito) {
+                mostrar_aviso("Pasajero creado", 'exito');
+                cerrar_modal_generico();
+                cargar_pasajeros();
+            } else {
+                mostrar_aviso(resultado.error || "Error al crear pasajero", 'error');
+            }
+        });
+    }
+}
+
+// ===== Inicializacion de listeners del panel Pasajeros =====
+(function() {
+    const btn = document.getElementById('boton_agregar_pasajero');
+    if (btn) btn.addEventListener('click', abrir_modal_agregar_pasajero);
+})();

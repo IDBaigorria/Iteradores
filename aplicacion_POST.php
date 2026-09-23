@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.56)
+ * ## Estructura de nodos actual (v1.5piloto.58)
  *
  * ### Nodos raíz especiales
  *
@@ -83,6 +83,7 @@
  * | `fecha_nacimiento`  | Nodo con dato string: fecha de nacimiento (YYYY-MM-DD). |
  * | `localidad`         | Nodo con dato string: localidad del pasajero.         |
  * | `direccion`         | Nodo con dato string: dirección del pasajero.         |
+ * | `fecha_ultima_modificacion` | Nodo con dato string ISO `"YYYY-MM-DD"`: fecha de la última modificación de los datos del pasajero. Se inicializa al crear el pasajero y se actualiza en cada edición. Se usa para el autocompletado del formulario de venta. |
  * | `ficha_salud`       | Nodo contenedor con dato vacío (opcional).            |
  * |                     | Contiene los siguientes enlaces directos a nodos con dato string: |
  * |                     | ├─ `grupo_sanguineo` → string (ej. "O+", "Desconocido"). |
@@ -93,6 +94,19 @@
  * |                     | ├─ `impedimentos` → string (texto libre).             |
  * |                     | ├─ `regimenes_comida` → string (texto libre).         |
  * |                     | └─ `observaciones` → string (texto libre).            |
+ *
+ * **Nota (fecha de última modificación):** A partir de v1.5piloto.58, cada
+ * pasajero tiene un enlace `fecha_ultima_modificacion` con la fecha ISO
+ * (`YYYY-MM-DD`) de la última modificación de sus datos. Se actualiza al
+ * crear y al editar un pasajero. Se usa para el autocompletado del
+ * formulario de venta (un pasajero reciente es candidato a autocompletar,
+ * uno viejo no).
+ *
+ * Los pasajeros existentes se migraron con `migrar_fecha_ultima_modificacion_pasajeros`.
+ * A cada uno se le puso la fecha de la venta más reciente en la que aparecía
+ * (como comprador o como pasajero en algún asiento). Los que no aparecían en
+ * ninguna venta quedaron con `"2000-01-01"`, que actúa como "fecha muy vieja"
+ * para que cualquier venta nueva los supere.
  *
  * **Nota (nombres y apellido):** A partir de v1.5piloto.36, el campo `nombre`
  * dejó de existir. Se separó en dos enlaces: `nombres` y `apellido`. La
@@ -639,7 +653,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.56
+ * @version   1.5piloto.58
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

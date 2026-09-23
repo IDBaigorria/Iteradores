@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.42
+ * @version   1.5piloto.59
  */
 
 use Iteradores\Nodos\Nodo;
@@ -127,6 +127,7 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
         'fecha_nacimiento' => $nodo_pasajero->adyacente('fecha_nacimiento') ? $nodo_pasajero->adyacente('fecha_nacimiento')->dato() : '',
         'localidad' => $nodo_pasajero->adyacente('localidad') ? $nodo_pasajero->adyacente('localidad')->dato() : '',
         'direccion' => $nodo_pasajero->adyacente('direccion') ? $nodo_pasajero->adyacente('direccion')->dato() : '',
+        'fecha_ultima_modificacion' => $nodo_pasajero->adyacente('fecha_ultima_modificacion') ? $nodo_pasajero->adyacente('fecha_ultima_modificacion')->dato() : '',
     ];
 
     $ficha = $nodo_pasajero->adyacente('ficha_salud');
@@ -314,16 +315,34 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
     if (!$nodo_pasajero) return ['exito' => false, 'error' => 'Pasajero no encontrado'];
 
     $campos = ['nombres', 'apellido', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento', 'localidad', 'direccion'];
+    $hubo_cambios = false;
     foreach ($campos as $campo) {
         if (isset($datos[$campo])) {
             $valor = trim($datos[$campo]);
             $nodo_campo = $nodo_pasajero->adyacente($campo);
+            $valor_actual = $nodo_campo ? $nodo_campo->dato() : '';
+            if ($valor === $valor_actual) continue;
+
+            $hubo_cambios = true;
             if ($nodo_campo) {
                 if ($valor === '') $nodo_pasajero->eliminar_adyacente($campo);
                 else $nodo_campo->_dato($valor);
             } else {
                 if ($valor !== '') $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato($valor), $campo);
             }
+        }
+    }
+
+    // Si hubo cambios reales en los datos personales, actualizamos la
+    // fecha de ultima modificacion. Se usa para el autocompletado de
+    // pasajeros en el formulario de venta.
+    if ($hubo_cambios) {
+        $hoy = date('Y-m-d');
+        $nodo_fecha = $nodo_pasajero->adyacente('fecha_ultima_modificacion');
+        if ($nodo_fecha) {
+            $nodo_fecha->_dato($hoy);
+        } else {
+            $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato($hoy), 'fecha_ultima_modificacion');
         }
     }
 
@@ -334,6 +353,70 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
         'exito' => true,
         'tiene_pasajes_activos' => $activos['tiene_activos'],
         'ventas_activas' => $activos['ventas'],
+    ];
+}
+
+/**
+ * Crea un pasajero nuevo para un dueno. El DNI es obligatorio y no
+ * puede coincidir con uno existente. Todos los campos personales
+ * son obligatorios excepto el email. La fecha_ultima_modificacion
+ * se inicializa con la fecha de hoy.
+ *
+ * @param string $nombre_dueno
+ * @param array  $datos
+ * @return array
+ */
+function crear_pasajero(string $nombre_dueno, array $datos): array {
+    // Validaciones
+    $err = validar_dni($datos['dni'] ?? '');
+    if ($err !== null) return ['exito' => false, 'error' => 'DNI: ' . $err];
+    $err = validar_nombre_o_apellido($datos['apellido'] ?? '');
+    if ($err !== null) return ['exito' => false, 'error' => 'Apellido: ' . $err];
+    $err = validar_nombre_o_apellido($datos['nombres'] ?? '');
+    if ($err !== null) return ['exito' => false, 'error' => 'Nombres: ' . $err];
+    $err = validar_email($datos['email'] ?? '');
+    if ($err !== null) return ['exito' => false, 'error' => $err];
+    $err = validar_telefono($datos['celular'] ?? '');
+    if ($err !== null) return ['exito' => false, 'error' => 'Celular: ' . $err];
+    $err = validar_telefono($datos['celular_emergencia'] ?? '');
+    if ($err !== null) return ['exito' => false, 'error' => 'Celular de emergencia: ' . $err];
+    $err = validar_fecha_nacimiento($datos['fecha_nacimiento'] ?? '');
+    if ($err !== null) return ['exito' => false, 'error' => 'Fecha de nacimiento: ' . $err];
+    $err = validar_localidad($datos['localidad'] ?? '');
+    if ($err !== null) return ['exito' => false, 'error' => 'Localidad: ' . $err];
+    $err = validar_direccion($datos['direccion'] ?? '');
+    if ($err !== null) return ['exito' => false, 'error' => 'Direccion: ' . $err];
+
+    $dni_norm = normalizar_dni($datos['dni']);
+    if ($dni_norm === '') return ['exito' => false, 'error' => 'DNI invalido'];
+
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+    if (!$contenedor) return ['exito' => false, 'error' => 'Dueno no encontrado'];
+
+    if ($contenedor->adyacente($dni_norm)) {
+        return ['exito' => false, 'error' => 'Ya existe un pasajero con ese DNI'];
+    }
+
+    $nodo_pasajero = Nodo::crear_con_dato($dni_norm);
+    $contenedor->_adyacente_en($nodo_pasajero, $dni_norm);
+
+    $campos = ['nombres', 'apellido', 'email', 'celular', 'celular_emergencia', 'fecha_nacimiento', 'localidad', 'direccion'];
+    foreach ($campos as $campo) {
+        if (isset($datos[$campo])) {
+            $valor = trim($datos[$campo]);
+            if ($valor !== '') {
+                $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato($valor), $campo);
+            }
+        }
+    }
+
+    $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato(date('Y-m-d')), 'fecha_ultima_modificacion');
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+
+    return [
+        'exito' => true,
+        'pasajero' => formatear_pasajero($dni_norm, $nodo_pasajero),
     ];
 }
 
