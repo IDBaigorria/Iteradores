@@ -18,7 +18,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.58
+ * @version   1.5piloto.62d
  */
 
 // --- Utilidades base ----------------------------------
@@ -189,6 +189,51 @@ if (isset($_GET['migrar_fecha_ultima_modificacion_pasajeros'])) {
     exit;
 }
 
+// ==== Bloque temporal para migración de declaraciones juradas v2 (v1.5piloto.62b) ====
+// Actualiza los fragmentos de texto por defecto del consentimiento de las
+// declaraciones juradas, SOLO si el contenido actual coincide con el texto
+// por defecto anterior. Si el dueño ya editó el texto, no lo toca.
+// Es idempotente: si se corre dos veces, la segunda no hace nada.
+if (isset($_GET['migrar_declaraciones_juradas_v2'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_declaraciones_juradas_v2.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_declaraciones_juradas_v2();
+    echo "Migración de declaraciones juradas v2 completada.\n";
+    echo "Dueños procesados:         {$res['duenos_procesados']}\n";
+    echo "Viajes procesados:         {$res['viajes_procesados']}\n";
+    echo "--- Anexo I (mayor) ---\n";
+    echo "Migrados:                  {$res['mayor_migrados']}\n";
+    echo "Sin cambio (por defecto):  {$res['mayor_sin_cambio']}\n";
+    echo "Personalizados:            {$res['mayor_personalizados']}\n";
+    echo "--- Anexo II (menor) ---\n";
+    echo "Migrados:                  {$res['menor_migrados']}\n";
+    echo "Sin cambio (por defecto):  {$res['menor_sin_cambio']}\n";
+    echo "Personalizados:            {$res['menor_personalizados']}\n";
+    exit;
+}
+
+// ==== Bloque temporal para migración de declaraciones juradas v3 (v1.5piloto.62d) ====
+// Reemplaza "a realizarse en [puntos]," por "a realizarse en {{DESTINO_VIAJE}},"
+// en los textos guardados, y agrega la leyenda "(tildar o marcar con una X)"
+// al bloque de checkboxes padre/madre/tutor del Anexo II.
+// Solo actúa si encuentra el patrón exacto. Si el dueño personalizó esas
+// partes, no las toca. Es idempotente.
+if (isset($_GET['migrar_declaraciones_juradas_v3'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_declaraciones_juradas_v3.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_declaraciones_juradas_v3();
+    echo "Migración de declaraciones juradas v3 completada.\n";
+    echo "Dueños procesados:         {$res['duenos_procesados']}\n";
+    echo "Viajes procesados:         {$res['viajes_procesados']}\n";
+    echo "--- Anexo I (mayor) ---\n";
+    echo "Migrados:                  {$res['mayor_migrados']}\n";
+    echo "Sin cambio:                {$res['mayor_sin_cambio']}\n";
+    echo "--- Anexo II (menor) ---\n";
+    echo "Migrados:                  {$res['menor_migrados']}\n";
+    echo "Sin cambio:                {$res['menor_sin_cambio']}\n";
+    exit;
+}
+
 // Crear usuario administrador si no existe
 if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
@@ -279,6 +324,16 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
             $_GET['dueno'] ?? '',
             $_GET['viaje'] ?? '',
             $_GET['micro'] ?? ''
+        );
+        exit;
+    }
+
+    // Caso especial: declaración jurada del viaje (mayor o menor).
+    if ($tipo === 'declaracion_jurada') {
+        imprimir_declaracion_jurada(
+            $_GET['dueno'] ?? '',
+            $_GET['viaje'] ?? '',
+            $_GET['tipo_dj'] ?? 'mayor'
         );
         exit;
     }

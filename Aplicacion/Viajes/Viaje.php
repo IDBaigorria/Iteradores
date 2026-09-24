@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.34
+ * @version   1.5piloto.62d
  */
 
 use Iteradores\Nodos\Nodo;
@@ -14,6 +14,162 @@ include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./miscelaneas/Arbol.php");
+
+/**
+ * Texto por defecto de la declaración jurada del pasajero mayor de 18 años
+ * (Anexo I). Se usa cuando el viaje todavía no tiene una declaración guardada.
+ */
+const TEXTO_DJ_MAYOR_DEFAULT = <<<'HTML'
+ANEXO I
+DECLARACIÓN JURADA DEL PASAJERO MAYOR DE 18 AÑOS
+
+VIAJE TURÍSTICO / RELIGIOSO
+
+Quien suscribe, ..........................................................................................................................
+
+DNI ..........................................................., domiciliado/a en ....................................................................................................................,
+
+localidad de ...................................................................................................................., participará del viaje turístico/religioso denominado
+
+{{NOMBRE_VIAJE}}
+
+a realizarse en {{DESTINO_VIAJE}},
+
+el/los día/días {{FECHA_VIAJE}}
+
+Declaro que he sido informado/a de las características del viaje, las actividades previstas, el medio de transporte, los lugares de alojamiento y demás servicios comprendidos.
+
+Asimismo, dejo constancia de cualquier información de salud, indicación o circunstancia que considere necesario comunicar a los responsables del viaje:
+
+....................................................................................................................................................................................
+
+....................................................................................................................................................................................
+
+....................................................................................................................................................................................
+
+Obra Social / Prepaga: ............................................................................................................
+
+N.º de afiliado: ........................................................................................................................
+
+Teléfonos de contacto en caso de urgencia:
+
+........................................................................................................................................................
+
+........................................................................................................................................................
+
+DATOS DE SALUD
+
+Autorizo que la información de salud proporcionada en este formulario pueda ser registrada y digitalizada exclusivamente para facilitar la organización y asistencia durante el viaje.
+
+Dicha información tendrá acceso limitado a las personas responsables que necesiten conocerla y podrá ser comunicada a profesionales o servicios de salud cuando resulte necesario ante una situación de asistencia.
+
+La información será conservada durante el tiempo necesario para dichas finalidades y conforme a la normativa aplicable.
+
+CONSENTIMIENTO PARA EL TRATAMIENTO DE DATOS DE SALUD
+
+De conformidad con lo dispuesto por el artículo 7 de la Ley 25.326 de Protección de Datos Personales, presto mi consentimiento expreso y por escrito para el tratamiento de los datos de salud consignados en este formulario.
+
+☐ SÍ, PRESTÓ MI CONSENTIMIENTO al tratamiento de mis datos de salud en los términos del artículo 7 de la Ley 25.326.
+   (tildar o marcar con una X)
+
+Asimismo, autorizo, en caso de necesidad y urgencia, a que se solicite asistencia médica y se adopten las indicaciones que los profesionales de la salud consideren necesarias, en los términos del artículo 9 de la Ley 26.529 de Derechos del Paciente, procurando que se me informe de ello a la brevedad posible.
+
+Declaro que los datos consignados son verdaderos y que comunicaré cualquier circunstancia que considere relevante para mi seguridad o asistencia durante el viaje.
+
+<br>
+
+Firma: ..............................................................................................................
+
+Aclaración: ........................................................................................................
+
+DNI: ...................................................................................................................
+
+Fecha: ....../....../............
+
+El titular de los datos puede ejercer los derechos de acceso, rectificación, supresión y oposición previstos en la Ley 25.326 contactando al organizador del viaje.
+HTML;
+
+/**
+ * Texto por defecto de la declaración jurada del pasajero menor de 18 años
+ * (Anexo II). Se usa cuando el viaje todavía no tiene una declaración guardada.
+ */
+const TEXTO_DJ_MENOR_DEFAULT = <<<'HTML'
+ANEXO II
+AUTORIZACIÓN Y DECLARACIÓN DEL PASAJERO MENOR DE 18 AÑOS
+
+VIAJE TURÍSTICO / RELIGIOSO
+
+Por la presente, quien suscribe ....................................................................................................................,
+
+DNI ..........................................................., en carácter de:
+
+☐ Padre  ☐ Madre  ☐ Tutor/a  ☐ Responsable
+   (tildar o marcar con una X)
+
+autorizo al/la menor ....................................................................................................................,
+
+DNI ..........................................................., a participar del viaje turístico/religioso denominado
+
+{{NOMBRE_VIAJE}}
+
+a realizarse en {{DESTINO_VIAJE}},
+
+el/los día/días {{FECHA_VIAJE}}
+
+Declaro haber sido informado/a de las características del viaje, las actividades previstas, el medio de transporte, los lugares de alojamiento y demás servicios comprendidos.
+
+SALUD
+
+Dejo constancia de cualquier información de salud, indicación o circunstancia que considere necesario que conozcan los responsables del viaje:
+
+....................................................................................................................................................................................
+
+....................................................................................................................................................................................
+
+....................................................................................................................................................................................
+
+Obra Social / Prepaga: ............................................................................................................
+
+N.º de afiliado: ........................................................................................................................
+
+Teléfonos de contacto en caso de urgencia:
+
+........................................................................................................................................................
+
+........................................................................................................................................................
+
+Autorizo que la información de salud proporcionada en este formulario pueda ser registrada y digitalizada exclusivamente para facilitar la organización y asistencia del menor durante el viaje.
+
+Dicha información tendrá acceso limitado a las personas responsables que necesiten conocerla y podrá ser comunicada a profesionales o servicios de salud cuando resulte necesario ante una situación de asistencia.
+
+La información será conservada durante el tiempo necesario para dichas finalidades y conforme a la normativa aplicable.
+
+CONSENTIMIENTO PARA EL TRATAMIENTO DE DATOS DE SALUD DEL MENOR
+
+De conformidad con lo dispuesto por el artículo 7 de la Ley 25.326 de Protección de Datos Personales, en mi carácter de padre, madre, tutor/a o responsable legal del menor, presto consentimiento expreso y por escrito para el tratamiento de los datos de salud del menor consignados en este formulario.
+
+☐ SÍ, PRESTÓ MI CONSENTIMIENTO al tratamiento de los datos de salud del menor en los términos del artículo 7 de la Ley 25.326.
+   (tildar o marcar con una X)
+
+Asimismo, autorizo, en caso de necesidad y urgencia, a que se solicite asistencia médica para el/la menor y se adopten las indicaciones que los profesionales de la salud consideren necesarias, en los términos del artículo 9 de la Ley 26.529 de Derechos del Paciente, procurando que se me informe de ello a la brevedad posible.
+
+Declaro que los datos consignados son verdaderos y que informaré cualquier circunstancia que considere relevante para la seguridad o asistencia del/la menor durante el viaje.
+
+<br>
+
+Firma del padre, madre, tutor/a o responsable:
+....................................................................................................................
+
+Aclaración: ........................................................................................................
+
+DNI: ...................................................................................................................
+
+Teléfono: ............................................................................................................
+
+Fecha: ....../....../............
+
+El titular de los datos (o su representante legal) puede ejercer los derechos de acceso, rectificación, supresión y oposición previstos en la Ley 25.326 contactando al organizador del viaje.
+HTML;
 
 /**
  * Obtiene el contenedor de viajes de un dueño, creándolo si no existe.
@@ -851,6 +1007,120 @@ function guardar_viaje_completo(array $datos): array {
     $resultado_opciones = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones);
     if (!$resultado_opciones['exito']) {
         return $resultado_opciones;
+    }
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+    return ['exito' => true];
+}
+
+/**
+ * Sustituye los placeholders {{NOMBRE_VIAJE}} y {{FECHA_VIAJE}} en
+ * un texto de declaración jurada por los datos reales del viaje.
+ *
+ * Si el viaje no tiene fecha definida (vacía o "a confirmar"), el
+ * placeholder de la fecha se reemplaza por una racha de puntos para
+ * completar a mano.
+ *
+ * @param string $contenido
+ * @param Nodo   $nodo_viaje
+ * @return string
+ */
+function _sustituir_placeholders_dj(string $contenido, Nodo $nodo_viaje): string {
+    $nombre_visible = $nodo_viaje->adyacente('nombre')
+        ? $nodo_viaje->adyacente('nombre')->dato()
+        : $nodo_viaje->dato();
+
+    $destino = $nodo_viaje->adyacente('destino')
+        ? trim($nodo_viaje->adyacente('destino')->dato())
+        : '';
+    if ($destino === '') {
+        $destino = '............................................................................................................................';
+    }
+
+    $fecha_iso = $nodo_viaje->adyacente('fecha')
+        ? trim($nodo_viaje->adyacente('fecha')->dato())
+        : '';
+
+    if ($fecha_iso === '' || $fecha_iso === 'a confirmar') {
+        $fecha_mostrar = '............................................................................................................................';
+    } else {
+        $fecha_mostrar = formatear_fecha_visible($fecha_iso);
+    }
+
+    return str_replace(
+        ['{{NOMBRE_VIAJE}}', '{{DESTINO_VIAJE}}', '{{FECHA_VIAJE}}'],
+        [$nombre_visible, $destino, $fecha_mostrar],
+        $contenido
+    );
+}
+
+/**
+ * Devuelve el HTML de una declaración jurada del viaje. Si el nodo no
+ * existe todavía, o si se pasa $forzar_default = true, devuelve el
+ * texto por defecto con los placeholders ya sustituidos por los datos
+ * del viaje (nombre visible y fecha), y lo marca con es_default = true.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $tipo  "mayor" o "menor"
+ * @param bool   $forzar_default  Si es true, devuelve siempre el default
+ *                                aunque exista un nodo guardado.
+ * @return array
+ */
+function obtener_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, string $tipo, bool $forzar_default = false): array {
+    $tipo = ($tipo === 'menor') ? 'menor' : 'mayor';
+    $enlace = 'declaracion_jurada_' . $tipo;
+
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    if (!$forzar_default) {
+        $nodo_dj = $nodo_viaje->adyacente($enlace);
+        if ($nodo_dj) {
+            return [
+                'exito' => true,
+                'contenido' => $nodo_dj->dato(),
+                'es_default' => false,
+            ];
+        }
+    }
+
+    $default = ($tipo === 'mayor') ? TEXTO_DJ_MAYOR_DEFAULT : TEXTO_DJ_MENOR_DEFAULT;
+    $default = _sustituir_placeholders_dj($default, $nodo_viaje);
+
+    return [
+        'exito' => true,
+        'contenido' => $default,
+        'es_default' => true,
+    ];
+}
+
+/**
+ * Guarda el HTML de una declaración jurada del viaje. Crea el nodo si
+ * no existe, o lo actualiza si ya existe.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $tipo  "mayor" o "menor"
+ * @param string $contenido
+ * @return array
+ */
+function guardar_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, string $tipo, string $contenido): array {
+    $tipo = ($tipo === 'menor') ? 'menor' : 'mayor';
+    $enlace = 'declaracion_jurada_' . $tipo;
+
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    $nodo_dj = $nodo_viaje->adyacente($enlace);
+    if ($nodo_dj) {
+        $nodo_dj->_dato($contenido);
+    } else {
+        $nodo_viaje->_adyacente_en(Nodo::crear_con_dato($contenido), $enlace);
     }
 
     Controlador::guardar(Conf::NOMBRE_APP);

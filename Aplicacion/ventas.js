@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.59f
+ * @version 1.5piloto.60
  */
 
 // (aplicar_cambios.php funcionó)
@@ -2283,9 +2283,14 @@ async function cerrar_rendicion() {
     const preview = datos.preview;
 
     // Guardar estado global para el confirm y para el recálculo.
+    // La selección es un mapa { id_venta: Set([numeros de cupon]) }.
+    // Al abrir, todos los cupones arrancan seleccionados.
     window.rendicion_preview_actual = preview;
     window.rendicion_filtros_actual = filtros;
-    window.rendicion_seleccion = (preview.ventas || []).map(v => v.id_venta);
+    window.rendicion_seleccion = {};
+    (preview.ventas || []).forEach(v => {
+        window.rendicion_seleccion[v.id_venta] = new Set(v.cupones.map(c => String(c.numero)));
+    });
 
     abrir_modal_generico('Cerrar rendición', '');
     _renderizar_modal_rendicion();
@@ -2322,21 +2327,42 @@ function _renderizar_modal_rendicion() {
         return;
     }
 
-    // Lista de ventas con checkbox.
+    // Lista de ventas con checkbox padre y sub-lista de cupones.
+    // El padre selecciona/deselecciona todos los cupones de esa venta;
+    // cada cupón se puede destildar individualmente.
     let ventas_html = '';
     ventas.forEach(v => {
-        const cupones_nums = v.cupones.map(c => c.numero).join(', ');
         const viaje_micro = [v.viaje_visible, v.micro_visible].filter(x => x).join(' · ');
+        const cupones_nums = v.cupones.map(c => c.numero).join(', ');
+
+        let cupones_html = '';
+        v.cupones.forEach(c => {
+            const metodo = c.metodo_pago === 'transferencia' ? 'Banco' : 'Efectivo';
+            cupones_html += `
+                <label class="rendicion-cupon-item">
+                    <input type="checkbox" class="rendicion-cupon-check" data-id-venta="${v.id_venta}" data-numero="${c.numero}" checked>
+                    <span class="rendicion-cupon-numero">Cupón ${c.numero}</span>
+                    <span class="rendicion-cupon-monto">$${_formatear_monto_rendicion(c.monto)}</span>
+                    <span class="rendicion-cupon-metodo">${metodo}</span>
+                </label>
+            `;
+        });
+
         ventas_html += `
-            <label class="rendicion-venta-item">
-                <input type="checkbox" class="rendicion-venta-check" data-id-venta="${v.id_venta}" checked>
-                <div class="rendicion-venta-info">
-                    <div class="rendicion-venta-id">Venta ${v.id_venta}</div>
-                    ${viaje_micro ? `<div class="rendicion-venta-detalle">${viaje_micro}</div>` : ''}
-                    <div class="rendicion-venta-detalle">${v.terminal_nombre_real || v.terminal} · Cupones ${cupones_nums}</div>
+            <div class="rendicion-venta-grupo">
+                <label class="rendicion-venta-item">
+                    <input type="checkbox" class="rendicion-venta-check" data-id-venta="${v.id_venta}" checked>
+                    <div class="rendicion-venta-info">
+                        <div class="rendicion-venta-id">Venta ${v.id_venta}</div>
+                        ${viaje_micro ? `<div class="rendicion-venta-detalle">${viaje_micro}</div>` : ''}
+                        <div class="rendicion-venta-detalle">${v.terminal_nombre_real || v.terminal} · Cupones ${cupones_nums}</div>
+                    </div>
+                    <div class="rendicion-venta-monto">$${_formatear_monto_rendicion(v.total_sin_rendir)}</div>
+                </label>
+                <div class="rendicion-cupones-sublista">
+                    ${cupones_html}
                 </div>
-                <div class="rendicion-venta-monto">$${_formatear_monto_rendicion(v.total_sin_rendir)}</div>
-            </label>
+            </div>
         `;
     });
 
@@ -2406,15 +2432,36 @@ function _renderizar_modal_rendicion() {
     const cont = document.getElementById('modal_generico_contenido');
     if (cont) cont.innerHTML = html;
 
-    // Listeners de checkboxes.
+    // Listener del checkbox padre: marca o desmarca todos los
+    // cupones de esa venta.
     cont.querySelectorAll('.rendicion-venta-check').forEach(chk => {
         chk.addEventListener('change', function() {
             const id = this.dataset.idVenta;
-            if (this.checked) {
-                if (!window.rendicion_seleccion.includes(id)) window.rendicion_seleccion.push(id);
-            } else {
-                window.rendicion_seleccion = window.rendicion_seleccion.filter(x => x !== id);
-            }
+            const marcado = this.checked;
+            const set = window.rendicion_seleccion[id];
+            if (!set) return;
+            const hijos = cont.querySelectorAll(`.rendicion-cupon-check[data-id-venta="${id}"]`);
+            hijos.forEach(h => {
+                h.checked = marcado;
+                const num = String(h.dataset.numero);
+                if (marcado) set.add(num);
+                else set.delete(num);
+            });
+            _recalcular_totales_rendicion();
+        });
+    });
+
+    // Listener de cada checkbox de cupón: actualiza el Set y
+    // reevalua el estado del padre (checked / indeterminate / unchecked).
+    cont.querySelectorAll('.rendicion-cupon-check').forEach(chk => {
+        chk.addEventListener('change', function() {
+            const id = this.dataset.idVenta;
+            const num = String(this.dataset.numero);
+            const set = window.rendicion_seleccion[id];
+            if (!set) return;
+            if (this.checked) set.add(num);
+            else set.delete(num);
+            _actualizar_estado_checkbox_padre(cont, id);
             _recalcular_totales_rendicion();
         });
     });
@@ -2430,19 +2477,46 @@ function _renderizar_modal_rendicion() {
  * Recalcula totales y tabla por terminal según las ventas tildadas.
  * Actualiza solo los nodos del DOM (no re-renderiza el modal entero).
  */
+/**
+ * Actualiza el estado del checkbox padre de una venta según
+ * cuántos cupones tiene tildados:
+ *   - todos tildados: checked
+ *   - ninguno tildado: unchecked
+ *   - algunos tildados: indeterminate (guion horizontal)
+ *
+ * @param {HTMLElement} contenedor
+ * @param {string} id_venta
+ */
+function _actualizar_estado_checkbox_padre(contenedor, id_venta) {
+    const padre = contenedor.querySelector(`.rendicion-venta-check[data-id-venta="${id_venta}"]`);
+    if (!padre) return;
+    const hijos = contenedor.querySelectorAll(`.rendicion-cupon-check[data-id-venta="${id_venta}"]`);
+    const total = hijos.length;
+    const tildados = Array.from(hijos).filter(h => h.checked).length;
+    if (total === 0 || tildados === 0) {
+        padre.checked = false;
+        padre.indeterminate = false;
+    } else if (tildados === total) {
+        padre.checked = true;
+        padre.indeterminate = false;
+    } else {
+        padre.checked = false;
+        padre.indeterminate = true;
+    }
+}
+
 function _recalcular_totales_rendicion() {
     const preview = window.rendicion_preview_actual;
     if (!preview) return;
-
-    const seleccion = new Set(window.rendicion_seleccion || []);
 
     let total = 0, efvo = 0, banco = 0, cupones = 0, cant_ventas = 0;
     const por_terminal = {};
 
     (preview.ventas || []).forEach(v => {
-        if (!seleccion.has(v.id_venta)) return;
-        cant_ventas++;
-        total += parseFloat(v.total_sin_rendir) || 0;
+        const seleccionados = window.rendicion_seleccion[v.id_venta];
+        if (!seleccionados || seleccionados.size === 0) return;
+
+        let venta_tiene_algo = false;
 
         const t = v.terminal;
         if (!por_terminal[t]) {
@@ -2453,8 +2527,11 @@ function _recalcular_totales_rendicion() {
         }
 
         v.cupones.forEach(c => {
+            if (!seleccionados.has(String(c.numero))) return;
+            venta_tiene_algo = true;
             const m = parseFloat(c.monto) || 0;
             cupones++;
+            total += m;
             por_terminal[t].cupones++;
             por_terminal[t].total += m;
             if (c.metodo_pago === 'transferencia') {
@@ -2465,6 +2542,8 @@ function _recalcular_totales_rendicion() {
                 por_terminal[t].efvo += m;
             }
         });
+
+        if (venta_tiene_algo) cant_ventas++;
     });
 
     // Actualizar resumen.
@@ -2512,16 +2591,20 @@ async function confirmar_rendicion_modal() {
     const preview = window.rendicion_preview_actual;
     if (!preview) return;
 
-    const seleccion = new Set(window.rendicion_seleccion || []);
-    const ventas_seleccionadas = (preview.ventas || [])
-        .filter(v => seleccion.has(v.id_venta))
-        .map(v => ({
-            id_venta: v.id_venta,
-            cupones: v.cupones.map(c => String(c.numero))
-        }));
+    // Recolectar solo los cupones tildados por el operador.
+    const ventas_seleccionadas = [];
+    Object.keys(window.rendicion_seleccion || {}).forEach(id_venta => {
+        const set = window.rendicion_seleccion[id_venta];
+        if (set && set.size > 0) {
+            ventas_seleccionadas.push({
+                id_venta,
+                cupones: Array.from(set).sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+            });
+        }
+    });
 
     if (ventas_seleccionadas.length === 0) {
-        mostrar_aviso('No hay ventas seleccionadas para rendir', 'error');
+        mostrar_aviso('No hay cupones seleccionados para rendir', 'error');
         return;
     }
 

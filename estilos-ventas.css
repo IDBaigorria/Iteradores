@@ -930,8 +930,8 @@
 .rendicion-ventas-lista {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    max-height: 320px;
+    gap: 8px;
+    max-height: 60vh;
     overflow-y: auto;
     padding-right: 4px;
 }
@@ -998,4 +998,73 @@
     text-align: center;
     color: var(--muted);
     font-size: 13px;
+}
+
+/* ===== v1.5piloto.60b: sub-lista de cupones en el modal de cerrar rendición ===== */
+
+/* Cada venta pasa a ser un grupo: header con checkbox padre y
+   sub-lista de cupones debajo. */
+.rendicion-venta-grupo {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+}
+
+/* El header hereda el look del .rendicion-venta-item original,
+   pero sin borde propio: el borde lo pone el grupo. */
+.rendicion-venta-grupo .rendicion-venta-item {
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid var(--border);
+    margin: 0;
+}
+
+/* Sub-lista indentada con cada cupón. */
+.rendicion-cupones-sublista {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 10px 8px 32px;
+    background: #fbfbfb;
+}
+
+.rendicion-cupon-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 6px;
+    font-size: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.rendicion-cupon-item:hover {
+    background: #f0f0f0;
+}
+
+.rendicion-cupon-check {
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.rendicion-cupon-numero {
+    font-weight: 700;
+    color: var(--primary-dark);
+    min-width: 70px;
+}
+
+.rendicion-cupon-monto {
+    font-weight: 600;
+    color: var(--text);
+    min-width: 90px;
+    font-variant-numeric: tabular-nums;
+}
+
+.rendicion-cupon-metodo {
+    color: var(--muted);
+    font-size: 11px;
 }

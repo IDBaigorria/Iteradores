@@ -1,6 +1,6 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.41
+ * @version 1.5piloto.62d
  */
 
 function obtener_nombre_dueno_actual() {
@@ -209,10 +209,16 @@ async function ver_detalle_viaje(viaje) {
         </div>
 
         ${usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno' ? `
-            <div style="margin-bottom:15px;">
+            <div style="margin-bottom:15px; display:flex; gap:8px; flex-wrap:wrap;">
                 <button class="btn" id="modal_btn_editar_viaje" ${viaje.activo === '0' ? 'disabled' : ''}>Editar viaje</button>
+                <button class="btn" id="modal_btn_editar_dj_mayor">Editar declaración mayor</button>
+                <button class="btn" id="modal_btn_editar_dj_menor">Editar declaración menor</button>
             </div>
         ` : ''}
+        <div style="margin-bottom:15px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn" id="modal_btn_imprimir_dj_mayor">Imprimir declaración mayor</button>
+            <button class="btn" id="modal_btn_imprimir_dj_menor">Imprimir declaración menor</button>
+        </div>
         <div class="row">
             <label>Micros:</label>
             ${usuario_actual.nivel !== 'terminal' ? `<button class="btn" id="boton_agregar_micro_viaje">Agregar micro</button>` : ''}
@@ -257,6 +263,23 @@ async function ver_detalle_viaje(viaje) {
         btnEditar.addEventListener('click', () => {
             abrir_modal_viaje('editar', viaje, () => ver_detalle_viaje(viaje));
         });
+    }
+
+    const btnEditDjMayor = document.getElementById('modal_btn_editar_dj_mayor');
+    if (btnEditDjMayor) {
+        btnEditDjMayor.addEventListener('click', () => abrir_modal_editar_declaracion('mayor'));
+    }
+    const btnEditDjMenor = document.getElementById('modal_btn_editar_dj_menor');
+    if (btnEditDjMenor) {
+        btnEditDjMenor.addEventListener('click', () => abrir_modal_editar_declaracion('menor'));
+    }
+    const btnImpDjMayor = document.getElementById('modal_btn_imprimir_dj_mayor');
+    if (btnImpDjMayor) {
+        btnImpDjMayor.addEventListener('click', () => imprimir_declaracion_jurada_ui('mayor'));
+    }
+    const btnImpDjMenor = document.getElementById('modal_btn_imprimir_dj_menor');
+    if (btnImpDjMenor) {
+        btnImpDjMenor.addEventListener('click', () => imprimir_declaracion_jurada_ui('menor'));
     }
 
     const btnVender = document.getElementById('boton_confirmar_venta');
@@ -448,4 +471,128 @@ function formatear_paradas_con_hora(paradas) {
         if (p.hora_estimada) return `${p.nombre} (${p.hora_estimada})`;
         return `${p.nombre} (hora a confirmar)`;
     });
+}
+
+/**
+ * Abre el modal apilado para editar una declaración jurada del viaje.
+ * Reutiliza la infraestructura del modal apilado: se muestra encima
+ * del modal grande de detalle del viaje, que queda vivo detrás.
+ *
+ * @param {string} tipo  "mayor" o "menor"
+ */
+async function abrir_modal_editar_declaracion(tipo) {
+    if (!viaje_seleccionado) return;
+
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const nombre_viaje = viaje_seleccionado.nombre_viaje;
+    const tipo_norm = (tipo === 'menor') ? 'menor' : 'mayor';
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/obtener_declaracion",
+            nombre_dueno,
+            nombre_viaje,
+            tipo_dj: tipo_norm
+        })
+    });
+    const datos = await respuesta.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al obtener la declaración", 'error');
+        return;
+    }
+
+    const etiqueta = tipo_norm === 'mayor' ? 'Pasajero mayor de 18' : 'Pasajero menor de 18';
+    const aviso_default = datos.es_default
+        ? '<div class="aviso-autocompletado gris">Estás viendo el texto por defecto. Si guardás, queda fijo para este viaje.</div>'
+        : '';
+
+    const html = `
+        <h3>Declaración jurada - ${etiqueta}</h3>
+        <p class="muted" style="margin-top:0;">Editá el contenido de la declaración. Se imprime tal cual se guarde.</p>
+        ${aviso_default}
+        <textarea id="dj_contenido_editor" class="dj-editor-textarea" rows="25"></textarea>
+        <div class="actions" style="margin-top:12px;">
+            <button class="btn" id="dj_default_btn">Texto por defecto</button>
+            <button class="btn primary" id="dj_guardar_btn">Guardar</button>
+            <button class="btn" id="dj_cancelar_btn">Cancelar</button>
+        </div>
+    `;
+
+    abrir_modal_apilado('Editar declaración jurada', html);
+
+    const contenedor = document.getElementById('modal_apilado_contenido');
+    if (!contenedor) return;
+
+    contenedor.querySelector('#dj_contenido_editor').value = datos.contenido;
+
+    contenedor.querySelector('#dj_cancelar_btn').addEventListener('click', cerrar_modal_apilado);
+
+    contenedor.querySelector('#dj_default_btn').addEventListener('click', async () => {
+        const confirmado = confirm(
+            '¿Reemplazar el contenido actual por el texto por defecto?\n\n'
+            + 'Se perderán los cambios no guardados.'
+        );
+        if (!confirmado) return;
+
+        const resp = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/obtener_declaracion",
+                nombre_dueno,
+                nombre_viaje,
+                tipo_dj: tipo_norm,
+                forzar_default: '1'
+            })
+        });
+        const datos_default = await resp.json();
+        if (datos_default.exito) {
+            contenedor.querySelector('#dj_contenido_editor').value = datos_default.contenido;
+            mostrar_aviso('Texto por defecto restaurado. Recordá guardar para aplicarlo.', 'info');
+        } else {
+            mostrar_aviso(datos_default.error || 'Error al obtener el texto por defecto', 'error');
+        }
+    });
+
+    contenedor.querySelector('#dj_guardar_btn').addEventListener('click', async () => {
+        const contenido = contenedor.querySelector('#dj_contenido_editor').value;
+        const resp2 = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/guardar_declaracion",
+                nombre_dueno,
+                nombre_viaje,
+                tipo_dj: tipo_norm,
+                contenido
+            })
+        });
+        const resultado = await resp2.json();
+        if (resultado.exito) {
+            mostrar_aviso('Declaración guardada', 'exito');
+            cerrar_modal_apilado();
+        } else {
+            mostrar_aviso(resultado.error || 'Error al guardar', 'error');
+        }
+    });
+}
+
+/**
+ * Abre la impresión de una declaración jurada del viaje en una
+ * pestaña nueva. Visible para todos los roles (dueño, admin, terminal).
+ *
+ * @param {string} tipo  "mayor" o "menor"
+ */
+function imprimir_declaracion_jurada_ui(tipo) {
+    if (!viaje_seleccionado) return;
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    const nombre_viaje = viaje_seleccionado.nombre_viaje;
+    const tipo_norm = (tipo === 'menor') ? 'menor' : 'mayor';
+    const url = `index.php?imprimir=1&tipo=declaracion_jurada`
+        + `&dueno=${encodeURIComponent(nombre_dueno)}`
+        + `&viaje=${encodeURIComponent(nombre_viaje)}`
+        + `&tipo_dj=${tipo_norm}`;
+    window.open(url, '_blank');
 }

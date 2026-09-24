@@ -409,3 +409,18 @@
     color: var(--primary-dark);
     margin-bottom: 4px;
 }
+
+/* ===== v1.5piloto.62b: editor de declaraciones juradas ===== */
+
+.dj-editor-textarea {
+    width: 100%;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 8px;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 400px;
+}

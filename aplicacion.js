@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.54b
+ * @version 1.5piloto.61d
  */
 
 // Utilidades
@@ -384,4 +384,25 @@ document.getElementById('cerrar_modal_apilado')?.addEventListener('click', cerra
 document.getElementById('modal_apilado')?.addEventListener('click', function(e) {
     if (e.target === this) cerrar_modal_apilado();
 });
+
+// ============================================================
+// Tabs compactas al scrollear.
+//
+// El header y las tabs viven dentro de .header-wrapper, que es
+// el que hace el sticky. Ya no hace falta medir alturas ni
+// sincronizar variables CSS entre el header y las tabs.
+// .scrolled en el body: lo usa el CSS para achicar las tabs.
+// ============================================================
+
+function aplicar_estado_scroll() {
+    if (window.scrollY > 40) {
+        document.body.classList.add('scrolled');
+    } else {
+        document.body.classList.remove('scrolled');
+    }
+}
+
+window.addEventListener('scroll', aplicar_estado_scroll, { passive: true });
+document.addEventListener('DOMContentLoaded', aplicar_estado_scroll);
+aplicar_estado_scroll();
 

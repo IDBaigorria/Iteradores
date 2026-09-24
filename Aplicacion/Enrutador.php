@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.57
+ * @version   1.5piloto.62c
  */
 
 use Iteradores\Nodos\Nodo;
@@ -334,6 +334,30 @@ function enrutar_peticion_post(string $accion, array $post): void {
                 case 'guardar':
                     // Alta o edición unificada, incluyendo opciones avanzadas
                     $resultado = guardar_viaje_completo($post);
+                    responder_json($resultado);
+                    break;
+
+                case 'obtener_declaracion':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $tipo_dj = $post['tipo_dj'] ?? 'mayor';
+                    $forzar_default = ($post['forzar_default'] ?? '0') === '1';
+                    if (empty($nombre_dueno) || empty($nombre_viaje)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = obtener_declaracion_jurada($nombre_dueno, $nombre_viaje, $tipo_dj, $forzar_default);
+                    responder_json($resultado);
+                    break;
+
+                case 'guardar_declaracion':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $tipo_dj = $post['tipo_dj'] ?? 'mayor';
+                    $contenido = $post['contenido'] ?? '';
+                    if (empty($nombre_dueno) || empty($nombre_viaje)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = guardar_declaracion_jurada($nombre_dueno, $nombre_viaje, $tipo_dj, $contenido);
                     responder_json($resultado);
                     break;
 

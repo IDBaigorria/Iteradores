@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.57k
+ * @version   1.5piloto.62
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -2271,6 +2271,55 @@ function imprimir_informe_rendicion(string $id_rendicion): void {
 
     echo '</div>'; // cierre informe
 
+    echo '<script>window.onload = function() { window.print(); }</script>';
+    echo '</body></html>';
+}
+
+/**
+ * Imprime una declaración jurada del viaje (mayor o menor).
+ *
+ * El contenido es HTML crudo que el dueño edita y guarda. Se imprime
+ * tal cual, sin membrete ni encabezados del sistema. Si el viaje
+ * todavía no tiene una declaración guardada, se imprime el texto por
+ * defecto correspondiente.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $tipo  "mayor" o "menor"
+ */
+function imprimir_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, string $tipo): void {
+    $res = obtener_declaracion_jurada($nombre_dueno, $nombre_viaje, $tipo);
+    if (!$res['exito']) {
+        echo "No se pudo obtener la declaración: " . htmlspecialchars($res['error']);
+        return;
+    }
+    $contenido = $res['contenido'];
+
+    echo '<!DOCTYPE html>';
+    echo '<html lang="es">';
+    echo '<head><meta charset="UTF-8"><title>Declaración jurada</title>';
+    echo '<style>
+        @page { size: A4; margin: 15mm; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: white;
+            color: black;
+            font-family: "Times New Roman", Georgia, serif;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        body { padding: 10px 15px; }
+        .contenido-dj {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        @media print {
+            body { padding: 0; }
+        }
+    </style>';
+    echo '</head><body>';
+    echo '<div class="contenido-dj">' . $contenido . '</div>';
     echo '<script>window.onload = function() { window.print(); }</script>';
     echo '</body></html>';
 }

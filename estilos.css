@@ -30,6 +30,19 @@ body {
 button, select, input { font: inherit; }
 button { cursor: pointer; }
 
+/* Contenedor que agrupa el header y las tabs para que se peguen
+   juntos arriba al scrollear. Como el wrapper es el que hace el
+   sticky, el header y las tabs no necesitan medir alturas ni
+   sincronizarse con variables CSS. */
+.header-wrapper {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    /* Evita el loop de reflow: aunque los tabs cambien de tamaño
+       horizontal, la altura se mantiene estable. */
+    contain: layout;
+}
+
 .header {
     background: linear-gradient(180deg, #ffe680 0%, #f9d857 100%);
     border-bottom: 1px solid var(--border);
@@ -38,9 +51,6 @@ button { cursor: pointer; }
     align-items: center;
     justify-content: space-between;
     gap: 20px;
-    position: sticky;
-    top: 0;
-    z-index: 20;
     box-shadow: 0 2px 6px rgba(60,40,20,.08);
 }
 
@@ -62,7 +72,10 @@ select:focus, input:focus { border-color: var(--primary); outline: none; }
     border-bottom: 1px solid var(--border);
     padding: 0 24px;
     display: flex;
+    flex-wrap: nowrap;
     overflow-x: auto;
+    overflow-y: hidden;
+    transition: padding 0.2s ease;
 }
 
 .tab {
@@ -73,7 +86,18 @@ select:focus, input:focus { border-color: var(--primary); outline: none; }
     font-weight: 600;
     border-bottom: 3px solid transparent;
     white-space: nowrap;
-    transition: background var(--transition), color var(--transition);
+    flex-shrink: 0;
+    transition: background var(--transition), color var(--transition), padding 0.2s ease, font-size 0.2s ease;
+}
+
+/* Cuando el usuario baja, las pestanas se achican para ocupar
+   menos alto sin dejar de estar visibles. */
+body.scrolled .tabs {
+    padding: 0 16px;
+}
+body.scrolled .tab {
+    padding: 8px 14px;
+    font-size: 13px;
 }
 
 .tab:hover { background: #f9d857; color: var(--primary-dark); }

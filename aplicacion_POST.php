@@ -277,6 +277,18 @@
  * default duro. Ya no hay una regla fija de "transferencia siempre 1 cuota":
  * ahora es configurable.
  *
+ * **Nota (declaraciones juradas):** A partir de v1.5piloto.62, cada viaje
+ * puede tener dos declaraciones juradas editables por el dueño:
+ *   - `declaracion_jurada_mayor` → Nodo con dato string: HTML completo del
+ *     Anexo I (declaración jurada del pasajero mayor de 18 años). Si no
+ *     existe, se usa el texto por defecto.
+ *   - `declaracion_jurada_menor` → Nodo con dato string: HTML completo del
+ *     Anexo II (autorización y declaración del pasajero menor de 18 años).
+ *     Si no existe, se usa el texto por defecto.
+ *
+ * El contenido es HTML crudo y se imprime tal cual, sin membrete, con
+ * `index.php?imprimir=1&tipo=declaracion_jurada&dueno=X&viaje=Y&tipo_dj=mayor|menor`.
+ *
  * ### Nodo Parada (dentro de `paradas_intermedias` de un viaje)
  *
  * Cada parada intermedia es un nodo cuyo dato es el **nombre visible** de la
@@ -653,7 +665,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.58
+ * @version   1.5piloto.62
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.
