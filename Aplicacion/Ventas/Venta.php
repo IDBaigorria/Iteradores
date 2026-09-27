@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.58
+ * @version   1.5piloto.67
  */
 
 
@@ -494,10 +494,6 @@ function confirmar_venta_actual(
         $nodo_pasajero = obtener_o_crear_pasajero($nombre_dueno, $dni_pasajero, $datos_pasajero);
         if (!$nodo_pasajero) {
             return ['exito' => false, 'error' => 'No se pudo crear el pasajero para el asiento ' . ($indice_asiento + 1)];
-        }
-        // Guardar ficha de salud si viene
-        if (isset($datos_pasajero['salud']) && is_array($datos_pasajero['salud'])) {
-            guardar_ficha_salud($nombre_dueno, $dni_pasajero, $datos_pasajero['salud']);
         }
 
         // Cambiar estado del asiento real a vendido

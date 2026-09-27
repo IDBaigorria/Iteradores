@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.62d
+ * @version   1.5piloto.67
  */
 
 use Iteradores\Nodos\Nodo;
@@ -995,7 +995,6 @@ function guardar_viaje_completo(array $datos): array {
 
     // Guardar opciones avanzadas y condiciones de pago
     $opciones = [
-        'mostrar_ficha_medica' => $datos['mostrar_ficha_medica'] ?? '0',
         'restriccion_edad' => $datos['restriccion_edad'] ?? '0',
         'edad_minima' => $datos['edad_minima'] ?? '18',
         'edad_maxima' => $datos['edad_maxima'] ?? '80',
@@ -1003,6 +1002,7 @@ function guardar_viaje_completo(array $datos): array {
         'cuotas_efectivo_max' => $datos['cuotas_efectivo_max'] ?? '3',
         'permite_transferencia' => $datos['permite_transferencia'] ?? '1',
         'cuotas_transferencia_max' => $datos['cuotas_transferencia_max'] ?? '1',
+        'mostrar_dj_en_terminales' => $datos['mostrar_dj_en_terminales'] ?? '0',
     ];
     $resultado_opciones = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones);
     if (!$resultado_opciones['exito']) {

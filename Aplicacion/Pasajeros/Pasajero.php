@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.59
+ * @version   1.5piloto.67
  */
 
 use Iteradores\Nodos\Nodo;
@@ -130,102 +130,23 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
         'fecha_ultima_modificacion' => $nodo_pasajero->adyacente('fecha_ultima_modificacion') ? $nodo_pasajero->adyacente('fecha_ultima_modificacion')->dato() : '',
     ];
 
-    $ficha = $nodo_pasajero->adyacente('ficha_salud');
-    $datos['ficha_salud'] = null;
-    if ($ficha) {
-        $ficha_salud = [];
-
-        // Campos simples
-        $ficha_salud['grupo_sanguineo'] = $ficha->adyacente('grupo_sanguineo') ? $ficha->adyacente('grupo_sanguineo')->dato() : '';
-        $ficha_salud['obra_social'] = $ficha->adyacente('obra_social') ? $ficha->adyacente('obra_social')->dato() : '';
-        $ficha_salud['regimenes_comida'] = $ficha->adyacente('regimenes_comida') ? $ficha->adyacente('regimenes_comida')->dato() : '';
-        $ficha_salud['observaciones'] = $ficha->adyacente('observaciones') ? $ficha->adyacente('observaciones')->dato() : '';
-
-        // Categorías que antes eran listas, ahora string
-        foreach (['enfermedades', 'medicamentos', 'impedimentos', 'alergias'] as $cat) {
-            $raiz_cat = $ficha->adyacente($cat);
-            $items = [];
-            if ($raiz_cat) {
-                $actual_item = hmi($raiz_cat);
-                while ($actual_item) {
-                    $items[] = $actual_item->dato();
-                    $actual_item = hd($actual_item);
-                }
-                if (!empty($items)) {
-                    // Si había lista, la concatenamos en un string
-                    $ficha_salud[$cat] = implode('; ', $items);
-                } else {
-                    // Si no tiene hijos, puede que ya sea string en el dato del nodo
-                    $ficha_salud[$cat] = $raiz_cat->dato() ?? '';
-                }
-            } else {
-                $ficha_salud[$cat] = '';
-            }
-        }
-
-        $datos['ficha_salud'] = $ficha_salud;
+    // Declaración jurada adjunta (imagen o PDF). Opcional.
+    $nodo_dj = $nodo_pasajero->adyacente('declaracion_jurada');
+    $datos['declaracion_jurada'] = null;
+    if ($nodo_dj) {
+        $tipo_mime = $nodo_dj->adyacente('tipo') ? $nodo_dj->adyacente('tipo')->dato() : '';
+        $datos['declaracion_jurada'] = [
+            'ruta' => $nodo_dj->dato(),
+            'nombre_original' => $nodo_dj->adyacente('nombre_original') ? $nodo_dj->adyacente('nombre_original')->dato() : '',
+            'tipo' => $tipo_mime,
+            'tamano' => $nodo_dj->adyacente('tamano') ? $nodo_dj->adyacente('tamano')->dato() : '0',
+            'fecha_subida' => $nodo_dj->adyacente('fecha_subida') ? $nodo_dj->adyacente('fecha_subida')->dato() : '',
+            'es_imagen' => strpos($tipo_mime, 'image/') === 0,
+            'es_pdf' => $tipo_mime === 'application/pdf',
+        ];
     }
 
     return $datos;
-}
-
-/**
- * Guarda la ficha de salud de un pasajero.
- * Ahora todos los campos son strings simples (excepto grupo sanguíneo que también es string).
- * Las antiguas listas se convierten a string si se recibe un array.
- */
-function guardar_ficha_salud(string $nombre_dueno, string $dni, array $salud): void {
-    $nodo_pasajero = obtener_pasajero_nodo_por_dni($nombre_dueno, $dni);
-    if (!$nodo_pasajero) return;
-
-    $ficha = $nodo_pasajero->adyacente('ficha_salud');
-    if (!$ficha) {
-        $ficha = Nodo::crear_con_dato('');
-        $nodo_pasajero->_adyacente_en($ficha, 'ficha_salud');
-    }
-
-    // Campos simples
-    $campos_simples = ['grupo_sanguineo', 'obra_social', 'regimenes_comida', 'observaciones'];
-    foreach ($campos_simples as $campo) {
-        if (isset($salud[$campo])) {
-            $valor = trim($salud[$campo]);
-            $nodo_campo = $ficha->adyacente($campo);
-            if ($nodo_campo) {
-                if ($valor === '') $ficha->eliminar_adyacente($campo);
-                else $nodo_campo->_dato($valor);
-            } else {
-                if ($valor !== '') $ficha->_adyacente_en(Nodo::crear_con_dato($valor), $campo);
-            }
-        }
-    }
-
-    // Categorías de lista convertidas a string
-    $categorias = ['enfermedades', 'medicamentos', 'impedimentos', 'alergias'];
-    foreach ($categorias as $cat) {
-        $raiz = $ficha->adyacente($cat);
-        if (!$raiz) {
-            $raiz = Nodo::crear_con_dato('');
-            $ficha->_adyacente_en($raiz, $cat);
-        }
-
-        // Limpiar posibles hijos antiguos
-        while ($hijo = hmi($raiz)) {
-            eliminar_hmi($raiz);
-        }
-
-        // Obtener valor (string o array)
-        $valor = '';
-        if (isset($salud[$cat])) {
-            if (is_array($salud[$cat])) {
-                $valor = implode('; ', array_map('trim', $salud[$cat]));
-            } else {
-                $valor = trim($salud[$cat]);
-            }
-        }
-        $raiz->_dato($valor);
-    }
-
-    Controlador::guardar(Conf::NOMBRE_APP);
 }
 
 /**
@@ -909,4 +830,129 @@ function obtener_reservas_de_pasajero(string $nombre_dueno, string $dni): array 
     });
 
     return $reservas;
+}
+
+/**
+ * Sube (o reemplaza) la declaración jurada adjunta de un pasajero.
+ *
+ * Acepta imágenes (jpg, jpeg, png, gif, webp) y PDF. Tamaño máximo
+ * 5 MB. El archivo se guarda en uploads/declaraciones_juradas/{dueno}/
+ * con el DNI como nombre base. Si había un archivo previo con otra
+ * extensión, se elimina.
+ *
+ * @param string $nombre_dueno
+ * @param string $dni
+ * @param array  $archivo  Entrada de $_FILES
+ * @return array
+ */
+function subir_declaracion_jurada_pasajero(string $nombre_dueno, string $dni, array $archivo): array {
+    $dni_norm = normalizar_dni($dni);
+    if ($dni_norm === '') return ['exito' => false, 'error' => 'DNI inválido'];
+
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+    if (!$contenedor) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_pasajero = $contenedor->adyacente($dni_norm);
+    if (!$nodo_pasajero) return ['exito' => false, 'error' => 'Pasajero no encontrado'];
+
+    if (!isset($archivo['tmp_name']) || !is_uploaded_file($archivo['tmp_name'])) {
+        return ['exito' => false, 'error' => 'No se recibió archivo válido'];
+    }
+
+    // Tamaño máximo 5 MB.
+    $tamano = (int)($archivo['size'] ?? 0);
+    if ($tamano > 5 * 1024 * 1024) {
+        return ['exito' => false, 'error' => 'El archivo no puede superar los 5 MB'];
+    }
+
+    // Validar extensión y tipo MIME.
+    $extension = strtolower(pathinfo($archivo['name'] ?? '', PATHINFO_EXTENSION));
+    $permitidas = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+    if (!in_array($extension, $permitidas)) {
+        return ['exito' => false, 'error' => 'Formato no permitido. Solo imágenes JPG, PNG, GIF, WEBP o PDF.'];
+    }
+
+    // Tipos MIME esperados según extensión.
+    $mimes_por_ext = [
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'pdf' => 'application/pdf',
+    ];
+    $tipo_mime = $mimes_por_ext[$extension] ?? 'application/octet-stream';
+
+    // Normalizar el nombre de la carpeta del dueño para evitar path traversal.
+    $carpeta_dueno = preg_replace('/[^A-Za-z0-9_\-]/', '_', $nombre_dueno);
+    if ($carpeta_dueno === '') $carpeta_dueno = 'sin_dueno';
+
+    $directorio = __DIR__ . '/../../uploads/declaraciones_juradas/' . $carpeta_dueno . '/';
+    if (!is_dir($directorio)) {
+        mkdir($directorio, 0777, true);
+    }
+
+    // Eliminar archivo anterior si existe (puede tener otra extensión).
+    $nodo_dj_previo = $nodo_pasajero->adyacente('declaracion_jurada');
+    if ($nodo_dj_previo) {
+        $ruta_previa = __DIR__ . '/../../' . $nodo_dj_previo->dato();
+        if (file_exists($ruta_previa)) {
+            @unlink($ruta_previa);
+        }
+        $nodo_pasajero->eliminar_adyacente('declaracion_jurada');
+    }
+
+    // Nombre definitivo: {dni}.{ext}.
+    $nombre_archivo = $dni_norm . '.' . $extension;
+    $ruta_destino = $directorio . $nombre_archivo;
+    if (!move_uploaded_file($archivo['tmp_name'], $ruta_destino)) {
+        return ['exito' => false, 'error' => 'Error al guardar el archivo'];
+    }
+
+    $ruta_relativa = 'uploads/declaraciones_juradas/' . $carpeta_dueno . '/' . $nombre_archivo;
+
+    $nodo_dj = Nodo::crear_con_dato($ruta_relativa);
+    $nodo_dj->_adyacente_en(Nodo::crear_con_dato((string)($archivo['name'] ?? $nombre_archivo)), 'nombre_original');
+    $nodo_dj->_adyacente_en(Nodo::crear_con_dato($tipo_mime), 'tipo');
+    $nodo_dj->_adyacente_en(Nodo::crear_con_dato((string)$tamano), 'tamano');
+    $nodo_dj->_adyacente_en(Nodo::crear_con_dato(date('d/m/Y H:i')), 'fecha_subida');
+    $nodo_pasajero->_adyacente_en($nodo_dj, 'declaracion_jurada');
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+
+    return [
+        'exito' => true,
+        'declaracion_jurada' => formatear_pasajero($dni_norm, $nodo_pasajero)['declaracion_jurada'],
+    ];
+}
+
+/**
+ * Elimina la declaración jurada adjunta de un pasajero.
+ *
+ * @param string $nombre_dueno
+ * @param string $dni
+ * @return array
+ */
+function eliminar_declaracion_jurada_pasajero(string $nombre_dueno, string $dni): array {
+    $dni_norm = normalizar_dni($dni);
+    if ($dni_norm === '') return ['exito' => false, 'error' => 'DNI inválido'];
+
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+    if (!$contenedor) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_pasajero = $contenedor->adyacente($dni_norm);
+    if (!$nodo_pasajero) return ['exito' => false, 'error' => 'Pasajero no encontrado'];
+
+    $nodo_dj = $nodo_pasajero->adyacente('declaracion_jurada');
+    if (!$nodo_dj) return ['exito' => false, 'error' => 'Este pasajero no tiene declaración jurada adjunta'];
+
+    $ruta = __DIR__ . '/../../' . $nodo_dj->dato();
+    if (file_exists($ruta)) {
+        @unlink($ruta);
+    }
+
+    $nodo_pasajero->eliminar_adyacente('declaracion_jurada');
+
+    Controlador::guardar(Conf::NOMBRE_APP);
+    return ['exito' => true];
 }

@@ -1,6 +1,6 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.59
+ * @version 1.5piloto.66
  */
 /**
  * Normaliza un DNI dejando solo dígitos.
@@ -398,7 +398,7 @@ function renderizar_tabla_pasajeros(pasajeros) {
     const tabla = document.getElementById('tabla_pasajeros');
     tabla.innerHTML = '';
     pasajeros.forEach(pasajero => {
-        const tieneFicha = pasajero.ficha_salud !== null && pasajero.ficha_salud !== undefined;
+        const tieneDj = pasajero.declaracion_jurada !== null && pasajero.declaracion_jurada !== undefined;
         const direccionCompleta = [pasajero.direccion, pasajero.localidad].filter(v => v).join(', ') || '—';
         const nc = (pasajero.nombre_completo || '').trim();
         const nombreMostrar = (nc !== '' && nc !== ',' && nc !== ', ') ? nc : '(sin nombre)';
@@ -412,8 +412,8 @@ function renderizar_tabla_pasajeros(pasajeros) {
             <td>${pasajero.celular || '—'}</td>
             <td>${pasajero.celular_emergencia || '—'}</td>
             <td>
-                <button class="btn ${tieneFicha ? 'ver-ficha' : 'anexar-ficha'}" data-dni="${pasajero.dni}">
-                    ${tieneFicha ? 'Ver ficha salud' : 'Anexar ficha salud'}
+                <button class="btn ${tieneDj ? 'ver-dj' : 'anexar-dj'}" data-dni="${pasajero.dni}">
+                    ${tieneDj ? 'Ver declaración jurada' : 'Anexar declaración jurada'}
                 </button>
             </td>
             <td>
@@ -435,22 +435,10 @@ function renderizar_tabla_pasajeros(pasajeros) {
         `;
         tabla.appendChild(fila);
 
-        const botonFicha = fila.querySelector('.ver-ficha, .anexar-ficha');
-        if (botonFicha) {
-            botonFicha.addEventListener('click', async function() {
-                const dni = this.dataset.dni;
-                const nombre_dueno = obtener_nombre_dueno_pasajeros();
-                const resp = await fetch("index.php", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    body: new URLSearchParams({ accion: "pasajeros/obtener", dni, nombre_dueno })
-                });
-                const datos = await resp.json();
-                if (datos.exito) {
-                    mostrar_ficha_salud_edicion(dni, datos.pasajero.ficha_salud);
-                } else {
-                    mostrar_aviso("Error al obtener ficha", 'error');
-                }
+        const botonDj = fila.querySelector('.ver-dj, .anexar-dj');
+        if (botonDj) {
+            botonDj.addEventListener('click', function() {
+                abrir_modal_declaracion_jurada(this.dataset.dni);
             });
         }
 
@@ -627,174 +615,9 @@ function mostrar_modal_chico_impresion_pasajero(dni, nombre_dueno) {
     contenedor.classList.remove('hidden');
 }
 
-function mostrar_ficha_salud_edicion(dni, fichaSalud) {
-    if (!fichaSalud) {
-        fichaSalud = {
-            grupo_sanguineo: '',
-            obra_social: '',
-            alergias: '',
-            enfermedades: '',
-            medicamentos: '',
-            impedimentos: '',
-            regimenes_comida: '',
-            observaciones: ''
-        };
-    }
-
-    const opcionesGrupo = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'Desconocido'];
-    const grupoActual = fichaSalud.grupo_sanguineo || 'Desconocido';
-
-    const contenidoHTML = `
-        <h3>Datos de salud</h3>
-        <div class="seccion-salud">
-            <label>Grupo sanguíneo</label>
-            <select id="grupo_sanguineo">
-                ${opcionesGrupo.map(op => `<option value="${op}" ${op === grupoActual ? 'selected' : ''}>${op}</option>`).join('')}
-            </select>
-        </div>
-        <div class="seccion-salud">
-            <label>Obra social o prepaga (incluya num de emergencias si corresponde)</label>
-            <input type="text" id="obra_social" value="${fichaSalud.obra_social || ''}">
-        </div>
-        <div class="seccion-salud">
-            <label>¿Tiene algún tipo de alergia?</label>
-            <input type="checkbox" id="check_alergia" ${fichaSalud.alergias ? 'checked' : ''}>
-            <input type="text" id="alergias" value="${fichaSalud.alergias || ''}" placeholder="Detalle" style="${fichaSalud.alergias ? '' : 'display:none;'}">
-        </div>
-        <div class="seccion-salud">
-            <label>¿Padece alguna enfermedad crónica o tiene secuelas de alguna que ha tenido?</label>
-            <input type="checkbox" id="check_enfermedad" ${fichaSalud.enfermedades ? 'checked' : ''}>
-            <input type="text" id="enfermedades" value="${fichaSalud.enfermedades || ''}" placeholder="Detalle" style="${fichaSalud.enfermedades ? '' : 'display:none;'}">
-        </div>
-        <div class="seccion-salud">
-            <label>¿Está tomando algún medicamento? ¿Cual/es? ¿En qué horarios?</label>
-            <input type="checkbox" id="check_medicamento" ${fichaSalud.medicamentos ? 'checked' : ''}>
-            <input type="text" id="medicamentos" value="${fichaSalud.medicamentos || ''}" placeholder="Detalle" style="${fichaSalud.medicamentos ? '' : 'display:none;'}">
-        </div>
-        <div class="seccion-salud">
-            <label>¿Posee algún impedimento físico?</label>
-            <input type="checkbox" id="check_impedimento" ${fichaSalud.impedimentos ? 'checked' : ''}>
-            <input type="text" id="impedimentos" value="${fichaSalud.impedimentos || ''}" placeholder="Detalle" style="${fichaSalud.impedimentos ? '' : 'display:none;'}">
-        </div>
-        <div class="seccion-salud">
-            <label>¿Sigue algún regimen especial de comida?</label>
-            <input type="checkbox" id="check_regimen_comida" ${fichaSalud.regimenes_comida ? 'checked' : ''}>
-            <input type="text" id="regimenes_comida" value="${fichaSalud.regimenes_comida || ''}" placeholder="Detalle" style="${fichaSalud.regimenes_comida ? '' : 'display:none;'}">
-        </div>
-        <div class="seccion-salud">
-            <label>Algún otro dato que considere importante:</label>
-            <textarea id="observaciones" rows="3">${fichaSalud.observaciones || ''}</textarea>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-top:15px;">
-            <button class="btn primary" id="guardar_ficha_salud">Guardar ficha</button>
-            ${(usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno') ? `<button class="btn" id="imprimir_ficha_salud">Imprimir ficha</button>` : ''}
-        </div>
-    `;
-
-    abrir_modal_generico('Ficha de salud', contenidoHTML);
-
-    const contenedor = document.getElementById('modal_generico_contenido');
-    if (!contenedor) return;
-
-    // Eventos para mostrar/ocultar inputs según checkbox
-    const pares = [
-        ['check_alergia', 'alergias'],
-        ['check_enfermedad', 'enfermedades'],
-        ['check_medicamento', 'medicamentos'],
-        ['check_impedimento', 'impedimentos'],
-        ['check_regimen_comida', 'regimenes_comida']   // <-- agregar
-    ];
-    pares.forEach(([checkId, inputId]) => {
-        const check = contenedor.querySelector(`#${checkId}`);
-        const input = contenedor.querySelector(`#${inputId}`);
-        if (check && input) {
-            check.addEventListener('change', () => {
-                input.style.display = check.checked ? '' : 'none';
-                if (!check.checked) input.value = '';
-            });
-        }
-    });
-
-    // Botón guardar
-    contenedor.querySelector('#guardar_ficha_salud').addEventListener('click', async () => {
-        const nombre_dueno = obtener_nombre_dueno_pasajeros();
-        const ficha = {
-            grupo_sanguineo: contenedor.querySelector('#grupo_sanguineo').value,
-            obra_social: contenedor.querySelector('#obra_social').value.trim(),
-            alergias: contenedor.querySelector('#alergias').value.trim(),
-            enfermedades: contenedor.querySelector('#enfermedades').value.trim(),
-            medicamentos: contenedor.querySelector('#medicamentos').value.trim(),
-            impedimentos: contenedor.querySelector('#impedimentos').value.trim(),
-            regimenes_comida: contenedor.querySelector('#regimenes_comida').value.trim(),
-            observaciones: contenedor.querySelector('#observaciones').value.trim()
-        };
-
-        const respuesta = await fetch("index.php", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-                accion: "pasajeros/guardar_ficha",
-                dni,
-                nombre_dueno,
-                ficha: JSON.stringify(ficha)
-            })
-        });
-        const resultado = await respuesta.json();
-        if (resultado.exito) {
-            mostrar_aviso("Ficha de salud guardada", 'exito');
-            cerrar_modal_generico();
-            cargar_pasajeros();
-        } else {
-            mostrar_aviso(resultado.error || "Error al guardar ficha", 'error');
-        }
-    });
-
-    // Botón imprimir
-    const botonImprimir = contenedor.querySelector('#imprimir_ficha_salud');
-    if (botonImprimir) {
-        botonImprimir.addEventListener('click', () => {
-            const nombre_dueno = obtener_nombre_dueno_pasajeros();
-            window.open(`index.php?imprimir=1&tipo=ficha_salud&id_venta=${nombre_dueno}&dni=${dni}`, '_blank');
-        });
-    }
-}
-function agregarInputSalud(contenedor, tipo, index, valorInicial = '', esUltimo = true) {
-    const div = document.createElement('div');
-    div.className = 'input_salud';
-    div.style.marginBottom = '5px';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = `salud_${tipo}`;
-    input.dataset.index = index;
-    input.placeholder = tipo === 'enfermedad' ? '¿Cuál?' : (tipo === 'medicamento' ? 'Nombre del medicamento' : '¿Cuál?');
-    input.value = valorInicial;
-
-    const boton = document.createElement('button');
-    boton.type = 'button';
-    boton.className = 'btn small';
-    boton.dataset.index = index;
-    boton.dataset.tipo = tipo;
-
-    let esAgregar = esUltimo;
-    boton.textContent = esAgregar ? 'Agregar otra' : 'Quitar';
-    boton.className = esAgregar ? 'btn small' : 'btn small danger';
-
-    boton.addEventListener('click', () => {
-        if (esAgregar) {
-            boton.textContent = 'Quitar';
-            boton.className = 'btn small danger';
-            esAgregar = false;
-            agregarInputSalud(contenedor, tipo, index, '', true);
-        } else {
-            div.remove();
-        }
-    });
-
-    div.appendChild(input);
-    div.appendChild(boton);
-    contenedor.appendChild(div);
-}
+// (mostrar_ficha_salud_edicion eliminada en v1.5piloto.66:
+//  la ficha médica se reemplazó por la declaración jurada adjunta)
+// (agregarInputSalud eliminada en v1.5piloto.66)
 
 /**
  * Abre el modal para agregar un pasajero/cliente nuevo. Reutiliza
@@ -878,6 +701,158 @@ function abrir_modal_agregar_pasajero() {
                 mostrar_aviso(resultado.error || "Error al crear pasajero", 'error');
             }
         });
+    }
+}
+
+// ============================================================
+// Declaración jurada adjunta del pasajero.
+//
+// Muestra el modal con la declaración jurada actual, si existe.
+// Permite subir un archivo nuevo (imagen o PDF) o eliminar el
+// existente. Dueño y admin pueden subir/eliminar; los demás roles
+// solo ven.
+// ============================================================
+
+function _formatear_tamano_bytes(bytes) {
+    const n = parseInt(bytes, 10) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+async function abrir_modal_declaracion_jurada(dni) {
+    const nombre_dueno = obtener_nombre_dueno_pasajeros();
+    if (!nombre_dueno) {
+        mostrar_aviso('Seleccione un dueño', 'info');
+        return;
+    }
+
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "pasajeros/obtener", dni, nombre_dueno })
+    });
+    const datos = await resp.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al obtener el pasajero", 'error');
+        return;
+    }
+
+    const p = datos.pasajero;
+    const dj = p.declaracion_jurada || null;
+    const es_admin_o_dueno = (usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno');
+
+    let vista_html = '';
+    if (!dj) {
+        vista_html = '<p class="muted" style="margin:0;">Este pasajero todavía no tiene una declaración jurada adjunta.</p>';
+    } else {
+        const info_lineas = [
+            `<div class="detail-line"><span>Archivo:</span><strong>${dj.nombre_original || dj.ruta}</strong></div>`,
+            `<div class="detail-line"><span>Tamaño:</span><strong>${_formatear_tamano_bytes(dj.tamano)}</strong></div>`,
+            `<div class="detail-line"><span>Subido:</span><strong>${dj.fecha_subida}</strong></div>`,
+        ].join('');
+
+        let previsualizacion = '';
+        if (dj.es_imagen) {
+            previsualizacion = `<div style="text-align:center; margin-top:12px;"><img src="${dj.ruta}" alt="Declaración jurada" style="max-width:100%; max-height:500px; border:1px solid #ddd; border-radius:6px;"></div>`;
+        } else if (dj.es_pdf) {
+            previsualizacion = `<div style="margin-top:12px;"><iframe src="${dj.ruta}" style="width:100%; height:500px; border:1px solid #ddd; border-radius:6px;"></iframe></div>`;
+        }
+
+        vista_html = `
+            <div class="seccion" style="margin-bottom:12px;">
+                ${info_lineas}
+            </div>
+            ${previsualizacion}
+        `;
+    }
+
+    const botones_admin = es_admin_o_dueno ? `
+        <label class="btn primary" for="dj_input_archivo" style="cursor:pointer;">${dj ? 'Reemplazar declaración jurada' : 'Subir declaración jurada'}</label>
+        <input type="file" id="dj_input_archivo" accept="image/*,application/pdf" style="display:none;">
+        ${dj ? `<button class="btn danger" id="dj_btn_eliminar">Eliminar</button>` : ''}
+    ` : '';
+
+    const boton_abrir_nueva = dj
+        ? `<button class="btn" id="dj_btn_abrir_nueva">Abrir en nueva pestaña</button>`
+        : '';
+
+    const contenido = `
+        <h3>Declaración jurada</h3>
+        <p class="muted" style="margin-top:0;">Podés subir una imagen (JPG, PNG, GIF, WEBP) o un PDF. Tamaño máximo 5 MB. Desde el celular, el menú de carga ofrece la opción de usar la cámara.</p>
+        ${vista_html}
+        <div class="actions" style="margin-top:15px;">
+            ${botones_admin}
+            ${boton_abrir_nueva}
+            <button class="btn" id="dj_btn_cerrar">Cerrar</button>
+        </div>
+    `;
+
+    abrir_modal_generico('Declaración jurada del pasajero', contenido);
+
+    const cont = document.getElementById('modal_generico_contenido');
+    if (!cont) return;
+
+    cont.querySelector('#dj_btn_cerrar').addEventListener('click', cerrar_modal_generico);
+
+    const btn_abrir = cont.querySelector('#dj_btn_abrir_nueva');
+    if (btn_abrir) {
+        btn_abrir.addEventListener('click', () => window.open(dj.ruta, '_blank'));
+    }
+
+    const input_archivo = cont.querySelector('#dj_input_archivo');
+    if (input_archivo) {
+        input_archivo.addEventListener('change', async function() {
+            const archivo = this.files && this.files[0];
+            if (!archivo) return;
+            await _subir_declaracion_jurada(dni, nombre_dueno, archivo);
+        });
+    }
+
+    const btn_eliminar = cont.querySelector('#dj_btn_eliminar');
+    if (btn_eliminar) {
+        btn_eliminar.addEventListener('click', async () => {
+            if (!confirm('¿Eliminar la declaración jurada adjunta?\n\nEsta acción no se puede deshacer.')) return;
+            const resp2 = await fetch("index.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({ accion: "pasajeros/eliminar_declaracion", dni, nombre_dueno })
+            });
+            const resultado = await resp2.json();
+            if (resultado.exito) {
+                mostrar_aviso('Declaración jurada eliminada', 'exito');
+                cerrar_modal_generico();
+                cargar_pasajeros();
+            } else {
+                mostrar_aviso(resultado.error || 'Error al eliminar', 'error');
+            }
+        });
+    }
+}
+
+async function _subir_declaracion_jurada(dni, nombre_dueno, archivo) {
+    const form_data = new FormData();
+    form_data.append('accion', 'pasajeros/subir_declaracion');
+    form_data.append('nombre_dueno', nombre_dueno);
+    form_data.append('dni', dni);
+    form_data.append('archivo', archivo);
+
+    try {
+        const resp = await fetch("index.php", {
+            method: "POST",
+            body: form_data
+        });
+        const resultado = await resp.json();
+        if (resultado.exito) {
+            mostrar_aviso('Declaración jurada subida', 'exito');
+            cerrar_modal_generico();
+            cargar_pasajeros();
+        } else {
+            mostrar_aviso(resultado.error || 'Error al subir el archivo', 'error');
+        }
+    } catch (e) {
+        console.error('Error subiendo declaración jurada:', e);
+        mostrar_aviso('Error de comunicación', 'error');
     }
 }
 

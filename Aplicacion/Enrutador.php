@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.62c
+ * @version   1.5piloto.67
  */
 
 use Iteradores\Nodos\Nodo;
@@ -542,10 +542,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombre_viaje = $post['nombre_viaje'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
                     $opciones = [
-                        'mostrar_ficha_medica' => $post['mostrar_ficha_medica'] ?? '0',
                         'restriccion_edad' => $post['restriccion_edad'] ?? '0',
                         'edad_minima' => $post['edad_minima'] ?? '18',
                         'edad_maxima' => $post['edad_maxima'] ?? '80',
+                        'mostrar_dj_en_terminales' => $post['mostrar_dj_en_terminales'] ?? '0',
                     ];
                     if (empty($nombre_viaje) || empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
@@ -712,6 +712,29 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     responder_json($resultado);
                     break;
 
+                case 'subir_declaracion':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $dni = $post['dni'] ?? '';
+                    if (empty($nombre_dueno) || empty($dni)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
+                    }
+                    if (!isset($_FILES['archivo'])) {
+                        responder_json(['exito' => false, 'error' => 'Archivo no enviado']);
+                    }
+                    $resultado = subir_declaracion_jurada_pasajero($nombre_dueno, $dni, $_FILES['archivo']);
+                    responder_json($resultado);
+                    break;
+
+                case 'eliminar_declaracion':
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $dni = $post['dni'] ?? '';
+                    if (empty($nombre_dueno) || empty($dni)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
+                    }
+                    $resultado = eliminar_declaracion_jurada_pasajero($nombre_dueno, $dni);
+                    responder_json($resultado);
+                    break;
+
                 case 'listar':
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
                     if (empty($nombre_dueno)) {
@@ -762,18 +785,6 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     responder_json($resultado);
                     break;
 
-                case 'guardar_ficha':
-                    $nombre_dueno = $post['nombre_dueno'] ?? '';
-                    $dni = $post['dni'] ?? '';
-                    $ficha_json = $post['ficha'] ?? '[]';
-                    $ficha = json_decode($ficha_json, true);
-                    if (!is_array($ficha)) $ficha = ['enfermedades' => [], 'medicamentos' => [], 'impedimentos' => []];
-                    if (empty($nombre_dueno) || empty($dni)) {
-                        responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
-                    }
-                    guardar_ficha_salud($nombre_dueno, $dni, $ficha);
-                    responder_json(['exito' => true]);
-                    break;
                 case 'eliminar':
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
                     $dni = $post['dni'] ?? '';

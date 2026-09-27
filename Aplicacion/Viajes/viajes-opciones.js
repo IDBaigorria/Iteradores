@@ -1,6 +1,6 @@
 /***
  * Modal de alta/edición de viaje, opciones avanzadas y condiciones de pago.
- * @version 1.5piloto.34
+ * @version 1.5piloto.66
  */
 
 async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
@@ -14,7 +14,6 @@ async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
         hora: '',
         origen: '',
         destino: '',
-        mostrar_ficha_medica: '0',
         restriccion_edad: '0',
         edad_minima: '18',
         edad_maxima: '80',
@@ -22,6 +21,7 @@ async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
         cuotas_efectivo_max: '3',
         permite_transferencia: '1',
         cuotas_transferencia_max: '1',
+        mostrar_dj_en_terminales: '0',
         paradas_intermedias: []
     };
 
@@ -104,14 +104,15 @@ async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
         <div class="seccion-avanzada" style="margin-top:20px; border-top:1px solid #ccc; padding-top:15px;">
             <h4>Opciones avanzadas</h4>
             <div>
-                <label><input type="checkbox" id="modal_viaje_mostrar_ficha" ${datos.mostrar_ficha_medica === '1' ? 'checked' : ''}> Mostrar opción de agregar ficha médica al momento de la venta</label>
-            </div>
-            <div style="margin-top:10px;">
                 <label><input type="checkbox" id="modal_viaje_restriccion_edad" ${datos.restriccion_edad === '1' ? 'checked' : ''}> Aplicar restricción de edad</label>
                 <div id="modal_campos_edad" style="margin-left:20px; margin-top:10px; display:${datos.restriccion_edad === '1' ? 'block' : 'none'};">
                     <div class="field"><label>Edad mínima:</label><input type="number" id="modal_edad_minima" value="${datos.edad_minima}" min="0" max="120"></div>
                     <div class="field"><label>Edad máxima:</label><input type="number" id="modal_edad_maxima" value="${datos.edad_maxima}" min="0" max="120"></div>
                 </div>
+            </div>
+            <div style="margin-top:10px;">
+                <label><input type="checkbox" id="modal_viaje_mostrar_dj_terminales" ${datos.mostrar_dj_en_terminales === '1' ? 'checked' : ''}> Mostrar botones para imprimir declaraciones juradas en las terminales</label>
+                <div class="small muted" style="margin-left:20px; margin-top:4px;">Si no está activo, las terminales no verán los botones de impresión. El dueño y el admin siempre los ven.</div>
             </div>
         </div>
 
@@ -194,7 +195,6 @@ async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
             hora: document.getElementById('modal_viaje_hora_estado').value === 'a_confirmar' ? 'a confirmar' : document.getElementById('modal_viaje_hora').value,
             origen: document.getElementById('modal_viaje_origen').value,
             destino: document.getElementById('modal_viaje_destino').value,
-            mostrar_ficha_medica: document.getElementById('modal_viaje_mostrar_ficha').checked ? '1' : '0',
             restriccion_edad: document.getElementById('modal_viaje_restriccion_edad').checked ? '1' : '0',
             edad_minima: document.getElementById('modal_edad_minima').value,
             edad_maxima: document.getElementById('modal_edad_maxima').value,
@@ -202,6 +202,7 @@ async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
             cuotas_efectivo_max: document.getElementById('modal_viaje_cuotas_efectivo_max').value,
             permite_transferencia,
             cuotas_transferencia_max: document.getElementById('modal_viaje_cuotas_transferencia_max').value,
+            mostrar_dj_en_terminales: document.getElementById('modal_viaje_mostrar_dj_terminales').checked ? '1' : '0',
             paradas_intermedias: JSON.stringify(paradas)
         };
 

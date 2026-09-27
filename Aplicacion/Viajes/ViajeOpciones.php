@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.12
- * @version   1.5piloto.32
+ * @version   1.5piloto.67
  */
 
 use Iteradores\Nodos\Nodo;
@@ -24,7 +24,6 @@ include_once("./Controlador/Controlador.php");
  */
 function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje): array {
     $defaults = [
-        'mostrar_ficha_medica' => '0',
         'restriccion_edad' => '0',
         'edad_minima' => '18',
         'edad_maxima' => '80',
@@ -32,6 +31,7 @@ function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
         'cuotas_efectivo_max' => '3',
         'permite_transferencia' => '1',
         'cuotas_transferencia_max' => '1',
+        'mostrar_dj_en_terminales' => '0',
     ];
 
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
@@ -45,7 +45,6 @@ function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
 
     $opciones = $defaults;
     $campos = [
-        'mostrar_ficha_medica',
         'restriccion_edad',
         'edad_minima',
         'edad_maxima',
@@ -53,6 +52,7 @@ function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
         'cuotas_efectivo_max',
         'permite_transferencia',
         'cuotas_transferencia_max',
+        'mostrar_dj_en_terminales',
     ];
     foreach ($campos as $campo) {
         $nodo_campo = $nodo_opciones->adyacente($campo);
@@ -79,7 +79,6 @@ function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
     }
 
     // Sanitizar valores
-    $mostrar_ficha = ($opciones['mostrar_ficha_medica'] ?? '0') === '1' ? '1' : '0';
     $restriccion = ($opciones['restriccion_edad'] ?? '0') === '1' ? '1' : '0';
     $edad_min = (string)(int)($opciones['edad_minima'] ?? 18);
     $edad_max = (string)(int)($opciones['edad_maxima'] ?? 80);
@@ -95,7 +94,11 @@ function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
     $cuotas_efectivo_max = _clipear_cuotas($opciones['cuotas_efectivo_max'] ?? '3');
     $cuotas_transferencia_max = _clipear_cuotas($opciones['cuotas_transferencia_max'] ?? '1');
 
-    _actualizar_o_crear_campo($nodo_opciones, 'mostrar_ficha_medica', $mostrar_ficha);
+    // Flag de visibilidad de las declaraciones juradas en las terminales.
+    // Por defecto "0" (no mostrar). El dueño y el admin siempre ven los
+    // botones de impresión, independientemente de este valor.
+    $mostrar_dj_en_terminales = ($opciones['mostrar_dj_en_terminales'] ?? '0') === '1' ? '1' : '0';
+
     _actualizar_o_crear_campo($nodo_opciones, 'restriccion_edad', $restriccion);
     _actualizar_o_crear_campo($nodo_opciones, 'edad_minima', $edad_min);
     _actualizar_o_crear_campo($nodo_opciones, 'edad_maxima', $edad_max);
@@ -103,6 +106,7 @@ function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
     _actualizar_o_crear_campo($nodo_opciones, 'cuotas_efectivo_max', $cuotas_efectivo_max);
     _actualizar_o_crear_campo($nodo_opciones, 'permite_transferencia', $permite_transferencia);
     _actualizar_o_crear_campo($nodo_opciones, 'cuotas_transferencia_max', $cuotas_transferencia_max);
+    _actualizar_o_crear_campo($nodo_opciones, 'mostrar_dj_en_terminales', $mostrar_dj_en_terminales);
 
     Controlador::guardar(Conf::NOMBRE_APP);
     return ['exito' => true];

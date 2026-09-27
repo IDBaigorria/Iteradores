@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.60
+ * @version 1.5piloto.66
  */
 
 // (aplicar_cambios.php funcionó)
@@ -165,8 +165,7 @@ async function abrir_modal_confirmacion_venta() {
 
     $("#usar_pasajero_como_comprador").addEventListener("click", async () => {
         const r = recolectar_datos_pasajero(0, {
-            incluir_selector_sb: true,
-            incluir_ficha: false
+            incluir_selector_sb: true
         });
         if (!r.ok) {
             mostrar_aviso(r.error, 'error');
@@ -381,19 +380,17 @@ function actualizar_visibilidad_cuotas() {
  * Construye el HTML de los campos de un formulario de pasajero.
  *
  * Reutilizable desde el flujo de venta y desde el flujo de asignación
- * de pasajero a una reserva. Devuelve solo los campos (form-grid,
- * selector de subida/bajada y bloque de ficha médica), sin envoltorio
- * ni título. El llamador decide cómo envolverlo.
+ * de pasajero a una reserva. Devuelve solo los campos (form-grid y
+ * selector de subida/bajada), sin envoltorio ni título. El llamador
+ * decide cómo envolverlo.
  *
  * @param {number} index Índice del pasajero (para los IDs únicos).
  * @param {object} opciones Opciones:
  *   - incluir_selector_sb: bool, incluir el select de punto de subida/bajada.
- *   - incluir_ficha: bool, incluir el bloque de ficha médica.
  * @returns {string} HTML del formulario.
  */
 function construir_html_formulario_pasajero(index, opciones = {}) {
     const incluir_selector_sb = opciones.incluir_selector_sb === true;
-    const incluir_ficha = opciones.incluir_ficha === true;
 
     let html = `
         <div class="aviso-autocompletado gris" id="pasajero_aviso_${index}">Ingrese el DNI para buscar.</div>
@@ -458,67 +455,6 @@ function construir_html_formulario_pasajero(index, opciones = {}) {
         }
     }
 
-    // Bloque de ficha médica (opcional)
-    if (incluir_ficha) {
-        html += `
-            <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
-                <label style="margin:0;">¿Padece algún problema de salud?</label>
-                <button type="button" class="btn" id="btn_ficha_salud_${index}" data-index="${index}">Anexar ficha de salud</button>
-            </div>
-            <div id="ficha_salud_${index}" style="display:none; margin-top:10px;">
-                <h5>Datos de salud</h5>
-                <div class="seccion-salud">
-                    <label>Grupo sanguíneo</label>
-                    <select id="pasajero_grupo_sanguineo_${index}">
-                        <option value="">Seleccione...</option>
-                        <option value="O+">O+</option>
-                        <option value="O-">O-</option>
-                        <option value="A+">A+</option>
-                        <option value="A-">A-</option>
-                        <option value="B+">B+</option>
-                        <option value="B-">B-</option>
-                        <option value="AB+">AB+</option>
-                        <option value="AB-">AB-</option>
-                        <option value="Desconocido" selected>Desconocido</option>
-                    </select>
-                </div>
-                <div class="seccion-salud">
-                    <label>Obra social o prepaga (incluya numero de emergencias si corresponde)</label>
-                    <input type="text" id="pasajero_obra_social_${index}" value="">
-                </div>
-                <div class="seccion-salud">
-                    <label>¿Tiene algún tipo de alergia?</label>
-                    <input type="checkbox" class="check_alergia" data-index="${index}">
-                    <input type="text" id="pasajero_alergias_${index}" placeholder="Detalle" style="display:none;">
-                </div>
-                <div class="seccion-salud">
-                    <label>¿Padece alguna enfermedad crónica o tiene secuelas de alguna que ha tenido?</label>
-                    <input type="checkbox" class="check_enfermedad" data-index="${index}">
-                    <input type="text" id="pasajero_enfermedades_${index}" placeholder="Detalle" style="display:none;">
-                </div>
-                <div class="seccion-salud">
-                    <label>¿Está tomando algún medicamento? ¿Cual/es? ¿En qué horarios?</label>
-                    <input type="checkbox" class="check_medicamento" data-index="${index}">
-                    <input type="text" id="pasajero_medicamentos_${index}" placeholder="Detalle" style="display:none;">
-                </div>
-                <div class="seccion-salud">
-                    <label>¿Posee algún impedimento físico?</label>
-                    <input type="checkbox" class="check_impedimento" data-index="${index}">
-                    <input type="text" id="pasajero_impedimentos_${index}" placeholder="Detalle" style="display:none;">
-                </div>
-                <div class="seccion-salud">
-                    <label>¿Sigue algún regimen especial de comida?</label>
-                    <input type="checkbox" class="check_regimen_comida" data-index="${index}">
-                    <input type="text" id="pasajero_regimenes_comida_${index}" placeholder="Detalle" style="display:none;">
-                </div>
-                <div class="seccion-salud">
-                    <label>Algún otro dato que considere importante:</label>
-                    <textarea id="pasajero_observaciones_${index}" rows="2"></textarea>
-                </div>
-            </div>
-        `;
-    }
-
     return html;
 }
 
@@ -530,37 +466,6 @@ function construir_html_formulario_pasajero(index, opciones = {}) {
  * @param {number} index Índice del pasajero.
  */
 function conectar_listeners_formulario_pasajero(contenedor, index) {
-    // Toggle de la ficha médica
-    const btnFicha = contenedor.querySelector(`#btn_ficha_salud_${index}`);
-    if (btnFicha) {
-        btnFicha.addEventListener('click', () => {
-            const contenedorFicha = contenedor.querySelector(`#ficha_salud_${index}`);
-            if (contenedorFicha) {
-                contenedorFicha.style.display = contenedorFicha.style.display === 'none' ? 'block' : 'none';
-            }
-        });
-    }
-
-    // Checkboxes de salud: mostrar/ocultar input asociado
-    const pares = [
-        ['check_alergia', 'alergias'],
-        ['check_enfermedad', 'enfermedades'],
-        ['check_medicamento', 'medicamentos'],
-        ['check_impedimento', 'impedimentos'],
-        ['check_regimen_comida', 'regimenes_comida']
-    ];
-    pares.forEach(([checkClass, campo]) => {
-        contenedor.querySelectorAll(`.${checkClass}`).forEach(check => {
-            check.addEventListener('change', function() {
-                const input = contenedor.querySelector(`#pasajero_${campo}_${index}`);
-                if (input) {
-                    input.style.display = this.checked ? '' : 'none';
-                    if (!this.checked) input.value = '';
-                }
-            });
-        });
-    });
-
     // Listener para marcar fecha completada al cambiar
     const fechaInput = contenedor.querySelector(`#pasajero_fecha_nacimiento_${index}`);
     if (fechaInput) {
@@ -589,12 +494,10 @@ function conectar_listeners_formulario_pasajero(contenedor, index) {
  * @param {number} index Índice del pasajero.
  * @param {object} opciones Opciones:
  *   - incluir_selector_sb: bool, leer el select de punto de subida/bajada.
- *   - incluir_ficha: bool, leer el bloque de ficha médica.
  * @returns {object}
  */
 function recolectar_datos_pasajero(index, opciones = {}) {
     const incluir_selector_sb = opciones.incluir_selector_sb === true;
-    const incluir_ficha = opciones.incluir_ficha === true;
     const num_pas = index + 1;
 
     const get_val = (id) => {
@@ -667,34 +570,13 @@ function recolectar_datos_pasajero(index, opciones = {}) {
         }
     }
 
-    // Ficha de salud (opcional)
-    if (incluir_ficha) {
-        const fichaSaludDiv = document.getElementById(`ficha_salud_${index}`);
-        if (fichaSaludDiv) {
-            datos.salud = {
-                grupo_sanguineo: document.getElementById(`pasajero_grupo_sanguineo_${index}`)?.value || '',
-                obra_social: document.getElementById(`pasajero_obra_social_${index}`)?.value.trim() || '',
-                alergias: document.getElementById(`pasajero_alergias_${index}`)?.value.trim() || '',
-                enfermedades: document.getElementById(`pasajero_enfermedades_${index}`)?.value.trim() || '',
-                medicamentos: document.getElementById(`pasajero_medicamentos_${index}`)?.value.trim() || '',
-                impedimentos: document.getElementById(`pasajero_impedimentos_${index}`)?.value.trim() || '',
-                regimenes_comida: document.getElementById(`pasajero_regimenes_comida_${index}`)?.value.trim() || '',
-                observaciones: document.getElementById(`pasajero_observaciones_${index}`)?.value.trim() || ''
-            };
-        }
-    }
-
     return { ok: true, error: null, datos };
 }
 
-// Generar formularios para cada pasajero (incluye nuevos campos y ficha ampliada)
+// Generar formularios para cada pasajero
 function generar_formularios_pasajeros(asientos) {
     const contenedor = $("#pasajeros_venta");
     contenedor.innerHTML = '<h4>Pasajeros por asiento</h4>';
-
-    // Obtener opción de mostrar ficha médica desde opciones avanzadas del viaje
-    const opciones = viaje_seleccionado?.opciones_avanzadas;
-    const mostrarFichaMedica = opciones && opciones.mostrar_ficha_medica === '1';
 
     asientos.forEach((asiento, index) => {
         const div = document.createElement('div');
@@ -703,8 +585,7 @@ function generar_formularios_pasajeros(asientos) {
 
         const titulo = `<h5>Asiento ${asiento.numero} <span class="badge-atadura hidden" id="badge_atadura_pasajero_${index}">Vinculado</span></h5>`;
         const html_campos = construir_html_formulario_pasajero(index, {
-            incluir_selector_sb: true,
-            incluir_ficha: mostrarFichaMedica
+            incluir_selector_sb: true
         });
 
         div.innerHTML = titulo + html_campos;
@@ -810,8 +691,7 @@ async function confirmar_venta_modal() {
 
     for (let i = 0; i < cantidadPasajeros; i++) {
         const r = recolectar_datos_pasajero(i, {
-            incluir_selector_sb: true,
-            incluir_ficha: true
+            incluir_selector_sb: true
         });
         if (!r.ok) {
             mostrar_aviso(r.error, 'error');

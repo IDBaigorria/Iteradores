@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.41
+ * @version   1.5piloto.67
  */
 
 use Iteradores\Nodos\Nodo;
@@ -250,13 +250,6 @@ function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, stri
 
         $nodo_asiento->eliminar_adyacente('pasajero');
         $nodo_asiento->_adyacente_en($nodo_pasajero, 'pasajero');
-
-        // Guardar ficha de salud solo si el viaje la muestra
-        $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
-        if (($opciones['mostrar_ficha_medica'] ?? '0') === '1'
-            && isset($datos_pasajero['salud']) && is_array($datos_pasajero['salud'])) {
-            guardar_ficha_salud($nombre_dueno, $datos_pasajero['dni'], $datos_pasajero['salud']);
-        }
     }
 
     actualizar_contadores_micro($nodo_micro);
@@ -359,13 +352,6 @@ function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, 
     }
 
     $nodo_asiento->_adyacente_en($nodo_pasajero, 'pasajero');
-
-    // Guardar ficha de salud solo si el viaje la muestra
-    $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
-    if (($opciones['mostrar_ficha_medica'] ?? '0') === '1'
-        && isset($datos_pasajero['salud']) && is_array($datos_pasajero['salud'])) {
-        guardar_ficha_salud($nombre_dueno, $datos_pasajero['dni'], $datos_pasajero['salud']);
-    }
 
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);

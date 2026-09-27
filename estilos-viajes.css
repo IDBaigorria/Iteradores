@@ -410,6 +410,33 @@
     margin-bottom: 4px;
 }
 
+/* ===== v1.5piloto.64b: subseccion de declaraciones juradas ===== */
+
+.viaje-detalle-dj {
+    background: #fff9e6;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 15px;
+}
+
+.viaje-detalle-dj-titulo {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+}
+
+.viaje-detalle-dj-botones {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 /* ===== v1.5piloto.62b: editor de declaraciones juradas ===== */
 
 .dj-editor-textarea {

@@ -1,6 +1,6 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.62d
+ * @version 1.5piloto.65
  */
 
 function obtener_nombre_dueno_actual() {
@@ -172,6 +172,15 @@ async function ver_detalle_viaje(viaje) {
     const fechaPendiente = viaje.fecha === 'a confirmar' || viaje.fecha === '';
     const horaPendiente = viaje.hora === 'a confirmar' || viaje.hora === '';
 
+    // Visibilidad de los botones de impresion de declaraciones juradas.
+    // Dueno y admin los ven siempre. Terminal solo si el dueno activo la
+    // opcion "mostrar botones para imprimir declaraciones juradas en las
+    // terminales" en las opciones avanzadas del viaje.
+    const es_admin_o_dueno = usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno';
+    const opciones_av = viaje.opciones_avanzadas || {};
+    const mostrar_dj_term = (opciones_av.mostrar_dj_en_terminales || '0') === '1';
+    const mostrar_botones_impresion_dj = es_admin_o_dueno || mostrar_dj_term;
+
     const html = `
         <h3>${viaje.nombre} <span class="badge-viaje ${viaje.activo === '1' ? 'badge-viaje-activo' : 'badge-viaje-inactivo'}">${viaje.activo === '1' ? 'Activo' : 'Inactivo'}</span></h3>
 
@@ -208,17 +217,26 @@ async function ver_detalle_viaje(viaje) {
             </div>
         </div>
 
-        ${usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno' ? `
-            <div style="margin-bottom:15px; display:flex; gap:8px; flex-wrap:wrap;">
+        ${es_admin_o_dueno ? `
+            <div style="margin-bottom:15px;">
                 <button class="btn" id="modal_btn_editar_viaje" ${viaje.activo === '0' ? 'disabled' : ''}>Editar viaje</button>
-                <button class="btn" id="modal_btn_editar_dj_mayor">Editar declaración mayor</button>
-                <button class="btn" id="modal_btn_editar_dj_menor">Editar declaración menor</button>
             </div>
         ` : ''}
-        <div style="margin-bottom:15px; display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn" id="modal_btn_imprimir_dj_mayor">Imprimir declaración mayor</button>
-            <button class="btn" id="modal_btn_imprimir_dj_menor">Imprimir declaración menor</button>
+        ${(es_admin_o_dueno || mostrar_botones_impresion_dj) ? `
+        <div class="viaje-detalle-dj">
+            <div class="viaje-detalle-dj-titulo">Declaraciones juradas</div>
+            <div class="viaje-detalle-dj-botones">
+                ${es_admin_o_dueno ? `
+                    <button class="btn" id="modal_btn_editar_dj_mayor">Editar declaración mayor</button>
+                    <button class="btn" id="modal_btn_editar_dj_menor">Editar declaración menor</button>
+                ` : ''}
+                ${mostrar_botones_impresion_dj ? `
+                    <button class="btn" id="modal_btn_imprimir_dj_mayor">Imprimir declaración mayor</button>
+                    <button class="btn" id="modal_btn_imprimir_dj_menor">Imprimir declaración menor</button>
+                ` : ''}
+            </div>
         </div>
+        ` : ''}
         <div class="row">
             <label>Micros:</label>
             ${usuario_actual.nivel !== 'terminal' ? `<button class="btn" id="boton_agregar_micro_viaje">Agregar micro</button>` : ''}
@@ -483,7 +501,14 @@ function formatear_paradas_con_hora(paradas) {
 async function abrir_modal_editar_declaracion(tipo) {
     if (!viaje_seleccionado) return;
 
-    const nombre_dueno = obtener_nombre_dueno_actual();
+    // Usar obtener_dueno_viaje_seleccionado() en vez de
+    // obtener_nombre_dueno_actual(): para el rol terminal, esta ultima
+    // devuelve el nombre de la terminal, no el del dueno. La de viajes
+    // ya prioriza viaje_seleccionado.dueno y cae a la generica solo si
+    // falta.
+    const nombre_dueno = (typeof obtener_dueno_viaje_seleccionado === 'function')
+        ? obtener_dueno_viaje_seleccionado()
+        : obtener_nombre_dueno_actual();
     const nombre_viaje = viaje_seleccionado.nombre_viaje;
     const tipo_norm = (tipo === 'menor') ? 'menor' : 'mayor';
 
@@ -587,7 +612,12 @@ async function abrir_modal_editar_declaracion(tipo) {
  */
 function imprimir_declaracion_jurada_ui(tipo) {
     if (!viaje_seleccionado) return;
-    const nombre_dueno = obtener_nombre_dueno_actual();
+    // Usar obtener_dueno_viaje_seleccionado(): para el rol terminal,
+    // obtener_nombre_dueno_actual() devuelve el nombre de la terminal,
+    // no el del dueno.
+    const nombre_dueno = (typeof obtener_dueno_viaje_seleccionado === 'function')
+        ? obtener_dueno_viaje_seleccionado()
+        : obtener_nombre_dueno_actual();
     const nombre_viaje = viaje_seleccionado.nombre_viaje;
     const tipo_norm = (tipo === 'menor') ? 'menor' : 'mayor';
     const url = `index.php?imprimir=1&tipo=declaracion_jurada`

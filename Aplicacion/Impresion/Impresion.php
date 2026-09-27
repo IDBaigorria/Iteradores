@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.62
+ * @version   1.5piloto.67b
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -17,11 +17,6 @@ include_once("./Aplicacion/Ventas/Venta.php");
 include_once("./Aplicacion/Rendiciones/Rendicion.php");
 include_once("./Aplicacion/Liquidaciones/Liquidacion.php");
 function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = '', string $numero_cupon = ''): void {
-    if ($tipo === 'ficha_salud') {
-        // Para ficha de salud, id_venta contendrá el nombre_dueno y dni_filtro el dni
-        imprimir_ficha_salud($id_venta, $dni_filtro);
-        return;
-    }
     $venta = obtener_venta_por_id($id_venta);
     if (!$venta) {
         echo "Venta no encontrada";
@@ -171,6 +166,14 @@ function _pasajes_html_inicio(): void {
     echo '<html lang="es">';
     echo '<head><meta charset="UTF-8"><title>Pasajes</title>';
     echo '<style>
+        @page {
+            @bottom-center {
+                content: "Hoja " counter(page) " de " counter(pages);
+                font-size: 10px;
+                color: #4a3a2a;
+                font-family: "Segoe UI", Arial, sans-serif;
+            }
+        }
         body {
             font-family: "Segoe UI", Arial, sans-serif;
             margin: 0;
@@ -556,6 +559,14 @@ function imprimir_cupon(array $venta, string $numero_cupon = ''): void {
     echo '<html lang="es">';
     echo '<head><meta charset="UTF-8"><title>Cupón de pago</title>';
     echo '<style>
+        @page {
+            @bottom-center {
+                content: "Hoja " counter(page) " de " counter(pages);
+                font-size: 10px;
+                color: #4a3a2a;
+                font-family: "Segoe UI", Arial, sans-serif;
+            }
+        }
         body {
             font-family: "Segoe UI", Arial, sans-serif;
             margin: 0;
@@ -699,174 +710,6 @@ function imprimir_cupon(array $venta, string $numero_cupon = ''): void {
 
     echo '</div>'; // cierre contenido
     echo '</div>'; // cierre cupon
-
-    echo '<script>window.onload = function() { window.print(); }</script>';
-    echo '</body></html>';
-}
-
-/**
- * Imprime la ficha de salud completa de un pasajero.
- */
-function imprimir_ficha_salud(string $nombre_dueno, string $dni): void {
-    $pasajero = obtener_pasajero_por_dni($nombre_dueno, $dni);
-    if (!$pasajero) {
-        echo "Pasajero no encontrado";
-        return;
-    }
-
-    $ficha = $pasajero['ficha_salud'] ?? null;
-    $logo_ruta = './Aplicacion/LogoPeque.png';
-
-    echo '<!DOCTYPE html>';
-    echo '<html lang="es">';
-    echo '<head><meta charset="UTF-8"><title>Ficha de salud</title>';
-    echo '<style>
-        body {
-            font-family: "Segoe UI", Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: white;
-            color: black;
-            font-size: 12px;
-        }
-        .ficha {
-            max-width: 800px;
-            margin: 0 auto;
-            border: 2px solid black;
-            border-radius: 8px;
-            background: white;
-            overflow: hidden;
-        }
-        .membrete {
-            display: flex;
-            align-items: center;
-            justify-content: flex-start;
-            border-bottom: 2px solid black;
-            padding: 10px 15px;
-        }
-        .membrete img {
-            width: 60px;
-            height: 60px;
-            object-fit: contain;
-            filter: grayscale(100%);
-            margin-right: 15px;
-        }
-        .membrete-texto {
-            font-size: 18px;
-            font-weight: bold;
-            letter-spacing: 1px;
-        }
-        .contenido {
-            padding: 20px;
-        }
-        .encabezado {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .encabezado h1 {
-            margin: 0;
-            font-size: 20px;
-        }
-        .seccion {
-            border: 1px solid black;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        .seccion h3 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            border-bottom: 1px solid black;
-            padding-bottom: 5px;
-            font-size: 15px;
-        }
-        .fila {
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-        .fila strong {
-            display: inline-block;
-            min-width: 140px;
-        }
-        .lista {
-            margin-left: 20px;
-            list-style-type: disc;
-        }
-        @media print {
-            body { padding: 0; background: white; }
-            .ficha { border: 2px solid black; box-shadow: none; }
-        }
-    </style>';
-    echo '</head><body>';
-
-    echo '<div class="ficha">';
-    echo '<div class="membrete">';
-    echo '<img src="' . htmlspecialchars($logo_ruta) . '" alt="Logo">';
-    echo '<div class="membrete-texto">Parroquia Nuestra Señora del Carmen - Tres Arroyos</div>';
-    echo '</div>';
-
-    echo '<div class="contenido">';
-    echo '<div class="encabezado"><h1>Ficha de salud</h1></div>';
-
-    // Datos personales
-    echo '<div class="seccion">';
-    echo '<h3>Datos del pasajero</h3>';
-    $nombre_completo = $pasajero['nombre_completo']
-        ?? formatear_nombre_completo($pasajero['apellido'] ?? '', $pasajero['nombres'] ?? '');
-    echo '<div class="fila"><strong>Nombre completo:</strong> ' . htmlspecialchars($nombre_completo) . '</div>';
-    echo '<div class="fila"><strong>DNI:</strong> ' . htmlspecialchars(formatear_dni_con_puntos($pasajero['dni'])) . '</div>';
-    if (!empty($pasajero['celular'])) echo '<div class="fila"><strong>Celular:</strong> ' . htmlspecialchars($pasajero['celular']) . '</div>';
-    if (!empty($pasajero['celular_emergencia'])) echo '<div class="fila"><strong>Emergencia:</strong> ' . htmlspecialchars($pasajero['celular_emergencia']) . '</div>';
-    if (!empty($pasajero['email'])) echo '<div class="fila"><strong>Email:</strong> ' . htmlspecialchars($pasajero['email']) . '</div>';
-    if (!empty($pasajero['fecha_nacimiento'])) echo '<div class="fila"><strong>Fecha nacimiento:</strong> ' . htmlspecialchars(formatear_fecha_visible($pasajero['fecha_nacimiento'])) . '</div>';
-    $dir = trim(($pasajero['direccion'] ?? '') . ', ' . ($pasajero['localidad'] ?? ''));
-    if (!empty($dir)) echo '<div class="fila"><strong>Dirección:</strong> ' . htmlspecialchars($dir) . '</div>';
-    echo '</div>';
-
-    if ($ficha) {
-        echo '<div class="seccion">';
-        echo '<h3>Datos de salud</h3>';
-
-        // Grupo sanguíneo
-        if (!empty($ficha['grupo_sanguineo'])) {
-            echo '<div class="fila"><strong>Grupo sanguíneo:</strong> ' . htmlspecialchars($ficha['grupo_sanguineo']) . '</div>';
-        }
-        // Obra social
-        if (!empty($ficha['obra_social'])) {
-            echo '<div class="fila"><strong>Obra social o prepaga (incluya numero de emergencias si corresponde):</strong> ' . htmlspecialchars($ficha['obra_social']) . '</div>';
-        }
-        // Alergias
-        if (!empty($ficha['alergias'])) {
-            echo '<div class="fila"><strong>Alergias:</strong> ' . htmlspecialchars($ficha['alergias']) . '</div>';
-        }
-        // Enfermedades
-        if (!empty($ficha['enfermedades'])) {
-            echo '<div class="fila"><strong>Enfermedades:</strong> ' . htmlspecialchars($ficha['enfermedades']) . '</div>';
-        }
-        // Medicamentos
-        if (!empty($ficha['medicamentos'])) {
-            echo '<div class="fila"><strong>Medicamentos:</strong> ' . htmlspecialchars($ficha['medicamentos']) . '</div>';
-        }
-        // Impedimentos
-        if (!empty($ficha['impedimentos'])) {
-            echo '<div class="fila"><strong>Impedimentos:</strong> ' . htmlspecialchars($ficha['impedimentos']) . '</div>';
-        }
-        // Regímenes especiales de comida
-        if (!empty($ficha['regimenes_comida'])) {
-            echo '<div class="fila"><strong>¿Sigue algún regimen especial de comida?:</strong> ' . htmlspecialchars($ficha['regimenes_comida']) . '</div>';
-        }
-        // Algún otro dato
-        if (!empty($ficha['observaciones'])) {
-            echo '<div class="fila"><strong>Algún otro dato que considere importante:</strong> ' . htmlspecialchars($ficha['observaciones']) . '</div>';
-        }
-
-        echo '</div>';
-    } else {
-        echo '<p>No hay ficha de salud registrada.</p>';
-    }
-
-    echo '</div>'; // cierre contenido
-    echo '</div>'; // cierre ficha
 
     echo '<script>window.onload = function() { window.print(); }</script>';
     echo '</body></html>';
@@ -1077,6 +920,14 @@ function imprimir_informe_ventas(array $params): void {
     echo '<html lang="es">';
     echo '<head><meta charset="UTF-8"><title>Informe de ventas</title>';
     echo '<style>
+        @page {
+            @bottom-center {
+                content: "Hoja " counter(page) " de " counter(pages);
+                font-size: 10px;
+                color: #4a3a2a;
+                font-family: "Segoe UI", Arial, sans-serif;
+            }
+        }
         body {
             font-family: "Segoe UI", Arial, sans-serif;
             margin: 0;
@@ -1428,6 +1279,14 @@ function imprimir_informe_cancelacion(string $id_cancelacion): void {
     echo '<html lang="es">';
     echo '<head><meta charset="UTF-8"><title>Informe de cancelación</title>';
     echo '<style>
+        @page {
+            @bottom-center {
+                content: "Hoja " counter(page) " de " counter(pages);
+                font-size: 10px;
+                color: #4a3a2a;
+                font-family: "Segoe UI", Arial, sans-serif;
+            }
+        }
         body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 20px; background: white; color: black; font-size: 12px; }
         .informe { max-width: 1000px; margin: 0 auto; }
         .membrete { display: flex; align-items: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px; }
@@ -1555,6 +1414,14 @@ function imprimir_informe_liquidacion(string $id_liquidacion, bool $ocultar_dato
     echo '<html lang="es">';
     echo '<head><meta charset="UTF-8"><title>Informe de liquidación</title>';
     echo '<style>
+        @page {
+            @bottom-center {
+                content: "Hoja " counter(page) " de " counter(pages);
+                font-size: 10px;
+                color: #4a3a2a;
+                font-family: "Segoe UI", Arial, sans-serif;
+            }
+        }
         body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 20px; background: white; color: black; font-size: 12px; }
         .informe { max-width: 1000px; margin: 0 auto; }
         .membrete { display: flex; align-items: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px; }
@@ -1837,6 +1704,14 @@ function imprimir_croquis_micro(string $nombre_dueno, string $nombre_viaje, stri
     echo '<html lang="es">';
     echo '<head><meta charset="UTF-8"><title>Croquis del micro</title>';
     echo '<style>
+        @page {
+            @bottom-center {
+                content: "Hoja " counter(page) " de " counter(pages);
+                font-size: 10px;
+                color: #4a3a2a;
+                font-family: "Segoe UI", Arial, sans-serif;
+            }
+        }
         body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 15px; background: white; color: black; font-size: 12px; }
         .hoja { max-width: 900px; margin: 0 auto; }
         .membrete { display: flex; align-items: center; border-bottom: 2px solid black; padding-bottom: 8px; margin-bottom: 14px; }
@@ -2038,7 +1913,16 @@ function imprimir_planilla_pasajeros_micro(string $nombre_dueno, string $nombre_
     echo '<html lang="es">';
     echo '<head><meta charset="UTF-8"><title>Planilla de pasajeros</title>';
     echo '<style>
-        @page { size: A4 landscape; margin: 12mm; }
+        @page {
+            size: A4 landscape;
+            margin: 12mm;
+            @bottom-center {
+                content: "Hoja " counter(page) " de " counter(pages);
+                font-size: 10px;
+                color: #4a3a2a;
+                font-family: "Segoe UI", Arial, sans-serif;
+            }
+        }
         body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 0 10px 10px 10px; background: white; color: black; font-size: 12px; }
         .hoja { max-width: 1100px; margin: 0 auto; }
         .header { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 12px; align-items: center; padding: 0; margin: 0; }
@@ -2194,6 +2078,14 @@ function imprimir_informe_rendicion(string $id_rendicion): void {
     echo '<html lang="es">';
     echo '<head><meta charset="UTF-8"><title>Informe de rendición</title>';
     echo '<style>
+        @page {
+            @bottom-center {
+                content: "Hoja " counter(page) " de " counter(pages);
+                font-size: 10px;
+                color: #4a3a2a;
+                font-family: "Segoe UI", Arial, sans-serif;
+            }
+        }
         body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 20px; background: white; color: black; font-size: 12px; }
         .informe { max-width: 1000px; margin: 0 auto; }
         .membrete { display: flex; align-items: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px; }
@@ -2299,7 +2191,16 @@ function imprimir_declaracion_jurada(string $nombre_dueno, string $nombre_viaje,
     echo '<html lang="es">';
     echo '<head><meta charset="UTF-8"><title>Declaración jurada</title>';
     echo '<style>
-        @page { size: A4; margin: 15mm; }
+        @page {
+            size: A4;
+            margin: 15mm;
+            @bottom-center {
+                content: "Hoja " counter(page) " de " counter(pages);
+                font-size: 10px;
+                color: #4a3a2a;
+                font-family: "Times New Roman", Georgia, serif;
+            }
+        }
         html, body {
             margin: 0;
             padding: 0;
