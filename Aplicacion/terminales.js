@@ -1,6 +1,6 @@
 /***
  * Funciones de puntos de venta (dueño).
- * @version 1.5piloto.15
+ * @version 1.5piloto.68b
  */
 
 async function cargar_datos_terminales() {
@@ -26,7 +26,7 @@ async function cargar_datos_terminales() {
             <td>${terminal.nombre_usuario}</td>
             <td>${terminal.nombre_real || "—"}</td>
             <td>${terminal.email || "—"}</td>
-            <td>${terminal.codigo_acceso || "—"}</td>
+            <td>${terminal.codigo_asignado ? "•••••" : "—"}</td>
             <td>${terminal.efectivo || "0"}</td>
             <td>${terminal.bancarizado || "0"}</td>
             <td>${terminal.banco.nombre || "—"}</td>
@@ -114,8 +114,12 @@ $("#boton_guardar_terminal").addEventListener("click", async () => {
         banco_cuenta: $("#nuevo_terminal_banco_cuenta").value.trim()
     };
 
-    if (!datos_terminal.nombre_usuario || !datos_terminal.codigo_acceso) {
-        mostrar_aviso("Nombre de usuario y código de acceso son obligatorios", 'error');
+    if (!datos_terminal.nombre_usuario) {
+        mostrar_aviso("El nombre de usuario es obligatorio", 'error');
+        return;
+    }
+    if (!datos_terminal.codigo_acceso && !datos_terminal.contrasena) {
+        mostrar_aviso("Debe asignar al menos un código de acceso o una contraseña", 'error');
         return;
     }
     if (!datos_terminal.banco_nombre || !datos_terminal.banco_cuenta) {
@@ -130,6 +134,9 @@ $("#boton_guardar_terminal").addEventListener("click", async () => {
     });
     const datos = await respuesta.json();
     if (datos.exito) {
+        if (datos.codigo_asignado) {
+            alert("Código de acceso: " + datos.codigo_asignado + "\n\nGuardalo, no se mostrará de nuevo.");
+        }
         mostrar_aviso("Punto de venta agregado correctamente", 'exito');
         $("#formulario_nueva_terminal").classList.add("hidden");
         ["nuevo_terminal_nombre_usuario","nuevo_terminal_contrasena","nuevo_terminal_nombre_real","nuevo_terminal_email","nuevo_terminal_codigo_acceso","nuevo_terminal_banco_nombre","nuevo_terminal_banco_cuenta"].forEach(id => $("#"+id).value="");
@@ -158,7 +165,7 @@ async function iniciar_edicion_terminal(nombre_usuario) {
 
     const valor_nombre_real = terminal.nombre_real || '';
     const valor_email = terminal.email || '';
-    const valor_codigo = terminal.codigo_acceso || '';
+    const valor_codigo = '';
     const valor_banco_nombre = terminal.banco.nombre || '';
     const valor_banco_cuenta = terminal.banco.cuenta || '';
 
@@ -166,7 +173,7 @@ async function iniciar_edicion_terminal(nombre_usuario) {
         <td>${nombre_usuario}</td>
         <td><input type="text" id="editar_terminal_nombre_real" value="${valor_nombre_real}"></td>
         <td><input type="email" id="editar_terminal_email" value="${valor_email}"></td>
-        <td><input type="text" id="editar_terminal_codigo" value="${valor_codigo}"></td>
+        <td><input type="text" id="editar_terminal_codigo" value="" placeholder="Dejar vacío para no cambiar"></td>
         <td>${terminal.efectivo || '0'}</td>
         <td>${terminal.bancarizado || '0'}</td>
         <td><input type="text" id="editar_terminal_banco_nombre" value="${valor_banco_nombre}"></td>
@@ -224,6 +231,9 @@ async function guardar_edicion_terminal(nombre_usuario, fila) {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
+        if (resultado.codigo_asignado) {
+            alert("Nuevo código de acceso: " + resultado.codigo_asignado + "\n\nGuardalo, no se mostrará de nuevo.");
+        }
         mostrar_aviso("Punto de venta actualizado correctamente", 'exito');
         cargar_datos_terminales();
     } else {

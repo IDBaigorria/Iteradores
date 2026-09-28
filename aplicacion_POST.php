@@ -30,7 +30,7 @@
  * | Enlace          | Nodo destino y dato esperado                                                         |
  * |-----------------|---------------------------------------------------------------------------------------|
  * | `nivel`         | Nodo con dato string: `"admin"`, `"dueno"` o `"terminal"`.                           |
- * | `codigo_acceso` | Nodo con dato string: código único de acceso.                                         |
+ * | `codigo_hash`   | Nodo con dato string: hash bcrypt del código de acceso (password_hash).               |
  * | `contrasena`    | Nodo con dato string: hash de contraseña (opcional).                                  |
  * | `nombre_real`   | Nodo con dato string: nombre real o visible (opcional).                               |
  * | `email`         | Nodo con dato string: correo electrónico (opcional).                                  |
@@ -635,9 +635,15 @@
  *
  * ## Flujo de autenticación y administración
  *
- * - `autenticar_por_codigo($codigo)`: busca usuario por `codigo_acceso`; si existe,
- *   crea sesión y devuelve token. Si coincide con `Conf::CODIGO_ADMIN` y no existe,
- *   se crea automáticamente en `index.php`.
+ * - `autenticar_por_codigo($codigo)`: busca usuario por `codigo_hash` (password_verify);
+ *   si existe, crea sesión y devuelve token.
+ * - `autenticar_por_usuario($nombre, $contrasena)`: busca usuario por nombre y verifica
+ *   su `contrasena` (hash). Devuelve el mismo formato que `autenticar_por_codigo`.
+ *
+ * **Nota (migración v1.5piloto.68):** Los códigos de acceso existentes se hashearon
+ * con `password_hash` y se guardaron como `codigo_hash`. El admin principal ya no se
+ * crea con `codigo_acceso`: se crea con `codigo_hash` y se chequea por nombre en
+ * `index.php`.
  * - `validar_token_sesion($token)`: busca en `"sesiones"` por token, obtiene nombre
  *   de usuario, y devuelve array con `nombre_usuario` y `nodo` del usuario.
  * - Panel de administración usa `listar_usuarios()`, `listar_sesiones()` y
@@ -665,7 +671,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.62
+ * @version   1.5piloto.68
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

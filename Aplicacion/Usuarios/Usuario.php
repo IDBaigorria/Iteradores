@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.54
+ * @version   1.5piloto.68
  */
 
 use Iteradores\Nodos\Nodo;
@@ -25,8 +25,19 @@ function buscar_usuario_por_codigo(string $codigo): ?array {
     if (!$raiz_usuarios) return null;
 
     foreach ($raiz_usuarios->adyacentes() as $nombre_usuario => $nodo_usuario) {
-        $nodo_codigo = $nodo_usuario->adyacente('codigo_acceso');
-        if ($nodo_codigo && $nodo_codigo->dato() === $codigo) {
+        $nodo_codigo_hash = $nodo_usuario->adyacente('codigo_hash');
+        if ($nodo_codigo_hash && password_verify($codigo, $nodo_codigo_hash->dato())) {
+            $nodo_nivel = $nodo_usuario->adyacente('nivel');
+            $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
+            return [
+                'nombre_usuario' => $nombre_usuario,
+                'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : $nombre_usuario,
+                'nivel' => $nodo_nivel ? $nodo_nivel->dato() : 'terminal',
+            ];
+        }
+        // Fallback de transición: usuario sin migrar todavía.
+        $nodo_codigo_viejo = $nodo_usuario->adyacente('codigo_acceso');
+        if ($nodo_codigo_viejo && $nodo_codigo_viejo->dato() === $codigo) {
             $nodo_nivel = $nodo_usuario->adyacente('nivel');
             $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
             return [
@@ -36,6 +47,10 @@ function buscar_usuario_por_codigo(string $codigo): ?array {
             ];
         }
     }
+
+    // Dummy verification: igualar tiempos entre "usuario existe" y "no existe".
+    password_verify($codigo, '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
+
     return null;
 }
 
@@ -58,7 +73,7 @@ function listar_usuarios(): array {
         $nodo_banco = $nodo_usuario->adyacente('banco');
         $nodo_nivel = $nodo_usuario->adyacente('nivel');
         $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
-        $nodo_codigo_acceso = $nodo_usuario->adyacente('codigo_acceso');
+        $nodo_codigo_hash = $nodo_usuario->adyacente('codigo_hash');
         $nodo_email = $nodo_usuario->adyacente('email');
         $nodo_pasajes = $nodo_usuario->adyacente('pasajes');
 
@@ -80,7 +95,7 @@ function listar_usuarios(): array {
             'nivel' => $nodo_nivel ? $nodo_nivel->dato() : 'terminal',
             'efectivo' => $nodo_efectivo ? $nodo_efectivo->dato() : '0',
             'bancarizado' => $monto_banco,
-            'codigo_acceso' => $nodo_codigo_acceso ? $nodo_codigo_acceso->dato() : '',
+            'codigo_asignado' => $nodo_codigo_hash ? true : false,
             'pasajes' => $nodo_pasajes ? $nodo_pasajes->dato() : '0',
             'banco' => [
                 'nombre' => $banco_nombre,
@@ -174,11 +189,15 @@ function agregar_usuario(array $datos): array {
     $dueno = trim($datos['dueno'] ?? '');
     $email = trim($datos['email'] ?? '');
 
-    if (empty($nombre_usuario) || empty($codigo_acceso)) {
-        return ['exito' => false, 'error' => 'Nombre de usuario y código de acceso son obligatorios'];
+    if (empty($nombre_usuario)) {
+        return ['exito' => false, 'error' => 'El nombre de usuario es obligatorio'];
     }
 
-    if (buscar_usuario_por_codigo($codigo_acceso)) {
+    if ($codigo_acceso === '' && $contrasena === '') {
+        return ['exito' => false, 'error' => 'Debe asignar al menos un código de acceso o una contraseña'];
+    }
+
+    if ($codigo_acceso !== '' && buscar_usuario_por_codigo($codigo_acceso)) {
         return ['exito' => false, 'error' => 'El código de acceso ya está en uso'];
     }
 
@@ -208,7 +227,9 @@ function agregar_usuario(array $datos): array {
     }
 
     $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($nivel), 'nivel');
-    $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($codigo_acceso), 'codigo_acceso');
+    if ($codigo_acceso !== '') {
+        $nodo_usuario->_adyacente_en(Nodo::crear_con_dato(password_hash($codigo_acceso, PASSWORD_DEFAULT)), 'codigo_hash');
+    }
     if ($nombre_real !== '') $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($nombre_real), 'nombre_real');
     if ($email !== '') $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($email), 'email');
 
@@ -250,7 +271,11 @@ function agregar_usuario(array $datos): array {
     $raiz->_adyacente_en($nodo_usuario, $nombre_usuario);
     Controlador::guardar(Conf::NOMBRE_APP);
 
-    return ['exito' => true];
+    $resultado = ['exito' => true];
+    if ($codigo_acceso !== '') {
+        $resultado['codigo_asignado'] = $codigo_acceso;
+    }
+    return $resultado;
 }
 
 /**
@@ -298,9 +323,10 @@ function actualizar_usuario(array $datos): array {
         else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($email), 'email');
     }
     if ($codigo_acceso !== '') {
-        $nodo_codigo = $nodo_usuario->adyacente('codigo_acceso');
-        if ($nodo_codigo) $nodo_codigo->_dato($codigo_acceso);
-        else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($codigo_acceso), 'codigo_acceso');
+        $hash_nuevo = password_hash($codigo_acceso, PASSWORD_DEFAULT);
+        $nodo_codigo = $nodo_usuario->adyacente('codigo_hash');
+        if ($nodo_codigo) $nodo_codigo->_dato($hash_nuevo);
+        else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($hash_nuevo), 'codigo_hash');
     }
     if ($contrasena !== '') {
         $nodo_contrasena = $nodo_usuario->adyacente('contrasena');
@@ -378,7 +404,11 @@ function actualizar_usuario(array $datos): array {
     }
 
     Controlador::guardar(Conf::NOMBRE_APP);
-    return ['exito' => true];
+    $resultado = ['exito' => true];
+    if ($codigo_acceso !== '') {
+        $resultado['codigo_asignado'] = $codigo_acceso;
+    }
+    return $resultado;
 }
 
 /**
@@ -454,7 +484,7 @@ function listar_terminales_de_dueno(string $nombre_dueno): array {
         $nodo_banco = $nodo_terminal->adyacente('banco');
         $nodo_nivel_terminal = $nodo_terminal->adyacente('nivel');
         $nodo_nombre_real = $nodo_terminal->adyacente('nombre_real');
-        $nodo_codigo_acceso = $nodo_terminal->adyacente('codigo_acceso');
+        $nodo_codigo_hash = $nodo_terminal->adyacente('codigo_hash');
         $nodo_email = $nodo_terminal->adyacente('email');
         $nodo_pasajes = $nodo_terminal->adyacente('pasajes');
 
@@ -476,7 +506,7 @@ function listar_terminales_de_dueno(string $nombre_dueno): array {
             'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : '',
             'email' => $nodo_email ? $nodo_email->dato() : '',
             'nivel' => $nodo_nivel_terminal ? $nodo_nivel_terminal->dato() : 'terminal',
-            'codigo_acceso' => $nodo_codigo_acceso ? $nodo_codigo_acceso->dato() : '',
+            'codigo_asignado' => $nodo_codigo_hash ? true : false,
             'efectivo' => $nodo_efectivo ? $nodo_efectivo->dato() : '0',
             'bancarizado' => $monto_banco,
             'banco' => [

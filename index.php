@@ -18,7 +18,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.62d
+ * @version   1.5piloto.68e
  */
 
 // --- Utilidades base ----------------------------------
@@ -234,9 +234,48 @@ if (isset($_GET['migrar_declaraciones_juradas_v3'])) {
     exit;
 }
 
+// ==== Bloque temporal para migración de fichas médicas (v1.5piloto.68) ====
+// Recorre todos los pasajeros y elimina el nodo `ficha_salud` (con sus
+// hijos) si existe. Recorre todos los viajes y elimina el enlace
+// `mostrar_ficha_medica` de sus opciones avanzadas si existe.
+// Es idempotente: si se corre dos veces, la segunda no hace nada.
+if (isset($_GET['migrar_fichas_medicas'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_fichas_medicas.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_fichas_medicas();
+    echo "Migración de fichas médicas completada.\n";
+    echo "--- Fichas de salud ---\n";
+    echo "Dueños procesados:              {$res['duenos_procesados']}\n";
+    echo "Pasajeros procesados:           {$res['pasajeros_procesados']}\n";
+    echo "Fichas eliminadas:              {$res['fichas_eliminadas']}\n";
+    echo "Sin ficha (ya limpios):         {$res['sin_ficha']}\n";
+    echo "--- Opciones de viaje ---\n";
+    echo "Viajes procesados:              {$res['viajes_procesados']}\n";
+    echo "Enlaces mostrar_ficha_medica:   {$res['mostrar_ficha_eliminados']}\n";
+    echo "Sin enlace (ya limpios):        {$res['sin_mostrar_ficha']}\n";
+    exit;
+}
+
+// ==== Bloque temporal para migración de hasheo de credenciales (v1.5piloto.68) ====
+// Recorre todos los usuarios y convierte el `codigo_acceso` en texto plano
+// a `codigo_hash` con password_hash(). Elimina el enlace viejo.
+// Es idempotente: si un usuario ya tiene codigo_hash, lo saltea.
+if (isset($_GET['migrar_hashear_credenciales'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_hashear_credenciales.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_hashear_credenciales();
+    echo "Migración de hasheo de credenciales completada.\n";
+    echo "Usuarios procesados: {$res['usuarios_procesados']}\n";
+    echo "Migrados:            {$res['migrados']}\n";
+    echo "Ya migrados:         {$res['ya_migrados']}\n";
+    echo "Sin código:          {$res['sin_codigo']}\n";
+    exit;
+}
+
 // Crear usuario administrador si no existe
-if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+$raiz_usuarios = Nodo::nodo_por_id('usuarios');
+$nodo_admin_existente = $raiz_usuarios ? $raiz_usuarios->adyacente(Conf::NOMBRE_ADMIN) : null;
+if (!$nodo_admin_existente) {
     if (!$raiz_usuarios) {
         Nodo::crear_con_id('usuarios');
         $raiz_usuarios = Nodo::nodo_por_id('usuarios');
@@ -244,7 +283,7 @@ if (!buscar_usuario_por_codigo(Conf::CODIGO_ADMIN)) {
     $nodo_admin = Nodo::crear_con_dato(Conf::NOMBRE_ADMIN);
     $nodo_admin->_adyacente_en(Nodo::crear_con_dato(Conf::NOMBRE_ADMIN), 'nombre_real');
     $nodo_admin->_adyacente_en(Nodo::crear_con_dato('admin'), 'nivel');
-    $nodo_admin->_adyacente_en(Nodo::crear_con_dato(Conf::CODIGO_ADMIN), 'codigo_acceso');
+    $nodo_admin->_adyacente_en(Nodo::crear_con_dato(password_hash(Conf::CODIGO_ADMIN, PASSWORD_DEFAULT)), 'codigo_hash');
     $raiz_usuarios->_adyacente_en($nodo_admin, Conf::NOMBRE_ADMIN);
     Controlador::guardar($nombre_app);
     Controlador::establecer_metodo('JSON');

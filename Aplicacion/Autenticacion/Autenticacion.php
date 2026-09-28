@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.3
+ * @version   1.5piloto.68
  */
 
 use Iteradores\Configuracion\Conf;
@@ -67,5 +67,46 @@ function validar_token_sesion(string $token): ?array {
     return [
         'nombre_usuario' => $nombre_usuario,
         'nodo' => $nodo_usuario_real,
+    ];
+}
+
+/**
+ * Autentica a un usuario mediante su nombre y contraseña.
+ *
+ * @param string $nombre_usuario Nombre de usuario.
+ * @param string $contrasena Contraseña en texto plano.
+ * @return array|null Datos del usuario autenticado o null.
+ */
+function autenticar_por_usuario(string $nombre_usuario, string $contrasena): ?array {
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_usuarios) {
+        password_verify($contrasena, '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
+        return null;
+    }
+
+    $nodo_usuario = $raiz_usuarios->adyacente($nombre_usuario);
+    if (!$nodo_usuario) {
+        password_verify($contrasena, '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
+        return null;
+    }
+
+    $nodo_contrasena = $nodo_usuario->adyacente('contrasena');
+    if (!$nodo_contrasena) {
+        // El usuario no tiene contraseña asignada.
+        password_verify($contrasena, '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
+        return null;
+    }
+
+    if (!password_verify($contrasena, $nodo_contrasena->dato())) {
+        return null;
+    }
+
+    $nodo_nivel = $nodo_usuario->adyacente('nivel');
+    $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
+
+    return [
+        'nombre_usuario' => $nombre_usuario,
+        'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : $nombre_usuario,
+        'nivel' => $nodo_nivel ? $nodo_nivel->dato() : 'terminal',
     ];
 }

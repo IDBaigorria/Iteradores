@@ -11,14 +11,31 @@
 <link rel="stylesheet" href="estilos-rendiciones.css?v=1.5piloto.65">
 </head>
 <body>
-<!-- Pantalla de login (código de acceso) -->
+<!-- Pantalla de login -->
 <div id="pantalla_login" class="login-overlay">
   <div class="login-box">
     <h2>Administrador de Viajes</h2>
-    <div class="row">
-      <label for="codigo_acceso">Ingrese código de acceso:</label>
-      <input type="password" id="codigo_acceso" style="width:200px">
-      <button class="btn primary" id="boton_ingresar">Ingresar</button>
+    <div id="login_por_codigo">
+      <div class="row">
+        <label for="codigo_acceso">Ingrese código de acceso:</label>
+        <input type="password" id="codigo_acceso" style="width:200px">
+        <button class="btn primary" id="boton_ingresar">Ingresar</button>
+      </div>
+      <a href="#" id="link_login_usuario" class="small muted" style="display:inline-block; margin-top:10px; text-decoration:underline;">Ingresar con usuario y contraseña</a>
+    </div>
+    <div id="login_por_usuario" class="hidden">
+      <div class="row">
+        <label for="login_usuario">Usuario:</label>
+        <input type="text" id="login_usuario" style="width:200px">
+      </div>
+      <div class="row">
+        <label for="login_contrasena">Contraseña:</label>
+        <input type="password" id="login_contrasena" style="width:200px">
+      </div>
+      <div class="row">
+        <button class="btn primary" id="boton_ingresar_usuario">Ingresar</button>
+      </div>
+      <a href="#" id="link_login_codigo" class="small muted" style="display:inline-block; margin-top:10px; text-decoration:underline;">Volver a ingresar con código</a>
     </div>
   </div>
 </div>
@@ -615,9 +632,9 @@
     <div class="modal-body" id="modal_apilado_contenido"></div>
   </div>
 </div>
-<script src="aplicacion.js?v=1.5piloto.65"></script>
-<script src="Aplicacion/admin.js?v=1.5piloto.65"></script>
-<script src="Aplicacion/terminales.js?v=1.5piloto.65"></script>
+<script src="aplicacion.js?v=1.5piloto.68"></script>
+<script src="Aplicacion/admin.js?v=1.5piloto.68"></script>
+<script src="Aplicacion/terminales.js?v=1.5piloto.68b"></script>
 <script src="Aplicacion/micros.js?v=1.5piloto.65"></script>
 <script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.65"></script>
 <script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.65"></script>

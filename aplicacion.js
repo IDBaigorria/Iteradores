@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.61d
+ * @version 1.5piloto.68
  */
 
 // Utilidades
@@ -144,14 +144,7 @@ async function ingresar_con_codigo() {
         });
         const datos = await respuesta.json();
         if (datos.exito) {
-            usuario_actual = datos.usuario;
-            localStorage.setItem('token_sesion', usuario_actual.token_sesion);
-            localStorage.setItem('usuario_actual', JSON.stringify(usuario_actual));
-            $("#pantalla_login").classList.add("hidden");
-            $("#aplicacion").classList.remove("hidden");
-            $("#nombre_usuario_actual").textContent = usuario_actual.nombre_usuario;
-            $("#nivel_usuario_actual").textContent = usuario_actual.nivel;
-            configurar_pestanas_segun_nivel(usuario_actual.nivel);
+            _aplicar_login_exitoso(datos.usuario);
             mostrar_aviso("Bienvenido", 'exito');
         } else {
             mostrar_aviso(datos.error || "Código incorrecto", 'error');
@@ -160,6 +153,72 @@ async function ingresar_con_codigo() {
         console.error("Error en autenticación:", error);
         mostrar_aviso("Error de comunicación", 'error');
     }
+}
+
+/**
+ * Ingresa con usuario y contraseña.
+ */
+async function ingresar_con_usuario() {
+    const usuario_input = $("#login_usuario").value.trim();
+    const contrasena_input = $("#login_contrasena").value;
+    if (!usuario_input || !contrasena_input) {
+        mostrar_aviso("Ingrese usuario y contraseña", 'error');
+        return;
+    }
+    try {
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "autenticar/verificar",
+                usuario: usuario_input,
+                contrasena: contrasena_input
+            })
+        });
+        const datos = await respuesta.json();
+        if (datos.exito) {
+            _aplicar_login_exitoso(datos.usuario);
+            mostrar_aviso("Bienvenido", 'exito');
+        } else {
+            mostrar_aviso(datos.error || "Usuario o contraseña incorrectos", 'error');
+        }
+    } catch (error) {
+        console.error("Error en autenticación:", error);
+        mostrar_aviso("Error de comunicación", 'error');
+    }
+}
+
+/**
+ * Aplica un login exitoso: guarda estado, muestra la app y configura pestañas.
+ * Se usa tanto en login por código como por usuario.
+ */
+function _aplicar_login_exitoso(usuario) {
+    usuario_actual = usuario;
+    localStorage.setItem('token_sesion', usuario.token_sesion);
+    localStorage.setItem('usuario_actual', JSON.stringify(usuario));
+    $("#pantalla_login").classList.add("hidden");
+    $("#aplicacion").classList.remove("hidden");
+    $("#nombre_usuario_actual").textContent = usuario.nombre_usuario;
+    $("#nivel_usuario_actual").textContent = usuario.nivel;
+    configurar_pestanas_segun_nivel(usuario.nivel);
+}
+
+/**
+ * Muestra el bloque de login por usuario y oculta el de código.
+ */
+function mostrar_login_por_usuario() {
+    $("#login_por_codigo").classList.add("hidden");
+    $("#login_por_usuario").classList.remove("hidden");
+    $("#login_usuario").focus();
+}
+
+/**
+ * Muestra el bloque de login por código y oculta el de usuario.
+ */
+function mostrar_login_por_codigo() {
+    $("#login_por_usuario").classList.add("hidden");
+    $("#login_por_codigo").classList.remove("hidden");
+    $("#codigo_acceso").focus();
 }
 
 async function salir() {
@@ -181,6 +240,8 @@ async function salir() {
     $("#aplicacion").classList.add("hidden");
     $("#pantalla_login").classList.remove("hidden");
     $("#codigo_acceso").value = "";
+    $("#login_usuario").value = "";
+    $("#login_contrasena").value = "";
 }
 
 // Inicialización al cargar la página
@@ -220,6 +281,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 $("#boton_ingresar").addEventListener("click", ingresar_con_codigo);
 $("#codigo_acceso").addEventListener("keypress", (e) => {
     if (e.key === "Enter") ingresar_con_codigo();
+});
+$("#boton_ingresar_usuario").addEventListener("click", ingresar_con_usuario);
+$("#login_contrasena").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") ingresar_con_usuario();
+});
+$("#link_login_usuario").addEventListener("click", (e) => {
+    e.preventDefault();
+    mostrar_login_por_usuario();
+});
+$("#link_login_codigo").addEventListener("click", (e) => {
+    e.preventDefault();
+    mostrar_login_por_codigo();
 });
 $("#boton_salir").addEventListener("click", salir);
 

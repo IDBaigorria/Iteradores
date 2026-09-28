@@ -1,7 +1,7 @@
 /***
  * Funciones de administración de usuarios.
  * @since 1.5piloto.15
- * @version 1.5piloto.52b
+ * @version 1.5piloto.68
  */
 
 async function cargar_datos_admin() {
@@ -32,7 +32,7 @@ async function cargar_datos_admin() {
                 <td>${usuario.nombre_real || "—"}</td>
                 <td>${usuario.email || "—"}</td>
                 <td>${usuario.nivel}</td>
-                <td>${usuario.codigo_acceso || "—"}</td>
+                <td>${usuario.codigo_asignado ? "•••••" : "—"}</td>
                 <td>${usuario.efectivo || "0"}</td>
                 <td>${usuario.bancarizado || "0"}</td>
                 <td>${usuario.banco.nombre || "—"}</td>
@@ -145,7 +145,7 @@ async function iniciar_edicion_usuario(nombre_usuario) {
     const valor_nombre_real = usuario.nombre_real || '';
     const valor_email = usuario.email || '';
     const valor_nivel = usuario.nivel;
-    const valor_codigo = usuario.codigo_acceso || '';
+    const valor_codigo = '';
     const valor_banco_nombre = usuario.banco?.nombre || '';
     const valor_banco_cuenta = usuario.banco?.cuenta || '';
     const valor_dueno = usuario.dueno || '';
@@ -174,7 +174,7 @@ async function iniciar_edicion_usuario(nombre_usuario) {
                 <option value="admin" ${valor_nivel === 'admin' ? 'selected' : ''}>Administrador</option>
             </select>
         </td>
-        <td><input type="text" id="editar_codigo" value="${valor_codigo}"></td>
+        <td><input type="text" id="editar_codigo" value="" placeholder="Dejar vacío para no cambiar"></td>
         <td>${usuario.efectivo || '0'}</td>
         <td>${usuario.bancarizado || '0'}</td>
         <td><input type="text" id="editar_banco_nombre" value="${valor_banco_nombre}"></td>
@@ -248,6 +248,9 @@ async function guardar_edicion_usuario(nombre_usuario, fila) {
     });
     const resultado = await respuesta.json();
     if (resultado.exito) {
+        if (resultado.codigo_asignado) {
+            alert("Nuevo código de acceso: " + resultado.codigo_asignado + "\n\nGuardalo, no se mostrará de nuevo.");
+        }
         mostrar_aviso("Usuario actualizado correctamente", 'exito');
         cargar_datos_admin();
     } else {
@@ -329,8 +332,12 @@ $("#boton_guardar_usuario").addEventListener("click", async () => {
         banco_cuenta: (nivel === "terminal" || nivel === "dueno") ? $("#nuevo_banco_cuenta").value.trim() : ""
     };
 
-    if (!datos_usuario.nombre_usuario || !datos_usuario.codigo_acceso) {
-        mostrar_aviso("Nombre de usuario y código de acceso son obligatorios", 'error');
+    if (!datos_usuario.nombre_usuario) {
+        mostrar_aviso("El nombre de usuario es obligatorio", 'error');
+        return;
+    }
+    if (!datos_usuario.codigo_acceso && !datos_usuario.contrasena) {
+        mostrar_aviso("Debe asignar al menos un código de acceso o una contraseña", 'error');
         return;
     }
     if (nivel === "terminal") {
@@ -351,6 +358,9 @@ $("#boton_guardar_usuario").addEventListener("click", async () => {
     });
     const datos = await respuesta.json();
     if (datos.exito) {
+        if (datos.codigo_asignado) {
+            alert("Código de acceso: " + datos.codigo_asignado + "\n\nGuardalo, no se mostrará de nuevo.");
+        }
         mostrar_aviso("Usuario agregado correctamente", 'exito');
         $("#formulario_nuevo_usuario").classList.add("hidden");
         ["nuevo_nombre_usuario","nuevo_contrasena","nuevo_nombre_real","nuevo_email","nuevo_codigo_acceso","nuevo_dueno_select","nuevo_banco_nombre","nuevo_banco_cuenta"].forEach(id => $("#"+id).value="");

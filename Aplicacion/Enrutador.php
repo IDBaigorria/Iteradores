@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.67
+ * @version   1.5piloto.68
  */
 
 use Iteradores\Nodos\Nodo;
@@ -39,7 +39,15 @@ function enrutar_peticion_post(string $accion, array $post): void {
             switch ($subaccion) {
                 case 'verificar':
                     $codigo = $post['codigo'] ?? '';
-                    $usuario = autenticar_por_codigo($codigo);
+                    $usuario_ingresado = $post['usuario'] ?? '';
+                    $contrasena_ingresada = $post['contrasena'] ?? '';
+
+                    if ($usuario_ingresado !== '' && $contrasena_ingresada !== '') {
+                        $usuario = autenticar_por_usuario($usuario_ingresado, $contrasena_ingresada);
+                    } else {
+                        $usuario = autenticar_por_codigo($codigo);
+                    }
+
                     if ($usuario) {
                         // Si es terminal, incluir el nombre del dueño
                         if ($usuario['nivel'] === 'terminal') {
@@ -50,7 +58,7 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         }
                         responder_json(['exito' => true, 'usuario' => $usuario]);
                     } else {
-                        responder_json(['exito' => false, 'error' => 'Código incorrecto']);
+                        responder_json(['exito' => false, 'error' => 'Credenciales incorrectas']);
                     }
                     break;
                 default:
