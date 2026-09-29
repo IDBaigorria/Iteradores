@@ -1,12 +1,13 @@
 <?php
 namespace Iteradores\Configuracion;
+require_once __DIR__ . '/../config_servidor.php';
 /**
- * @version 1.5piloto.71
+ * @version 1.5piloto.72
  *
  * @author Ignacio David Baigorria
  *
  */
-class Conf {
+class Conf extends ConfServidor {
 
     // Sobre la aplicación
     public const NOMBRE_APP = "AdministradorDeViajes";
@@ -60,54 +61,17 @@ class Conf {
      */
     public const HASH_DUMMY_AUTENTICACION = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
 
-    public const CODIGO_ADMIN = 'IDB';
     public const NOMBRE_ADMIN = 'Administrador';
     // Sobre las sesiones
     public const PREFIJO_SESSION = self::NOMBRE_APP . "_";
 
 
 
-    // Sobre si se ejecuta en localhost o en hosting de internet
-    public const LOCAL = true;  // Cambiar a false en producción
-
-    // --- Constantes específicas para entorno local ---
-    public const HOST_SQL_LOCAL = "localhost";
-    public const USUARIO_SQL_LOCAL = "root";
-    public const CONTRASENA_SQL_LOCAL = "";
-    public const NOMBRE_BD_SQL_LOCAL = "HyS";
-
-    // --- Constantes específicas para entorno remoto ---
-    public const HOST_SQL_REMOTO = "sql200.infinityfree.com";
-    public const USUARIO_SQL_REMOTO = "if0_42773340";
-    public const CONTRASENA_SQL_REMOTO = "aBjxN1w0SF";
-    public const NOMBRE_BD_SQL_REMOTO = "if0_42773340_HyS";
-
-    // --- Constantes específicas para entorno remoto ---
-    /*
-    public const HOST_SQL_REMOTO = "sql303.infinityfree.com";
-    public const USUARIO_SQL_REMOTO = "if0_42770299";
-    public const CONTRASENA_SQL_REMOTO = "0EnWvlaHCp";
-    public const NOMBRE_BD_SQL_REMOTO = "if0_42770299_HyS";
-    */
-
-    // --- Constantes finales (se eligen según LOCAL) ---
-    public const HOST_SQL = self::LOCAL ? self::HOST_SQL_LOCAL : self::HOST_SQL_REMOTO;
-    public const USUARIO_SQL = self::LOCAL ? self::USUARIO_SQL_LOCAL : self::USUARIO_SQL_REMOTO;
-    public const CONTRASENA_SQL = self::LOCAL ? self::CONTRASENA_SQL_LOCAL : self::CONTRASENA_SQL_REMOTO;
-    public const NOMBRE_BD_SQL = self::LOCAL ? self::NOMBRE_BD_SQL_LOCAL : self::NOMBRE_BD_SQL_REMOTO;
-
     /**
      * Método predeterminado utilizado para guardar y recuperar la superestructura.
      * @var string
      */
     public const SUPERESTRUCTURA_METODO_PERDURAR = "SQL";
-
-    // --- Constantes para la persistencia de la superestructura ---
-    // Se heredan de las constantes principales (ya elegidas según LOCAL)
-    public const SUPERESTRUCTURA_HOST_SQL = self::HOST_SQL;
-    public const SUPERESTRUCTURA_USUARIO_SQL = self::USUARIO_SQL;
-    public const SUPERESTRUCTURA_CONTRASENA_SQL = self::CONTRASENA_SQL;
-    public const SUPERESTRUCTURA_NOMBRE_BD_SQL = self::NOMBRE_BD_SQL;
 
     /**
      * Carpeta donde se guardarán los archivos de la superestructura en formato JSON.

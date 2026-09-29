@@ -1,8 +1,9 @@
 # Prompt de trabajo — Sistema de scripts de aplicación de cambios
 
 Este es un prompt autocontenido. Vive en el propio proyecto, en
-`prompts/prompt_sistema_scripts.md`, y se pega al principio de la conversación junto
-con `prompts/prompt_continuidad_proyecto.md`.
+`prompts/prompt_sistema_scripts.md`, y se pega al principio de la conversación
+junto con `prompts/prompt_framework_iteradores.md` y `prompts/prompt_piloto.md`.
+Son tres prompts en total.
 
 ---
 
@@ -368,10 +369,33 @@ Documentación:
 - Avisá siempre si algo puede romper otro flujo.
 - No inventes funcionalidad.
 
-## ACTUALIZACIÓN DE LOS PROMPTS AL CERRAR CADA TANDA
+## ACTUALIZACIÓN DE LOS PROMPTS CON CADA CAMBIO
 
-Cuando cierres una tanda, además de los cambios de código, agregá al
-`aplicar_cambios.php` los bloques para actualizar los prompts. Lo mínimo:
+**Regla general, sin excepciones:** cada vez que se modifica código o se
+actualiza la forma de trabajo, se actualizan también los prompts. No se
+hace en una tanda aparte ni se deja para después.
+
+Esto aplica a todo `aplicar_cambios.php` que se entregue. Si el script
+toca código, tiene que tocar el prompt. Si el script cambia la forma de
+trabajo, tiene que tocar el prompt del sistema de scripts.
+
+Los prompts son parte del proyecto. Se versionan con git como cualquier
+otro archivo. Cuando arranca una conversación nueva, el usuario pega los
+tres y el asistente lee la "Discusión actual" del prompt del piloto para
+saber dónde retomar.
+
+### Cuándo se actualiza cada prompt
+
+- **`prompts/prompt_piloto.md`**: siempre que se toque código del piloto
+  (backend o frontend) o cambien decisiones de diseño del piloto.
+- **`prompts/prompt_framework_iteradores.md`**: solo si se toca el
+  framework Iteradores (clases `Nodo`, `Iterador`, `Controlador`,
+  persistencia, etc.). No cambia cuando se toca solo el piloto.
+- **`prompts/prompt_sistema_scripts.md`** (este): solo si cambia la forma
+  de trabajo en sí. Por ejemplo, cómo se entregan los scripts, cómo se
+  validan, cómo se estructuran las tandas.
+
+### Qué se actualiza en `prompts/prompt_piloto.md`
 
 1. **Bump de versión del prompt de continuidad** en el título y en la sección
    "Discusión actual".
@@ -382,9 +406,27 @@ Cuando cierres una tanda, además de los cambios de código, agregá al
    - Qué espera el usuario de la próxima sesión.
 3. **Actualizar el historial de versiones** si cambió la estructura.
 4. **Actualizar la estructura de nodos** si cambió.
+5. **Actualizar la estructura de archivos** si se agregó o quitó algún
+   archivo importante.
 
-Esto se hace con un bloque `tipo => 'crear'` que sobrescribe el archivo. Es la
-forma más simple: no hay que calcular diffs.
+### Cómo se actualiza
+
+- Con bloques `tipo => 'reemplazar'` chicos, sobre las secciones
+  puntuales que cambian. **No se reescribe el prompt entero.**
+- Los bloques de reemplazo tienen que buscar exactamente el texto actual.
+  Si un bloque falla, se ajusta el `buscar`.
+- Cuando el bloque es chico y estable, se puede usar el mismo script.
+  Cuando el cambio es grande (por ejemplo, reorganizar todo), se puede
+  usar `tipo => 'crear'` para sobrescribir el archivo entero. Es la
+  excepción, no la regla.
+- Los cambios al prompt van siempre en el mismo `aplicar_cambios.php`
+  que los cambios de código. Nunca en un script aparte.
+
+### Excepción: cuando el cambio afecta a los tres prompts
+
+Si el cambio toca el framework Y el piloto (por ejemplo, una nueva
+versión del framework que agrega funcionalidad y el piloto la usa),
+se actualizan los tres prompts. Es poco común, pero pasa.
 
 ## RECORDATORIOS FINALES
 
@@ -400,15 +442,18 @@ forma más simple: no hay que calcular diffs.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.71a. Se introdujo esta misma
-sección y la idea de que los prompts vivan en el proyecto.
+**Última actualización de este prompt:** v1.5piloto.72a. Se reforzó la
+regla: cada vez que se modifica código o se actualiza la forma de
+trabajo, se actualizan los prompts con el mismo `aplicar_cambios.php`.
+Se agregaron criterios sobre cuándo se actualiza cada prompt.
 
 **Estado:**
 
 - El sistema de scripts funciona bien. No hay cambios de fondo pendientes.
-- Lo único nuevo es la costumbre de actualizar los prompts al cerrar cada tanda.
-  Eso ya está documentado en la sección "Actualización de los prompts al cerrar cada
-  tanda".
+- La regla de actualizar prompts con cada cambio está documentada en la
+  sección "Actualización de los prompts con cada cambio".
+- Los bloques de reemplazo sobre los prompts son chicos y estables. En
+  general se puede hacer todo en el mismo `aplicar_cambios.php`.
 
 **Para el asistente de la próxima sesión:**
 
