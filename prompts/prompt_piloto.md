@@ -529,6 +529,9 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 - **v73**: nuevo rol `soporte`. Nodo usuario con `duenos` (contenedor).
   Enlace `soporte` en el nodo dueño. Validaciones de permisos por
   dueño con `_verificar_permiso_dueno`. Chequeo global en el enrutador.
+- **v73a**: alta de usuarios `soporte` desde el panel admin con
+  asignación de dueños (checkboxes). Edición de los dueños asignados
+  de un soporte existente.
 
 ---
 
@@ -803,8 +806,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73 (nuevo rol
-`soporte`).
+**Última actualización de este prompt:** v1.5piloto.73a (alta de
+usuarios `soporte` con asignación de dueños).
 
 **Estado de la conversación:**
 

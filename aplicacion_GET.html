@@ -84,6 +84,7 @@
                 <option value="terminal">Terminal</option>
                 <option value="dueno" selected>Dueño</option>
                 <option value="admin">Administrador</option>
+                <option value="soporte">Soporte</option>
               </select>
             </div>
             <div class="field" id="campo_dueno" style="display:none">
@@ -94,6 +95,12 @@
             </div>
             <div class="field" id="campo_banco_nombre" style="display:none"><label>Banco (nombre) *</label><input id="nuevo_banco_nombre"></div>
             <div class="field" id="campo_banco_cuenta" style="display:none"><label>Cuenta bancaria *</label><input id="nuevo_banco_cuenta"></div>
+            <div class="field" id="campo_duenos_soporte" style="display:none">
+              <label>Dueños asignados</label>
+              <div id="nuevo_soporte_duenos_lista" style="max-height:200px; overflow-y:auto; border:1px solid #ccc; padding:6px; border-radius:4px; min-width:260px;">
+                <!-- Se llena dinámicamente -->
+              </div>
+            </div>
           </div>
           <div class="actions" style="margin-top:12px">
             <button class="btn primary" id="boton_guardar_usuario">Guardar</button>
@@ -639,7 +646,7 @@
   </div>
 </div>
 <script src="aplicacion.js?v=1.5piloto.73"></script>
-<script src="Aplicacion/admin.js?v=1.5piloto.73"></script>
+<script src="Aplicacion/admin.js?v=1.5piloto.73a"></script>
 <script src="Aplicacion/terminales.js?v=1.5piloto.68b"></script>
 <script src="Aplicacion/micros.js?v=1.5piloto.65"></script>
 <script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.65"></script>

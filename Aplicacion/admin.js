@@ -1,7 +1,7 @@
 /***
  * Funciones de administración de usuarios.
  * @since 1.5piloto.15
- * @version 1.5piloto.73
+ * @version 1.5piloto.73a
  */
 
 async function cargar_datos_admin() {
@@ -170,6 +170,21 @@ async function iniciar_edicion_usuario(nombre_usuario) {
     let celda_dueno;
     if (valor_nivel === 'terminal') {
         celda_dueno = `<td><select id="editar_dueno">${opciones_dueno}</select></td>`;
+    } else if (valor_nivel === 'soporte') {
+        // Lista de checkboxes con todos los dueños, marcando los asignados.
+        const asignados = usuario.duenos || [];
+        let checkboxes_html = '<div id="editar_soporte_duenos" style="max-height:120px; overflow-y:auto; min-width:180px;">';
+        if (duenos.length === 0) {
+            checkboxes_html += '<em>Sin dueños disponibles</em>';
+        } else {
+            duenos.forEach(dueno => {
+                const marcado = asignados.indexOf(dueno.nombre_usuario) !== -1 ? 'checked' : '';
+                const texto = dueno.nombre_real ? `${dueno.nombre_real} (${dueno.nombre_usuario})` : dueno.nombre_usuario;
+                checkboxes_html += `<label style="display:block;"><input type="checkbox" class="chk_editar_dueno_soporte" value="${dueno.nombre_usuario}" ${marcado}> ${texto}</label>`;
+            });
+        }
+        checkboxes_html += '</div>';
+        celda_dueno = `<td>${checkboxes_html}</td>`;
     } else {
         celda_dueno = `<td>—</td>`;
     }
@@ -205,6 +220,7 @@ async function iniciar_edicion_usuario(nombre_usuario) {
     function actualizar_visibilidad() {
         const es_terminal = select_nivel.value === 'terminal';
         const es_dueno = select_nivel.value === 'dueno';
+        const es_soporte = select_nivel.value === 'soporte';
         const tiene_banco = es_terminal || es_dueno;
         campo_banco_nombre.style.display = tiene_banco ? '' : 'none';
         campo_banco_cuenta.style.display = tiene_banco ? '' : 'none';
@@ -228,6 +244,13 @@ async function guardar_edicion_usuario(nombre_usuario, fila) {
     const select_dueno = fila.querySelector('#editar_dueno');
     const dueno = select_dueno ? select_dueno.value : '';
 
+    let duenos_asignados = [];
+    if (nivel === 'soporte') {
+        fila.querySelectorAll('.chk_editar_dueno_soporte:checked').forEach(chk => {
+            duenos_asignados.push(chk.value);
+        });
+    }
+
     const datos = {
         accion: "administrador/actualizar_usuario",
         nombre_usuario: nombre_usuario,
@@ -238,7 +261,8 @@ async function guardar_edicion_usuario(nombre_usuario, fila) {
         banco_nombre: fila.querySelector('#editar_banco_nombre').value.trim(),
         banco_cuenta: fila.querySelector('#editar_banco_cuenta').value.trim(),
         dueno: nivel === 'terminal' ? dueno : '',
-        contrasena: ''
+        contrasena: '',
+        duenos_asignados: nivel === 'soporte' ? JSON.stringify(duenos_asignados) : ''
     };
 
     if (nivel === 'terminal') {
@@ -289,11 +313,13 @@ async function eliminar_usuario_confirmado(nombre_usuario) {
 $("#nuevo_nivel").addEventListener("change", function() {
     const es_terminal = this.value === "terminal";
     const es_dueno = this.value === "dueno";
+    const es_soporte = this.value === "soporte";
     const tiene_banco = es_terminal || es_dueno;
     // Se usa "" en vez de "block" para no pisar el display: flex del CSS.
     document.getElementById("campo_dueno").style.display = es_terminal ? "" : "none";
     document.getElementById("campo_banco_nombre").style.display = tiene_banco ? "" : "none";
     document.getElementById("campo_banco_cuenta").style.display = tiene_banco ? "" : "none";
+    document.getElementById("campo_duenos_soporte").style.display = es_soporte ? "" : "none";
 });
 
 $("#boton_agregar_usuario").addEventListener("click", async () => {
@@ -304,6 +330,9 @@ $("#boton_agregar_usuario").addEventListener("click", async () => {
         select_nivel.innerHTML = '<option value="terminal">Terminal</option>';
         select_nivel.value = 'terminal';
         select_nivel.disabled = true;
+    } else {
+        const select_nivel = $("#nuevo_nivel");
+        select_nivel.disabled = false;
     }
     try {
         const respuesta = await fetch("index.php", {
@@ -321,6 +350,28 @@ $("#boton_agregar_usuario").addEventListener("click", async () => {
                 opcion.textContent = dueno.nombre_real ? `${dueno.nombre_real} (${dueno.nombre_usuario})` : dueno.nombre_usuario;
                 select_dueno.appendChild(opcion);
             });
+
+            // Cargar la lista de dueños como checkboxes para el campo de soporte.
+            const contenedor = $("#nuevo_soporte_duenos_lista");
+            if (contenedor) {
+                contenedor.innerHTML = '';
+                if (datos.duenos.length === 0) {
+                    contenedor.innerHTML = '<em>No hay dueños disponibles</em>';
+                } else {
+                    datos.duenos.forEach(dueno => {
+                        const label = document.createElement('label');
+                        label.style.display = 'block';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.value = dueno.nombre_usuario;
+                        checkbox.className = 'chk_dueno_soporte';
+                        label.appendChild(checkbox);
+                        const txt = document.createTextNode(' ' + (dueno.nombre_real ? `${dueno.nombre_real} (${dueno.nombre_usuario})` : dueno.nombre_usuario));
+                        label.appendChild(txt);
+                        contenedor.appendChild(label);
+                    });
+                }
+            }
         } else {
             mostrar_aviso("No se pudieron cargar los dueños", 'error');
         }
@@ -444,6 +495,15 @@ function _renderizar_tabla_usuarios(usuarios) {
 
 $("#boton_guardar_usuario").addEventListener("click", async () => {
     const nivel = $("#nuevo_nivel").value;
+
+    // Recolectar dueños asignados si es soporte.
+    let duenos_asignados = [];
+    if (nivel === "soporte") {
+        document.querySelectorAll('.chk_dueno_soporte:checked').forEach(chk => {
+            duenos_asignados.push(chk.value);
+        });
+    }
+
     const datos_usuario = {
         accion: "administrador/agregar_usuario",
         nombre_usuario: $("#nuevo_nombre_usuario").value.trim(),
@@ -454,7 +514,8 @@ $("#boton_guardar_usuario").addEventListener("click", async () => {
         nivel: nivel,
         dueno: nivel === "terminal" ? $("#nuevo_dueno_select").value : "",
         banco_nombre: (nivel === "terminal" || nivel === "dueno") ? $("#nuevo_banco_nombre").value.trim() : "",
-        banco_cuenta: (nivel === "terminal" || nivel === "dueno") ? $("#nuevo_banco_cuenta").value.trim() : ""
+        banco_cuenta: (nivel === "terminal" || nivel === "dueno") ? $("#nuevo_banco_cuenta").value.trim() : "",
+        duenos_asignados: nivel === "soporte" ? JSON.stringify(duenos_asignados) : ""
     };
 
     if (!datos_usuario.nombre_usuario) {
