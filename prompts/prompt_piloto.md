@@ -526,6 +526,9 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 - **v71b**: prompts divididos en framework y piloto.
 - **v72**: host y credenciales movidos a `config_servidor.php` en la raíz.
   `Conf` ahora hereda de `ConfServidor`.
+- **v73**: nuevo rol `soporte`. Nodo usuario con `duenos` (contenedor).
+  Enlace `soporte` en el nodo dueño. Validaciones de permisos por
+  dueño con `_verificar_permiso_dueno`. Chequeo global en el enrutador.
 
 ---
 
@@ -800,8 +803,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.72 (host y
-credenciales movidos a `config_servidor.php`).
+**Última actualización de este prompt:** v1.5piloto.73 (nuevo rol
+`soporte`).
 
 **Estado de la conversación:**
 
@@ -809,6 +812,7 @@ credenciales movidos a `config_servidor.php`).
 - Introdujimos la carpeta `prompts/` en v71a.
 - Dividimos el prompt de continuidad en framework y piloto en v71b.
 - Separamos host y credenciales a `config_servidor.php` en v72.
+- Agregamos el rol `soporte` en v73.
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -818,6 +822,11 @@ credenciales movidos a `config_servidor.php`).
 - **Host y credenciales viven en `config_servidor.php`** en la raíz del
   proyecto. Es el único archivo que no se toca al desplegar. `Conf`
   hereda de `ConfServidor`.
+- **El rol `soporte`** asiste a uno o varios dueños. Ve las mismas
+  pestañas que el admin, pero solo sobre sus dueños asignados. Solo
+  puede crear/editar/eliminar terminales de esos dueños y editar al
+  propio dueño. No puede cambiar el nivel de un usuario. El admin es
+  "soporte universal".
 - **Los prompts viven en el proyecto**, en `prompts/`. Hay tres:
   framework, piloto, sistema de scripts.
 - **Los logs de errores usan `Controlador::_error()`**, no archivos de
@@ -861,7 +870,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.72. Todo funcional. Listo
+**Estado del proyecto al cierre:** v1.5piloto.73. Todo funcional. Listo
 para arrancar la diversificación por tipo de aplicación.
 
 ---

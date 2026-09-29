@@ -10,7 +10,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.71
+ * @version   1.5piloto.73
  */
 
 use Iteradores\Configuracion\Conf;
@@ -271,6 +271,17 @@ function _construir_respuesta_login(string $nombre_usuario): ?array {
         'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : $nombre_usuario,
         'nivel' => $nodo_nivel ? $nodo_nivel->dato() : 'terminal',
     ];
+
+    if ($usuario['nivel'] === 'soporte') {
+        $duenos = [];
+        $nodo_duenos = $nodo_app->adyacente('duenos');
+        if ($nodo_duenos) {
+            foreach ($nodo_duenos->adyacentes() as $nombre_d => $nodo_d) {
+                $duenos[] = (string)$nombre_d;
+            }
+        }
+        $usuario['duenos'] = $duenos;
+    }
 
     $token = crear_sesion($nombre_usuario);
     $usuario['token_sesion'] = $token;

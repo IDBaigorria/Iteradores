@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.70
+ * @version   1.5piloto.73
  */
 
 use Iteradores\Nodos\Nodo;
@@ -33,6 +33,16 @@ function enrutar_peticion_post(string $accion, array $post): void {
     $partes = explode('/', $accion);
     $modulo = $partes[0] ?? '';
     $subaccion = $partes[1] ?? '';
+
+    // Chequeo global: si viene nombre_solicitante y nombre_dueno,
+    // verificar que el solicitante tenga permiso sobre ese dueño.
+    $nombre_solicitante = $post['nombre_solicitante'] ?? '';
+    $nombre_dueno_post = $post['nombre_dueno'] ?? '';
+    if ($nombre_solicitante !== '' && $nombre_dueno_post !== '') {
+        if (!_verificar_permiso_dueno($nombre_solicitante, $nombre_dueno_post)) {
+            responder_json(['exito' => false, 'error' => 'Permiso denegado sobre el dueño solicitado']);
+        }
+    }
 
     switch ($modulo) {
         case 'autenticar':
@@ -67,6 +77,16 @@ function enrutar_peticion_post(string $accion, array $post): void {
             break;
 
         case 'administrador':
+            // Determinar el nivel del solicitante (excepto verificar).
+            $nombre_sol_admin = $post['nombre_solicitante'] ?? '';
+            $raiz_admin = Nodo::nodo_por_id('usuarios');
+            $nodo_sol_admin = ($raiz_admin && $nombre_sol_admin !== '') ? $raiz_admin->adyacente($nombre_sol_admin) : null;
+            $nodo_nivel_sol = $nodo_sol_admin ? $nodo_sol_admin->adyacente('nivel') : null;
+            $nivel_sol = $nodo_nivel_sol ? $nodo_nivel_sol->dato() : '';
+            if ($subaccion !== 'verificar' && !in_array($nivel_sol, ['admin', 'soporte'], true)) {
+                responder_json(['exito' => false, 'error' => 'Permiso denegado']);
+            }
+
             switch ($subaccion) {
                 case 'verificar':
                     $codigo = $post['codigo'] ?? '';
@@ -78,11 +98,15 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     break;
 
                 case 'listar_usuarios':
-                    responder_json(['exito' => true, 'usuarios' => listar_usuarios()]);
+                    if ($nivel_sol === 'soporte') {
+                        responder_json(['exito' => true, 'usuarios' => listar_usuarios_de_soporte($nombre_sol_admin)]);
+                    } else {
+                        responder_json(['exito' => true, 'usuarios' => listar_usuarios()]);
+                    }
                     break;
 
                 case 'listar_duenos':
-                    responder_json(['exito' => true, 'duenos' => listar_duenos()]);
+                    responder_json(['exito' => true, 'duenos' => listar_duenos($nombre_sol_admin)]);
                     break;
 
                 case 'listar_sesiones':
@@ -103,6 +127,31 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombre_usuario = $post['nombre_usuario'] ?? '';
                     $resultado = eliminar_usuario($nombre_usuario);
                     responder_json($resultado);
+                    break;
+
+                case 'listar_soportes':
+                    if ($nivel_sol !== 'admin') {
+                        responder_json(['exito' => false, 'error' => 'Solo el administrador puede listar soportes']);
+                    }
+                    responder_json(['exito' => true, 'soportes' => listar_soportes()]);
+                    break;
+
+                case 'listar_duenos_de_soporte':
+                    if ($nivel_sol !== 'admin') {
+                        responder_json(['exito' => false, 'error' => 'Solo el administrador puede listar los dueños de un soporte']);
+                    }
+                    $nombre_soporte = $post['nombre_soporte'] ?? '';
+                    if (empty($nombre_soporte)) {
+                        responder_json(['exito' => false, 'error' => 'Soporte no especificado']);
+                    }
+                    responder_json(['exito' => true, 'duenos' => listar_duenos_de_soporte($nombre_soporte)]);
+                    break;
+
+                case 'listar_duenos_disponibles':
+                    if ($nivel_sol !== 'admin') {
+                        responder_json(['exito' => false, 'error' => 'Solo el administrador puede listar todos los dueños']);
+                    }
+                    responder_json(['exito' => true, 'duenos' => listar_duenos()]);
                     break;
 
                 default:
@@ -188,6 +237,17 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if ($usuario['nivel'] === 'terminal') {
                         $nodo_dueno = $nodo_usuario->adyacente('dueno');
                         $usuario['dueno'] = $nodo_dueno ? $nodo_dueno->dato() : '';
+                    }
+                    // Si es soporte, incluir la lista de dueños asignados.
+                    if ($usuario['nivel'] === 'soporte') {
+                        $duenos = [];
+                        $nodo_duenos = $nodo_usuario->adyacente('duenos');
+                        if ($nodo_duenos) {
+                            foreach ($nodo_duenos->adyacentes() as $nombre_d => $nodo_d) {
+                                $duenos[] = (string)$nombre_d;
+                            }
+                        }
+                        $usuario['duenos'] = $duenos;
                     }
                     responder_json(['exito' => true, 'usuario' => $usuario]);
                 } else {

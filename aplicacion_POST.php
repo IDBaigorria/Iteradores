@@ -57,7 +57,7 @@
  *
  * | Enlace          | Nodo destino y dato esperado                                                         |
  * |-----------------|---------------------------------------------------------------------------------------|
- * | `nivel`         | Nodo con dato string: `"admin"`, `"dueno"` o `"terminal"`.                           |
+ * | `nivel`         | Nodo con dato string: `"admin"`, `"dueno"`, `"terminal"` o `"soporte"`.              |
  * | `codigo_hash`   | **(en el grafo de credenciales)** Nodo con dato string: hash bcrypt del código de acceso. |
  * | `contrasena`    | **(en el grafo de credenciales)** Nodo con dato string: hash de contraseña (opcional).    |
  * | `intentos_fallidos` | **(en el grafo de credenciales)** Nodo con dato string numérico: cantidad de intentos fallidos consecutivos. Se resetea a `"0"` con un login exitoso o al cambiar credenciales. |
@@ -90,6 +90,9 @@
  * | `cancelaciones` | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
  * |                 | └─ Enlaces salientes: utiliza árbol (hmi/hd) para almacenar las cancelaciones. Ver Nodo Cancelación. |
  * | `venta_actual`  | Enlace a un nodo venta actual (solo para `terminal`). Si no existe venta activa, el enlace no existe. |
+ * | `duenos`        | Nodo contenedor con dato vacío (solo para `soporte`).                                  |
+ * |                 | └─ Enlaces salientes con nombre de cada dueño asignado apuntando a su nodo usuario.    |
+ * | `soporte`       | Enlace directo al nodo usuario soporte (solo para `dueno`, opcional).                  |
  *
  * **Observaciones:**
  * - Los enlaces `dueno` y `venta_actual` solo existen en nodos de nivel `terminal`.
@@ -709,7 +712,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.71
+ * @version   1.5piloto.73
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

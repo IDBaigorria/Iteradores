@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.71
+ * @version   1.5piloto.73
  */
 
 use Iteradores\Nodos\Nodo;
@@ -124,7 +124,7 @@ function listar_usuarios(): array {
  *
  * @return array Lista de dueños con nombre de usuario y nombre real.
  */
-function listar_duenos(): array {
+function listar_duenos(string $nombre_solicitante = ''): array {
     $todos = listar_usuarios();
     $duenos = [];
     foreach ($todos as $usuario) {
@@ -135,7 +135,305 @@ function listar_duenos(): array {
             ];
         }
     }
+
+    // Si el solicitante es soporte, filtrar a sus dueños asignados.
+    if ($nombre_solicitante !== '' && $nombre_solicitante !== Conf::NOMBRE_ADMIN) {
+        $raiz = Nodo::nodo_por_id('usuarios');
+        if ($raiz) {
+            $nodo_sol = $raiz->adyacente($nombre_solicitante);
+            if ($nodo_sol) {
+                $nodo_nivel_sol = $nodo_sol->adyacente('nivel');
+                $nivel_sol = $nodo_nivel_sol ? $nodo_nivel_sol->dato() : '';
+                if ($nivel_sol === 'soporte') {
+                    $nodo_duenos_sol = $nodo_sol->adyacente('duenos');
+                    $permitidos = [];
+                    if ($nodo_duenos_sol) {
+                        foreach ($nodo_duenos_sol->adyacentes() as $nombre_d => $nodo_d) {
+                            $permitidos[(string)$nombre_d] = true;
+                        }
+                    }
+                    $duenos = array_values(array_filter($duenos, function($d) use ($permitidos) {
+                        return isset($permitidos[(string)$d['nombre_usuario']]);
+                    }));
+                }
+            }
+        }
+    }
+
     return $duenos;
+}
+
+/**
+ * Lista todos los usuarios con nivel "soporte".
+ *
+ * Cada uno con sus dueños asignados.
+ *
+ * @return array Lista de soportes.
+ */
+function listar_soportes(): array {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return [];
+
+    $soportes = [];
+    foreach ($raiz->adyacentes() as $nombre_usuario => $nodo_usuario) {
+        $nodo_nivel = $nodo_usuario->adyacente('nivel');
+        $nivel = $nodo_nivel ? $nodo_nivel->dato() : '';
+        if ($nivel !== 'soporte') continue;
+
+        $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
+        $nodo_email = $nodo_usuario->adyacente('email');
+
+        $duenos = [];
+        $nodo_duenos = $nodo_usuario->adyacente('duenos');
+        if ($nodo_duenos) {
+            foreach ($nodo_duenos->adyacentes() as $nombre_dueno => $nodo_d) {
+                $duenos[] = (string)$nombre_dueno;
+            }
+        }
+
+        $soportes[] = [
+            'nombre_usuario' => (string)$nombre_usuario,
+            'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : '',
+            'email' => $nodo_email ? $nodo_email->dato() : '',
+            'nivel' => 'soporte',
+            'duenos' => $duenos,
+        ];
+    }
+    return $soportes;
+}
+
+/**
+ * Lista los dueños asignados a un soporte.
+ *
+ * @param string $nombre_soporte Nombre del soporte.
+ * @return array Lista de dueños con nombre_usuario y nombre_real.
+ */
+function listar_duenos_de_soporte(string $nombre_soporte): array {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return [];
+    $nodo_soporte = $raiz->adyacente($nombre_soporte);
+    if (!$nodo_soporte) return [];
+
+    $nodo_nivel = $nodo_soporte->adyacente('nivel');
+    $nivel = $nodo_nivel ? $nodo_nivel->dato() : '';
+    if ($nivel !== 'soporte') return [];
+
+    $nodo_duenos = $nodo_soporte->adyacente('duenos');
+    if (!$nodo_duenos) return [];
+
+    $resultado = [];
+    foreach ($nodo_duenos->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nodo_nombre_real = $nodo_dueno->adyacente('nombre_real');
+        $resultado[] = [
+            'nombre_usuario' => (string)$nombre_dueno,
+            'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : '',
+        ];
+    }
+    return $resultado;
+}
+
+/**
+ * Lista los usuarios visibles para un soporte: cada dueño asignado
+ * más sus terminales.
+ *
+ * @param string $nombre_soporte Nombre del soporte.
+ * @return array Lista de usuarios.
+ */
+function listar_usuarios_de_soporte(string $nombre_soporte): array {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return [];
+    $nodo_soporte = $raiz->adyacente($nombre_soporte);
+    if (!$nodo_soporte) return [];
+
+    $nodo_duenos = $nodo_soporte->adyacente('duenos');
+    if (!$nodo_duenos) return [];
+
+    // Cargar el mapa de usuarios con código (para codigo_asignado).
+    $con_codigo = en_grafo_credenciales(function() {
+        $raiz_cred = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_cred) return [];
+        $mapa = [];
+        foreach ($raiz_cred->adyacentes() as $nombre => $nodo) {
+            $mapa[(string)$nombre] = $nodo->adyacente('codigo_hash') ? true : false;
+        }
+        return $mapa;
+    });
+
+    $usuarios = [];
+    foreach ($nodo_duenos->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $usuarios[] = _formatear_usuario_para_admin((string)$nombre_dueno, $nodo_dueno, $con_codigo);
+
+        $nodo_terminales = $nodo_dueno->adyacente('terminales');
+        if ($nodo_terminales) {
+            foreach ($nodo_terminales->adyacentes() as $nombre_terminal => $nodo_terminal) {
+                $usuarios[] = _formatear_usuario_para_admin((string)$nombre_terminal, $nodo_terminal, $con_codigo);
+            }
+        }
+    }
+    return $usuarios;
+}
+
+/**
+ * Formatea un nodo usuario para el listado del panel admin.
+ *
+ * @param string $nombre_usuario Nombre de usuario.
+ * @param Nodo $nodo_usuario Nodo del usuario.
+ * @param array $con_codigo Mapa nombre → tiene_codigo.
+ * @return array Datos formateados.
+ */
+function _formatear_usuario_para_admin(string $nombre_usuario, Nodo $nodo_usuario, array $con_codigo): array {
+    $nodo_efectivo = $nodo_usuario->adyacente('efectivo');
+    $nodo_banco = $nodo_usuario->adyacente('banco');
+    $nodo_nivel = $nodo_usuario->adyacente('nivel');
+    $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
+    $nodo_email = $nodo_usuario->adyacente('email');
+    $nodo_pasajes = $nodo_usuario->adyacente('pasajes');
+
+    $banco_nombre = '';
+    $banco_cuenta = '';
+    $monto_banco = '0';
+    if ($nodo_banco) {
+        $monto_banco = $nodo_banco->dato();
+        $nombre = $nodo_banco->adyacente('nombre');
+        $cuenta = $nodo_banco->adyacente('cuenta');
+        $banco_nombre = $nombre ? $nombre->dato() : '';
+        $banco_cuenta = $cuenta ? $cuenta->dato() : '';
+    }
+
+    $usuario = [
+        'nombre_usuario' => $nombre_usuario,
+        'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : '',
+        'email' => $nodo_email ? $nodo_email->dato() : '',
+        'nivel' => $nodo_nivel ? $nodo_nivel->dato() : 'terminal',
+        'efectivo' => $nodo_efectivo ? $nodo_efectivo->dato() : '0',
+        'bancarizado' => $monto_banco,
+        'codigo_asignado' => !empty($con_codigo[$nombre_usuario]),
+        'pasajes' => $nodo_pasajes ? $nodo_pasajes->dato() : '0',
+        'banco' => [
+            'nombre' => $banco_nombre,
+            'cuenta' => $banco_cuenta,
+        ],
+    ];
+
+    $nivel = $usuario['nivel'];
+    if ($nivel === 'terminal') {
+        $nodo_dueno = $nodo_usuario->adyacente('dueno');
+        $usuario['dueno'] = $nodo_dueno ? $nodo_dueno->dato() : '';
+    }
+    if ($nivel === 'dueno') {
+        $terminales = [];
+        $nodo_terminales = $nodo_usuario->adyacente('terminales');
+        if ($nodo_terminales) {
+            foreach ($nodo_terminales->adyacentes() as $nombre_terminal => $nodo_terminal) {
+                $terminales[] = (string)$nombre_terminal;
+            }
+        }
+        $usuario['terminales'] = $terminales;
+    }
+    if ($nivel === 'soporte') {
+        $duenos = [];
+        $nodo_duenos = $nodo_usuario->adyacente('duenos');
+        if ($nodo_duenos) {
+            foreach ($nodo_duenos->adyacentes() as $nombre_d => $nodo_d) {
+                $duenos[] = (string)$nombre_d;
+            }
+        }
+        $usuario['duenos'] = $duenos;
+    }
+
+    return $usuario;
+}
+
+/**
+ * Verifica si un usuario solicitante tiene permiso sobre un dueño.
+ *
+ * Reglas:
+ * - Admin: permiso sobre todos.
+ * - Soporte: permiso solo sobre los dueños asignados.
+ * - Dueño: permiso sobre sí mismo.
+ * - Terminal: permiso sobre su propio dueño.
+ *
+ * @param string $nombre_solicitante Nombre del usuario que solicita.
+ * @param string $nombre_dueno Nombre del dueño sobre el que se quiere operar.
+ * @return bool
+ */
+function _verificar_permiso_dueno(string $nombre_solicitante, string $nombre_dueno): bool {
+    if ($nombre_solicitante === '') return true;
+    if ($nombre_solicitante === $nombre_dueno) return true;
+    if ($nombre_solicitante === Conf::NOMBRE_ADMIN) return true;
+
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return false;
+    $nodo_sol = $raiz->adyacente($nombre_solicitante);
+    if (!$nodo_sol) return false;
+
+    $nodo_nivel = $nodo_sol->adyacente('nivel');
+    $nivel = $nodo_nivel ? $nodo_nivel->dato() : '';
+
+    if ($nivel === 'soporte') {
+        $nodo_duenos = $nodo_sol->adyacente('duenos');
+        if (!$nodo_duenos) return false;
+        return $nodo_duenos->adyacente($nombre_dueno) !== null;
+    }
+
+    if ($nivel === 'terminal') {
+        $nodo_dueno = $nodo_sol->adyacente('dueno');
+        return $nodo_dueno && $nodo_dueno->dato() === $nombre_dueno;
+    }
+
+    return false;
+}
+
+/**
+ * Asigna una lista de dueños a un soporte, manteniendo consistencia
+ * bidireccional (soporte→dueno y dueno→soporte).
+ *
+ * @param Nodo $nodo_soporte Nodo del soporte.
+ * @param array $nuevos_duenos Lista de nombres de dueños.
+ * @return void
+ */
+function _asignar_duenos_a_soporte(Nodo $nodo_soporte, array $nuevos_duenos): void {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return;
+
+    // Asegurar que exista el contenedor.
+    $nodo_duenos = $nodo_soporte->adyacente('duenos');
+    if (!$nodo_duenos) {
+        $nodo_duenos = Nodo::crear_con_dato('');
+        $nodo_soporte->_adyacente_en($nodo_duenos, 'duenos');
+    }
+
+    // Normalizar la lista de nuevos (solo strings).
+    $lista_nuevos = [];
+    foreach ($nuevos_duenos as $n) {
+        $n = (string)$n;
+        if ($n !== '') $lista_nuevos[$n] = true;
+    }
+
+    // Quitar los que ya no van.
+    $actuales = [];
+    foreach ($nodo_duenos->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $actuales[(string)$nombre_dueno] = $nodo_dueno;
+    }
+    foreach ($actuales as $nombre_dueno => $nodo_dueno) {
+        if (!isset($lista_nuevos[$nombre_dueno])) {
+            $nodo_dueno->eliminar_adyacente('soporte');
+            $nodo_duenos->eliminar_adyacente($nombre_dueno);
+        }
+    }
+
+    // Agregar los nuevos.
+    foreach ($lista_nuevos as $nombre_dueno => $_) {
+        if (isset($actuales[$nombre_dueno])) continue;
+        $nodo_dueno = $raiz->adyacente($nombre_dueno);
+        if (!$nodo_dueno) continue;
+        $nodo_nivel_d = $nodo_dueno->adyacente('nivel');
+        if (!$nodo_nivel_d || $nodo_nivel_d->dato() !== 'dueno') continue;
+
+        $nodo_duenos->_adyacente_en($nodo_dueno, $nombre_dueno);
+        $nodo_dueno->eliminar_adyacente('soporte');
+        $nodo_dueno->_adyacente_en($nodo_soporte, 'soporte');
+    }
 }
 
 /**
@@ -183,6 +481,13 @@ function agregar_usuario(array $datos): array {
     $codigo_acceso = trim($datos['codigo_acceso'] ?? '');
     $dueno = trim($datos['dueno'] ?? '');
     $email = trim($datos['email'] ?? '');
+
+    // Dueños asignados, solo para nivel soporte. Vienen como JSON string.
+    $duenos_asignados = [];
+    if (isset($datos['duenos_asignados']) && $datos['duenos_asignados'] !== '') {
+        $decodificado = json_decode($datos['duenos_asignados'], true);
+        if (is_array($decodificado)) $duenos_asignados = $decodificado;
+    }
 
     if (empty($nombre_usuario)) {
         return ['exito' => false, 'error' => 'El nombre de usuario es obligatorio'];
@@ -262,7 +567,18 @@ function agregar_usuario(array $datos): array {
         }
     }
 
+    if ($nivel === 'soporte') {
+        // Crear contenedor vacío; los enlaces se llenan después.
+        $nodo_usuario->_adyacente_en(Nodo::crear_con_dato(''), 'duenos');
+    }
+
     $raiz->_adyacente_en($nodo_usuario, $nombre_usuario);
+
+    // Si es soporte, asignar dueños.
+    if ($nivel === 'soporte' && !empty($duenos_asignados)) {
+        _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);
+    }
+
     guardar_ambos(Conf::NOMBRE_APP);
 
     // Escribir credenciales en su grafo aparte.
@@ -317,6 +633,19 @@ function actualizar_usuario(array $datos): array {
     $codigo_acceso = trim($datos['codigo_acceso'] ?? '');
     $contrasena = trim($datos['contrasena'] ?? '');
 
+    // El nivel no se puede cambiar entre "soporte" y otros. El rol
+    // se fija en la creación.
+    if (($nivel_actual === 'soporte') !== ($nivel === 'soporte')) {
+        return ['exito' => false, 'error' => 'No se puede cambiar el nivel desde o hacia soporte'];
+    }
+
+    // Dueños asignados, solo para nivel soporte.
+    $duenos_asignados = null;
+    if ($nivel === 'soporte' && isset($datos['duenos_asignados'])) {
+        $decodificado = json_decode($datos['duenos_asignados'], true);
+        $duenos_asignados = is_array($decodificado) ? $decodificado : [];
+    }
+
     if (!empty($codigo_acceso)) {
         $codigo_duplicado = en_grafo_credenciales(function() use ($codigo_acceso, $nombre_usuario) {
             $existente = buscar_usuario_por_codigo($codigo_acceso);
@@ -359,6 +688,11 @@ function actualizar_usuario(array $datos): array {
     // Asegurar que el dueño tenga cuenta de efectivo.
     if ($nivel === 'dueno' && !$nodo_usuario->adyacente('efectivo')) {
         $nodo_usuario->_adyacente_en(Nodo::crear_con_dato('0'), 'efectivo');
+    }
+
+    // Si es soporte y se pasaron dueños asignados, actualizarlos.
+    if ($nivel === 'soporte' && $duenos_asignados !== null) {
+        _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);
     }
 
     if ($nivel === 'terminal' || $nivel === 'dueno') {
@@ -481,6 +815,33 @@ function eliminar_usuario(string $nombre_usuario): array {
             $nodo_contenedor_terminales = $nodo_dueno_real->adyacente('terminales');
             if ($nodo_contenedor_terminales) {
                 $nodo_contenedor_terminales->eliminar_adyacente($nombre_usuario);
+            }
+        }
+    }
+
+    // Si es soporte, limpiar los enlaces `soporte` en sus dueños.
+    $nodo_nivel_actual = $nodo_usuario->adyacente('nivel');
+    $nivel_actual_del = $nodo_nivel_actual ? $nodo_nivel_actual->dato() : '';
+    if ($nivel_actual_del === 'soporte') {
+        $nodo_duenos_del = $nodo_usuario->adyacente('duenos');
+        if ($nodo_duenos_del) {
+            foreach ($nodo_duenos_del->adyacentes() as $nombre_d => $nodo_d) {
+                $nodo_d->eliminar_adyacente('soporte');
+            }
+        }
+    }
+
+    // Si es dueño, limpiar la referencia en su soporte.
+    if ($nivel_actual_del === 'dueno') {
+        $nodo_soporte_del = $nodo_usuario->adyacente('soporte');
+        if ($nodo_soporte_del) {
+            $nombre_soporte_del = $nodo_soporte_del->dato();
+            $nodo_soporte_real = $raiz->adyacente($nombre_soporte_del);
+            if ($nodo_soporte_real) {
+                $nodo_duenos_sop = $nodo_soporte_real->adyacente('duenos');
+                if ($nodo_duenos_sop) {
+                    $nodo_duenos_sop->eliminar_adyacente($nombre_usuario);
+                }
             }
         }
     }

@@ -1,10 +1,21 @@
 /***
  * Funciones de administración de usuarios.
  * @since 1.5piloto.15
- * @version 1.5piloto.68
+ * @version 1.5piloto.73
  */
 
 async function cargar_datos_admin() {
+    const es_soporte = usuario_actual && usuario_actual.nivel === 'soporte';
+
+    // Si es soporte, cargar el selector de dueños.
+    if (es_soporte) {
+        await _cargar_selector_dueno_admin();
+    } else {
+        // Si es admin, ocultar el selector.
+        const panel_sel = document.getElementById('panel_selector_dueno_admin');
+        if (panel_sel) panel_sel.style.display = 'none';
+    }
+
     // Cargar usuarios
     let respuesta = await fetch("index.php", {
         method: "POST",
@@ -286,6 +297,14 @@ $("#nuevo_nivel").addEventListener("change", function() {
 });
 
 $("#boton_agregar_usuario").addEventListener("click", async () => {
+    const es_soporte = usuario_actual && usuario_actual.nivel === 'soporte';
+    // Si es soporte, restringir el selector de nivel a "terminal".
+    if (es_soporte) {
+        const select_nivel = $("#nuevo_nivel");
+        select_nivel.innerHTML = '<option value="terminal">Terminal</option>';
+        select_nivel.value = 'terminal';
+        select_nivel.disabled = true;
+    }
     try {
         const respuesta = await fetch("index.php", {
             method: "POST",
@@ -316,6 +335,112 @@ $("#boton_agregar_usuario").addEventListener("click", async () => {
 $("#boton_cancelar_nuevo_usuario").addEventListener("click", () => {
     $("#formulario_nuevo_usuario").classList.add("hidden");
 });
+
+/**
+ * Carga el selector de dueños en la pestaña admin para un soporte.
+ */
+async function _cargar_selector_dueno_admin() {
+    const panel = document.getElementById('panel_selector_dueno_admin');
+    const select = document.getElementById('selector_dueno_admin');
+    if (!panel || !select) return;
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "administrador/listar_duenos" })
+    });
+    const datos = await respuesta.json();
+
+    select.innerHTML = '';
+    if (datos.exito && datos.duenos.length > 0) {
+        datos.duenos.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.nombre_usuario;
+            opt.textContent = d.nombre_real ? `${d.nombre_real} (${d.nombre_usuario})` : d.nombre_usuario;
+            select.appendChild(opt);
+        });
+        panel.style.display = '';
+    } else {
+        select.innerHTML = '<option value="">Sin dueños asignados</option>';
+        panel.style.display = '';
+    }
+
+    // Listener único (usando onclick para no acumular).
+    select.onchange = async () => {
+        await _cargar_usuarios_filtrados_por_dueno(select.value);
+    };
+    // Cargar la primera vez.
+    if (select.value) {
+        await _cargar_usuarios_filtrados_por_dueno(select.value);
+    }
+}
+
+/**
+ * Carga usuarios del dueño seleccionado (él mismo y sus terminales).
+ * Solo se usa cuando el usuario es soporte.
+ */
+async function _cargar_usuarios_filtrados_por_dueno(nombre_dueno) {
+    if (!nombre_dueno) return;
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "administrador/listar_usuarios" })
+    });
+    const datos = await respuesta.json();
+    if (!datos.exito) return;
+
+    // Filtrar a los usuarios visibles del soporte.
+    const visibles = datos.usuarios.filter(u => {
+        if (u.nivel === 'dueno' && u.nombre_usuario === nombre_dueno) return true;
+        if (u.nivel === 'terminal' && u.dueno === nombre_dueno) return true;
+        return false;
+    });
+    _renderizar_tabla_usuarios(visibles);
+}
+
+/**
+ * Renderiza la tabla de usuarios con los datos dados.
+ */
+function _renderizar_tabla_usuarios(usuarios) {
+    const cuerpo_tabla = $("#tabla_usuarios_admin");
+    cuerpo_tabla.innerHTML = "";
+
+    const mapa_nombres_reales = {};
+    usuarios.forEach(u => {
+        mapa_nombres_reales[u.nombre_usuario] = u.nombre_real || u.nombre_usuario;
+    });
+
+    usuarios.forEach(usuario => {
+        const fila = document.createElement("tr");
+        const nombre_dueno_mostrar = usuario.dueno
+            ? (mapa_nombres_reales[usuario.dueno] || usuario.dueno)
+            : '—';
+        fila.innerHTML = `
+            <td>${usuario.nombre_usuario}</td>
+            <td>${usuario.nombre_real || "—"}</td>
+            <td>${usuario.email || "—"}</td>
+            <td>${usuario.nivel}</td>
+            <td>${usuario.codigo_asignado ? "•••••" : "—"}</td>
+            <td>${usuario.efectivo || "0"}</td>
+            <td>${usuario.bancarizado || "0"}</td>
+            <td>${usuario.banco.nombre || "—"}</td>
+            <td>${usuario.banco.cuenta || "—"}</td>
+            <td>${nombre_dueno_mostrar}</td>
+            <td>
+                <button class="btn_editar_usuario" data-usuario="${usuario.nombre_usuario}">✏️</button>
+                <button class="btn_eliminar_usuario" data-usuario="${usuario.nombre_usuario}">🗑️</button>
+            </td>
+        `;
+        cuerpo_tabla.appendChild(fila);
+    });
+
+    cuerpo_tabla.querySelectorAll('.btn_editar_usuario').forEach(boton => {
+        boton.addEventListener('click', () => iniciar_edicion_usuario(boton.dataset.usuario));
+    });
+    cuerpo_tabla.querySelectorAll('.btn_eliminar_usuario').forEach(boton => {
+        boton.addEventListener('click', () => eliminar_usuario_confirmado(boton.dataset.usuario));
+    });
+}
 
 $("#boton_guardar_usuario").addEventListener("click", async () => {
     const nivel = $("#nuevo_nivel").value;

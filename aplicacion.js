@@ -1,12 +1,30 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.68
+ * @version 1.5piloto.73
  */
 
 // Utilidades
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
+
+// Interceptor de fetch: agrega nombre_solicitante a toda petición POST
+// a index.php cuando hay usuario logueado.
+const _fetch_original = window.fetch.bind(window);
+window.fetch = function(url, opciones) {
+    try {
+        if (typeof url === 'string' && url.indexOf('index.php') !== -1 && opciones && opciones.method === 'POST') {
+            if (typeof usuario_actual !== 'undefined' && usuario_actual && usuario_actual.nombre_usuario) {
+                if (opciones.body instanceof URLSearchParams) {
+                    opciones.body.set('nombre_solicitante', usuario_actual.nombre_usuario);
+                } else if (opciones.body instanceof FormData) {
+                    opciones.body.set('nombre_solicitante', usuario_actual.nombre_usuario);
+                }
+            }
+        }
+    } catch (e) { console.error('error agregando nombre_solicitante', e); }
+    return _fetch_original(url, opciones);
+};
 
 const DEBUG_FETCH = true;
 if (DEBUG_FETCH) {
@@ -71,6 +89,7 @@ function mostrar_aviso(mensaje, tipo = 'info') {
 function configurar_pestanas_segun_nivel(nivel) {
     const pestanas_permitidas = {
         admin: ['admin', 'micros', 'viajes', 'vendidos', 'pasajeros', 'rendiciones', 'liquidaciones'],
+        soporte: ['admin', 'micros', 'viajes', 'vendidos', 'pasajeros', 'rendiciones', 'liquidaciones'],
         dueno: ['terminales', 'micros', 'viajes', 'vendidos', 'pasajeros', 'rendiciones', 'liquidaciones'],
         terminal: ['viajes', 'vendidos', 'pasajeros']
     };

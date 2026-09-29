@@ -28,18 +28,12 @@ class ConfServidor {
     public const NOMBRE_BD_SQL_LOCAL = "HyS";
 
     // --- Constantes específicas para entorno remoto ---
-    public const HOST_SQL_REMOTO = "sql200.infinityfree.com";
-    public const USUARIO_SQL_REMOTO = "if0_42773340";
-    public const CONTRASENA_SQL_REMOTO = "aBjxN1w0SF";
-    public const NOMBRE_BD_SQL_REMOTO = "if0_42773340_HyS";
+    public const HOST_SQL_REMOTO = "";
+    public const USUARIO_SQL_REMOTO = "";
+    public const CONTRASENA_SQL_REMOTO = "";
+    public const NOMBRE_BD_SQL_REMOTO = "";
 
-    // --- Constantes específicas para entorno remoto (alternativa) ---
-    /*
-    public const HOST_SQL_REMOTO = "sql303.infinityfree.com";
-    public const USUARIO_SQL_REMOTO = "if0_42770299";
-    public const CONTRASENA_SQL_REMOTO = "0EnWvlaHCp";
-    public const NOMBRE_BD_SQL_REMOTO = "if0_42770299_HyS";
-    */
+
 
     // --- Constantes finales (se eligen según LOCAL) ---
     public const HOST_SQL = self::LOCAL ? self::HOST_SQL_LOCAL : self::HOST_SQL_REMOTO;
