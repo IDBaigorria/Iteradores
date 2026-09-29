@@ -2,7 +2,7 @@
 /**
  * Aplicador de cambios automáticos — Administrador de Viajes.
  *
- * v1.5piloto.73b: listar_usuarios devuelve los duenos del soporte.
+ * v1.5piloto.73c: fix del select de nivel al editar un soporte.
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -22,67 +22,63 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ==========================================================
-    // Usuario.php — bump
+    // admin.js — bump
     // ==========================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-        'descripcion' => 'Usuario.php: bump de version',
+        'archivo' => 'Aplicacion/admin.js',
+        'descripcion' => 'admin.js: bump de version',
         'buscar' => [
-            ' * @version   1.5piloto.73',
+            ' * @version 1.5piloto.73a',
         ],
         'reemplazar' => [
-            ' * @version   1.5piloto.73b',
+            ' * @version 1.5piloto.73c',
         ],
     ],
 
     // ==========================================================
-    // Usuario.php — listar_usuarios devuelve duenos si es soporte
+    // admin.js — select de edicion con opcion soporte
     // ==========================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-        'descripcion' => 'Usuario.php: listar_usuarios agrega duenos de soporte',
+        'archivo' => 'Aplicacion/admin.js',
+        'descripcion' => 'admin.js: opcion soporte en el select de edicion',
         'buscar' => [
-            '        if ($usuario[\'nivel\'] === \'dueno\') {',
-            '            $terminales = [];',
-            '            $nodo_terminales = $nodo_usuario->adyacente(\'terminales\');',
-            '            if ($nodo_terminales) {',
-            '                foreach ($nodo_terminales->adyacentes() as $nombre_terminal => $nodo_terminal) {',
-            '                    $terminales[] = $nombre_terminal;',
-            '                }',
-            '            }',
-            '            $usuario[\'terminales\'] = $terminales;',
-            '        }',
-            '',
-            '        $usuarios[] = $usuario;',
+            '        <td>',
+            '            <select id="editar_nivel">',
+            '                <option value="terminal" ${valor_nivel === \'terminal\' ? \'selected\' : \'\'}>Terminal</option>',
+            '                <option value="dueno" ${valor_nivel === \'dueno\' ? \'selected\' : \'\'}>Dueño</option>',
+            '                <option value="admin" ${valor_nivel === \'admin\' ? \'selected\' : \'\'}>Administrador</option>',
+            '            </select>',
+            '        </td>',
         ],
         'reemplazar' => [
-            '        if ($usuario[\'nivel\'] === \'dueno\') {',
-            '            $terminales = [];',
-            '            $nodo_terminales = $nodo_usuario->adyacente(\'terminales\');',
-            '            if ($nodo_terminales) {',
-            '                foreach ($nodo_terminales->adyacentes() as $nombre_terminal => $nodo_terminal) {',
-            '                    $terminales[] = $nombre_terminal;',
-            '                }',
-            '            }',
-            '            $usuario[\'terminales\'] = $terminales;',
-            '        }',
-            '',
-            '        if ($usuario[\'nivel\'] === \'soporte\') {',
-            '            $duenos = [];',
-            '            $nodo_duenos = $nodo_usuario->adyacente(\'duenos\');',
-            '            if ($nodo_duenos) {',
-            '                foreach ($nodo_duenos->adyacentes() as $nombre_d => $nodo_d) {',
-            '                    $duenos[] = (string)$nombre_d;',
-            '                }',
-            '            }',
-            '            $usuario[\'duenos\'] = $duenos;',
-            '        }',
-            '',
-            '        $usuarios[] = $usuario;',
+            '        <td>',
+            '            <select id="editar_nivel" ${valor_nivel === \'soporte\' ? \'disabled\' : \'\'}>',
+            '                <option value="terminal" ${valor_nivel === \'terminal\' ? \'selected\' : \'\'}>Terminal</option>',
+            '                <option value="dueno" ${valor_nivel === \'dueno\' ? \'selected\' : \'\'}>Dueño</option>',
+            '                <option value="admin" ${valor_nivel === \'admin\' ? \'selected\' : \'\'}>Administrador</option>',
+            '                <option value="soporte" ${valor_nivel === \'soporte\' ? \'selected\' : \'\'}>Soporte</option>',
+            '            </select>',
+            '        </td>',
+        ],
+    ],
+
+    // ==========================================================
+    // aplicacion_GET.html — bump de admin.js
+    // ==========================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_GET.html',
+        'descripcion' => 'HTML: bump de admin.js',
+        'buscar' => [
+            '<script src="Aplicacion/admin.js?v=1.5piloto.73a"></script>',
+        ],
+        'reemplazar' => [
+            '<script src="Aplicacion/admin.js?v=1.5piloto.73c"></script>',
         ],
     ],
 
@@ -95,31 +91,31 @@ $cambios = [
         'archivo' => 'prompts/prompt_piloto.md',
         'descripcion' => 'prompt_piloto: bump discusion actual',
         'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.73a (alta de',
-            'usuarios `soporte` con asignación de dueños).',
-        ],
-        'reemplazar' => [
             '**Última actualización de este prompt:** v1.5piloto.73b (fix:',
             'listar_usuarios devuelve los dueños asignados de cada soporte).',
+        ],
+        'reemplazar' => [
+            '**Última actualización de este prompt:** v1.5piloto.73c (fix: opción',
+            'soporte en el select de nivel al editar).',
         ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt_piloto: agregar v73b al historial',
+        'descripcion' => 'prompt_piloto: agregar v73c al historial',
         'buscar' => [
-            '- **v73a**: alta de usuarios `soporte` desde el panel admin con',
-            '  asignación de dueños (checkboxes). Edición de los dueños asignados',
-            '  de un soporte existente.',
-        ],
-        'reemplazar' => [
-            '- **v73a**: alta de usuarios `soporte` desde el panel admin con',
-            '  asignación de dueños (checkboxes). Edición de los dueños asignados',
-            '  de un soporte existente.',
             '- **v73b**: `listar_usuarios` devuelve el campo `duenos` para los',
             '  usuarios de nivel `soporte`, para que el panel admin pueda mostrar',
             '  los checkboxes marcados al editar.',
+        ],
+        'reemplazar' => [
+            '- **v73b**: `listar_usuarios` devuelve el campo `duenos` para los',
+            '  usuarios de nivel `soporte`, para que el panel admin pueda mostrar',
+            '  los checkboxes marcados al editar.',
+            '- **v73c**: opción "Soporte" agregada al select de nivel de edición.',
+            '  El select queda deshabilitado cuando el usuario editado es un',
+            '  soporte, porque el nivel no se puede cambiar.',
         ],
     ],
 
@@ -129,7 +125,7 @@ $cambios = [
 // Runner
 // ============================================================
 
-echo "=== Aplicador de cambios (fix de duenos del soporte) ===\n\n";
+echo "=== Aplicador de cambios (fix del select de edicion) ===\n\n";
 
 function detectar_eol(string $contenido): string {
     return (strpos($contenido, "\r\n") !== false) ? "\r\n" : "\n";

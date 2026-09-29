@@ -1,7 +1,7 @@
 /***
  * Funciones de administración de usuarios.
  * @since 1.5piloto.15
- * @version 1.5piloto.73a
+ * @version 1.5piloto.73c
  */
 
 async function cargar_datos_admin() {
@@ -194,10 +194,11 @@ async function iniciar_edicion_usuario(nombre_usuario) {
         <td><input type="text" id="editar_nombre_real" value="${valor_nombre_real}"></td>
         <td><input type="email" id="editar_email" value="${valor_email}"></td>
         <td>
-            <select id="editar_nivel">
+            <select id="editar_nivel" ${valor_nivel === 'soporte' ? 'disabled' : ''}>
                 <option value="terminal" ${valor_nivel === 'terminal' ? 'selected' : ''}>Terminal</option>
                 <option value="dueno" ${valor_nivel === 'dueno' ? 'selected' : ''}>Dueño</option>
                 <option value="admin" ${valor_nivel === 'admin' ? 'selected' : ''}>Administrador</option>
+                <option value="soporte" ${valor_nivel === 'soporte' ? 'selected' : ''}>Soporte</option>
             </select>
         </td>
         <td><input type="text" id="editar_codigo" value="" placeholder="Dejar vacío para no cambiar"></td>

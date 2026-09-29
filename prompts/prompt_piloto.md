@@ -535,6 +535,9 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 - **v73b**: `listar_usuarios` devuelve el campo `duenos` para los
   usuarios de nivel `soporte`, para que el panel admin pueda mostrar
   los checkboxes marcados al editar.
+- **v73c**: opción "Soporte" agregada al select de nivel de edición.
+  El select queda deshabilitado cuando el usuario editado es un
+  soporte, porque el nivel no se puede cambiar.
 
 ---
 
@@ -809,8 +812,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73b (fix:
-listar_usuarios devuelve los dueños asignados de cada soporte).
+**Última actualización de este prompt:** v1.5piloto.73c (fix: opción
+soporte en el select de nivel al editar).
 
 **Estado de la conversación:**
 
