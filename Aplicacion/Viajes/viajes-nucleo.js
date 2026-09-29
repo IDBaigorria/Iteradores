@@ -4,7 +4,7 @@
  */
 
 function obtener_nombre_dueno_actual() {
-    return usuario_actual.nivel === 'admin' ? $("#selector_dueno_viajes").value : usuario_actual.nombre_usuario;
+    return es_admin_o_soporte() ? $("#selector_dueno_viajes").value : usuario_actual.nombre_usuario;
 }
 
 async function cargar_viajes() {
@@ -14,7 +14,7 @@ async function cargar_viajes() {
     lista.innerHTML = '';
     ocultar_detalle_viaje();
 
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         panel_dueno.style.display = 'block';
         boton_agregar.style.display = 'none';
         await cargar_duenos_en_select_viajes();
@@ -176,7 +176,7 @@ async function ver_detalle_viaje(viaje) {
     // Dueno y admin los ven siempre. Terminal solo si el dueno activo la
     // opcion "mostrar botones para imprimir declaraciones juradas en las
     // terminales" en las opciones avanzadas del viaje.
-    const es_admin_o_dueno = usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno';
+    const es_admin_o_dueno = es_admin_o_soporte() || usuario_actual.nivel === 'dueno';
     const opciones_av = viaje.opciones_avanzadas || {};
     const mostrar_dj_term = (opciones_av.mostrar_dj_en_terminales || '0') === '1';
     const mostrar_botones_impresion_dj = es_admin_o_dueno || mostrar_dj_term;

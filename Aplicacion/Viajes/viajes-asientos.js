@@ -277,7 +277,7 @@ function es_asiento_propio(asiento) {
     if (usuario_actual.nivel === 'terminal') {
         return asiento.estado === 'seleccionado' && asiento.seleccionado_por === usuario_actual.nombre_usuario;
     }
-    if (usuario_actual.nivel === 'dueno' || usuario_actual.nivel === 'admin') {
+    if (usuario_actual.nivel === 'dueno' || es_admin_o_soporte()) {
         return asiento.estado === 'reservado';
     }
     return false;
@@ -379,7 +379,7 @@ async function _deseleccionar_todos_los_propios_interno() {
 function construir_html_tarjeta_asiento(asiento) {
     const es_propio = es_asiento_propio(asiento);
     const es_terminal = usuario_actual.nivel === 'terminal';
-    const es_dueno_o_admin = usuario_actual.nivel === 'dueno' || usuario_actual.nivel === 'admin';
+    const es_dueno_o_admin = usuario_actual.nivel === 'dueno' || es_admin_o_soporte();
 
     let html = `<div class="asiento-card">`;
     html += `<div class="asiento-card-header">Asiento ${asiento.numero}</div>`;
@@ -1152,7 +1152,7 @@ function renderizar_pasaje_micro(micro) {
     contenedorCroquis.insertAdjacentHTML('beforeend', leyendaHTML);
 
     // Botones de impresión: solo dueño y admin.
-    if (usuario_actual.nivel === 'dueno' || usuario_actual.nivel === 'admin') {
+    if (usuario_actual.nivel === 'dueno' || es_admin_o_soporte()) {
         const nombre_dueno_imp = obtener_dueno_viaje_seleccionado();
         const nombre_viaje_imp = viaje_seleccionado ? viaje_seleccionado.nombre_viaje : '';
         const nombre_micro_imp = micro.nombre_micro;

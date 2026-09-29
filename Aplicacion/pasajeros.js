@@ -15,7 +15,7 @@ let pasajero_seleccionado_dni = null;
 let dueno_pasajeros_seleccionado = '';
 
 function obtener_nombre_dueno_pasajeros() {
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         const select = document.getElementById('selector_dueno_pasajeros');
         if (select && select.value) {
             return select.value;
@@ -31,7 +31,7 @@ function obtener_nombre_dueno_pasajeros() {
 
 async function cargar_pasajeros() {
     const panelSelector = document.getElementById('panel_selector_dueno_pasajeros');
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         if (panelSelector) panelSelector.style.display = 'block';
         const select = document.getElementById('selector_dueno_pasajeros');
         if (select && select.options.length === 0) {
@@ -157,7 +157,7 @@ async function ver_pasajes_pasajero(dni) {
             // Ver compra: dueño y admin lo ven siempre; la terminal solo si
             // ella hizo la venta. Comparamos contra `terminal_nombre_usuario`
             // porque `terminal_nombre` puede ser el nombre visible.
-            const es_admin_o_dueno = (usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno');
+            const es_admin_o_dueno = (es_admin_o_soporte() || usuario_actual.nivel === 'dueno');
             const puede_ver_compra = es_admin_o_dueno
                 || (usuario_actual.nivel === 'terminal'
                     && compra.terminal_nombre_usuario === usuario_actual.nombre_usuario);
@@ -740,7 +740,7 @@ async function abrir_modal_declaracion_jurada(dni) {
 
     const p = datos.pasajero;
     const dj = p.declaracion_jurada || null;
-    const es_admin_o_dueno = (usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'dueno');
+    const es_admin_o_dueno = (es_admin_o_soporte() || usuario_actual.nivel === 'dueno');
 
     let vista_html = '';
     if (!dj) {

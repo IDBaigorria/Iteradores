@@ -781,7 +781,7 @@ function mostrar_opciones_impresion(id_venta) {
  */
 function configurar_filtros_vendidos() {
     const cont_dueno = document.getElementById('contenedor_filtro_dueno_vendidos');
-    const es_admin = usuario_actual.nivel === 'admin';
+    const es_admin = es_admin_o_soporte();
     if (cont_dueno) cont_dueno.style.display = es_admin ? '' : 'none';
 
     // El botón "Cerrar rendición" es exclusivo del dueño.
@@ -807,7 +807,7 @@ function actualizar_visibilidad_boton_cancelaciones() {
         btn.style.display = 'none';
         return;
     }
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         const sel = document.getElementById('selector_dueno_vendidos');
         btn.style.display = (sel && sel.value) ? '' : 'none';
     } else if (usuario_actual.nivel === 'dueno' || usuario_actual.nivel === 'terminal') {
@@ -828,7 +828,7 @@ function mostrar_filtros_secundarios_vendidos(visibles) {
     const cont_vendedor = document.getElementById('contenedor_filtro_vendedor_vendidos');
     const cont_estado = document.getElementById('contenedor_filtro_estado_vendidos');
     const es_dueno = usuario_actual.nivel === 'dueno';
-    const es_admin = usuario_actual.nivel === 'admin';
+    const es_admin = es_admin_o_soporte();
 
     if (cont_viaje) cont_viaje.style.display = visibles ? '' : 'none';
     // Vendedor: visible para admin y dueño, no para terminal.
@@ -916,7 +916,7 @@ async function cargar_ventas() {
 
     configurar_filtros_vendidos();
 
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         // Para admin, los filtros secundarios solo se muestran cuando hay un
         // dueño seleccionado. Si ya había uno elegido antes, lo respetamos.
         await cargar_duenos_en_select_vendidos();
@@ -1585,7 +1585,7 @@ async function ir_a_venta_en_vendidos(id_venta, nombre_dueno = '', nombre_viaje 
 
     // Si es admin, seleccionar el dueño ANTES de activar la pestaña.
     // La pestaña Vendidos depende de esa selección para cargar las ventas.
-    if (usuario_actual.nivel === 'admin' && nombre_dueno) {
+    if (es_admin_o_soporte() && nombre_dueno) {
         await cargar_duenos_en_select_vendidos();
         const select_dueno = document.getElementById('selector_dueno_vendidos');
         if (select_dueno) select_dueno.value = nombre_dueno;
@@ -2592,7 +2592,7 @@ function imprimir_informe_ventas() {
 
     // Determinar tipo y nombre según el rol.
     let tipo_ventas, nombre;
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         tipo_ventas = 'dueno';
         const sel = document.getElementById('selector_dueno_vendidos');
         nombre = sel ? sel.value : '';
@@ -2665,7 +2665,7 @@ async function ver_cancelaciones() {
     let nombre_dueno = '';
     let filtro_terminal = '';
 
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         const sel = document.getElementById('selector_dueno_vendidos');
         nombre_dueno = sel ? sel.value : '';
         if (!nombre_dueno) {

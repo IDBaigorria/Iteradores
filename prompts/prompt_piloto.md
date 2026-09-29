@@ -538,6 +538,10 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 - **v73c**: opción "Soporte" agregada al select de nivel de edición.
   El select queda deshabilitado cuando el usuario editado es un
   soporte, porque el nivel no se puede cambiar.
+- **v73d**: helper `es_admin_o_soporte()` en aplicacion.js. Todos los
+  JS que chequeaban `usuario_actual.nivel === 'admin'` ahora usan el
+  helper, así el soporte ve los selectores de dueño en todas las
+  pestañas.
 
 ---
 
@@ -812,8 +816,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73c (fix: opción
-soporte en el select de nivel al editar).
+**Última actualización de este prompt:** v1.5piloto.73d (soporte ve
+los selectores de dueño en todas las pestañas).
 
 **Estado de la conversación:**
 

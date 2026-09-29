@@ -1,12 +1,22 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.73
+ * @version 1.5piloto.73d
  */
 
 // Utilidades
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
+
+/**
+ * Devuelve true si el usuario actual es admin o soporte.
+ * Se usa en lugar de comparar directamente con "admin", porque
+ * el soporte tiene los mismos permisos sobre sus dueños asignados.
+ */
+function es_admin_o_soporte() {
+    if (!usuario_actual) return false;
+    return usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'soporte';
+}
 
 // Interceptor de fetch: agrega nombre_solicitante a toda petición POST
 // a index.php cuando hay usuario logueado.

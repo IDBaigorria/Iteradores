@@ -21,7 +21,7 @@ async function cargar_datos_micros() {
 
     if (!usuario_actual) return;
 
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         $("#panel_selector_dueno_micros").style.display = 'block';
         await cargar_duenos_en_select_micros();
     } else if (usuario_actual.nivel === 'dueno') {
@@ -232,7 +232,7 @@ $("#boton_cancelar_empresa").addEventListener("click", () => {
 });
 
 $("#boton_guardar_empresa").addEventListener("click", async () => {
-    const nombre_dueno = usuario_actual.nivel === 'admin' ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
+    const nombre_dueno = es_admin_o_soporte() ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
     if (!nombre_dueno) {
         mostrar_aviso("Seleccione un dueño", 'error');
         return;

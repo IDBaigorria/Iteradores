@@ -25,7 +25,7 @@ function _url_informe_liquidacion(id_liquidacion) {
 
 function obtener_nombre_dueno_liquidaciones() {
     if (!usuario_actual) return '';
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         const select = document.getElementById('selector_dueno_liquidaciones');
         if (select && select.value) return select.value;
         return dueno_liquidaciones_seleccionado || '';
@@ -39,7 +39,7 @@ function obtener_nombre_dueno_liquidaciones() {
 async function cargar_liquidaciones() {
     const panelSelector = document.getElementById('contenedor_filtro_dueno_liquidaciones');
 
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         if (panelSelector) panelSelector.style.display = 'block';
         const select = document.getElementById('selector_dueno_liquidaciones');
         if (select && select.options.length <= 1) {

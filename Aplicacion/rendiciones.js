@@ -12,7 +12,7 @@ let dueno_rendiciones_seleccionado = '';
  */
 function obtener_nombre_dueno_rendiciones() {
     if (!usuario_actual) return '';
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         const select = document.getElementById('selector_dueno_rendiciones');
         if (select && select.value) return select.value;
         return dueno_rendiciones_seleccionado || '';
@@ -38,7 +38,7 @@ function _formatear_monto_rendiciones(monto) {
 async function cargar_rendiciones() {
     const panelSelector = document.getElementById('contenedor_filtro_dueno_rendiciones');
 
-    if (usuario_actual.nivel === 'admin') {
+    if (es_admin_o_soporte()) {
         if (panelSelector) panelSelector.style.display = 'block';
         const select = document.getElementById('selector_dueno_rendiciones');
         if (select && select.options.length <= 1) {
