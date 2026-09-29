@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.73
+ * @version   1.5piloto.73b
  */
 
 use Iteradores\Nodos\Nodo;
@@ -112,6 +112,17 @@ function listar_usuarios(): array {
                 }
             }
             $usuario['terminales'] = $terminales;
+        }
+
+        if ($usuario['nivel'] === 'soporte') {
+            $duenos = [];
+            $nodo_duenos = $nodo_usuario->adyacente('duenos');
+            if ($nodo_duenos) {
+                foreach ($nodo_duenos->adyacentes() as $nombre_d => $nodo_d) {
+                    $duenos[] = (string)$nombre_d;
+                }
+            }
+            $usuario['duenos'] = $duenos;
         }
 
         $usuarios[] = $usuario;

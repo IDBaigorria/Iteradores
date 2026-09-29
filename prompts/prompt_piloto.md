@@ -532,6 +532,9 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 - **v73a**: alta de usuarios `soporte` desde el panel admin con
   asignación de dueños (checkboxes). Edición de los dueños asignados
   de un soporte existente.
+- **v73b**: `listar_usuarios` devuelve el campo `duenos` para los
+  usuarios de nivel `soporte`, para que el panel admin pueda mostrar
+  los checkboxes marcados al editar.
 
 ---
 
@@ -806,8 +809,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73a (alta de
-usuarios `soporte` con asignación de dueños).
+**Última actualización de este prompt:** v1.5piloto.73b (fix:
+listar_usuarios devuelve los dueños asignados de cada soporte).
 
 **Estado de la conversación:**
 
