@@ -12,7 +12,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php"
 /**
  * Clase PerdurarSuperestructuraJSON
  * 
- * @version 1.0.0 (Última revisión: 01/09/2025)
+ * @version 1.0.2 (Última revisión: 29/09/2026)
  *
  * @author Ignacio David Baigorria
  *
@@ -64,7 +64,7 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
      */
     static private function crear_carpeta_json(): bool
     {
-        $carpeta = Conf::SUPERESTRUCTURA_CARPETA_GUARDAR_JSON;
+        $carpeta = self::obtener_carpeta_absoluta();
         
         if (!is_dir($carpeta)) {
             if (!mkdir($carpeta, 0755, true)) {
@@ -74,6 +74,19 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
         }
         
         return true;
+    }
+
+    /**
+     * Devuelve la ruta absoluta de la carpeta de almacenamiento JSON.
+     *
+     * Se resuelve relativa a la raíz del proyecto (este archivo está en
+     * Controlador/PerdurarSuperestructura/, así que la raíz es dos niveles arriba).
+     *
+     * @return string Ruta absoluta de la carpeta JSON.
+     */
+    static private function obtener_carpeta_absoluta(): string
+    {
+        return __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . Conf::SUPERESTRUCTURA_CARPETA_GUARDAR_JSON;
     }
 
     /**
@@ -87,7 +100,7 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
      */
     static private function obtener_ruta_archivo(string $nombre): string
     {
-        $carpeta = Conf::SUPERESTRUCTURA_CARPETA_GUARDAR_JSON;
+        $carpeta = self::obtener_carpeta_absoluta();
         // Sanitizar el nombre para evitar problemas con el sistema de archivos
         $nombre_archivo = preg_replace('/[^a-zA-Z0-9_-]/', '_', $nombre) . '.json';
         return $carpeta . DIRECTORY_SEPARATOR . $nombre_archivo;
@@ -127,10 +140,13 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
             });
         }, null) ?: [];
 
-        // Construir la estructura de nodos
+        // Construir la estructura de nodos.
+        // Se fuerza (string) en id y referencias para que el JSON quede consistente.
+        // PHP convierte claves de array numericas a int automaticamente, por eso
+        // $id puede llegar como int aunque originalmente se haya creado como string.
         foreach ($datos_nodos as $id => $dato) {
             $nodo = [
-                'id' => $id,
+                'id' => (string)$id,
                 'dato' => $dato,
                 'adyacentes' => []
             ];
@@ -138,7 +154,7 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
             // Agregar adyacentes si existen
             if (isset($datos_adyacentes[$id]) && is_array($datos_adyacentes[$id])) {
                 foreach ($datos_adyacentes[$id] as $enlace => $idadyacente) {
-                    $nodo['adyacentes'][$enlace] = $idadyacente;
+                    $nodo['adyacentes'][$enlace] = (string)$idadyacente;
                 }
             }
 
@@ -281,9 +297,11 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
 
         $equivalencias = [];
 
-        // Primero crear todos los nodos
+        // Primero crear todos los nodos.
+        // Se castea el id a string por si el JSON tiene valores numericos
+        // (por ejemplo, archivos escritos antes del fix de consistencia).
         foreach ($estructura['nodos'] as $nodo_data) {
-            $id = $nodo_data['id'];
+            $id = (string)$nodo_data['id'];
             $dato = $nodo_data['dato'];
 
             if (self::es_id_especial($id)) {
@@ -300,7 +318,7 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
 
         // Luego establecer las relaciones de adyacencia
         foreach ($estructura['nodos'] as $nodo_data) {
-            $id_original = $nodo_data['id'];
+            $id_original = (string)$nodo_data['id'];
             $adyacentes = $nodo_data['adyacentes'] ?? [];
 
             // Determinar el ID real del nodo (puede haber cambiado por equivalencias)
@@ -309,6 +327,7 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
 
             if ($nodo && !empty($adyacentes)) {
                 foreach ($adyacentes as $enlace => $id_adyacente_original) {
+                    $id_adyacente_original = (string)$id_adyacente_original;
                     // Determinar el ID real del adyacente
                     $id_adyacente = self::es_id_especial($id_adyacente_original) ? 
                                    $id_adyacente_original : 
@@ -360,7 +379,7 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
             return null;
         }
 
-        $carpeta = Conf::SUPERESTRUCTURA_CARPETA_GUARDAR_JSON;
+        $carpeta = self::obtener_carpeta_absoluta();
         $archivos = glob($carpeta . DIRECTORY_SEPARATOR . '*.json');
         
         $superestructuras = [];

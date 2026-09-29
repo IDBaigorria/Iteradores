@@ -18,7 +18,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.68e
+ * @version   1.5piloto.70
  */
 
 // --- Utilidades base ----------------------------------
@@ -69,11 +69,13 @@ $nombre_app = Conf::NOMBRE_APP;
 if (Controlador::existe($nombre_app)) {
     Controlador::cargar($nombre_app);
 } else {
-    Controlador::guardar($nombre_app);
+    guardar_ambos($nombre_app);
 }
 
 // Incluir módulos de la aplicación
+require_once __DIR__ . '/Aplicacion/GuardarAmbos.php';
 require_once __DIR__ . '/Aplicacion/FuncionesAuxiliares.php';
+require_once __DIR__ . '/Aplicacion/GrafoCredenciales.php';
 require_once __DIR__ . '/Aplicacion/Usuarios/Usuario.php';
 require_once __DIR__ . '/Aplicacion/Sesiones/Sesion.php';
 require_once __DIR__ . '/Aplicacion/Admin/Admin.php';
@@ -272,7 +274,25 @@ if (isset($_GET['migrar_hashear_credenciales'])) {
     exit;
 }
 
-// Crear usuario administrador si no existe
+// ==== Bloque temporal para migración de separación de grafos (v1.5piloto.69) ====
+// Copia codigo_hash y contrasena de cada usuario al grafo de credenciales
+// y los elimina del grafo de la aplicación.
+// Es idempotente: si un usuario ya está migrado, lo saltea.
+if (isset($_GET['migrar_separar_grafos'])) {
+    require_once __DIR__ . '/miscelaneas/migrar_separar_grafos.php';
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = migrar_separar_grafos();
+    echo "Migración de separación de grafos completada.\n";
+    echo "Usuarios procesados:    {$res['usuarios_procesados']}\n";
+    echo "Credenciales copiadas:  {$res['credenciales_copiadas']}\n";
+    echo "Códigos copiados:       {$res['codigos_copiados']}\n";
+    echo "Contraseñas copiadas:   {$res['contrasenas_copiadas']}\n";
+    echo "Ya migrados:            {$res['ya_migrados']}\n";
+    echo "Sin credenciales:       {$res['sin_credenciales']}\n";
+    exit;
+}
+
+// Crear usuario administrador si no existe (en ambos grafos).
 $raiz_usuarios = Nodo::nodo_por_id('usuarios');
 $nodo_admin_existente = $raiz_usuarios ? $raiz_usuarios->adyacente(Conf::NOMBRE_ADMIN) : null;
 if (!$nodo_admin_existente) {
@@ -283,12 +303,23 @@ if (!$nodo_admin_existente) {
     $nodo_admin = Nodo::crear_con_dato(Conf::NOMBRE_ADMIN);
     $nodo_admin->_adyacente_en(Nodo::crear_con_dato(Conf::NOMBRE_ADMIN), 'nombre_real');
     $nodo_admin->_adyacente_en(Nodo::crear_con_dato('admin'), 'nivel');
-    $nodo_admin->_adyacente_en(Nodo::crear_con_dato(password_hash(Conf::CODIGO_ADMIN, PASSWORD_DEFAULT)), 'codigo_hash');
     $raiz_usuarios->_adyacente_en($nodo_admin, Conf::NOMBRE_ADMIN);
-    Controlador::guardar($nombre_app);
-    Controlador::establecer_metodo('JSON');
-    Controlador::guardar($nombre_app);
+    guardar_ambos($nombre_app);
 }
+
+// Crear admin en el grafo de credenciales si no existe.
+en_grafo_credenciales(function() {
+    $raiz_cred = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_cred) {
+        Nodo::crear_con_id('usuarios');
+        $raiz_cred = Nodo::nodo_por_id('usuarios');
+    }
+    if (!$raiz_cred->adyacente(Conf::NOMBRE_ADMIN)) {
+        $nodo_admin_cred = Nodo::crear_con_dato(Conf::NOMBRE_ADMIN);
+        $nodo_admin_cred->_adyacente_en(Nodo::crear_con_dato(password_hash(Conf::CODIGO_ADMIN, PASSWORD_DEFAULT)), 'codigo_hash');
+        $raiz_cred->_adyacente_en($nodo_admin_cred, Conf::NOMBRE_ADMIN);
+    }
+});
 
 // Manejo de impresión
 if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
@@ -385,12 +416,9 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
 // Enrutar según método
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     header('Content-Type: application/json; charset=utf-8');
+    // enrutar_peticion_post termina en responder_json(), que hace exit.
+    // Los guardados internos de cada operación ya se encargan de persistir.
     enrutar_peticion_post($_POST['accion'], $_POST);
-    Controlador::guardar($nombre_app);
-    Controlador::establecer_metodo('JSON');
-    Controlador::guardar($nombre_app);
-    Controlador::imprimir_alertas();
-    Controlador::imprimir_errores();
     exit;
 }
 

@@ -12,7 +12,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php"
 /**
  * Clase PerdurarSuperestructuraStringSQL
  * 
- * @version 1.5i.4 
+ * @version 1.5i.6 
  *
  * @author Ignacio David Baigorria
  *
@@ -193,6 +193,10 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 			return $nodo->dato();
 		}, null);
 
+		if (empty($datos)) {
+			return '';
+		}
+
 		$consulta = "INSERT INTO nodo (idsuperestructura, idnodo, dato) values";
 		$separador = " ";
 		$primero = true;
@@ -230,6 +234,21 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 				return $nodo->id();
 			});
 		});
+
+		if (empty($datos)) {
+			return '';
+		}
+
+		$hubo_alguno = false;
+		foreach ($datos as $arreglo) {
+			if (is_array($arreglo) && !empty($arreglo)) {
+				$hubo_alguno = true;
+				break;
+			}
+		}
+		if (!$hubo_alguno) {
+			return '';
+		}
 
 		$consulta = 'INSERT INTO adyacente (idsuperestructura, idnodo, enlace, idadyacente) values';
 		$separador = " ";
@@ -278,8 +297,14 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 		$sql = self::crear_conexion_sql();
 		$sql->query("DELETE FROM `nodo` WHERE `idsuperestructura`='" . $nombre . "';");
 		$sql->query("DELETE FROM `adyacente` WHERE `idsuperestructura`='" . $nombre . "';");
-		$sql->query(self::crear_consulta_insertar_sql($sql, $nombre));
-		$sql->query(self::crear_consulta_insertar2_sql($sql, $nombre));
+		$consulta_nodos = self::crear_consulta_insertar_sql($sql, $nombre);
+		if ($consulta_nodos !== '') {
+			$sql->query($consulta_nodos);
+		}
+		$consulta_adyacentes = self::crear_consulta_insertar2_sql($sql, $nombre);
+		if ($consulta_adyacentes !== '') {
+			$sql->query($consulta_adyacentes);
+		}
 		$sql->close();
 		return true;
 	}

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.67
+ * @version   1.5piloto.70
  */
 
 use Iteradores\Nodos\Nodo;
@@ -621,7 +621,7 @@ function agregar_viaje(array $datos): array {
     }
 
     $nodo_viajes->_adyacente_en($nodo_viaje, $nombre_viaje);
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -656,7 +656,7 @@ function editar_viaje(string $nombre_viaje, array $datos): array {
         }
     }
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -677,7 +677,7 @@ function eliminar_viaje(string $nombre_viaje, string $nombre_dueno): array {
 
     // TODO: eliminar nodos huérfanos
     $nodo_viajes->eliminar_adyacente($nombre_viaje);
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -728,7 +728,7 @@ function agregar_terminal_autorizada(string $nombre_viaje, string $nombre_termin
 
     $nodo_terminales->_adyacente_en($nodo_terminal_viaje, $nombre_terminal);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -764,7 +764,7 @@ function eliminar_terminal_autorizada(string $nombre_viaje, string $nombre_termi
 
     $nodo_terminales->eliminar_adyacente($nombre_terminal);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -933,7 +933,7 @@ function guardar_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
         _actualizar_o_crear_campo($nodo_terminal_viaje, 'cuotas_transferencia_max', $cuotas_transferencia_max);
     }
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 /**
@@ -1009,7 +1009,7 @@ function guardar_viaje_completo(array $datos): array {
         return $resultado_opciones;
     }
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -1123,7 +1123,7 @@ function guardar_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, 
         $nodo_viaje->_adyacente_en(Nodo::crear_con_dato($contenido), $enlace);
     }
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 

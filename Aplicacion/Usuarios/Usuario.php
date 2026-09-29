@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.68
+ * @version   1.5piloto.71
  */
 
 use Iteradores\Nodos\Nodo;
@@ -27,23 +27,8 @@ function buscar_usuario_por_codigo(string $codigo): ?array {
     foreach ($raiz_usuarios->adyacentes() as $nombre_usuario => $nodo_usuario) {
         $nodo_codigo_hash = $nodo_usuario->adyacente('codigo_hash');
         if ($nodo_codigo_hash && password_verify($codigo, $nodo_codigo_hash->dato())) {
-            $nodo_nivel = $nodo_usuario->adyacente('nivel');
-            $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
             return [
-                'nombre_usuario' => $nombre_usuario,
-                'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : $nombre_usuario,
-                'nivel' => $nodo_nivel ? $nodo_nivel->dato() : 'terminal',
-            ];
-        }
-        // Fallback de transición: usuario sin migrar todavía.
-        $nodo_codigo_viejo = $nodo_usuario->adyacente('codigo_acceso');
-        if ($nodo_codigo_viejo && $nodo_codigo_viejo->dato() === $codigo) {
-            $nodo_nivel = $nodo_usuario->adyacente('nivel');
-            $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
-            return [
-                'nombre_usuario' => $nombre_usuario,
-                'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : $nombre_usuario,
-                'nivel' => $nodo_nivel ? $nodo_nivel->dato() : 'terminal',
+                'nombre_usuario' => (string)$nombre_usuario,
             ];
         }
     }
@@ -63,6 +48,17 @@ function listar_usuarios(): array {
     $raiz = Nodo::nodo_por_id('usuarios');
     if (!$raiz) return [];
 
+    // Pre-cargar el mapa de usuarios con código desde credenciales.
+    $con_codigo = en_grafo_credenciales(function() {
+        $raiz_cred = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_cred) return [];
+        $mapa = [];
+        foreach ($raiz_cred->adyacentes() as $nombre => $nodo) {
+            $mapa[(string)$nombre] = $nodo->adyacente('codigo_hash') ? true : false;
+        }
+        return $mapa;
+    });
+
     $adyacentes = $raiz->adyacentes();
     if (!$adyacentes) return [];
 
@@ -73,7 +69,6 @@ function listar_usuarios(): array {
         $nodo_banco = $nodo_usuario->adyacente('banco');
         $nodo_nivel = $nodo_usuario->adyacente('nivel');
         $nodo_nombre_real = $nodo_usuario->adyacente('nombre_real');
-        $nodo_codigo_hash = $nodo_usuario->adyacente('codigo_hash');
         $nodo_email = $nodo_usuario->adyacente('email');
         $nodo_pasajes = $nodo_usuario->adyacente('pasajes');
 
@@ -95,7 +90,7 @@ function listar_usuarios(): array {
             'nivel' => $nodo_nivel ? $nodo_nivel->dato() : 'terminal',
             'efectivo' => $nodo_efectivo ? $nodo_efectivo->dato() : '0',
             'bancarizado' => $monto_banco,
-            'codigo_asignado' => $nodo_codigo_hash ? true : false,
+            'codigo_asignado' => !empty($con_codigo[(string)$nombre_usuario]),
             'pasajes' => $nodo_pasajes ? $nodo_pasajes->dato() : '0',
             'banco' => [
                 'nombre' => $banco_nombre,
@@ -197,8 +192,14 @@ function agregar_usuario(array $datos): array {
         return ['exito' => false, 'error' => 'Debe asignar al menos un código de acceso o una contraseña'];
     }
 
-    if ($codigo_acceso !== '' && buscar_usuario_por_codigo($codigo_acceso)) {
-        return ['exito' => false, 'error' => 'El código de acceso ya está en uso'];
+    if ($codigo_acceso !== '') {
+        $codigo_duplicado = en_grafo_credenciales(function() use ($codigo_acceso) {
+            $encontrado = buscar_usuario_por_codigo($codigo_acceso);
+            return $encontrado !== null;
+        });
+        if ($codigo_duplicado) {
+            return ['exito' => false, 'error' => 'El código de acceso ya está en uso'];
+        }
     }
 
     if ($nivel === 'terminal' && empty($dueno)) {
@@ -222,14 +223,7 @@ function agregar_usuario(array $datos): array {
 
     $nodo_usuario = Nodo::crear_con_dato($nombre_usuario);
 
-    if ($contrasena !== '') {
-        $nodo_usuario->_adyacente_en(Nodo::crear_con_dato(password_hash($contrasena, PASSWORD_DEFAULT)), 'contrasena');
-    }
-
     $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($nivel), 'nivel');
-    if ($codigo_acceso !== '') {
-        $nodo_usuario->_adyacente_en(Nodo::crear_con_dato(password_hash($codigo_acceso, PASSWORD_DEFAULT)), 'codigo_hash');
-    }
     if ($nombre_real !== '') $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($nombre_real), 'nombre_real');
     if ($email !== '') $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($email), 'email');
 
@@ -269,7 +263,25 @@ function agregar_usuario(array $datos): array {
     }
 
     $raiz->_adyacente_en($nodo_usuario, $nombre_usuario);
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
+
+    // Escribir credenciales en su grafo aparte.
+    en_grafo_credenciales(function() use ($nombre_usuario, $codigo_acceso, $contrasena) {
+        $raiz_cred = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_cred) {
+            Nodo::crear_con_id('usuarios');
+            $raiz_cred = Nodo::nodo_por_id('usuarios');
+        }
+        $nodo_cred = Nodo::crear_con_dato($nombre_usuario);
+        if ($codigo_acceso !== '') {
+            $nodo_cred->_adyacente_en(Nodo::crear_con_dato(password_hash($codigo_acceso, PASSWORD_DEFAULT)), 'codigo_hash');
+        }
+        if ($contrasena !== '') {
+            $nodo_cred->_adyacente_en(Nodo::crear_con_dato(password_hash($contrasena, PASSWORD_DEFAULT)), 'contrasena');
+        }
+        $nodo_cred->_adyacente_en(Nodo::crear_con_dato('0'), 'intentos_fallidos');
+        $raiz_cred->_adyacente_en($nodo_cred, $nombre_usuario);
+    });
 
     $resultado = ['exito' => true];
     if ($codigo_acceso !== '') {
@@ -306,8 +318,12 @@ function actualizar_usuario(array $datos): array {
     $contrasena = trim($datos['contrasena'] ?? '');
 
     if (!empty($codigo_acceso)) {
-        $existente = buscar_usuario_por_codigo($codigo_acceso);
-        if ($existente && $existente['nombre_usuario'] !== $nombre_usuario) {
+        $codigo_duplicado = en_grafo_credenciales(function() use ($codigo_acceso, $nombre_usuario) {
+            $existente = buscar_usuario_por_codigo($codigo_acceso);
+            if ($existente === null) return false;
+            return $existente['nombre_usuario'] !== $nombre_usuario;
+        });
+        if ($codigo_duplicado) {
             return ['exito' => false, 'error' => 'El código de acceso ya está en uso por otro usuario'];
         }
     }
@@ -322,19 +338,6 @@ function actualizar_usuario(array $datos): array {
         if ($nodo_email) $nodo_email->_dato($email);
         else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($email), 'email');
     }
-    if ($codigo_acceso !== '') {
-        $hash_nuevo = password_hash($codigo_acceso, PASSWORD_DEFAULT);
-        $nodo_codigo = $nodo_usuario->adyacente('codigo_hash');
-        if ($nodo_codigo) $nodo_codigo->_dato($hash_nuevo);
-        else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($hash_nuevo), 'codigo_hash');
-    }
-    if ($contrasena !== '') {
-        $nodo_contrasena = $nodo_usuario->adyacente('contrasena');
-        $hash = password_hash($contrasena, PASSWORD_DEFAULT);
-        if ($nodo_contrasena) $nodo_contrasena->_dato($hash);
-        else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($hash), 'contrasena');
-    }
-
     $nodo_nivel = $nodo_usuario->adyacente('nivel');
     if ($nodo_nivel) $nodo_nivel->_dato($nivel);
     else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($nivel), 'nivel');
@@ -403,7 +406,40 @@ function actualizar_usuario(array $datos): array {
         }
     }
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
+
+    if ($codigo_acceso !== '' || $contrasena !== '') {
+        en_grafo_credenciales(function() use ($nombre_usuario, $codigo_acceso, $contrasena) {
+            $raiz_cred = Nodo::nodo_por_id('usuarios');
+            if (!$raiz_cred) {
+                Nodo::crear_con_id('usuarios');
+                $raiz_cred = Nodo::nodo_por_id('usuarios');
+            }
+            $nodo_cred = $raiz_cred->adyacente($nombre_usuario);
+            if (!$nodo_cred) {
+                $nodo_cred = Nodo::crear_con_dato($nombre_usuario);
+                $raiz_cred->_adyacente_en($nodo_cred, $nombre_usuario);
+            }
+            if ($codigo_acceso !== '') {
+                $hash_nuevo = password_hash($codigo_acceso, PASSWORD_DEFAULT);
+                $nodo_hash = $nodo_cred->adyacente('codigo_hash');
+                if ($nodo_hash) $nodo_hash->_dato($hash_nuevo);
+                else $nodo_cred->_adyacente_en(Nodo::crear_con_dato($hash_nuevo), 'codigo_hash');
+            }
+            if ($contrasena !== '') {
+                $hash = password_hash($contrasena, PASSWORD_DEFAULT);
+                $nodo_pass = $nodo_cred->adyacente('contrasena');
+                if ($nodo_pass) $nodo_pass->_dato($hash);
+                else $nodo_cred->_adyacente_en(Nodo::crear_con_dato($hash), 'contrasena');
+            }
+            // Al cambiar credenciales, resetear el estado de bloqueo.
+            $nodo_intentos = $nodo_cred->adyacente('intentos_fallidos');
+            if ($nodo_intentos) $nodo_intentos->_dato('0');
+            else $nodo_cred->_adyacente_en(Nodo::crear_con_dato('0'), 'intentos_fallidos');
+            $nodo_cred->eliminar_adyacente('bloqueado_hasta');
+        });
+    }
+
     $resultado = ['exito' => true];
     if ($codigo_acceso !== '') {
         $resultado['codigo_asignado'] = $codigo_acceso;
@@ -451,7 +487,19 @@ function eliminar_usuario(string $nombre_usuario): array {
 
     $raiz->eliminar_adyacente($nombre_usuario);
     Nodo::eliminar($nodo_usuario);
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
+
+    // Eliminar también en credenciales.
+    en_grafo_credenciales(function() use ($nombre_usuario) {
+        $raiz_cred = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_cred) return;
+        $nodo_cred = $raiz_cred->adyacente($nombre_usuario);
+        if ($nodo_cred) {
+            $raiz_cred->eliminar_adyacente($nombre_usuario);
+            Nodo::eliminar($nodo_cred);
+        }
+    });
+
     return ['exito' => true];
 }
 
@@ -477,6 +525,17 @@ function listar_terminales_de_dueno(string $nombre_dueno): array {
     $adyacentes = $nodo_terminales->adyacentes();
     if (!$adyacentes) return [];
 
+    // Pre-cargar el mapa de usuarios con código desde credenciales.
+    $con_codigo = en_grafo_credenciales(function() {
+        $raiz_cred = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_cred) return [];
+        $mapa = [];
+        foreach ($raiz_cred->adyacentes() as $nombre => $nodo) {
+            $mapa[(string)$nombre] = $nodo->adyacente('codigo_hash') ? true : false;
+        }
+        return $mapa;
+    });
+
     $terminales = [];
     foreach ($adyacentes as $nombre_terminal => $nodo_terminal) {
         $nodo_contrasena = $nodo_terminal->adyacente('contrasena');
@@ -484,7 +543,6 @@ function listar_terminales_de_dueno(string $nombre_dueno): array {
         $nodo_banco = $nodo_terminal->adyacente('banco');
         $nodo_nivel_terminal = $nodo_terminal->adyacente('nivel');
         $nodo_nombre_real = $nodo_terminal->adyacente('nombre_real');
-        $nodo_codigo_hash = $nodo_terminal->adyacente('codigo_hash');
         $nodo_email = $nodo_terminal->adyacente('email');
         $nodo_pasajes = $nodo_terminal->adyacente('pasajes');
 
@@ -506,7 +564,7 @@ function listar_terminales_de_dueno(string $nombre_dueno): array {
             'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : '',
             'email' => $nodo_email ? $nodo_email->dato() : '',
             'nivel' => $nodo_nivel_terminal ? $nodo_nivel_terminal->dato() : 'terminal',
-            'codigo_asignado' => $nodo_codigo_hash ? true : false,
+            'codigo_asignado' => !empty($con_codigo[(string)$nombre_terminal]),
             'efectivo' => $nodo_efectivo ? $nodo_efectivo->dato() : '0',
             'bancarizado' => $monto_banco,
             'banco' => [

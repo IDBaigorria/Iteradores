@@ -1,7 +1,7 @@
 <?php
 namespace Iteradores\Configuracion;
 /**
- * @version 1.5piloto.2
+ * @version 1.5piloto.71
  *
  * @author Ignacio David Baigorria
  *
@@ -12,6 +12,53 @@ class Conf {
     public const NOMBRE_APP = "AdministradorDeViajes";
     public const VERSION_APP = "0.0.0";
     public const AUTOR_APP = "Ignacio David Baigorria";
+
+    /**
+     * Nombre del grafo de credenciales.
+     *
+     * Es un grafo separado del principal que contiene únicamente:
+     * - los nodos usuarios con codigo_hash y contrasena
+     * - los nodos de sesiones activas
+     *
+     * El nombre de usuario (clave del enlace en `usuarios`) es el punto de
+     * unión entre ambos grafos.
+     *
+     * @var string
+     * @since 1.5piloto.69
+     */
+    public const NOMBRE_APP_CREDENCIALES = self::NOMBRE_APP . "_credenciales";
+
+    // --- Rate limiting de autenticación (v1.5piloto.71) ---
+
+    /**
+     * Cantidad de intentos fallidos consecutivos antes de bloquear a un usuario.
+     *
+     * @var int
+     * @since 1.5piloto.71
+     */
+    public const INTENTOS_MAXIMOS_AUTENTICACION = 5;
+
+    /**
+     * Duración del bloqueo por intentos fallidos, en segundos.
+     *
+     * 900 segundos = 15 minutos.
+     *
+     * @var int
+     * @since 1.5piloto.71
+     */
+    public const BLOQUEO_AUTENTICACION_SEGUNDOS = 900;
+
+    /**
+     * Hash bcrypt válido usado como señuelo para igualar tiempos de respuesta.
+     *
+     * Cuando un usuario no existe, no tiene credencial, o está bloqueado, se
+     * ejecuta password_verify() contra este hash para que el tiempo total del
+     * intento sea similar al de un login exitoso. Evita ataques de temporización.
+     *
+     * @var string
+     * @since 1.5piloto.71
+     */
+    public const HASH_DUMMY_AUTENTICACION = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
 
     public const CODIGO_ADMIN = 'IDB';
     public const NOMBRE_ADMIN = 'Administrador';
@@ -34,6 +81,14 @@ class Conf {
     public const USUARIO_SQL_REMOTO = "if0_42773340";
     public const CONTRASENA_SQL_REMOTO = "aBjxN1w0SF";
     public const NOMBRE_BD_SQL_REMOTO = "if0_42773340_HyS";
+
+    // --- Constantes específicas para entorno remoto ---
+    /*
+    public const HOST_SQL_REMOTO = "sql303.infinityfree.com";
+    public const USUARIO_SQL_REMOTO = "if0_42770299";
+    public const CONTRASENA_SQL_REMOTO = "0EnWvlaHCp";
+    public const NOMBRE_BD_SQL_REMOTO = "if0_42770299_HyS";
+    */
 
     // --- Constantes finales (se eligen según LOCAL) ---
     public const HOST_SQL = self::LOCAL ? self::HOST_SQL_LOCAL : self::HOST_SQL_REMOTO;

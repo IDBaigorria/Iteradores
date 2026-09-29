@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.8
+ * @version   1.5piloto.70
  */
 
 use Iteradores\Nodos\Nodo;
@@ -80,7 +80,7 @@ function agregar_empresa(string $nombre_dueno, string $nombre_empresa, string $n
 
     $nodo_empresas->_adyacente_en($nodo_empresa, $nombre_empresa);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
 
     return ['exito' => true];
 }
@@ -119,7 +119,7 @@ function editar_empresa(string $nombre_dueno, string $nombre_empresa, string $nu
         $nodo_empresa->_adyacente_en(Nodo::crear_con_dato($nuevo_nombre), 'nombre');
     }
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -161,6 +161,6 @@ function eliminar_empresa(string $nombre_dueno, string $nombre_empresa): array {
     // Eliminar enlace de la empresa
     $nodo_empresas->eliminar_adyacente($nombre_empresa);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }

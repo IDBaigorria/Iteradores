@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.27
+ * @version   1.5piloto.70
  */
 
 use Iteradores\Nodos\Nodo;
@@ -147,7 +147,7 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true, 'nombre_micro' => $nombre_micro];
 }
 
@@ -169,7 +169,7 @@ function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, str
 
     $nodo_micros->eliminar_adyacente($nombre_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -196,7 +196,7 @@ function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, stri
         $nodo_micro->_adyacente_en(Nodo::crear_con_dato($monto), 'monto');
     }
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.12
- * @version   1.5piloto.67
+ * @version   1.5piloto.70
  */
 
 use Iteradores\Nodos\Nodo;
@@ -108,7 +108,7 @@ function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
     _actualizar_o_crear_campo($nodo_opciones, 'cuotas_transferencia_max', $cuotas_transferencia_max);
     _actualizar_o_crear_campo($nodo_opciones, 'mostrar_dj_en_terminales', $mostrar_dj_en_terminales);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 

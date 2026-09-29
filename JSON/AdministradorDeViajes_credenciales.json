@@ -1,0 +1,191 @@
+{
+    "metadata": {
+        "fecha_creacion": "2026-09-29T16:38:31+02:00",
+        "total_nodos": 30
+    },
+    "nodos": [
+        {
+            "id": "4655",
+            "dato": "Administrador",
+            "adyacentes": {
+                "codigo_hash": "4656"
+            }
+        },
+        {
+            "id": "4656",
+            "dato": "$2y$10$mZTYcg1eySceoJFiZ\/DM4.21e58XHTp8FuBUKQb.rp9kDkB8Ljmk2",
+            "adyacentes": []
+        },
+        {
+            "id": "4657",
+            "dato": "ignacio",
+            "adyacentes": {
+                "codigo_hash": "4658"
+            }
+        },
+        {
+            "id": "4658",
+            "dato": "$2y$10$Ow7R0qvNwqhki81DLiPIWel8nBkEVxbeugebhrxAqmSfKKwLvQF2S",
+            "adyacentes": []
+        },
+        {
+            "id": "4659",
+            "dato": "ignacio2",
+            "adyacentes": {
+                "codigo_hash": "4660",
+                "contrasena": "4661"
+            }
+        },
+        {
+            "id": "4660",
+            "dato": "$2y$10$Q6eXRvyhSNDJtHyMT4TNGOVx5Jv7sxOvOa7QMpisz\/qjzHFUqr6WW",
+            "adyacentes": []
+        },
+        {
+            "id": "4661",
+            "dato": "$2y$10$ZyxD.von2j7UX.OpTOQ0J.udvHH4fEg64\/u0muf65cPVQePeFFkBi",
+            "adyacentes": []
+        },
+        {
+            "id": "4662",
+            "dato": "manolo",
+            "adyacentes": {
+                "codigo_hash": "4663",
+                "contrasena": "4664"
+            }
+        },
+        {
+            "id": "4663",
+            "dato": "$2y$10$8QZQV2trh.8vBGwRzoyILOnxzDXgp7dLjp3blQDDzz9KVuEzuPSrW",
+            "adyacentes": []
+        },
+        {
+            "id": "4664",
+            "dato": "$2y$10$nwikIw5lpEz5t4Hg0XUlmuTKjUxuMs63X6lKMMc82QyaXIkQpPugq",
+            "adyacentes": []
+        },
+        {
+            "id": "4665",
+            "dato": "Parroquia_del_Carmen",
+            "adyacentes": {
+                "codigo_hash": "4666"
+            }
+        },
+        {
+            "id": "4666",
+            "dato": "$2y$10$sMaUwcoDo9g\/dRlaBDdq7OR\/7LJ8Fi4OCaOt4GtEuowT8Xk3ACcQu",
+            "adyacentes": []
+        },
+        {
+            "id": "4667",
+            "dato": "secretaria_carmen",
+            "adyacentes": {
+                "codigo_hash": "4668"
+            }
+        },
+        {
+            "id": "4668",
+            "dato": "$2y$10$TrjVP.uMtOh3f0zwDZTsfOljVjDdxkA6SzOL0SPe2ENk9040ue\/Mu",
+            "adyacentes": []
+        },
+        {
+            "id": "4669",
+            "dato": "Secretaria_Lujan",
+            "adyacentes": {
+                "codigo_hash": "4670"
+            }
+        },
+        {
+            "id": "4670",
+            "dato": "$2y$10$WDmr3xwCCAJ8Py1D7l3d2.dwVRa7bmhPWWPeuqIyFGqzUW3Ros.ZK",
+            "adyacentes": []
+        },
+        {
+            "id": "4671",
+            "dato": "Administrador",
+            "adyacentes": []
+        },
+        {
+            "id": "4672",
+            "dato": "1790655930",
+            "adyacentes": []
+        },
+        {
+            "id": "4673",
+            "dato": "Administrador",
+            "adyacentes": []
+        },
+        {
+            "id": "4674",
+            "dato": "1790658997",
+            "adyacentes": []
+        },
+        {
+            "id": "4675",
+            "dato": "ignacio2",
+            "adyacentes": []
+        },
+        {
+            "id": "4676",
+            "dato": "1790659649",
+            "adyacentes": []
+        },
+        {
+            "id": "4677",
+            "dato": "",
+            "adyacentes": {
+                "creado_en": "4679",
+                "usuario": "4678"
+            }
+        },
+        {
+            "id": "4678",
+            "dato": "ignacio2",
+            "adyacentes": []
+        },
+        {
+            "id": "4679",
+            "dato": "1790659651",
+            "adyacentes": []
+        },
+        {
+            "id": "4680",
+            "dato": "lila",
+            "adyacentes": {
+                "codigo_hash": "4681",
+                "contrasena": "4682"
+            }
+        },
+        {
+            "id": "4681",
+            "dato": "$2y$10$jzawjKdrULYmFFrBSRVHheCVgB8TGjDNUOvFHQYCdf3ipZHY\/UWsG",
+            "adyacentes": []
+        },
+        {
+            "id": "4682",
+            "dato": "$2y$10$60CYBFqmCrH\/mmOUHDpAle.DHHOhjxIqzahzHhwXlQabNc7U39fVu",
+            "adyacentes": []
+        },
+        {
+            "id": "sesiones",
+            "dato": "",
+            "adyacentes": {
+                "363983bfd9c1800f13b9c9e897a927e1": "4677"
+            }
+        },
+        {
+            "id": "usuarios",
+            "dato": "",
+            "adyacentes": {
+                "Administrador": "4655",
+                "ignacio": "4657",
+                "ignacio2": "4659",
+                "lila": "4680",
+                "manolo": "4662",
+                "Parroquia_del_Carmen": "4665",
+                "secretaria_carmen": "4667",
+                "Secretaria_Lujan": "4669"
+            }
+        }
+    ]
+}

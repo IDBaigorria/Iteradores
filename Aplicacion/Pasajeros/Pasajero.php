@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.67
+ * @version   1.5piloto.70
  */
 
 use Iteradores\Nodos\Nodo;
@@ -267,7 +267,7 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
         }
     }
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
 
     $activos = pasajero_tiene_pasajes_activos($nombre_dueno, $dni);
     return [
@@ -333,7 +333,7 @@ function crear_pasajero(string $nombre_dueno, array $datos): array {
 
     $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato(date('Y-m-d')), 'fecha_ultima_modificacion');
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
 
     return [
         'exito' => true,
@@ -514,7 +514,7 @@ function eliminar_pasajero(string $nombre_dueno, string $dni): array {
     $contenedor->eliminar_adyacente($dni);
     Nodo::eliminar($nodo_pasajero);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -918,7 +918,7 @@ function subir_declaracion_jurada_pasajero(string $nombre_dueno, string $dni, ar
     $nodo_dj->_adyacente_en(Nodo::crear_con_dato(date('d/m/Y H:i')), 'fecha_subida');
     $nodo_pasajero->_adyacente_en($nodo_dj, 'declaracion_jurada');
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
 
     return [
         'exito' => true,
@@ -953,6 +953,6 @@ function eliminar_declaracion_jurada_pasajero(string $nombre_dueno, string $dni)
 
     $nodo_pasajero->eliminar_adyacente('declaracion_jurada');
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }

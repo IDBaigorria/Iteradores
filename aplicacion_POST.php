@@ -22,6 +22,34 @@
  * Ya no existe un nodo especial `"pasajeros"`. Los pasajeros ahora se almacenan
  * en un contenedor `pasajeros` que cuelga del nodo usuario dueño (ver Nodo Usuario).
  *
+ * ### Grafos separados (v1.5piloto.69)
+ *
+ * A partir de la v1.5piloto.69 la persistencia se divide en dos grafos:
+ *
+ * - Grafo de la aplicación (`Conf::NOMBRE_APP`): usuarios con datos
+ *   visibles (nivel, nombre_real, email, efectivo, banco, empresas,
+ *   viajes, terminales, pasajeros, ventas, rendiciones, liquidaciones,
+ *   cancelaciones, venta_actual). NO contiene credenciales.
+ *
+ * - Grafo de credenciales (`Conf::NOMBRE_APP_CREDENCIALES`): usuarios
+ *   con `codigo_hash`, `contrasena` y los campos de rate limiting
+ *   (`intentos_fallidos`, `bloqueado_hasta`, `ultimo_acceso`,
+ *   `ip_ultimo_acceso`), más las sesiones activas.
+ *   El nombre de usuario (clave del enlace en `usuarios`) es el punto de
+ *   unión entre ambos grafos.
+ *
+ * Ambos grafos usan el mismo esquema de nodos especiales `usuarios` y
+ * `sesiones`. Los datos visibles del usuario viven en el grafo de la
+ * aplicación; las credenciales y las sesiones viven en el de credenciales.
+ *
+ * ### Persistencia (SQL + JSON)
+ *
+ * A partir de v1.5piloto.70, cada operación de guardado escribe en SQL
+ * (fuente de verdad, se lee al arrancar) y en JSON (respaldo, no se lee
+ * automáticamente). El helper `guardar_ambos($nombre)` se encarga del doble
+ * guardado. Si la escritura JSON falla, se registra con `Controlador::_error()`
+ * (el sistema de errores de `Objeto`) y la operación SQL sigue siendo válida.
+ *
  * ### Nodo Usuario (dato del nodo: nombre de usuario)
  *
  * Cada usuario es un nodo cuyo dato es el **nombre de usuario** (string).  
@@ -30,8 +58,12 @@
  * | Enlace          | Nodo destino y dato esperado                                                         |
  * |-----------------|---------------------------------------------------------------------------------------|
  * | `nivel`         | Nodo con dato string: `"admin"`, `"dueno"` o `"terminal"`.                           |
- * | `codigo_hash`   | Nodo con dato string: hash bcrypt del código de acceso (password_hash).               |
- * | `contrasena`    | Nodo con dato string: hash de contraseña (opcional).                                  |
+ * | `codigo_hash`   | **(en el grafo de credenciales)** Nodo con dato string: hash bcrypt del código de acceso. |
+ * | `contrasena`    | **(en el grafo de credenciales)** Nodo con dato string: hash de contraseña (opcional).    |
+ * | `intentos_fallidos` | **(en el grafo de credenciales)** Nodo con dato string numérico: cantidad de intentos fallidos consecutivos. Se resetea a `"0"` con un login exitoso o al cambiar credenciales. |
+ * | `bloqueado_hasta`   | **(en el grafo de credenciales)** Nodo con dato string: timestamp Unix hasta el cual el usuario está bloqueado. Solo existe si hubo bloqueo. Al expirar, se elimina y se resetean los intentos. |
+ * | `ultimo_acceso`     | **(en el grafo de credenciales)** Nodo con dato string `"DD/MM/YYYY HH:MM"`: fecha del último login exitoso. |
+ * | `ip_ultimo_acceso`  | **(en el grafo de credenciales)** Nodo con dato string: dirección IP del último login exitoso. |
  * | `nombre_real`   | Nodo con dato string: nombre real o visible (opcional).                               |
  * | `email`         | Nodo con dato string: correo electrónico (opcional).                                  |
  * | `efectivo`      | Nodo con dato string numérico: monto en efectivo. Para `terminal`, es el saldo en la caja de la terminal. Para `dueno`, es la cuenta de efectivo acumulada de las rendiciones. Inicia en `"0"`. |
@@ -644,6 +676,12 @@
  * con `password_hash` y se guardaron como `codigo_hash`. El admin principal ya no se
  * crea con `codigo_acceso`: se crea con `codigo_hash` y se chequea por nombre en
  * `index.php`.
+ *
+ * **Nota (rate limiting, v1.5piloto.71):** Después de
+ * `Conf::INTENTOS_MAXIMOS_AUTENTICACION` intentos fallidos consecutivos, el usuario
+ * queda bloqueado durante `Conf::BLOQUEO_AUTENTICACION_SEGUNDOS` segundos. Mientras
+ * esté bloqueado, el login devuelve el mismo error genérico que un fallo normal, y
+ * el tiempo de respuesta se mantiene similar usando `Conf::HASH_DUMMY_AUTENTICACION`.
  * - `validar_token_sesion($token)`: busca en `"sesiones"` por token, obtiene nombre
  *   de usuario, y devuelve array con `nombre_usuario` y `nodo` del usuario.
  * - Panel de administración usa `listar_usuarios()`, `listar_sesiones()` y
@@ -671,7 +709,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.68
+ * @version   1.5piloto.71
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

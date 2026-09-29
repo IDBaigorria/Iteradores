@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.67
+ * @version   1.5piloto.70
  */
 
 use Iteradores\Nodos\Nodo;
@@ -255,7 +255,7 @@ function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, stri
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -356,7 +356,7 @@ function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, 
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -418,7 +418,7 @@ function liberar_reserva_asiento_micro(string $nombre_viaje, string $nombre_micr
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -682,7 +682,7 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -789,6 +789,6 @@ function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro,
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }

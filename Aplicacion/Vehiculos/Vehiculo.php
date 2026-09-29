@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.7
+ * @version   1.5piloto.70
  */
 
 use Iteradores\Nodos\Nodo;
@@ -156,7 +156,7 @@ function agregar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, strin
 
         $nodo_vehiculos->_adyacente_en($nodo_vehiculo, $nombre_vehiculo);
 
-        Controlador::guardar(Conf::NOMBRE_APP);
+        guardar_ambos(Conf::NOMBRE_APP);
 
         return ['exito' => true];
     }
@@ -227,7 +227,7 @@ function actualizar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, ar
             }
         }
 
-        Controlador::guardar(Conf::NOMBRE_APP);
+        guardar_ambos(Conf::NOMBRE_APP);
 
         return ['exito' => true];
     }
@@ -334,7 +334,7 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
 
         $nodo_asientos->_dato((string)$total_asientos);
 
-        Controlador::guardar(Conf::NOMBRE_APP);
+        guardar_ambos(Conf::NOMBRE_APP);
 
         return ['exito' => true];
     }
@@ -374,7 +374,7 @@ function eliminar_vehiculo(string $nombre_empresa, string $nombre_vehiculo): arr
         // Por ahora solo se elimina el enlace.
         $nodo_vehiculos->eliminar_adyacente($nombre_vehiculo);
 
-        Controlador::guardar(Conf::NOMBRE_APP);
+        guardar_ambos(Conf::NOMBRE_APP);
         return ['exito' => true];
     }
 
@@ -472,7 +472,7 @@ function subir_foto_vehiculo(string $nombre_empresa, string $nombre_vehiculo, ar
         $vehiculo_encontrado->_adyacente_en(Nodo::crear_con_dato($ruta_relativa), 'foto');
 
         // Guardar persistencia
-        Controlador::guardar(Conf::NOMBRE_APP);
+        guardar_ambos(Conf::NOMBRE_APP);
 
         return ['exito' => true, 'foto' => $ruta_relativa];
     }

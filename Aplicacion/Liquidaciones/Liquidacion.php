@@ -8,7 +8,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.54
- * @version   1.5piloto.54
+ * @version   1.5piloto.70
  */
 
 use Iteradores\Nodos\Nodo;
@@ -142,7 +142,7 @@ function confirmar_liquidacion(string $nombre_dueno, string $monto_efectivo_str,
     if ($nodo_ba) $nodo_ba->_dato((string)$banco_restante);
 
     _hmi($contenedor, $nodo_liq);
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
 
     return [
         'exito' => true,

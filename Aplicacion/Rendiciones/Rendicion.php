@@ -13,7 +13,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.50
- * @version   1.5piloto.55
+ * @version   1.5piloto.70
  */
 
 use Iteradores\Nodos\Nodo;
@@ -519,7 +519,7 @@ function confirmar_rendicion(string $nombre_dueno, array $ventas_seleccionadas, 
     // Insertar la rendición al inicio del contenedor del dueño.
     _hmi($contenedor, $nodo_rendicion);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
 
     return [
         'exito' => true,
@@ -772,7 +772,7 @@ function aceptar_ajuste_rendicion(string $id_rendicion, string $id_cancelacion):
     if ($acept) return ['exito' => false, 'error' => 'Este ajuste ya fue aceptado'];
     $ajuste->_adyacente_en(Nodo::crear_con_dato(date('d/m/Y H:i')), 'aceptada_en');
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
 

@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.67
+ * @version   1.5piloto.70
  */
 
 
@@ -569,7 +569,7 @@ function confirmar_venta_actual(
     // Eliminar venta actual de la terminal
     $nodo_terminal->eliminar_adyacente('venta_actual');
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
 
     return [
         'exito' => true,
@@ -1288,7 +1288,7 @@ function cancelar_venta(string $id_venta, string $motivo = ''): array {
     // 8. Eliminar el nodo venta entero.
     Nodo::eliminar($nodo_venta);
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
 
     $dev_ef_total = $desglose['en_terminal_efectivo'] + $desglose['rendido_efectivo'];
     $dev_ba_total = $desglose['en_terminal_banco'] + $desglose['rendido_banco'];
@@ -1578,7 +1578,7 @@ function pagar_cupon_venta(string $id_venta, string $numero_cupon, string $monto
         }
     }
 
-    Controlador::guardar(Conf::NOMBRE_APP);
+    guardar_ambos(Conf::NOMBRE_APP);
 
     return [
         'exito' => true,
