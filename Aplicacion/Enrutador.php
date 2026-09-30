@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.73
+ * @version   1.5piloto.73i
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1033,6 +1033,25 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de cancelaciones no válida']);
+            }
+            break;
+
+        case 'usuarios':
+            switch ($subaccion) {
+                case 'mi_perfil':
+                    if ($nombre_solicitante === '') {
+                        responder_json(['exito' => false, 'error' => 'Sin sesión activa']);
+                    }
+                    $perfil = obtener_perfil_usuario($nombre_solicitante);
+                    if ($perfil) {
+                        responder_json(['exito' => true, 'perfil' => $perfil]);
+                    } else {
+                        responder_json(['exito' => false, 'error' => 'Usuario no encontrado']);
+                    }
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de usuarios no válida']);
             }
             break;
 

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.73b
+ * @version   1.5piloto.73i
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1001,4 +1001,35 @@ function eliminar_terminal(string $nombre_usuario, string $nombre_dueno_actual):
     }
 
     return eliminar_usuario($nombre_usuario);
+}
+
+/**
+ * Devuelve los datos del propio usuario (perfil).
+ *
+ * Reutiliza `_formatear_usuario_para_admin` para no duplicar la
+ * lógica de armado. Solo lee, no modifica nada. Sirve para que
+ * cualquier rol vea sus propios datos sin necesitar permisos
+ * de administrador.
+ *
+ * @param string $nombre_usuario Nombre del usuario.
+ * @return array|null Datos del perfil, o null si no existe.
+ */
+function obtener_perfil_usuario(string $nombre_usuario): ?array {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return null;
+    $nodo_usuario = $raiz->adyacente($nombre_usuario);
+    if (!$nodo_usuario) return null;
+
+    // Mapa de usuarios con código (desde credenciales).
+    $con_codigo = en_grafo_credenciales(function() {
+        $raiz_cred = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_cred) return [];
+        $mapa = [];
+        foreach ($raiz_cred->adyacentes() as $nombre => $nodo) {
+            $mapa[(string)$nombre] = $nodo->adyacente('codigo_hash') ? true : false;
+        }
+        return $mapa;
+    });
+
+    return _formatear_usuario_para_admin($nombre_usuario, $nodo_usuario, $con_codigo);
 }

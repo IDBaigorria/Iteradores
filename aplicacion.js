@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.73h
+ * @version 1.5piloto.73i
  */
 
 // Utilidades
@@ -334,6 +334,9 @@ $("#link_login_codigo").addEventListener("click", (e) => {
     mostrar_login_por_codigo();
 });
 $("#boton_salir").addEventListener("click", salir);
+
+// Click en el nombre de usuario: abre el modal "Mis datos".
+$("#nombre_usuario_actual")?.addEventListener("click", abrir_modal_mi_perfil);
 
 // Ocultar aplicación y mostrar login al inicio
 $("#aplicacion").classList.add("hidden");
@@ -1124,5 +1127,73 @@ async function _guardar_alta_usuario_generico(contenedor, opciones) {
     } else {
         mostrar_aviso(resultado.error || "Error al crear usuario", 'error');
     }
+}
+
+// ============================================================
+// ====== MODAL "MIS DATOS" ===================================
+// ============================================================
+
+/**
+ * Abre el modal con los datos del usuario actual. Lo puede usar
+ * cualquier rol. Solo lectura.
+ */
+function abrir_modal_mi_perfil() {
+    fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "usuarios/mi_perfil" })
+    })
+    .then(r => r.json())
+    .then(datos => {
+        if (!datos.exito) {
+            mostrar_aviso(datos.error || "No se pudo cargar el perfil", 'error');
+            return;
+        }
+        _renderizar_modal_mi_perfil(datos.perfil);
+    })
+    .catch(e => {
+        console.error("Error al cargar mi perfil:", e);
+        mostrar_aviso("Error de comunicación", 'error');
+    });
+}
+
+/**
+ * Arma y muestra el HTML del modal "Mis datos" a partir del
+ * perfil recibido del backend.
+ *
+ * @param {object} p Datos del perfil.
+ */
+function _renderizar_modal_mi_perfil(p) {
+    const filas = [];
+    filas.push(['Usuario', p.nombre_usuario || '—']);
+    filas.push(['Nivel', p.nivel || '—']);
+    if (p.nombre_real) filas.push(['Nombre real', p.nombre_real]);
+    if (p.email) filas.push(['Email', p.email]);
+    filas.push(['Código de acceso', p.codigo_asignado ? 'Asignado' : '—']);
+    filas.push(['Efectivo', '$' + (p.efectivo || '0')]);
+    filas.push(['Bancarizado', '$' + (p.bancarizado || '0')]);
+    if (p.banco && p.banco.nombre) filas.push(['Banco', p.banco.nombre]);
+    if (p.banco && p.banco.cuenta) filas.push(['Cuenta bancaria', p.banco.cuenta]);
+    if (p.nivel === 'terminal' && p.dueno) filas.push(['Dueño', p.dueno]);
+    if (p.nivel === 'soporte' && Array.isArray(p.duenos)) {
+        filas.push(['Dueños asignados', p.duenos.length > 0 ? p.duenos.join(', ') : '—']);
+    }
+
+    const filas_html = filas.map(f => `<tr><th>${f[0]}</th><td>${f[1]}</td></tr>`).join('');
+
+    const html = `
+        <table class="perfil-tabla">
+            <tbody>
+                ${filas_html}
+            </tbody>
+        </table>
+        <div class="actions" style="margin-top:15px">
+            <button class="btn" id="perfil_cerrar_btn">Cerrar</button>
+        </div>
+    `;
+
+    abrir_modal_generico('Mis datos', html);
+
+    document.getElementById('perfil_cerrar_btn')?.addEventListener('click', cerrar_modal_generico);
 }
 

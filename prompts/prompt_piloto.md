@@ -555,6 +555,10 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   todo el contenido dinámico al salir y al ingresar. Además, el
   soporte ya no recibe la lista completa de usuarios: la tabla se
   llena solo con lo que dejó el selector de dueños.
+- **v73i**: modal "Mis datos". Se puede tocar el nombre del usuario
+  en el header para ver el perfil propio. Nuevo endpoint
+  `usuarios/mi_perfil` (sin permisos especiales, devuelve los
+  datos del solicitante). Solo lectura.
 
 ---
 
@@ -829,8 +833,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73h (limpieza
-de contenido dinámico al cambiar de sesión).
+**Última actualización de este prompt:** v1.5piloto.73i (modal
+"Mis datos" al tocar el nombre del usuario en el header).
 
 **Estado de la conversación:**
 

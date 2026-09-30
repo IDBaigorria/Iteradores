@@ -373,3 +373,33 @@ h3 { margin: 0 0 12px; font-size: 17px; color: var(--primary-dark); }
 .modal-header-izquierda h3 {
     margin: 0;
 }
+
+/* Nombre de usuario en el header: clickeable para ver "Mis datos". */
+#nombre_usuario_actual {
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+    transition: color var(--transition);
+}
+#nombre_usuario_actual:hover { color: var(--primary); }
+
+/* Tabla del modal "Mis datos". */
+.perfil-tabla {
+    width: 100%;
+    border-collapse: collapse;
+}
+.perfil-tabla th,
+.perfil-tabla td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+.perfil-tabla th {
+    font-weight: 700;
+    color: var(--primary-dark);
+    width: 180px;
+    white-space: nowrap;
+}
+.perfil-tabla tr:last-child th,
+.perfil-tabla tr:last-child td { border-bottom: 0; }
