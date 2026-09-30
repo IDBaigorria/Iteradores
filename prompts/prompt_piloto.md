@@ -542,6 +542,8 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   JS que chequeaban `usuario_actual.nivel === 'admin'` ahora usan el
   helper, así el soporte ve los selectores de dueño en todas las
   pestañas.
+- **v73e**: edición de usuarios en modal. Se reemplazó la edición
+  inline en la tabla por un modal genérico con `form-grid`.
 
 ---
 
@@ -816,8 +818,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73d (soporte ve
-los selectores de dueño en todas las pestañas).
+**Última actualización de este prompt:** v1.5piloto.73e (edición de
+usuarios en modal).
 
 **Estado de la conversación:**
 
