@@ -1,6 +1,6 @@
 /***
  * Funciones de puntos de venta (dueño).
- * @version 1.5piloto.73f
+ * @version 1.5piloto.73g
  */
 
 async function cargar_datos_terminales() {
@@ -92,59 +92,26 @@ async function cargar_datos_terminales() {
     }
 }
 
-// Eventos de formulario de terminales
-$("#boton_agregar_terminal").addEventListener("click", () => {
-    $("#formulario_nueva_terminal").classList.remove("hidden");
-});
-
-$("#boton_cancelar_terminal").addEventListener("click", () => {
-    $("#formulario_nueva_terminal").classList.add("hidden");
-});
-
-$("#boton_guardar_terminal").addEventListener("click", async () => {
-    const datos_terminal = {
-        accion: "dueno/agregar_terminal",
-        nombre_dueno: usuario_actual.nombre_usuario,
-        nombre_usuario: $("#nuevo_terminal_nombre_usuario").value.trim(),
-        contrasena: $("#nuevo_terminal_contrasena").value,
-        nombre_real: $("#nuevo_terminal_nombre_real").value.trim(),
-        email: $("#nuevo_terminal_email").value.trim(),
-        codigo_acceso: $("#nuevo_terminal_codigo_acceso").value.trim(),
-        banco_nombre: $("#nuevo_terminal_banco_nombre").value.trim(),
-        banco_cuenta: $("#nuevo_terminal_banco_cuenta").value.trim()
-    };
-
-    if (!datos_terminal.nombre_usuario) {
-        mostrar_aviso("El nombre de usuario es obligatorio", 'error');
-        return;
-    }
-    if (!datos_terminal.codigo_acceso && !datos_terminal.contrasena) {
-        mostrar_aviso("Debe asignar al menos un código de acceso o una contraseña", 'error');
-        return;
-    }
-    if (!datos_terminal.banco_nombre || !datos_terminal.banco_cuenta) {
-        mostrar_aviso("Banco y cuenta son obligatorios", 'error');
-        return;
-    }
-
-    const respuesta = await fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(datos_terminal)
+/**
+ * Abre el modal para crear una terminal del dueño.
+ * Envuelve la función común con las opciones del dueño:
+ * nivel forzado a terminal, sin selector de dueño, con banco.
+ */
+async function abrir_modal_agregar_terminal() {
+    return abrir_modal_agregar_usuario_generico({
+        accion_guardar: 'dueno/agregar_terminal',
+        titulo: 'Nuevo punto de venta',
+        mostrar_nivel: false,
+        nivel_forzado: 'terminal',
+        mostrar_banco: true,
+        mostrar_dueno: false,
+        mostrar_duenos_soporte: false,
+        datos_extra: { nombre_dueno: usuario_actual.nombre_usuario },
+        al_guardar_exito: cargar_datos_terminales
     });
-    const datos = await respuesta.json();
-    if (datos.exito) {
-        if (datos.codigo_asignado) {
-            alert("Código de acceso: " + datos.codigo_asignado + "\n\nGuardalo, no se mostrará de nuevo.");
-        }
-        mostrar_aviso("Punto de venta agregado correctamente", 'exito');
-        $("#formulario_nueva_terminal").classList.add("hidden");
-        ["nuevo_terminal_nombre_usuario","nuevo_terminal_contrasena","nuevo_terminal_nombre_real","nuevo_terminal_email","nuevo_terminal_codigo_acceso","nuevo_terminal_banco_nombre","nuevo_terminal_banco_cuenta"].forEach(id => $("#"+id).value="");
-        cargar_datos_terminales();
-    } else {
-        mostrar_aviso(datos.error || "Error al agregar punto de venta", 'error');
-    }
-});
+}
+
+$("#boton_agregar_terminal").addEventListener("click", abrir_modal_agregar_terminal);
 
 async function obtener_datos_terminal(nombre_usuario) {
     const respuesta = await fetch("index.php", {

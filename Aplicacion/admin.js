@@ -1,7 +1,7 @@
 /***
  * Funciones de administración de usuarios.
  * @since 1.5piloto.15
- * @version 1.5piloto.73f
+ * @version 1.5piloto.73g
  */
 
 async function cargar_datos_admin() {
@@ -136,74 +136,43 @@ async function eliminar_usuario_confirmado(nombre_usuario) {
     }
 }
 
-// Eventos del formulario de nuevo usuario
-$("#nuevo_nivel").addEventListener("change", function() {
-    const es_terminal = this.value === "terminal";
-    const es_dueno = this.value === "dueno";
-    const es_soporte = this.value === "soporte";
-    const tiene_banco = es_terminal || es_dueno;
-    // Se usa "" en vez de "block" para no pisar el display: flex del CSS.
-    document.getElementById("campo_dueno").style.display = es_terminal ? "" : "none";
-    document.getElementById("campo_banco_nombre").style.display = tiene_banco ? "" : "none";
-    document.getElementById("campo_banco_cuenta").style.display = tiene_banco ? "" : "none";
-    document.getElementById("campo_duenos_soporte").style.display = es_soporte ? "" : "none";
-});
+// El listener del formulario embebido de nuevo usuario (nuevo_nivel)
+// se eliminó al pasar al modal. El HTML embebido se limpia en una
+// tanda aparte.
 
-$("#boton_agregar_usuario").addEventListener("click", async () => {
+/**
+ * Abre el modal para crear un usuario. Envuelve la función
+ * común con las opciones de admin: cualquier nivel, selector
+ * de dueño, banco y checkboxes de soporte. Si el usuario actual
+ * es soporte, restringe el nivel a terminal.
+ */
+async function abrir_modal_agregar_usuario() {
     const es_soporte = usuario_actual && usuario_actual.nivel === 'soporte';
-    // Si es soporte, restringir el selector de nivel a "terminal".
-    if (es_soporte) {
-        const select_nivel = $("#nuevo_nivel");
-        select_nivel.innerHTML = '<option value="terminal">Terminal</option>';
-        select_nivel.value = 'terminal';
-        select_nivel.disabled = true;
-    } else {
-        const select_nivel = $("#nuevo_nivel");
-        select_nivel.disabled = false;
-    }
-    try {
-        const duenos = await _listar_duenos_admin();
-        const select_dueno = $("#nuevo_dueno_select");
-        select_dueno.innerHTML = '<option value="">Seleccione dueño...</option>';
-        duenos.forEach(dueno => {
-            const opcion = document.createElement("option");
-            opcion.value = dueno.nombre_usuario;
-            opcion.textContent = dueno.nombre_real ? `${dueno.nombre_real} (${dueno.nombre_usuario})` : dueno.nombre_usuario;
-            select_dueno.appendChild(opcion);
-        });
 
-        // Cargar la lista de dueños como checkboxes para el campo de soporte.
-        const contenedor = $("#nuevo_soporte_duenos_lista");
-        if (contenedor) {
-            contenedor.innerHTML = '';
-            if (duenos.length === 0) {
-                contenedor.innerHTML = '<em>No hay dueños disponibles</em>';
-            } else {
-                duenos.forEach(dueno => {
-                    const label = document.createElement('label');
-                    label.style.display = 'block';
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.value = dueno.nombre_usuario;
-                    checkbox.className = 'chk_dueno_soporte';
-                    label.appendChild(checkbox);
-                    const txt = document.createTextNode(' ' + (dueno.nombre_real ? `${dueno.nombre_real} (${dueno.nombre_usuario})` : dueno.nombre_usuario));
-                    label.appendChild(txt);
-                    contenedor.appendChild(label);
-                });
-            }
-        }
-    } catch (e) {
-        console.error("Error al cargar dueños", e);
-        mostrar_aviso("Error al cargar dueños", 'error');
-    }
-    $("#formulario_nuevo_usuario").classList.remove("hidden");
-    $("#nuevo_nivel").dispatchEvent(new Event("change"));
-});
+    const niveles_disponibles = es_soporte
+        ? [{ valor: 'terminal', etiqueta: 'Terminal' }]
+        : [
+            { valor: 'terminal', etiqueta: 'Terminal' },
+            { valor: 'dueno', etiqueta: 'Dueño' },
+            { valor: 'admin', etiqueta: 'Administrador' },
+            { valor: 'soporte', etiqueta: 'Soporte' }
+        ];
 
-$("#boton_cancelar_nuevo_usuario").addEventListener("click", () => {
-    $("#formulario_nuevo_usuario").classList.add("hidden");
-});
+    return abrir_modal_agregar_usuario_generico({
+        accion_guardar: 'administrador/agregar_usuario',
+        titulo: 'Nuevo usuario',
+        mostrar_nivel: true,
+        niveles_disponibles: niveles_disponibles,
+        mostrar_banco: true,
+        mostrar_dueno: true,
+        mostrar_duenos_soporte: !es_soporte,
+        listar_duenos: _listar_duenos_admin,
+        al_guardar_exito: cargar_datos_admin
+    });
+}
+
+$("#boton_agregar_usuario").addEventListener("click", abrir_modal_agregar_usuario);
+
 
 /**
  * Carga el selector de dueños en la pestaña admin para un soporte.
@@ -306,65 +275,3 @@ function _renderizar_tabla_usuarios(usuarios) {
     });
 }
 
-$("#boton_guardar_usuario").addEventListener("click", async () => {
-    const nivel = $("#nuevo_nivel").value;
-
-    // Recolectar dueños asignados si es soporte.
-    let duenos_asignados = [];
-    if (nivel === "soporte") {
-        document.querySelectorAll('.chk_dueno_soporte:checked').forEach(chk => {
-            duenos_asignados.push(chk.value);
-        });
-    }
-
-    const datos_usuario = {
-        accion: "administrador/agregar_usuario",
-        nombre_usuario: $("#nuevo_nombre_usuario").value.trim(),
-        contrasena: $("#nuevo_contrasena").value,
-        nombre_real: $("#nuevo_nombre_real").value.trim(),
-        email: $("#nuevo_email").value.trim(),
-        codigo_acceso: $("#nuevo_codigo_acceso").value.trim(),
-        nivel: nivel,
-        dueno: nivel === "terminal" ? $("#nuevo_dueno_select").value : "",
-        banco_nombre: (nivel === "terminal" || nivel === "dueno") ? $("#nuevo_banco_nombre").value.trim() : "",
-        banco_cuenta: (nivel === "terminal" || nivel === "dueno") ? $("#nuevo_banco_cuenta").value.trim() : "",
-        duenos_asignados: nivel === "soporte" ? JSON.stringify(duenos_asignados) : ""
-    };
-
-    if (!datos_usuario.nombre_usuario) {
-        mostrar_aviso("El nombre de usuario es obligatorio", 'error');
-        return;
-    }
-    if (!datos_usuario.codigo_acceso && !datos_usuario.contrasena) {
-        mostrar_aviso("Debe asignar al menos un código de acceso o una contraseña", 'error');
-        return;
-    }
-    if (nivel === "terminal") {
-        if (!datos_usuario.dueno) {
-            mostrar_aviso("Debe seleccionar un dueño", 'error');
-            return;
-        }
-        if (!datos_usuario.banco_nombre || !datos_usuario.banco_cuenta) {
-            mostrar_aviso("Banco y cuenta son obligatorios para terminales", 'error');
-            return;
-        }
-    }
-
-    const respuesta = await fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(datos_usuario)
-    });
-    const datos = await respuesta.json();
-    if (datos.exito) {
-        if (datos.codigo_asignado) {
-            alert("Código de acceso: " + datos.codigo_asignado + "\n\nGuardalo, no se mostrará de nuevo.");
-        }
-        mostrar_aviso("Usuario agregado correctamente", 'exito');
-        $("#formulario_nuevo_usuario").classList.add("hidden");
-        ["nuevo_nombre_usuario","nuevo_contrasena","nuevo_nombre_real","nuevo_email","nuevo_codigo_acceso","nuevo_dueno_select","nuevo_banco_nombre","nuevo_banco_cuenta"].forEach(id => $("#"+id).value="");
-        cargar_datos_admin();
-    } else {
-        mostrar_aviso(datos.error || "Error al agregar usuario", 'error');
-    }
-});

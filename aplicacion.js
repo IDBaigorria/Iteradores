@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.73f
+ * @version 1.5piloto.73g
  */
 
 // Utilidades
@@ -772,6 +772,271 @@ async function _guardar_edicion_usuario_generico(nombre_usuario, contenedor, opc
         }
     } else {
         mostrar_aviso(resultado.error || "Error al actualizar", 'error');
+    }
+}
+
+// ============================================================
+// ====== MODAL GENERICO DE ALTA DE USUARIO ===================
+// ============================================================
+
+/**
+ * Abre el modal para crear un usuario. Lo usan tanto el admin
+ * (para usuarios de cualquier nivel) como el dueño (para sus
+ * propias terminales) y el soporte (solo terminales).
+ *
+ * Acepta las mismas opciones que abrir_modal_editar_usuario_generico
+ * salvo obtener_datos (no hay usuario previo).
+ *
+ * @param {object} opciones
+ *   - accion_guardar: string, accion POST
+ *   - titulo: string (opcional)
+ *   - mostrar_nivel: bool
+ *   - nivel_forzado: string (si mostrar_nivel es false)
+ *   - niveles_disponibles: array de {valor, etiqueta}
+ *   - mostrar_banco: bool
+ *   - mostrar_dueno: bool
+ *   - mostrar_duenos_soporte: bool
+ *   - listar_duenos: async () => array (opcional)
+ *   - datos_extra: objeto de campos fijos (opcional)
+ *   - al_guardar_exito: function (opcional)
+ */
+async function abrir_modal_agregar_usuario_generico(opciones) {
+    // Listar dueños si hace falta.
+    let duenos = [];
+    if ((opciones.mostrar_dueno || opciones.mostrar_duenos_soporte) && typeof opciones.listar_duenos === 'function') {
+        try {
+            duenos = await opciones.listar_duenos();
+        } catch (e) {
+            console.error('Error al cargar dueños', e);
+        }
+    }
+
+    const valor_nivel = opciones.nivel_forzado || (opciones.mostrar_nivel && opciones.niveles_disponibles && opciones.niveles_disponibles[0]
+        ? opciones.niveles_disponibles[0].valor
+        : 'dueno');
+
+    // Bloque "Nivel".
+    let html_nivel = '';
+    if (opciones.mostrar_nivel) {
+        const opciones_nivel = (opciones.niveles_disponibles || []).map(n => {
+            const sel = (n.valor === valor_nivel) ? ' selected' : '';
+            return `<option value="${n.valor}"${sel}>${n.etiqueta}</option>`;
+        }).join('');
+        html_nivel = `
+            <div class="field">
+                <label>Nivel</label>
+                <select id="modal_agregar_nivel">
+                    ${opciones_nivel}
+                </select>
+            </div>
+        `;
+    }
+
+    // Bloque "Dueño" (select, solo para terminal del admin o soporte).
+    let html_dueno = '';
+    if (opciones.mostrar_dueno) {
+        let opciones_dueno = '<option value="">Seleccione dueño...</option>';
+        duenos.forEach(d => {
+            const texto = d.nombre_real ? `${d.nombre_real} (${d.nombre_usuario})` : d.nombre_usuario;
+            opciones_dueno += `<option value="${d.nombre_usuario}">${texto}</option>`;
+        });
+        html_dueno = `
+            <div class="field" id="modal_agregar_campo_dueno" style="display:none">
+                <label>Dueño (para terminales) *</label>
+                <select id="modal_agregar_dueno">${opciones_dueno}</select>
+            </div>
+        `;
+    }
+
+    // Bloque "Banco" (nombre y cuenta).
+    let html_banco = '';
+    if (opciones.mostrar_banco) {
+        html_banco = `
+            <div class="field" id="modal_agregar_campo_banco_nombre" style="display:none">
+                <label>Banco (nombre) *</label>
+                <input type="text" id="modal_agregar_banco_nombre" value="">
+            </div>
+            <div class="field" id="modal_agregar_campo_banco_cuenta" style="display:none">
+                <label>Cuenta bancaria *</label>
+                <input type="text" id="modal_agregar_banco_cuenta" value="">
+            </div>
+        `;
+    }
+
+    // Bloque "Dueños asignados" (checkboxes, solo para soporte).
+    let html_duenos_soporte = '';
+    if (opciones.mostrar_duenos_soporte) {
+        let checkboxes_html = '';
+        if (duenos.length === 0) {
+            checkboxes_html = '<em>Sin dueños disponibles</em>';
+        } else {
+            duenos.forEach(d => {
+                const texto = d.nombre_real ? `${d.nombre_real} (${d.nombre_usuario})` : d.nombre_usuario;
+                checkboxes_html += `<label style="display:block;"><input type="checkbox" class="chk_modal_agregar_dueno_soporte" value="${d.nombre_usuario}"> ${texto}</label>`;
+            });
+        }
+        html_duenos_soporte = `
+            <div class="field full" id="modal_agregar_campo_duenos_soporte" style="display:none">
+                <label>Dueños asignados</label>
+                <div style="max-height:200px; overflow-y:auto; border:1px solid #ccc; padding:6px; border-radius:4px;">
+                    ${checkboxes_html}
+                </div>
+            </div>
+        `;
+    }
+
+    const titulo = opciones.titulo || 'Nuevo usuario';
+
+    const html = `
+        <div class="form-grid">
+            <div class="field">
+                <label>Nombre de usuario *</label>
+                <input type="text" id="modal_agregar_nombre_usuario" value="">
+            </div>
+            ${html_nivel}
+            <div class="field">
+                <label>Contraseña (opcional)</label>
+                <input type="password" id="modal_agregar_contrasena" value="">
+            </div>
+            <div class="field">
+                <label>Nombre real</label>
+                <input type="text" id="modal_agregar_nombre_real" value="">
+            </div>
+            <div class="field">
+                <label>Email (opcional)</label>
+                <input type="email" id="modal_agregar_email" value="">
+            </div>
+            <div class="field">
+                <label>Código de acceso *</label>
+                <input type="text" id="modal_agregar_codigo" value="">
+            </div>
+            ${html_dueno}
+            ${html_banco}
+            ${html_duenos_soporte}
+        </div>
+        <div class="actions" style="margin-top:15px">
+            <button class="btn primary" id="modal_btn_guardar_alta">Guardar</button>
+            <button class="btn" id="modal_btn_cancelar_alta">Cancelar</button>
+        </div>
+    `;
+
+    abrir_modal_generico(titulo, html);
+
+    const contenedor = document.getElementById('modal_generico_contenido');
+    if (!contenedor) return;
+
+    const select_nivel = contenedor.querySelector('#modal_agregar_nivel');
+    const campo_dueno = contenedor.querySelector('#modal_agregar_campo_dueno');
+    const campo_banco_nombre = contenedor.querySelector('#modal_agregar_campo_banco_nombre');
+    const campo_banco_cuenta = contenedor.querySelector('#modal_agregar_campo_banco_cuenta');
+    const campo_duenos_soporte = contenedor.querySelector('#modal_agregar_campo_duenos_soporte');
+
+    function _nivel_actual() {
+        if (opciones.mostrar_nivel && select_nivel) return select_nivel.value;
+        return opciones.nivel_forzado || '';
+    }
+
+    function actualizar_visibilidad() {
+        const nivel = _nivel_actual();
+        const es_terminal = nivel === 'terminal';
+        const es_dueno = nivel === 'dueno';
+        const es_soporte = nivel === 'soporte';
+        const tiene_banco = es_terminal || es_dueno;
+        if (campo_banco_nombre) campo_banco_nombre.style.display = tiene_banco ? '' : 'none';
+        if (campo_banco_cuenta) campo_banco_cuenta.style.display = tiene_banco ? '' : 'none';
+        if (campo_dueno) campo_dueno.style.display = es_terminal ? '' : 'none';
+        if (campo_duenos_soporte) campo_duenos_soporte.style.display = es_soporte ? '' : 'none';
+    }
+    if (select_nivel) select_nivel.addEventListener('change', actualizar_visibilidad);
+    actualizar_visibilidad();
+
+    contenedor.querySelector('#modal_btn_cancelar_alta').addEventListener('click', cerrar_modal_generico);
+    contenedor.querySelector('#modal_btn_guardar_alta').addEventListener('click', () => {
+        _guardar_alta_usuario_generico(contenedor, opciones);
+    });
+}
+
+/**
+ * Guarda un usuario creado desde el modal genérico.
+ */
+async function _guardar_alta_usuario_generico(contenedor, opciones) {
+    const nivel = opciones.mostrar_nivel
+        ? contenedor.querySelector('#modal_agregar_nivel').value
+        : (opciones.nivel_forzado || '');
+    const select_dueno = contenedor.querySelector('#modal_agregar_dueno');
+    const dueno = select_dueno ? select_dueno.value : '';
+
+    let duenos_asignados = [];
+    if (opciones.mostrar_duenos_soporte && nivel === 'soporte') {
+        contenedor.querySelectorAll('.chk_modal_agregar_dueno_soporte:checked').forEach(chk => {
+            duenos_asignados.push(chk.value);
+        });
+    }
+
+    const datos = {
+        accion: opciones.accion_guardar,
+        nombre_usuario: (contenedor.querySelector('#modal_agregar_nombre_usuario')?.value || '').trim(),
+        contrasena: (contenedor.querySelector('#modal_agregar_contrasena')?.value || ''),
+        nombre_real: (contenedor.querySelector('#modal_agregar_nombre_real')?.value || '').trim(),
+        email: (contenedor.querySelector('#modal_agregar_email')?.value || '').trim(),
+        codigo_acceso: (contenedor.querySelector('#modal_agregar_codigo')?.value || '').trim(),
+        nivel: nivel
+    };
+
+    if (opciones.mostrar_banco) {
+        datos.banco_nombre = (contenedor.querySelector('#modal_agregar_banco_nombre')?.value || '').trim();
+        datos.banco_cuenta = (contenedor.querySelector('#modal_agregar_banco_cuenta')?.value || '').trim();
+    }
+
+    if (opciones.mostrar_dueno) {
+        datos.dueno = (nivel === 'terminal') ? dueno : '';
+    }
+
+    if (opciones.mostrar_duenos_soporte) {
+        datos.duenos_asignados = (nivel === 'soporte') ? JSON.stringify(duenos_asignados) : '';
+    }
+
+    if (opciones.datos_extra) {
+        Object.assign(datos, opciones.datos_extra);
+    }
+
+    // Validaciones locales.
+    if (!datos.nombre_usuario) {
+        mostrar_aviso('El nombre de usuario es obligatorio', 'error');
+        return;
+    }
+    if (!datos.codigo_acceso && !datos.contrasena) {
+        mostrar_aviso('Debe asignar al menos un código de acceso o una contraseña', 'error');
+        return;
+    }
+    if (nivel === 'terminal') {
+        if (opciones.mostrar_dueno && !datos.dueno) {
+            mostrar_aviso('Debe seleccionar un dueño', 'error');
+            return;
+        }
+        if (opciones.mostrar_banco && (!datos.banco_nombre || !datos.banco_cuenta)) {
+            mostrar_aviso('Banco y cuenta son obligatorios para terminales', 'error');
+            return;
+        }
+    }
+
+    const respuesta = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(datos)
+    });
+    const resultado = await respuesta.json();
+    if (resultado.exito) {
+        if (resultado.codigo_asignado) {
+            alert("Código de acceso: " + resultado.codigo_asignado + "\n\nGuardalo, no se mostrará de nuevo.");
+        }
+        mostrar_aviso("Usuario creado correctamente", 'exito');
+        cerrar_modal_generico();
+        if (typeof opciones.al_guardar_exito === 'function') {
+            opciones.al_guardar_exito();
+        }
+    } else {
+        mostrar_aviso(resultado.error || "Error al crear usuario", 'error');
     }
 }
 

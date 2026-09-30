@@ -548,6 +548,9 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   `abrir_modal_editar_usuario_generico` (en `aplicacion.js`).
   `admin.js` y `terminales.js` ahora son solo wrappers que lo
   llaman con opciones distintas.
+- **v73g**: el alta de usuarios también pasa a modal, reutilizando
+  el mismo patrón. Los formularios embebidos en el HTML quedan sin
+  uso (se limpian en una próxima tanda).
 
 ---
 
@@ -822,8 +825,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73f (modal de
-edición de usuario reutilizable).
+**Última actualización de este prompt:** v1.5piloto.73g (alta de
+usuarios en modal, reutilizando el mismo patrón que la edición).
 
 **Estado de la conversación:**
 
