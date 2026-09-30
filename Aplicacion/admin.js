@@ -1,7 +1,7 @@
 /***
  * Funciones de administración de usuarios.
  * @since 1.5piloto.15
- * @version 1.5piloto.73h
+ * @version 1.5piloto.73j
  */
 
 async function cargar_datos_admin() {
@@ -9,8 +9,8 @@ async function cargar_datos_admin() {
 
     // Si es soporte, cargar el selector de dueños. El selector, al
     // inicializarse, ya trae la lista filtrada del primer dueño
-    // asignado y la renderiza. NO hay que volver a pedir todos los
-    // usuarios porque eso pisaría el filtro con la lista completa.
+    // asignado, la renderiza y dispara la carga de sesiones
+    // filtradas por ese dueño.
     if (es_soporte) {
         await _cargar_selector_dueno_admin();
     } else {
@@ -27,50 +27,68 @@ async function cargar_datos_admin() {
         if (datos_usuarios.exito) {
             _renderizar_tabla_usuarios(datos_usuarios.usuarios);
         }
-    }
 
-    // Cargar sesiones
-    const respuesta = await fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "administrador/listar_sesiones" })
-    });
-    const datos = await respuesta.json();
-    if (datos.exito) {
-        const cuerpo_tabla = $("#tabla_sesiones_admin");
-        cuerpo_tabla.innerHTML = "";
-        datos.sesiones.forEach(sesion => {
-            const fila = document.createElement("tr");
-            const es_sesion_actual = usuario_actual && usuario_actual.token_sesion === sesion.token;
-            fila.innerHTML = `
-                <td>${sesion.token}</td>
-                <td>${sesion.usuario}</td>
-                <td>${sesion.creado_en}</td>
-                <td>${es_sesion_actual ? '<span class="badge">Actual</span>' : '<button class="btn danger btn_cerrar_sesion" data-token="' + sesion.token + '">Salir</button>'}</td>
-            `;
-            cuerpo_tabla.appendChild(fila);
+        // El admin ve todas las sesiones del sistema.
+        const respuesta = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ accion: "administrador/listar_sesiones" })
         });
-        cuerpo_tabla.querySelectorAll('.btn_cerrar_sesion').forEach(boton => {
-            boton.addEventListener('click', async (evento) => {
-                evento.preventDefault();
-                const token = boton.dataset.token;
-                if (token) {
-                    const respuesta_cierre = await fetch("index.php", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                        body: new URLSearchParams({ accion: "sesiones/cerrar", token })
-                    });
-                    const datos_cierre = await respuesta_cierre.json();
-                    if (datos_cierre.exito) {
-                        mostrar_aviso("Sesión cerrada correctamente", 'exito');
-                        cargar_datos_admin();
-                    } else {
-                        mostrar_aviso(datos_cierre.error || "No se pudo cerrar la sesión", 'error');
-                    }
-                }
-            });
-        });
+        const datos = await respuesta.json();
+        if (datos.exito) {
+            _renderizar_tabla_sesiones(datos.sesiones);
+        }
     }
+}
+
+/**
+ * Renderiza la tabla de sesiones del panel admin.
+ *
+ * @param {Array} sesiones
+ */
+function _renderizar_tabla_sesiones(sesiones) {
+    const cuerpo_tabla = $("#tabla_sesiones_admin");
+    if (!cuerpo_tabla) return;
+    cuerpo_tabla.innerHTML = "";
+    sesiones.forEach(sesion => {
+        const fila = document.createElement("tr");
+        const es_sesion_actual = usuario_actual && usuario_actual.token_sesion === sesion.token;
+        fila.innerHTML = `
+            <td>${sesion.token}</td>
+            <td>${sesion.usuario}</td>
+            <td>${sesion.creado_en}</td>
+            <td>${es_sesion_actual ? '<span class="badge">Actual</span>' : '<button class="btn danger btn_cerrar_sesion" data-token="' + sesion.token + '">Salir</button>'}</td>
+        `;
+        cuerpo_tabla.appendChild(fila);
+    });
+    cuerpo_tabla.querySelectorAll('.btn_cerrar_sesion').forEach(boton => {
+        boton.addEventListener('click', async (evento) => {
+            evento.preventDefault();
+            const token = boton.dataset.token;
+            if (token) {
+                const respuesta_cierre = await fetch("index.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({ accion: "sesiones/cerrar", token })
+                });
+                const datos_cierre = await respuesta_cierre.json();
+                if (datos_cierre.exito) {
+                    mostrar_aviso("Sesión cerrada correctamente", 'exito');
+                    // Recargar solo la tabla según el nivel.
+                    if (usuario_actual && usuario_actual.nivel === 'soporte') {
+                        const select = document.getElementById('selector_dueno_admin');
+                        if (select && select.value) {
+                            _cargar_usuarios_filtrados_por_dueno(select.value);
+                        }
+                    } else {
+                        cargar_datos_admin();
+                    }
+                } else {
+                    mostrar_aviso(datos_cierre.error || "No se pudo cerrar la sesión", 'error');
+                }
+            }
+        });
+    });
 }
 
 async function obtener_datos_usuario(nombre_usuario) {
@@ -231,6 +249,19 @@ async function _cargar_usuarios_filtrados_por_dueno(nombre_dueno) {
         return false;
     });
     _renderizar_tabla_usuarios(visibles);
+
+    // Cargar las sesiones filtradas por ese dueño. El backend
+    // aplica el filtro del soporte: solo las sesiones del dueño,
+    // sus terminales, y la del propio soporte.
+    const respuesta_ses = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ accion: "administrador/listar_sesiones", nombre_dueno })
+    });
+    const datos_ses = await respuesta_ses.json();
+    if (datos_ses.exito) {
+        _renderizar_tabla_sesiones(datos_ses.sesiones);
+    }
 }
 
 /**

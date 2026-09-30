@@ -337,6 +337,11 @@ Enlaces: `usuario` (string), `creado_en` (timestamp Unix).
 - `listar_usuarios`, `listar_duenos`, `obtener_saldos_dueno`.
 - `agregar_usuario`, `actualizar_usuario`, `eliminar_usuario`.
 - `listar_terminales_de_dueno`, `actualizar_terminal`, `eliminar_terminal`.
+- `listar_soportes`, `listar_duenos_de_soporte`, `listar_usuarios_de_soporte`.
+- `listar_nombres_usuarios_para_soporte($nombre_soporte, $nombre_dueno_filtro = '')`.
+- `_verificar_permiso_dueno`, `_asignar_duenos_a_soporte`,
+  `_puede_cerrar_sesion`.
+- `obtener_perfil_usuario`.
 
 ### 5.4 `Aplicacion/Sesiones/Sesion.php`
 
@@ -559,6 +564,16 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   en el header para ver el perfil propio. Nuevo endpoint
   `usuarios/mi_perfil` (sin permisos especiales, devuelve los
   datos del solicitante). Solo lectura.
+- **v73j**: fix de permisos de sesiones.
+  `administrador/listar_sesiones` filtra para soportes (solo
+  sus dueños asignados, sus terminales, y él mismo). El filtro
+  se ajusta al dueño seleccionado en el selector del panel
+  admin. `dueno/listar_sesiones_terminales` ya no confía en la
+  lista de terminales del cliente: lee las terminales reales
+  del dueño y aplica chequeo de nivel (solo admin, soporte y
+  dueño). `sesiones/cerrar` valida que el solicitante tenga
+  permiso sobre la sesión (nuevo helper `_puede_cerrar_sesion`).
+  Nueva función `listar_nombres_usuarios_para_soporte`.
 
 ---
 
@@ -833,8 +848,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73i (modal
-"Mis datos" al tocar el nombre del usuario en el header).
+**Última actualización de este prompt:** v1.5piloto.73j (fix de
+permisos de sesiones: soporte filtrado por dueño, cierre validado).
 
 **Estado de la conversación:**
 
@@ -843,6 +858,8 @@ function _venta_en_curso() {
 - Dividimos el prompt de continuidad en framework y piloto en v71b.
 - Separamos host y credenciales a `config_servidor.php` en v72.
 - Agregamos el rol `soporte` en v73.
+- Cerramos en v73j el fix de permisos de sesiones (fuga de datos
+  entre roles y falta de validación al cerrar sesión ajena).
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -870,15 +887,6 @@ function _venta_en_curso() {
   quedó fuera de la implementación. No se agregó el chequeo
   `password_needs_rehash`. Se puede agregar en un bloque chico dentro
   de `_registrar_login_exitoso`.
-- **Bug de sesiones para el rol soporte** (detectado en v73h):
-  `cargar_datos_admin` llama a `administrador/listar_sesiones` sin
-  filtrar por solicitante. El backend devuelve TODAS las sesiones
-  del sistema, así que un soporte ve las sesiones de usuarios que
-  no son sus dueños. Fix pendiente: que `listar_sesiones`
-  (en `Sesion.php`) reciba el solicitante y, si es soporte, devuelva
-  solo las sesiones de sus dueños asignados y las terminales de
-  esos dueños. Se puede hacer en una sub-tanda aparte (toca solo
-  el backend de sesiones).
 - **Limpieza de migraciones**: hay varias tandas de migración que se
   pueden eliminar cuando se confirmen en los 3 entornos. Ver sección
   8.2.
@@ -909,8 +917,8 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.73. Todo funcional. Listo
-para arrancar la diversificación por tipo de aplicación.
+**Estado del proyecto al cierre:** v1.5piloto.73j. Todo funcional.
+Listo para arrancar la diversificación por tipo de aplicación.
 
 ---
 

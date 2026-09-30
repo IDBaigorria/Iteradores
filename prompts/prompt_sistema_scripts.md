@@ -321,11 +321,20 @@ Cuando te toque entregar cambios:
 
 ## CÓMO MENCIONAR LOS BUMPS DE VERSIÓN
 
+**Regla sin excepción: en CADA tanda se bumpean TODOS los archivos
+que se modifican, tanto en el `@version` interno como en el `?v=` del
+HTML.**
+
 - **Actualizá el `@version` de cada archivo modificado.**
-- **Actualizá los `?v=` en HTML.**
+- **Actualizá los `?v=` en HTML.** Si no tenés el HTML a mano,
+  pedilo ANTES de entregar el script. No entregues una tanda con
+  bumps incompletos.
 - **Nombrá la versión en el título del script.**
 - **No bumpees archivos que no cambian.**
 - **Los CSS no tienen `@version`.** Se bumpean solo desde el `?v=` del HTML.
+- **Antes de entregar, revisá el listado de cambios de la tanda.**
+  Cada archivo que aparece en `$cambios` tiene que estar bumpeado,
+  tanto adentro como en el HTML.
 
 ## COSAS QUE YA FALLARON (LECCIONES APRENDIDAS)
 
@@ -344,6 +353,19 @@ Cuando te toque entregar cambios:
 
 Antes de escribir el script, si necesitás ver archivos actualizados, pedilos
 explícitamente. **Nunca asumas que un archivo no cambió.**
+
+**Regla del entorno de trabajo:** durante la conversación, el usuario NO
+modifica archivos por su cuenta. Si te pasó un archivo al principio de
+la sesión, ese archivo está vigente hasta que él te diga lo contrario.
+Esto significa que:
+
+- **Las versiones de los archivos que tenés son siempre las últimas.**
+  No hace falta volver a pedirlas "por si acaso".
+- **Igual conviene pedir los archivos que vas a tocar si no los tenés
+  a mano.** Especialmente los HTML, porque los `?v=` viven ahí y son
+  fáciles de olvidar.
+- **Si el usuario cambia algo, te lo avisa.** Vos no tenés que
+  preguntar en cada tanda.
 
 ## CÓMO ESTRUCTURAR EL COMMIT SUGERIDO
 
@@ -442,10 +464,15 @@ se actualizan los tres prompts. Es poco común, pero pasa.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.72a. Se reforzó la
-regla: cada vez que se modifica código o se actualiza la forma de
-trabajo, se actualizan los prompts con el mismo `aplicar_cambios.php`.
-Se agregaron criterios sobre cuándo se actualiza cada prompt.
+**Última actualización de este prompt:** v1.5piloto.73j. Se agregaron
+dos reglas al método de trabajo:
+
+1. **Bumps obligatorios siempre.** En cada tanda se bumpean todos los
+   archivos modificados (tanto `@version` internos como `?v=` en HTML).
+   Si no se tiene el HTML a mano, se pide antes de entregar el script.
+2. **Vigencia de los archivos.** Durante la conversación el usuario no
+   modifica archivos por su cuenta. Las versiones que el asistente
+   tiene son siempre las últimas. Si el usuario cambia algo, lo avisa.
 
 **Estado:**
 

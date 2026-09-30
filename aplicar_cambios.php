@@ -1,11 +1,19 @@
 <?php
 /**
- * Aplicador de cambios automáticos — Administrador de Viajes.
+ * Aplicador de cambios automáticos — AdministradorDeViajes.
  *
- * v1.5piloto.73i: modal "Mis datos" al tocar el nombre del usuario.
+ * Tanda v73j-bis: bumps faltantes + reglas nuevas en el prompt del
+ * sistema de scripts.
+ *
+ * - aplicacion_GET.html: bump de admin.js y terminales.js a 73j.
+ * - prompts/prompt_sistema_scripts.md: reglas sobre bumps obligatorios
+ *   y vigencia de archivos durante la conversación.
  *
  * Uso:
  *   php aplicar_cambios.php
+ *
+ * Si PHP no está en el PATH del sistema:
+ *   C:\xampp\php\php.exe aplicar_cambios.php
  */
 
 // ============================================================
@@ -21,378 +29,126 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
 
-    // ==========================================================
-    // Usuario.php — bump y nueva función obtener_perfil_usuario
-    // ==========================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-        'descripcion' => 'Usuario.php: bump de version',
-        'buscar' => [
-            ' * @version   1.5piloto.73b',
-        ],
-        'reemplazar' => [
-            ' * @version   1.5piloto.73i',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-        'descripcion' => 'Usuario.php: agregar obtener_perfil_usuario al final',
-        'buscar' => [
-            '    return eliminar_usuario($nombre_usuario);',
-            '}',
-        ],
-        'reemplazar' => [
-            '    return eliminar_usuario($nombre_usuario);',
-            '}',
-            '',
-            '/**',
-            ' * Devuelve los datos del propio usuario (perfil).',
-            ' *',
-            ' * Reutiliza `_formatear_usuario_para_admin` para no duplicar la',
-            ' * lógica de armado. Solo lee, no modifica nada. Sirve para que',
-            ' * cualquier rol vea sus propios datos sin necesitar permisos',
-            ' * de administrador.',
-            ' *',
-            ' * @param string $nombre_usuario Nombre del usuario.',
-            ' * @return array|null Datos del perfil, o null si no existe.',
-            ' */',
-            'function obtener_perfil_usuario(string $nombre_usuario): ?array {',
-            '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz) return null;',
-            '    $nodo_usuario = $raiz->adyacente($nombre_usuario);',
-            '    if (!$nodo_usuario) return null;',
-            '',
-            '    // Mapa de usuarios con código (desde credenciales).',
-            '    $con_codigo = en_grafo_credenciales(function() {',
-            '        $raiz_cred = Nodo::nodo_por_id(\'usuarios\');',
-            '        if (!$raiz_cred) return [];',
-            '        $mapa = [];',
-            '        foreach ($raiz_cred->adyacentes() as $nombre => $nodo) {',
-            '            $mapa[(string)$nombre] = $nodo->adyacente(\'codigo_hash\') ? true : false;',
-            '        }',
-            '        return $mapa;',
-            '    });',
-            '',
-            '    return _formatear_usuario_para_admin($nombre_usuario, $nodo_usuario, $con_codigo);',
-            '}',
-        ],
-    ],
-
-    // ==========================================================
-    // Enrutador.php — bump y nuevo módulo usuarios/mi_perfil
-    // ==========================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Enrutador.php',
-        'descripcion' => 'Enrutador.php: bump de version',
-        'buscar' => [
-            ' * @version   1.5piloto.73',
-        ],
-        'reemplazar' => [
-            ' * @version   1.5piloto.73i',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Enrutador.php',
-        'descripcion' => 'Enrutador.php: modulo usuarios/mi_perfil',
-        'buscar' => [
-            '                default:',
-            '                    responder_json([\'exito\' => false, \'error\' => \'Subacción de cancelaciones no válida\']);',
-            '            }',
-            '            break;',
-            '',
-            '        default:',
-            '            responder_json([\'exito\' => false, \'error\' => \'Módulo no reconocido\']);',
-            '    }',
-            '}',
-        ],
-        'reemplazar' => [
-            '                default:',
-            '                    responder_json([\'exito\' => false, \'error\' => \'Subacción de cancelaciones no válida\']);',
-            '            }',
-            '            break;',
-            '',
-            '        case \'usuarios\':',
-            '            switch ($subaccion) {',
-            '                case \'mi_perfil\':',
-            '                    if ($nombre_solicitante === \'\') {',
-            '                        responder_json([\'exito\' => false, \'error\' => \'Sin sesión activa\']);',
-            '                    }',
-            '                    $perfil = obtener_perfil_usuario($nombre_solicitante);',
-            '                    if ($perfil) {',
-            '                        responder_json([\'exito\' => true, \'perfil\' => $perfil]);',
-            '                    } else {',
-            '                        responder_json([\'exito\' => false, \'error\' => \'Usuario no encontrado\']);',
-            '                    }',
-            '                    break;',
-            '',
-            '                default:',
-            '                    responder_json([\'exito\' => false, \'error\' => \'Subacción de usuarios no válida\']);',
-            '            }',
-            '            break;',
-            '',
-            '        default:',
-            '            responder_json([\'exito\' => false, \'error\' => \'Módulo no reconocido\']);',
-            '    }',
-            '}',
-        ],
-    ],
-
-    // ==========================================================
-    // aplicacion.js — bump, listener y funciones del modal
-    // ==========================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion.js',
-        'descripcion' => 'aplicacion.js: bump de version',
-        'buscar' => [
-            ' * @version 1.5piloto.73h',
-        ],
-        'reemplazar' => [
-            ' * @version 1.5piloto.73i',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion.js',
-        'descripcion' => 'aplicacion.js: listener del nombre del usuario',
-        'buscar' => [
-            '$("#boton_salir").addEventListener("click", salir);',
-        ],
-        'reemplazar' => [
-            '$("#boton_salir").addEventListener("click", salir);',
-            '',
-            '// Click en el nombre de usuario: abre el modal "Mis datos".',
-            '$("#nombre_usuario_actual")?.addEventListener("click", abrir_modal_mi_perfil);',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion.js',
-        'descripcion' => 'aplicacion.js: funciones del modal Mi datos',
-        'buscar' => [
-            '    } else {',
-            '        mostrar_aviso(resultado.error || "Error al crear usuario", \'error\');',
-            '    }',
-            '}',
-        ],
-        'reemplazar' => [
-            '    } else {',
-            '        mostrar_aviso(resultado.error || "Error al crear usuario", \'error\');',
-            '    }',
-            '}',
-            '',
-            '// ============================================================',
-            '// ====== MODAL "MIS DATOS" ===================================',
-            '// ============================================================',
-            '',
-            '/**',
-            ' * Abre el modal con los datos del usuario actual. Lo puede usar',
-            ' * cualquier rol. Solo lectura.',
-            ' */',
-            'function abrir_modal_mi_perfil() {',
-            '    fetch("index.php", {',
-            '        method: "POST",',
-            '        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
-            '        body: new URLSearchParams({ accion: "usuarios/mi_perfil" })',
-            '    })',
-            '    .then(r => r.json())',
-            '    .then(datos => {',
-            '        if (!datos.exito) {',
-            '            mostrar_aviso(datos.error || "No se pudo cargar el perfil", \'error\');',
-            '            return;',
-            '        }',
-            '        _renderizar_modal_mi_perfil(datos.perfil);',
-            '    })',
-            '    .catch(e => {',
-            '        console.error("Error al cargar mi perfil:", e);',
-            '        mostrar_aviso("Error de comunicación", \'error\');',
-            '    });',
-            '}',
-            '',
-            '/**',
-            ' * Arma y muestra el HTML del modal "Mis datos" a partir del',
-            ' * perfil recibido del backend.',
-            ' *',
-            ' * @param {object} p Datos del perfil.',
-            ' */',
-            'function _renderizar_modal_mi_perfil(p) {',
-            '    const filas = [];',
-            '    filas.push([\'Usuario\', p.nombre_usuario || \'—\']);',
-            '    filas.push([\'Nivel\', p.nivel || \'—\']);',
-            '    if (p.nombre_real) filas.push([\'Nombre real\', p.nombre_real]);',
-            '    if (p.email) filas.push([\'Email\', p.email]);',
-            '    filas.push([\'Código de acceso\', p.codigo_asignado ? \'Asignado\' : \'—\']);',
-            '    filas.push([\'Efectivo\', \'$\' + (p.efectivo || \'0\')]);',
-            '    filas.push([\'Bancarizado\', \'$\' + (p.bancarizado || \'0\')]);',
-            '    if (p.banco && p.banco.nombre) filas.push([\'Banco\', p.banco.nombre]);',
-            '    if (p.banco && p.banco.cuenta) filas.push([\'Cuenta bancaria\', p.banco.cuenta]);',
-            '    if (p.nivel === \'terminal\' && p.dueno) filas.push([\'Dueño\', p.dueno]);',
-            '    if (p.nivel === \'soporte\' && Array.isArray(p.duenos)) {',
-            '        filas.push([\'Dueños asignados\', p.duenos.length > 0 ? p.duenos.join(\', \') : \'—\']);',
-            '    }',
-            '',
-            '    const filas_html = filas.map(f => `<tr><th>${f[0]}</th><td>${f[1]}</td></tr>`).join(\'\');',
-            '',
-            '    const html = `',
-            '        <table class="perfil-tabla">',
-            '            <tbody>',
-            '                ${filas_html}',
-            '            </tbody>',
-            '        </table>',
-            '        <div class="actions" style="margin-top:15px">',
-            '            <button class="btn" id="perfil_cerrar_btn">Cerrar</button>',
-            '        </div>',
-            '    `;',
-            '',
-            '    abrir_modal_generico(\'Mis datos\', html);',
-            '',
-            '    document.getElementById(\'perfil_cerrar_btn\')?.addEventListener(\'click\', cerrar_modal_generico);',
-            '}',
-        ],
-    ],
-
-    // ==========================================================
-    // estilos.css — estilos para el nombre y la tabla del modal
-    // ==========================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'estilos.css',
-        'descripcion' => 'estilos.css: nombre clickeable y tabla de perfil',
-        'buscar' => [
-            '/* Header del modal genérico: botón Volver + título a la izquierda, X a la derecha */',
-            '.modal-header-izquierda {',
-            '    display: flex;',
-            '    align-items: center;',
-            '    gap: 12px;',
-            '    min-width: 0;',
-            '}',
-            '',
-            '.modal-header-izquierda h3 {',
-            '    margin: 0;',
-            '}',
-        ],
-        'reemplazar' => [
-            '/* Header del modal genérico: botón Volver + título a la izquierda, X a la derecha */',
-            '.modal-header-izquierda {',
-            '    display: flex;',
-            '    align-items: center;',
-            '    gap: 12px;',
-            '    min-width: 0;',
-            '}',
-            '',
-            '.modal-header-izquierda h3 {',
-            '    margin: 0;',
-            '}',
-            '',
-            '/* Nombre de usuario en el header: clickeable para ver "Mis datos". */',
-            '#nombre_usuario_actual {',
-            '    cursor: pointer;',
-            '    text-decoration: underline dotted;',
-            '    text-underline-offset: 3px;',
-            '    transition: color var(--transition);',
-            '}',
-            '#nombre_usuario_actual:hover { color: var(--primary); }',
-            '',
-            '/* Tabla del modal "Mis datos". */',
-            '.perfil-tabla {',
-            '    width: 100%;',
-            '    border-collapse: collapse;',
-            '}',
-            '.perfil-tabla th,',
-            '.perfil-tabla td {',
-            '    padding: 10px 12px;',
-            '    text-align: left;',
-            '    border-bottom: 1px solid var(--border);',
-            '    vertical-align: top;',
-            '}',
-            '.perfil-tabla th {',
-            '    font-weight: 700;',
-            '    color: var(--primary-dark);',
-            '    width: 180px;',
-            '    white-space: nowrap;',
-            '}',
-            '.perfil-tabla tr:last-child th,',
-            '.perfil-tabla tr:last-child td { border-bottom: 0; }',
-        ],
-    ],
-
-    // ==========================================================
-    // aplicacion_GET.html — bumps de version
-    // ==========================================================
+    // ============================================================
+    // aplicacion_GET.html
+    // ============================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'HTML: bump de estilos.css',
+        'descripcion' => 'Bump de admin.js a 1.5piloto.73j',
         'buscar' => [
-            '<link rel="stylesheet" href="estilos.css?v=1.5piloto.65">',
+            '<script src="Aplicacion/admin.js?v=1.5piloto.73h"></script>',
         ],
         'reemplazar' => [
-            '<link rel="stylesheet" href="estilos.css?v=1.5piloto.73i">',
+            '<script src="Aplicacion/admin.js?v=1.5piloto.73j"></script>',
         ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'HTML: bump de aplicacion.js',
+        'descripcion' => 'Bump de terminales.js a 1.5piloto.73j',
         'buscar' => [
-            '<script src="aplicacion.js?v=1.5piloto.73h"></script>',
+            '<script src="Aplicacion/terminales.js?v=1.5piloto.73g"></script>',
         ],
         'reemplazar' => [
-            '<script src="aplicacion.js?v=1.5piloto.73i"></script>',
+            '<script src="Aplicacion/terminales.js?v=1.5piloto.73j"></script>',
         ],
     ],
 
-    // ==========================================================
-    // prompts/prompt_piloto.md — bump y nota
-    // ==========================================================
+    // ============================================================
+    // prompts/prompt_sistema_scripts.md
+    // ============================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt_piloto: bump discusion actual',
+        'archivo' => 'prompts/prompt_sistema_scripts.md',
+        'descripcion' => 'Reforzar seccion de bumps obligatorios',
         'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.73h (limpieza',
-            'de contenido dinámico al cambiar de sesión).',
+            '## CÓMO MENCIONAR LOS BUMPS DE VERSIÓN',
+            '',
+            '- **Actualizá el `@version` de cada archivo modificado.**',
+            '- **Actualizá los `?v=` en HTML.**',
+            '- **Nombrá la versión en el título del script.**',
+            '- **No bumpees archivos que no cambian.**',
+            '- **Los CSS no tienen `@version`.** Se bumpean solo desde el `?v=` del HTML.',
         ],
         'reemplazar' => [
-            '**Última actualización de este prompt:** v1.5piloto.73i (modal',
-            '"Mis datos" al tocar el nombre del usuario en el header).',
+            '## CÓMO MENCIONAR LOS BUMPS DE VERSIÓN',
+            '',
+            '**Regla sin excepción: en CADA tanda se bumpean TODOS los archivos',
+            'que se modifican, tanto en el `@version` interno como en el `?v=` del',
+            'HTML.**',
+            '',
+            '- **Actualizá el `@version` de cada archivo modificado.**',
+            '- **Actualizá los `?v=` en HTML.** Si no tenés el HTML a mano,',
+            '  pedilo ANTES de entregar el script. No entregues una tanda con',
+            '  bumps incompletos.',
+            '- **Nombrá la versión en el título del script.**',
+            '- **No bumpees archivos que no cambian.**',
+            '- **Los CSS no tienen `@version`.** Se bumpean solo desde el `?v=` del HTML.',
+            '- **Antes de entregar, revisá el listado de cambios de la tanda.**',
+            '  Cada archivo que aparece en `$cambios` tiene que estar bumpeado,',
+            '  tanto adentro como en el HTML.',
         ],
     ],
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt_piloto: agregar v73i al historial',
+        'archivo' => 'prompts/prompt_sistema_scripts.md',
+        'descripcion' => 'Agregar regla sobre vigencia de archivos',
         'buscar' => [
-            '- **v73h**: fix de fuga de datos al cambiar de sesión. Se limpia',
-            '  todo el contenido dinámico al salir y al ingresar. Además, el',
-            '  soporte ya no recibe la lista completa de usuarios: la tabla se',
-            '  llena solo con lo que dejó el selector de dueños.',
+            '## CÓMO MENCIONAR LO QUE HACE FALTA DE PARTE DEL USUARIO',
+            '',
+            'Antes de escribir el script, si necesitás ver archivos actualizados, pedilos',
+            'explícitamente. **Nunca asumas que un archivo no cambió.**',
         ],
         'reemplazar' => [
-            '- **v73h**: fix de fuga de datos al cambiar de sesión. Se limpia',
-            '  todo el contenido dinámico al salir y al ingresar. Además, el',
-            '  soporte ya no recibe la lista completa de usuarios: la tabla se',
-            '  llena solo con lo que dejó el selector de dueños.',
-            '- **v73i**: modal "Mis datos". Se puede tocar el nombre del usuario',
-            '  en el header para ver el perfil propio. Nuevo endpoint',
-            '  `usuarios/mi_perfil` (sin permisos especiales, devuelve los',
-            '  datos del solicitante). Solo lectura.',
+            '## CÓMO MENCIONAR LO QUE HACE FALTA DE PARTE DEL USUARIO',
+            '',
+            'Antes de escribir el script, si necesitás ver archivos actualizados, pedilos',
+            'explícitamente. **Nunca asumas que un archivo no cambió.**',
+            '',
+            '**Regla del entorno de trabajo:** durante la conversación, el usuario NO',
+            'modifica archivos por su cuenta. Si te pasó un archivo al principio de',
+            'la sesión, ese archivo está vigente hasta que él te diga lo contrario.',
+            'Esto significa que:',
+            '',
+            '- **Las versiones de los archivos que tenés son siempre las últimas.**',
+            '  No hace falta volver a pedirlas "por si acaso".',
+            '- **Igual conviene pedir los archivos que vas a tocar si no los tenés',
+            '  a mano.** Especialmente los HTML, porque los `?v=` viven ahí y son',
+            '  fáciles de olvidar.',
+            '- **Si el usuario cambia algo, te lo avisa.** Vos no tenés que',
+            '  preguntar en cada tanda.',
+        ],
+    ],
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_sistema_scripts.md',
+        'descripcion' => 'Actualizar Discusion actual del prompt de scripts',
+        'buscar' => [
+            '## DISCUSIÓN ACTUAL',
+            '',
+            '**Última actualización de este prompt:** v1.5piloto.72a. Se reforzó la',
+            'regla: cada vez que se modifica código o se actualiza la forma de',
+            'trabajo, se actualizan los prompts con el mismo `aplicar_cambios.php`.',
+            'Se agregaron criterios sobre cuándo se actualiza cada prompt.',
+        ],
+        'reemplazar' => [
+            '## DISCUSIÓN ACTUAL',
+            '',
+            '**Última actualización de este prompt:** v1.5piloto.73j. Se agregaron',
+            'dos reglas al método de trabajo:',
+            '',
+            '1. **Bumps obligatorios siempre.** En cada tanda se bumpean todos los',
+            '   archivos modificados (tanto `@version` internos como `?v=` en HTML).',
+            '   Si no se tiene el HTML a mano, se pide antes de entregar el script.',
+            '2. **Vigencia de los archivos.** Durante la conversación el usuario no',
+            '   modifica archivos por su cuenta. Las versiones que el asistente',
+            '   tiene son siempre las últimas. Si el usuario cambia algo, lo avisa.',
         ],
     ],
 
@@ -402,7 +158,7 @@ $cambios = [
 // Runner
 // ============================================================
 
-echo "=== Aplicador de cambios (modal Mis datos) ===\n\n";
+echo "=== Aplicador de cambios ===\n\n";
 
 function detectar_eol(string $contenido): string {
     return (strpos($contenido, "\r\n") !== false) ? "\r\n" : "\n";
@@ -468,17 +224,14 @@ foreach ($reemplazos_por_archivo as $archivo_rel => $lista_cambios) {
         $buscar_str = implode("\n", $cambio['buscar']);
         $reemplazar_str = implode("\n", $cambio['reemplazar']);
         $ocurrencias = contar_ocurrencias($contenido, $buscar_str);
-        $permitir_multiples = !empty($cambio['permitir_multiples']);
-
         if ($ocurrencias === 0) {
             $bloques_fallidos[] = "$archivo_rel: bloque no encontrado - {$cambio['descripcion']}";
             $hubo_error = true; continue;
         }
-        if ($ocurrencias > 1 && !$permitir_multiples) {
+        if ($ocurrencias > 1) {
             $bloques_fallidos[] = "$archivo_rel: bloque ambiguo ($ocurrencias ocurrencias) - {$cambio['descripcion']}";
             $hubo_error = true; continue;
         }
-
         $contenido = str_replace($buscar_str, $reemplazar_str, $contenido);
         $bloques_ok++;
     }

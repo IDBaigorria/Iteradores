@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.73i
+ * @version   1.5piloto.73j
  */
 
 use Iteradores\Nodos\Nodo;
@@ -285,6 +285,49 @@ function listar_usuarios_de_soporte(string $nombre_soporte): array {
 }
 
 /**
+ * Devuelve los nombres de usuario que un soporte puede ver en la
+ * lista de sesiones: él mismo, sus dueños asignados y las terminales
+ * de esos dueños. Si se pasa un dueño específico, filtra a ese dueño
+ * y sus terminales (manteniendo siempre al propio soporte en la lista).
+ *
+ * @param string $nombre_soporte Nombre del soporte.
+ * @param string $nombre_dueno_filtro Dueño a filtrar (opcional).
+ * @return array Lista de nombres de usuario.
+ */
+function listar_nombres_usuarios_para_soporte(string $nombre_soporte, string $nombre_dueno_filtro = ''): array {
+    $nombres = [];
+    if ($nombre_soporte === '') return $nombres;
+
+    // Siempre se incluye a sí mismo.
+    $nombres[$nombre_soporte] = true;
+
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return array_keys($nombres);
+    $nodo_soporte = $raiz->adyacente($nombre_soporte);
+    if (!$nodo_soporte) return array_keys($nombres);
+
+    $nodo_duenos = $nodo_soporte->adyacente('duenos');
+    if (!$nodo_duenos) return array_keys($nombres);
+
+    $filtro = (string)$nombre_dueno_filtro;
+
+    foreach ($nodo_duenos->adyacentes() as $nombre_d => $nodo_d) {
+        $nombre_d = (string)$nombre_d;
+        if ($filtro !== '' && $nombre_d !== $filtro) continue;
+        $nombres[$nombre_d] = true;
+
+        $nodo_terms = $nodo_d->adyacente('terminales');
+        if ($nodo_terms) {
+            foreach ($nodo_terms->adyacentes() as $nombre_t => $nodo_t) {
+                $nombres[(string)$nombre_t] = true;
+            }
+        }
+    }
+
+    return array_keys($nombres);
+}
+
+/**
  * Formatea un nodo usuario para el listado del panel admin.
  *
  * @param string $nombre_usuario Nombre de usuario.
@@ -390,6 +433,70 @@ function _verificar_permiso_dueno(string $nombre_solicitante, string $nombre_due
     if ($nivel === 'terminal') {
         $nodo_dueno = $nodo_sol->adyacente('dueno');
         return $nodo_dueno && $nodo_dueno->dato() === $nombre_dueno;
+    }
+
+    return false;
+}
+
+/**
+ * Determina si un solicitante puede cerrar una sesión ajena.
+ *
+ * Reglas:
+ * - Admin: siempre.
+ * - Cualquier usuario: su propia sesión.
+ * - Soporte: las sesiones de sus dueños asignados y sus terminales.
+ * - Dueño: las sesiones de sus propias terminales.
+ *
+ * @param string $nombre_solicitante Nombre del usuario que solicita.
+ * @param string $token Token de la sesión a cerrar.
+ * @return bool
+ */
+function _puede_cerrar_sesion(string $nombre_solicitante, string $token): bool {
+    if ($nombre_solicitante === '') return false;
+    if ($nombre_solicitante === Conf::NOMBRE_ADMIN) return true;
+
+    // Leer el usuario de la sesión desde credenciales.
+    $usuario_de_sesion = en_grafo_credenciales(function() use ($token) {
+        $raiz = Nodo::nodo_por_id('sesiones');
+        if (!$raiz) return null;
+        $nodo_sesion = $raiz->adyacente($token);
+        if (!$nodo_sesion) return null;
+        $nodo_usuario = $nodo_sesion->adyacente('usuario');
+        return $nodo_usuario ? $nodo_usuario->dato() : null;
+    });
+
+    if ($usuario_de_sesion === null) return false;
+
+    // Es su propia sesión.
+    if ($usuario_de_sesion === $nombre_solicitante) return true;
+
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return false;
+    $nodo_sol = $raiz->adyacente($nombre_solicitante);
+    if (!$nodo_sol) return false;
+    $nodo_nivel = $nodo_sol->adyacente('nivel');
+    $nivel = $nodo_nivel ? $nodo_nivel->dato() : '';
+
+    if ($nivel === 'soporte') {
+        $nodo_duenos = $nodo_sol->adyacente('duenos');
+        if ($nodo_duenos) {
+            if ($nodo_duenos->adyacente($usuario_de_sesion)) return true;
+            foreach ($nodo_duenos->adyacentes() as $nombre_d => $nodo_d) {
+                $nodo_terms = $nodo_d->adyacente('terminales');
+                if ($nodo_terms && $nodo_terms->adyacente($usuario_de_sesion)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    if ($nivel === 'dueno') {
+        $nodo_terms = $nodo_sol->adyacente('terminales');
+        if ($nodo_terms && $nodo_terms->adyacente($usuario_de_sesion)) {
+            return true;
+        }
+        return false;
     }
 
     return false;

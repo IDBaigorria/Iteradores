@@ -1,6 +1,6 @@
 /***
  * Funciones de puntos de venta (dueño).
- * @version 1.5piloto.73g
+ * @version 1.5piloto.73j
  */
 
 async function cargar_datos_terminales() {
@@ -47,11 +47,13 @@ async function cargar_datos_terminales() {
         boton.addEventListener('click', () => eliminar_terminal_confirmado(boton.dataset.usuario));
     });
 
-    const nombres_terminales = terminales.map(t => t.nombre_usuario);
+    // El backend lee las terminales reales del dueño desde el grafo.
+    // El cliente solo manda `nombre_dueno`; el solicitante va agregado
+    // por el interceptor de fetch.
     respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "dueno/listar_sesiones_terminales", terminales: JSON.stringify(nombres_terminales) })
+        body: new URLSearchParams({ accion: "dueno/listar_sesiones_terminales", nombre_dueno: usuario_actual.nombre_usuario })
     });
     datos = await respuesta.json();
     if (datos.exito) {

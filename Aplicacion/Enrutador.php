@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.73i
+ * @version   1.5piloto.73j
  */
 
 use Iteradores\Nodos\Nodo;
@@ -110,7 +110,13 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     break;
 
                 case 'listar_sesiones':
-                    responder_json(['exito' => true, 'sesiones' => listar_sesiones()]);
+                    if ($nivel_sol === 'soporte') {
+                        $nombre_dueno_filtro = $post['nombre_dueno'] ?? '';
+                        $nombres = listar_nombres_usuarios_para_soporte($nombre_sol_admin, $nombre_dueno_filtro);
+                        responder_json(['exito' => true, 'sesiones' => listar_sesiones_de_usuarios($nombres)]);
+                    } else {
+                        responder_json(['exito' => true, 'sesiones' => listar_sesiones()]);
+                    }
                     break;
 
                 case 'agregar_usuario':
@@ -201,9 +207,25 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     break;
 
                 case 'listar_sesiones_terminales':
-                    $terminales = json_decode($post['terminales'] ?? '[]', true);
-                    if (!is_array($terminales)) $terminales = [];
-                    $sesiones = listar_sesiones_de_usuarios($terminales);
+                    // Chequeo de nivel: solo admin, soporte y dueño.
+                    $nombre_sol_dueno = $post['nombre_solicitante'] ?? '';
+                    $raiz_sol_dueno = Nodo::nodo_por_id('usuarios');
+                    $nodo_sol_dueno = ($raiz_sol_dueno && $nombre_sol_dueno !== '') ? $raiz_sol_dueno->adyacente($nombre_sol_dueno) : null;
+                    $nodo_nivel_dueno = $nodo_sol_dueno ? $nodo_sol_dueno->adyacente('nivel') : null;
+                    $nivel_sol_dueno = $nodo_nivel_dueno ? $nodo_nivel_dueno->dato() : '';
+                    if (!in_array($nivel_sol_dueno, ['admin', 'soporte', 'dueno'], true)) {
+                        responder_json(['exito' => false, 'error' => 'Permiso denegado']);
+                    }
+
+                    // No se confía en la lista de terminales del cliente:
+                    // se leen las terminales reales del dueño.
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $terminales_datos = listar_terminales_de_dueno($nombre_dueno);
+                    $nombres_terminales = array_map(function($t) { return (string)$t['nombre_usuario']; }, $terminales_datos);
+                    $sesiones = listar_sesiones_de_usuarios($nombres_terminales);
                     responder_json(['exito' => true, 'sesiones' => $sesiones]);
                     break;
 
@@ -215,7 +237,14 @@ function enrutar_peticion_post(string $accion, array $post): void {
         case 'sesiones':
             if ($subaccion === 'cerrar') {
                 $token = $post['token'] ?? '';
-                if ($token && cerrar_sesion($token)) {
+                if (empty($token)) {
+                    responder_json(['exito' => false, 'error' => 'Token no válido']);
+                }
+                $nombre_solicitante_cerrar = $post['nombre_solicitante'] ?? '';
+                if (!_puede_cerrar_sesion($nombre_solicitante_cerrar, $token)) {
+                    responder_json(['exito' => false, 'error' => 'Permiso denegado']);
+                }
+                if (cerrar_sesion($token)) {
                     responder_json(['exito' => true]);
                 } else {
                     responder_json(['exito' => false, 'error' => 'Token no válido']);
