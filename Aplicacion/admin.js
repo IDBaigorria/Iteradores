@@ -1,39 +1,41 @@
 /***
  * Funciones de administración de usuarios.
  * @since 1.5piloto.15
- * @version 1.5piloto.73g
+ * @version 1.5piloto.73h
  */
 
 async function cargar_datos_admin() {
     const es_soporte = usuario_actual && usuario_actual.nivel === 'soporte';
 
-    // Si es soporte, cargar el selector de dueños.
+    // Si es soporte, cargar el selector de dueños. El selector, al
+    // inicializarse, ya trae la lista filtrada del primer dueño
+    // asignado y la renderiza. NO hay que volver a pedir todos los
+    // usuarios porque eso pisaría el filtro con la lista completa.
     if (es_soporte) {
         await _cargar_selector_dueno_admin();
     } else {
-        // Si es admin, ocultar el selector.
+        // Si es admin, ocultar el selector y cargar todos los usuarios.
         const panel_sel = document.getElementById('panel_selector_dueno_admin');
         if (panel_sel) panel_sel.style.display = 'none';
-    }
 
-    // Cargar usuarios
-    let respuesta = await fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "administrador/listar_usuarios" })
-    });
-    let datos = await respuesta.json();
-    if (datos.exito) {
-        _renderizar_tabla_usuarios(datos.usuarios);
+        const respuesta_usuarios = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ accion: "administrador/listar_usuarios" })
+        });
+        const datos_usuarios = await respuesta_usuarios.json();
+        if (datos_usuarios.exito) {
+            _renderizar_tabla_usuarios(datos_usuarios.usuarios);
+        }
     }
 
     // Cargar sesiones
-    respuesta = await fetch("index.php", {
+    const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ accion: "administrador/listar_sesiones" })
     });
-    datos = await respuesta.json();
+    const datos = await respuesta.json();
     if (datos.exito) {
         const cuerpo_tabla = $("#tabla_sesiones_admin");
         cuerpo_tabla.innerHTML = "";

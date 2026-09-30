@@ -551,6 +551,10 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 - **v73g**: el alta de usuarios también pasa a modal, reutilizando
   el mismo patrón. Los formularios embebidos en el HTML quedan sin
   uso (se limpian en una próxima tanda).
+- **v73h**: fix de fuga de datos al cambiar de sesión. Se limpia
+  todo el contenido dinámico al salir y al ingresar. Además, el
+  soporte ya no recibe la lista completa de usuarios: la tabla se
+  llena solo con lo que dejó el selector de dueños.
 
 ---
 
@@ -825,8 +829,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73g (alta de
-usuarios en modal, reutilizando el mismo patrón que la edición).
+**Última actualización de este prompt:** v1.5piloto.73h (limpieza
+de contenido dinámico al cambiar de sesión).
 
 **Estado de la conversación:**
 
@@ -862,6 +866,15 @@ usuarios en modal, reutilizando el mismo patrón que la edición).
   quedó fuera de la implementación. No se agregó el chequeo
   `password_needs_rehash`. Se puede agregar en un bloque chico dentro
   de `_registrar_login_exitoso`.
+- **Bug de sesiones para el rol soporte** (detectado en v73h):
+  `cargar_datos_admin` llama a `administrador/listar_sesiones` sin
+  filtrar por solicitante. El backend devuelve TODAS las sesiones
+  del sistema, así que un soporte ve las sesiones de usuarios que
+  no son sus dueños. Fix pendiente: que `listar_sesiones`
+  (en `Sesion.php`) reciba el solicitante y, si es soporte, devuelva
+  solo las sesiones de sus dueños asignados y las terminales de
+  esos dueños. Se puede hacer en una sub-tanda aparte (toca solo
+  el backend de sesiones).
 - **Limpieza de migraciones**: hay varias tandas de migración que se
   pueden eliminar cuando se confirmen en los 3 entornos. Ver sección
   8.2.

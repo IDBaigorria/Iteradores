@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.73g
+ * @version 1.5piloto.73h
  */
 
 // Utilidades
@@ -222,6 +222,11 @@ async function ingresar_con_usuario() {
  * Se usa tanto en login por código como por usuario.
  */
 function _aplicar_login_exitoso(usuario) {
+    // Limpieza defensiva: si quedó contenido del usuario anterior
+    // (por ejemplo, al cambiar de sesión sin recargar la página),
+    // se borra antes de configurar la nueva UI.
+    _limpiar_contenido_dinamico();
+
     usuario_actual = usuario;
     localStorage.setItem('token_sesion', usuario.token_sesion);
     localStorage.setItem('usuario_actual', JSON.stringify(usuario));
@@ -266,6 +271,11 @@ async function salir() {
     localStorage.removeItem('token_sesion');
     localStorage.removeItem('usuario_actual');
     usuario_actual = null;
+
+    // Borrar todo el contenido dinámico para no exponer datos del
+    // usuario que se acaba de ir.
+    _limpiar_contenido_dinamico();
+
     $("#aplicacion").classList.add("hidden");
     $("#pantalla_login").classList.remove("hidden");
     $("#codigo_acceso").value = "";
@@ -486,6 +496,82 @@ document.getElementById('cerrar_modal_apilado')?.addEventListener('click', cerra
 document.getElementById('modal_apilado')?.addEventListener('click', function(e) {
     if (e.target === this) cerrar_modal_apilado();
 });
+
+// ============================================================
+// ====== LIMPIEZA DE CONTENIDO DINAMICO ======================
+// ============================================================
+
+/**
+ * Limpia todo el contenido dinámico (tablas, listas, selectores)
+ * que se llenó en la sesión anterior. Se llama al salir y al
+ * ingresar, para no exponer datos de un rol a otro cuando cambia
+ * el usuario logueado.
+ *
+ * No toca el HTML estático (headers de secciones, botones, etc.),
+ * solo los contenedores que se llenan desde el backend.
+ */
+function _limpiar_contenido_dinamico() {
+    const ids_a_limpiar = [
+        // Administrador
+        'tabla_usuarios_admin',
+        'tabla_sesiones_admin',
+        'selector_dueno_admin',
+        // Puntos de venta
+        'tabla_terminales_dueno',
+        'tabla_sesiones_terminales',
+        // Empresas / Micros
+        'selector_dueno_micros',
+        'selector_empresa_micros',
+        'selector_vehiculo_micros',
+        'lista_micros_viaje',
+        'lista_terminales_viaje',
+        // Viajes
+        'selector_dueno_viajes',
+        'lista_viajes',
+        // Vendidos
+        'selector_dueno_vendidos',
+        'lista_ventas',
+        'saldos_vendidos',
+        'chips_filtros_activos_vendidos',
+        'contador_ventas_vendidos',
+        'selector_viaje_vendido',
+        'filtro_vendedor',
+        // Rendiciones
+        'selector_dueno_rendiciones',
+        'rendicion_filtro_terminal',
+        'tabla_rendiciones_container',
+        'resumen_rendiciones',
+        'chips_filtros_activos_rendiciones',
+        'aviso_rendiciones_desactualizadas',
+        // Liquidaciones
+        'selector_dueno_liquidaciones',
+        'tabla_liquidaciones_container',
+        'resumen_liquidaciones',
+        'chips_filtros_activos_liquidaciones',
+        // Pasajeros
+        'selector_dueno_pasajeros',
+        'tabla_pasajeros',
+    ];
+    ids_a_limpiar.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+    });
+
+    // Los selectores cuyo primer option es estático también se
+    // resetean a un estado neutro para que no queden con datos.
+    const selectores_con_default = {
+        'selector_dueno_vendidos': '<option value="">Seleccione dueño...</option>',
+        'selector_dueno_rendiciones': '<option value="">Seleccione dueño...</option>',
+        'selector_dueno_liquidaciones': '<option value="">Seleccione dueño...</option>',
+        'rendicion_filtro_terminal': '<option value="">Todas</option>',
+        'selector_viaje_vendido': '<option value="todos">Todos</option>',
+        'filtro_vendedor': '<option value="Todos">Todos</option>',
+    };
+    Object.keys(selectores_con_default).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = selectores_con_default[id];
+    });
+}
 
 // ============================================================
 // Tabs compactas al scrollear.
