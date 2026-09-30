@@ -1,6 +1,6 @@
 /***
  * Funciones de puntos de venta (dueño).
- * @version 1.5piloto.68b
+ * @version 1.5piloto.73f
  */
 
 async function cargar_datos_terminales() {
@@ -41,7 +41,7 @@ async function cargar_datos_terminales() {
     });
 
     cuerpo_tabla.querySelectorAll('.btn_editar_terminal').forEach(boton => {
-        boton.addEventListener('click', () => iniciar_edicion_terminal(boton.dataset.usuario));
+        boton.addEventListener('click', () => abrir_modal_editar_terminal(boton.dataset.usuario));
     });
     cuerpo_tabla.querySelectorAll('.btn_eliminar_terminal').forEach(boton => {
         boton.addEventListener('click', () => eliminar_terminal_confirmado(boton.dataset.usuario));
@@ -146,53 +146,6 @@ $("#boton_guardar_terminal").addEventListener("click", async () => {
     }
 });
 
-// Funciones de edición y eliminación de terminales
-async function iniciar_edicion_terminal(nombre_usuario) {
-    const terminal = await obtener_datos_terminal(nombre_usuario);
-    if (!terminal) return;
-
-    const cuerpo_tabla = $("#tabla_terminales_dueno");
-    const filas = cuerpo_tabla.querySelectorAll('tr');
-    let fila_objetivo = null;
-    for (let fila of filas) {
-        const boton_editar = fila.querySelector('.btn_editar_terminal');
-        if (boton_editar && boton_editar.dataset.usuario === nombre_usuario) {
-            fila_objetivo = fila;
-            break;
-        }
-    }
-    if (!fila_objetivo) return;
-
-    const valor_nombre_real = terminal.nombre_real || '';
-    const valor_email = terminal.email || '';
-    const valor_codigo = '';
-    const valor_banco_nombre = terminal.banco.nombre || '';
-    const valor_banco_cuenta = terminal.banco.cuenta || '';
-
-    fila_objetivo.innerHTML = `
-        <td>${nombre_usuario}</td>
-        <td><input type="text" id="editar_terminal_nombre_real" value="${valor_nombre_real}"></td>
-        <td><input type="email" id="editar_terminal_email" value="${valor_email}"></td>
-        <td><input type="text" id="editar_terminal_codigo" value="" placeholder="Dejar vacío para no cambiar"></td>
-        <td>${terminal.efectivo || '0'}</td>
-        <td>${terminal.bancarizado || '0'}</td>
-        <td><input type="text" id="editar_terminal_banco_nombre" value="${valor_banco_nombre}"></td>
-        <td><input type="text" id="editar_terminal_banco_cuenta" value="${valor_banco_cuenta}"></td>
-        <td>${terminal.pasajes || '0'}</td>
-        <td>
-            <button class="btn_guardar_edicion_terminal" data-usuario="${nombre_usuario}">💾</button>
-            <button class="btn_cancelar_edicion_terminal">❌</button>
-        </td>
-    `;
-
-    fila_objetivo.querySelector('.btn_guardar_edicion_terminal').addEventListener('click', async () => {
-        await guardar_edicion_terminal(nombre_usuario, fila_objetivo);
-    });
-    fila_objetivo.querySelector('.btn_cancelar_edicion_terminal').addEventListener('click', () => {
-        cargar_datos_terminales();
-    });
-}
-
 async function obtener_datos_terminal(nombre_usuario) {
     const respuesta = await fetch("index.php", {
         method: "POST",
@@ -206,39 +159,26 @@ async function obtener_datos_terminal(nombre_usuario) {
     return null;
 }
 
-async function guardar_edicion_terminal(nombre_usuario, fila) {
-    const datos = {
-        accion: "dueno/actualizar_terminal",
-        nombre_dueno: usuario_actual.nombre_usuario,
-        nombre_usuario: nombre_usuario,
-        nombre_real: fila.querySelector('#editar_terminal_nombre_real').value.trim(),
-        email: fila.querySelector('#editar_terminal_email').value.trim(),
-        codigo_acceso: fila.querySelector('#editar_terminal_codigo').value.trim(),
-        banco_nombre: fila.querySelector('#editar_terminal_banco_nombre').value.trim(),
-        banco_cuenta: fila.querySelector('#editar_terminal_banco_cuenta').value.trim(),
-        contrasena: ''
-    };
-
-    if (!datos.banco_nombre || !datos.banco_cuenta) {
-        mostrar_aviso("Banco y cuenta son obligatorios", 'error');
-        return;
-    }
-
-    const respuesta = await fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(datos)
+/**
+ * Abre el modal para editar una terminal del dueño.
+ * Envuelve la función común con las opciones apropiadas para el
+ * dueño: sin selector de nivel, sin selector de dueño, con banco.
+ *
+ * @param {string} nombre_usuario
+ */
+async function abrir_modal_editar_terminal(nombre_usuario) {
+    return abrir_modal_editar_usuario_generico(nombre_usuario, {
+        obtener_datos: obtener_datos_terminal,
+        accion_guardar: 'dueno/actualizar_terminal',
+        titulo: 'Editar punto de venta: ' + nombre_usuario,
+        mostrar_nivel: false,
+        nivel_forzado: 'terminal',
+        mostrar_banco: true,
+        mostrar_dueno: false,
+        mostrar_duenos_soporte: false,
+        datos_extra: { nombre_dueno: usuario_actual.nombre_usuario },
+        al_guardar_exito: cargar_datos_terminales
     });
-    const resultado = await respuesta.json();
-    if (resultado.exito) {
-        if (resultado.codigo_asignado) {
-            alert("Nuevo código de acceso: " + resultado.codigo_asignado + "\n\nGuardalo, no se mostrará de nuevo.");
-        }
-        mostrar_aviso("Punto de venta actualizado correctamente", 'exito');
-        cargar_datos_terminales();
-    } else {
-        mostrar_aviso(resultado.error || "Error al actualizar", 'error');
-    }
 }
 
 async function eliminar_terminal_confirmado(nombre_usuario) {

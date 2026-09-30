@@ -544,6 +544,10 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   pestañas.
 - **v73e**: edición de usuarios en modal. Se reemplazó la edición
   inline en la tabla por un modal genérico con `form-grid`.
+- **v73f**: el modal de edición se centralizó en
+  `abrir_modal_editar_usuario_generico` (en `aplicacion.js`).
+  `admin.js` y `terminales.js` ahora son solo wrappers que lo
+  llaman con opciones distintas.
 
 ---
 
@@ -818,8 +822,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73e (edición de
-usuarios en modal).
+**Última actualización de este prompt:** v1.5piloto.73f (modal de
+edición de usuario reutilizable).
 
 **Estado de la conversación:**
 
