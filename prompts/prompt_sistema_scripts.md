@@ -118,11 +118,13 @@ function contar_ocurrencias(string $contenido, string $bloque): int {
 }
 
 $creaciones = [];
+$eliminaciones = [];
 $reemplazos_por_archivo = [];
 
 foreach ($cambios as $cambio) {
     $tipo = $cambio['tipo'] ?? 'reemplazar';
     if ($tipo === 'crear') { $creaciones[] = $cambio; continue; }
+    if ($tipo === 'eliminar') { $eliminaciones[] = $cambio; continue; }
     if (!isset($cambio['archivo']) || !isset($cambio['buscar']) || !isset($cambio['reemplazar'])) {
         echo "[FALLO] Cambio mal formado (faltan campos).\n";
         exit(1);
@@ -135,7 +137,8 @@ foreach ($reemplazos_por_archivo as $lista) { $total_reemplazos += count($lista)
 
 echo "[INFO] " . count($creaciones) . " archivo(s) a crear, "
     . $total_reemplazos . " reemplazo(s) en "
-    . count($reemplazos_por_archivo) . " archivo(s).\n\n";
+    . count($reemplazos_por_archivo) . " archivo(s), "
+    . count($eliminaciones) . " archivo(s) a eliminar.\n\n";
 
 $archivos_a_escribir = [];
 $bloques_ok = 0;
@@ -205,6 +208,19 @@ foreach ($creaciones as $creacion) {
     echo "[OK] {$creacion['archivo']} ($accion)\n";
 }
 
+foreach ($eliminaciones as $elim) {
+    $ruta_abs = $raiz_proyecto . '/' . $elim['archivo'];
+    if (!file_exists($ruta_abs)) {
+        echo "[INFO] " . $elim['archivo'] . " no existía (nada que eliminar).\n";
+        continue;
+    }
+    if (unlink($ruta_abs)) {
+        echo "[OK] " . $elim['archivo'] . " (eliminado)\n";
+    } else {
+        echo "[FALLO] No se pudo eliminar: " . $elim['archivo'] . "\n";
+    }
+}
+
 echo "\n=== Resumen ===\n";
 echo "Bloques aplicados: $bloques_ok\n";
 echo "Archivos nuevos:   " . count($creaciones) . "\n";
@@ -251,6 +267,19 @@ echo "\nListo.\n";
 
 **Ojo:** el tipo `crear` **sobrescribe** si el archivo ya existe. El runner lo
 reporta como `(sobrescrito)` en el log.
+
+### Tipo `eliminar`
+
+```php
+[
+    'tipo' => 'eliminar',
+    'archivo' => 'ruta/relativa/al/archivo/a/eliminar.ext',
+    'descripcion' => 'Archivo que ya no se usa',
+],
+```
+
+El runner lo borra si existe. Si no existe, lo reporta como
+informativo y sigue (es idempotente: correrlo dos veces no es error).
 
 ## REGLAS DEL ARRAY DE LÍNEAS
 
@@ -369,8 +398,11 @@ Esto significa que:
 
 ## CÓMO ESTRUCTURAR EL COMMIT SUGERIDO
 
+**El título del commit siempre arranca con la versión completa del
+proyecto, con la `V` mayúscula.** Formato:
+
 ```
-vX.Y.Z: Título corto
+V1.5piloto.73j: Título corto
 
 Servidor:
 - cambio 1
@@ -381,6 +413,17 @@ Interfaz:
 Documentación:
 - cambio 3
 ```
+
+Reglas:
+
+- **Siempre `V1.5piloto.XX`.** No `v73j`, no `v1.5piloto.73j`,
+  no `73j`, no `V73j`. La versión completa, con la `V` mayúscula.
+- **Un solo número de versión por tanda.** Si la tanda es v73j,
+  todos los archivos, los `?v=` y el commit dicen exactamente
+  lo mismo.
+- **El título va en una sola línea.** El cuerpo del commit puede
+  tener varias, con las secciones que ya conocemos (Servidor,
+  Interfaz, Documentación).
 
 ## TONO Y ESTILO
 
@@ -464,8 +507,11 @@ se actualizan los tres prompts. Es poco común, pero pasa.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.73j. Se agregaron
-dos reglas al método de trabajo:
+**Última actualización de este prompt:** v1.5piloto.73l. Se agregó el
+tipo `eliminar` al runner, para poder borrar archivos que ya no se usan
+en una tanda.
+
+Reglas incorporadas al método de trabajo en las últimas tandas:
 
 1. **Bumps obligatorios siempre.** En cada tanda se bumpean todos los
    archivos modificados (tanto `@version` internos como `?v=` en HTML).
@@ -473,6 +519,17 @@ dos reglas al método de trabajo:
 2. **Vigencia de los archivos.** Durante la conversación el usuario no
    modifica archivos por su cuenta. Las versiones que el asistente
    tiene son siempre las últimas. Si el usuario cambia algo, lo avisa.
+3. **Formato del título de commit.** Siempre `V1.5piloto.XX: Título corto`,
+   con `V` mayúscula y la versión completa del proyecto.
+4. **Tipo `eliminar` en `$cambios`.** El runner acepta un tercer tipo
+   de cambio que borra un archivo. Es idempotente: si el archivo no
+   existe, lo reporta y sigue.
+
+**Lección aprendida (tanda v73k):** cuando un bloque `buscar` incluye
+caracteres especiales (tildes, símbolos, secuencias de escape), usar
+un ancla más corta y sin esos caracteres. Ejemplo: en vez de matchear
+la línea del `preg_match` con tildes y `\s`, matchear solo el `return`
+que viene justo después.
 
 **Estado:**
 

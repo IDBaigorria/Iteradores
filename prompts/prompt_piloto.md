@@ -84,7 +84,8 @@ Cuando llegue el momento, `Conf::NOMBRE_APP` se derivará del subdominio.
 
 **`Aplicacion/`:**
 - `GrafoCredenciales.php`: helper `en_grafo_credenciales`.
-- `GuardarAmbos.php`: helper `guardar_ambos`.
+- `FuncionesAuxiliares.php`: helpers de formato, validación
+  y `guardar_ambos`.
 - `admin.js`, `terminales.js`, `micros.js`.
 - `Usuarios/Usuario.php`, `Sesiones/Sesion.php`, `Admin/Admin.php`,
   `Autenticacion/Autenticacion.php`.
@@ -318,6 +319,9 @@ Enlaces: `usuario` (string), `creado_en` (timestamp Unix).
 - Validaciones: `validar_dni`, `validar_telefono`, `validar_email`,
   `validar_nombre_o_apellido`, `validar_fecha_nacimiento`,
   `validar_localidad`, `validar_direccion`.
+- `guardar_ambos($nombre)`: guarda la superestructura en SQL
+  (fuente de verdad) y después en JSON (respaldo). Desde v73k
+  vive acá, no en `GuardarAmbos.php`.
 
 ### 5.2 `Aplicacion/Autenticacion/Autenticacion.php`
 
@@ -348,10 +352,17 @@ Enlaces: `usuario` (string), `creado_en` (timestamp Unix).
 - `crear_sesion`, `listar_sesiones`, `cerrar_sesion`,
   `listar_sesiones_de_usuarios`, `eliminar_sesiones_de_usuario`.
 
-### 5.5 `Aplicacion/GuardarAmbos.php`
+### 5.5 Persistencia SQL + JSON
 
-- `guardar_ambos($nombre)`: SQL primero, después JSON. Si JSON falla,
-  `Controlador::_error()`. Devuelve true si SQL fue exitoso.
+`guardar_ambos($nombre)` vive en `FuncionesAuxiliares.php`
+(ver 5.1). Guarda la superestructura en SQL (fuente de verdad)
+y después en JSON (respaldo). Si JSON falla, `Controlador::_error()`.
+Devuelve true si SQL fue exitoso.
+
+El archivo `Aplicacion/GuardarAmbos.php` existió hasta v73j. Se
+eliminó en v73k: el helper se movió a `FuncionesAuxiliares.php` y
+se reordenaron los `require_once` en `index.php` para que
+`guardar_ambos` esté definida antes de inicializar la persistencia.
 
 ### 5.6 `Aplicacion/GrafoCredenciales.php`
 
@@ -574,6 +585,12 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   dueño). `sesiones/cerrar` valida que el solicitante tenga
   permiso sobre la sesión (nuevo helper `_puede_cerrar_sesion`).
   Nueva función `listar_nombres_usuarios_para_soporte`.
+- **v73k**: fix de orden de includes en `index.php`. El helper
+  `guardar_ambos` se movió de `Aplicacion/GuardarAmbos.php` a
+  `Aplicacion/FuncionesAuxiliares.php`, y el bloque de
+  inicialización de la persistencia se reordenó después de los
+  `require_once` para que `guardar_ambos` esté definida antes
+  de usarse. Eliminado `Aplicacion/GuardarAmbos.php`.
 
 ---
 
@@ -848,8 +865,9 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73j (fix de
-permisos de sesiones: soporte filtrado por dueño, cierre validado).
+**Última actualización de este prompt:** v1.5piloto.73k (mover
+`guardar_ambos` a `FuncionesAuxiliares.php` y reordenar los includes
+de `index.php`).
 
 **Estado de la conversación:**
 
@@ -860,6 +878,8 @@ permisos de sesiones: soporte filtrado por dueño, cierre validado).
 - Agregamos el rol `soporte` en v73.
 - Cerramos en v73j el fix de permisos de sesiones (fuga de datos
   entre roles y falta de validación al cerrar sesión ajena).
+- Cerramos en v73k el fix del orden de includes en `index.php`
+  y la mudanza de `guardar_ambos` a `FuncionesAuxiliares.php`.
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -917,7 +937,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.73j. Todo funcional.
+**Estado del proyecto al cierre:** v1.5piloto.73k. Todo funcional.
 Listo para arrancar la diversificación por tipo de aplicación.
 
 ---

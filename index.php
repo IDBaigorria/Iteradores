@@ -18,7 +18,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.70
+ * @version   1.5piloto.73k
  */
 
 // --- Utilidades base ----------------------------------
@@ -63,17 +63,8 @@ include_once("Comunicadores/index.php");
 // --- Controlador (inicialización) ----------------------
 include_once("Controlador/Controlador.php");
 
-// Inicialización de la persistencia
-Controlador::establecer_metodo('SQL');
-$nombre_app = Conf::NOMBRE_APP;
-if (Controlador::existe($nombre_app)) {
-    Controlador::cargar($nombre_app);
-} else {
-    guardar_ambos($nombre_app);
-}
-
-// Incluir módulos de la aplicación
-require_once __DIR__ . '/Aplicacion/GuardarAmbos.php';
+// Incluir módulos de la aplicación.
+// Primero `FuncionesAuxiliares.php`, que define `guardar_ambos`.
 require_once __DIR__ . '/Aplicacion/FuncionesAuxiliares.php';
 require_once __DIR__ . '/Aplicacion/GrafoCredenciales.php';
 require_once __DIR__ . '/Aplicacion/Usuarios/Usuario.php';
@@ -89,6 +80,16 @@ require_once __DIR__ . '/Aplicacion/Rendiciones/Rendicion.php';
 require_once __DIR__ . '/Aplicacion/Liquidaciones/Liquidacion.php';
 require_once __DIR__ . '/Aplicacion/Enrutador.php';
 
+// Inicialización de la persistencia.
+// Va después de los require_once para que `guardar_ambos` esté
+// definida (vive en FuncionesAuxiliares.php).
+Controlador::establecer_metodo('SQL');
+$nombre_app = Conf::NOMBRE_APP;
+if (Controlador::existe($nombre_app)) {
+    Controlador::cargar($nombre_app);
+} else {
+    guardar_ambos($nombre_app);
+}
 
 // ==== Bloque temporal para pruebas de árbol ====
 if (isset($_GET['probar_arbol'])) {

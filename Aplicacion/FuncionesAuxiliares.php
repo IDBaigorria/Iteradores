@@ -1,11 +1,18 @@
 <?php
 /**
- * Funciones auxiliares de formato y validación.
+ * Funciones auxiliares de formato, validación y persistencia.
  *
  * @package   Iteradores
  * @since     1.5piloto.37
- * @version   1.5piloto.37
+ * @version   1.5piloto.73k
  */
+
+use Iteradores\Controlador\Controlador;
+use Iteradores\Configuracion\Conf;
+use Iteradores\Nodos\Nodo;
+include_once(__DIR__ . '/../Configuracion/Configuracion.php');
+include_once(__DIR__ . '/../Controlador/Controlador.php');
+include_once(__DIR__ . '/../Nodos/Nodo.php');
 
 /**
  * Normaliza un DNI: devuelve solo los dígitos.
@@ -164,4 +171,46 @@ function validar_direccion(string $valor): ?string {
         return 'La dirección tiene caracteres no permitidos';
     }
     return null;
+}
+
+// ============================================================
+// Persistencia
+// ============================================================
+
+/**
+ * Guarda una superestructura en SQL y después en JSON.
+ *
+ * El JSON es solo respaldo. Si falla, se registra el error con el
+ * sistema centralizado de Objeto y la operación sigue siendo exitosa
+ * porque SQL ya persistió.
+ *
+ * @param string $nombre Nombre de la superestructura.
+ * @return bool True si el guardado en SQL fue exitoso.
+ */
+function guardar_ambos($nombre): bool {
+    if (!is_string($nombre) || $nombre === '') {
+        Controlador::_error("guardar_ambos: nombre invalido");
+        return false;
+    }
+
+    // 1) Guardar en SQL (fuente de verdad).
+    $ok_sql = Controlador::guardar($nombre);
+    if (!$ok_sql) {
+        return false;
+    }
+
+    // 2) Guardar en JSON (respaldo). No debe romper la operación.
+    try {
+        Controlador::establecer_metodo('JSON');
+        $ok_json = Controlador::guardar($nombre);
+        if (!$ok_json) {
+            Controlador::_error("guardar_ambos: fallo el guardado JSON para el grafo \"$nombre\"");
+        }
+    } catch (\Throwable $e) {
+        Controlador::_error("guardar_ambos: excepcion al guardar JSON para \"$nombre\": " . $e->getMessage());
+    } finally {
+        Controlador::establecer_metodo('SQL');
+    }
+
+    return true;
 }
