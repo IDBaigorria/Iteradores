@@ -162,8 +162,9 @@ Namespace: `Iteradores\Controlador\Controlador`
 - `Controlador::guardar($nombre)`: guarda la superestructura actual con
   ese nombre. **Falla si hay nodos ocupados.**
 - `Controlador::cargar($nombre)`: vacía la superestructura y carga la
-  pedida. Si el nombre no existe, deja la superestructura vacía y
-  devuelve `false`.
+  pedida. Devuelve `true` si se cargó, `false` si no existe, `null`
+  si hubo error (conexión, query). Los llamadores deben distinguir
+  "no existe" de "error".
 - `Controlador::eliminar($nombre)`: elimina la superestructura guardada
   con ese nombre.
 - `Controlador::existe($nombre)`: chequeo booleano.
@@ -217,10 +218,17 @@ cabeza). La comparación se hace por `->id()`, no por objeto.
 
 ### 6.2 Cómo funciona `guardar`
 
-- Recorre todos los nodos de la superestructura y arma dos consultas SQL:
-  una para nodos, otra para adyacentes.
+- **Desde 1.5i.7 usa transacción**: `begin_transaction` → DELETE de
+  nodos y adyacentes → INSERT por chunks → `commit`. Si algo falla,
+  `rollback`. O se reemplaza el grafo entero, o no se toca nada.
+- **Los INSERT se dividen en chunks de ~200 KB.** Esto evita superar
+  `max_allowed_packet` de MySQL (que en XAMPP por defecto es 1 MB).
+  Antes de 1.5i.7, un grafo grande podía crashear MySQL o dejar la
+  tabla corrupta.
+- **Cada query se chequea.** Si una falla, `_error` con el mensaje de
+  MySQL y `rollback`. `guardar` devuelve `false` en ese caso.
 - **No falla con consultas vacías.** Si un grafo solo tiene nodos
-  especiales sin enlaces, los armadores de consulta devuelven string
+  especiales sin enlaces, los armadores de chunks devuelven array
   vacío y se saltea la ejecución.
 
 ### 6.3 Cómo funciona `cargar`
@@ -231,6 +239,12 @@ cabeza). La comparación se hace por `->id()`, no por objeto.
   arma un mapa de equivalencias entre IDs viejos y nuevos.
 - Después lee los adyacentes y reconstruye los enlaces usando las
   equivalencias.
+- **Desde 1.5i.7a:** la query de adyacentes se chequea (no se llama
+  `fetch_assoc()` sobre `false`). Si falla, devuelve `null`.
+- **Desde 1.5i.7a:** el nombre se escapa con `real_escape_string` en
+  `cargar`, `existe` y `eliminar`.
+- **Desde 1.5i.7a:** la conexión SQL se cierra en todos los
+  early-returns (antes quedaban conexiones abiertas en algunos casos).
 
 ### 6.4 Grafos separados
 
@@ -247,6 +261,11 @@ Ver `prompts/prompt_piloto.md` para el detalle.
 - Al guardar se fuerza string en `id` y referencias de adyacentes.
 - Al cargar se castea `id` y referencias a string para archivos viejos.
 - Se escribe con rutas absolutas basadas en `__DIR__`.
+- **Escritura atómica desde 1.5i.7a:** se escribe a `.tmp` y después
+  se renombra. Si el proceso muere a mitad, el `.json` original queda
+  intacto.
+- **Validación desde 1.5i.7a:** al cargar se chequea que exista la
+  clave `nodos`. Si no, se devuelve `null` y se loguea error.
 
 ---
 
@@ -350,6 +369,9 @@ function migrar_xxx(): array {
   `null` y genera una alerta. Es normal, no un error.
 - **Guardar con un nodo ocupado.** `Controlador::guardar` falla. Hay que
   desocupar antes.
+- **`Controlador::cargar` devuelve `bool|null`.** `true` = cargó,
+  `false` = no existe, `null` = error. No castear a bool sin
+  distinguir los dos últimos casos.
 - **Los IDs de nodos sin ID especial cambian entre cargas.** Si
   necesitás referenciarlos desde otro nodo persistido, usá ID especial.
 
@@ -383,6 +405,15 @@ function migrar_xxx(): array {
 - **1.5i.5**: fix para que `guardar` no falle con consultas SQL vacías.
 - **1.5i.6**: fix real del anterior: los armadores de consulta devuelven
   string vacío cuando no hay filas.
+- **1.5i.7**: `guardar` usa transacción y divide los INSERT en chunks
+  de ~200 KB. Chequea el resultado de cada query. Fix del bug que
+  crasheaba la tabla cuando el grafo superaba `max_allowed_packet`.
+- **1.5i.7a**: `cargar` chequea el resultado de la query de adyacentes
+  (no llama `fetch_assoc()` sobre `false`). `real_escape_string` en
+  `cargar`, `existe` y `eliminar`. Conexiones SQL se cierran en
+  todos los early-returns. JSON con escritura atómica (`.tmp` +
+  `rename`) y validación de la clave `nodos`. `Controlador::cargar`
+  devuelve `bool|null` para distinguir "no existe" de "error".
 
 El framework en sí no cambia mucho. La mayoría de los cambios son en el
 piloto.

@@ -86,8 +86,15 @@ require_once __DIR__ . '/Aplicacion/Enrutador.php';
 Controlador::establecer_metodo('SQL');
 $nombre_app = Conf::NOMBRE_APP;
 if (Controlador::existe($nombre_app)) {
-    Controlador::cargar($nombre_app);
+    if (!Controlador::cargar($nombre_app)) {
+        // Existe en SQL pero no se pudo cargar. No caemos al else:
+        // guardar vacío pisaría el grafo. Morimos con mensaje claro.
+        Controlador::_error("index.php: no se pudo cargar el grafo \"$nombre_app\".");
+        http_response_code(500);
+        die('Error fatal: no se pudo cargar el grafo principal. Revise los logs.');
+    }
 } else {
+    // Primera ejecución: no existe el grafo. Se crea vacío.
     guardar_ambos($nombre_app);
 }
 

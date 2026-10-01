@@ -12,7 +12,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php"
 /**
  * Clase PerdurarSuperestructuraJSON
  * 
- * @version 1.0.2 (Última revisión: 29/09/2026)
+ * @version 1.0.3 (Última revisión: 30/09/2026)
  *
  * @author Ignacio David Baigorria
  *
@@ -204,8 +204,17 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
             return false;
         }
 
-        if (file_put_contents($ruta_archivo, $json) === false) {
-            self::_error("No se pudo guardar el archivo JSON: " . $ruta_archivo);
+        // Escritura atomica: escribir a .tmp y renombrar. En la mayoria
+        // de los filesystems, rename() es atomico. Si el proceso muere a
+        // mitad de la escritura, el .json original queda intacto.
+        $ruta_temporal = $ruta_archivo . '.tmp';
+        if (file_put_contents($ruta_temporal, $json) === false) {
+            self::_error("No se pudo guardar el archivo JSON temporal: " . $ruta_temporal);
+            return false;
+        }
+        if (!rename($ruta_temporal, $ruta_archivo)) {
+            self::_error("No se pudo renombrar el archivo JSON temporal: " . $ruta_temporal);
+            @unlink($ruta_temporal);
             return false;
         }
 
@@ -287,13 +296,18 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
         }
 
         $estructura = json_decode($contenido, true);
-        if ($estructura === null) {
+        if ($estructura === null || !is_array($estructura)) {
             self::_error("Error al decodificar el archivo JSON: " . $ruta_archivo);
             return null;
         }
+        if (!isset($estructura['nodos']) || !is_array($estructura['nodos'])) {
+            self::_error("El JSON no tiene la clave \"nodos\" esperada: " . $ruta_archivo);
+            return null;
+        }
 
-        // Limpiar la superestructura actual antes de cargar
-        Nodo::vaciar_superestructura(static::$token);
+        // La superestructura ya fue vaciada por Controlador::cargar.
+        // No vaciar de nuevo: si algo fallara entre las dos limpiezas,
+        // quedaria una superestructura vacia sin que nadie lo note.
 
         $equivalencias = [];
 

@@ -60,21 +60,35 @@ function en_grafo_credenciales(callable $fn) {
                 Nodo::crear_con_id('sesiones');
             }
             guardar_ambos(Conf::NOMBRE_APP_CREDENCIALES);
+        } else {
+            // Solo cargar si ya existe (el caso "no existe" ya la cargó arriba).
+            Controlador::cargar(Conf::NOMBRE_APP_CREDENCIALES);
         }
 
-        // Cargar credenciales.
-        Controlador::cargar(Conf::NOMBRE_APP_CREDENCIALES);
-
-        // Ejecutar callback.
-        $resultado = $fn();
-
-        // Guardar credenciales.
-        guardar_ambos(Conf::NOMBRE_APP_CREDENCIALES);
+        // Ejecutar callback y guardar credenciales en el finally interno,
+        // para no perder cambios si el callback lanza una excepción.
+        $resultado = null;
+        $excepcion = null;
+        try {
+            $resultado = $fn();
+        } catch (\Throwable $e) {
+            $excepcion = $e;
+        } finally {
+            guardar_ambos(Conf::NOMBRE_APP_CREDENCIALES);
+        }
+        if ($excepcion !== null) {
+            throw $excepcion;
+        }
 
         return $resultado;
     } finally {
-        // Recargar la app.
-        Controlador::cargar(Conf::NOMBRE_APP);
+        // Recargar la app. Si falla, es un error fatal: la superestructura
+        // quedaría vacía y el próximo guardado podría pisar el grafo.
+        $ok_carga = Controlador::cargar(Conf::NOMBRE_APP);
         $GLOBALS['__en_grafo_credenciales'] = false;
+        if (!$ok_carga) {
+            Controlador::_error("en_grafo_credenciales: no se pudo recargar la app \"" . Conf::NOMBRE_APP . "\".");
+            throw new \RuntimeException("No se pudo recargar el grafo de la aplicacion tras operar en credenciales.");
+        }
     }
 }

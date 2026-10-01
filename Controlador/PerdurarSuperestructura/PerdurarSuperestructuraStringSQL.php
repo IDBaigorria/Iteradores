@@ -12,7 +12,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php"
 /**
  * Clase PerdurarSuperestructuraStringSQL
  * 
- * @version 1.5i.6 
+ * @version 1.5i.7a
  *
  * @author Ignacio David Baigorria
  *
@@ -295,18 +295,139 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 			return false;
 		}
 		$sql = self::crear_conexion_sql();
-		$sql->query("DELETE FROM `nodo` WHERE `idsuperestructura`='" . $nombre . "';");
-		$sql->query("DELETE FROM `adyacente` WHERE `idsuperestructura`='" . $nombre . "';");
-		$consulta_nodos = self::crear_consulta_insertar_sql($sql, $nombre);
-		if ($consulta_nodos !== '') {
-			$sql->query($consulta_nodos);
+		if (!$sql) {
+			self::_error("guardar: no se pudo crear la conexion");
+			return false;
 		}
-		$consulta_adyacentes = self::crear_consulta_insertar2_sql($sql, $nombre);
-		if ($consulta_adyacentes !== '') {
-			$sql->query($consulta_adyacentes);
+
+		// Transacción: o se reemplaza el grafo entero, o no se toca nada.
+		$sql->begin_transaction();
+		try {
+			$nombre_escapado = $sql->real_escape_string((string)$nombre);
+			if (!$sql->query("DELETE FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+				throw new \RuntimeException("guardar: fallo DELETE en nodo: " . $sql->error);
+			}
+			if (!$sql->query("DELETE FROM `adyacente` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+				throw new \RuntimeException("guardar: fallo DELETE en adyacente: " . $sql->error);
+			}
+
+			$chunks_nodos = self::crear_chunks_insertar_nodos($sql, $nombre);
+			foreach ($chunks_nodos as $consulta) {
+				if (!$sql->query($consulta)) {
+					throw new \RuntimeException("guardar: fallo INSERT en nodo: " . $sql->error);
+				}
+			}
+
+			$chunks_ady = self::crear_chunks_insertar_adyacentes($sql, $nombre);
+			foreach ($chunks_ady as $consulta) {
+				if (!$sql->query($consulta)) {
+					throw new \RuntimeException("guardar: fallo INSERT en adyacente: " . $sql->error);
+				}
+			}
+
+			$sql->commit();
+			$sql->close();
+			return true;
+		} catch (\Throwable $e) {
+			$sql->rollback();
+			self::_error($e->getMessage());
+			$sql->close();
+			return false;
 		}
-		$sql->close();
-		return true;
+	}
+
+    /**
+     * Arma los chunks de INSERT para la tabla nodo.
+     *
+     * Cada chunk es una query independiente de hasta ~200 KB, para
+     * no acercarse a `max_allowed_packet` (que en XAMPP es 1 MB).
+     *
+     * @param \mysqli $sql Conexion activa.
+     * @param string  $nombre Nombre de la superestructura.
+     * @return array Lista de queries listas para ejecutar.
+     */
+	static private function crear_chunks_insertar_nodos($sql, $nombre): array
+	{
+		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
+			return $nodo->dato();
+		}, null);
+
+		if (empty($datos)) return [];
+
+		$nombre_escapado = $sql->real_escape_string((string)$nombre);
+		$limite_bytes = 200 * 1024;
+		$chunks = [];
+		$lote = [];
+		$tamano_lote = 0;
+
+		foreach ($datos as $id => $dato) {
+			if (!is_string($dato) && !is_null($dato) && !is_int($dato)) {
+				$dato = null;
+			}
+			$id_escapado = $sql->real_escape_string((string)$id);
+			$dato_escapado = is_null($dato) ? '' : $sql->real_escape_string((string)$dato);
+			$fila = "('" . $nombre_escapado . "','" . $id_escapado . "','" . $dato_escapado . "')";
+			$tamano_fila = strlen($fila) + 2;
+
+			if (!empty($lote) && ($tamano_lote + $tamano_fila) > $limite_bytes) {
+				$chunks[] = "INSERT INTO nodo (idsuperestructura, idnodo, dato) VALUES " . implode(", ", $lote) . ";";
+				$lote = [];
+				$tamano_lote = 0;
+			}
+			$lote[] = $fila;
+			$tamano_lote += $tamano_fila;
+		}
+		if (!empty($lote)) {
+			$chunks[] = "INSERT INTO nodo (idsuperestructura, idnodo, dato) VALUES " . implode(", ", $lote) . ";";
+		}
+		return $chunks;
+	}
+
+    /**
+     * Arma los chunks de INSERT para la tabla adyacente.
+     *
+     * @param \mysqli $sql Conexion activa.
+     * @param string  $nombre Nombre de la superestructura.
+     * @return array Lista de queries listas para ejecutar.
+     */
+	static private function crear_chunks_insertar_adyacentes($sql, $nombre): array
+	{
+		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
+			return $nodo->por_cada_adyacente_ejecutar(function ($ady) {
+				return $ady->id();
+			});
+		});
+
+		if (empty($datos)) return [];
+
+		$nombre_escapado = $sql->real_escape_string((string)$nombre);
+		$limite_bytes = 200 * 1024;
+		$chunks = [];
+		$lote = [];
+		$tamano_lote = 0;
+
+		foreach ($datos as $idnodo => $arreglo) {
+			if (!is_array($arreglo) || empty($arreglo)) continue;
+			foreach ($arreglo as $enlace => $idady) {
+				$idnodo_escapado = $sql->real_escape_string((string)$idnodo);
+				$enlace_escapado = $sql->real_escape_string((string)$enlace);
+				$idady_escapado = $sql->real_escape_string((string)$idady);
+				$fila = "('" . $nombre_escapado . "','" . $idnodo_escapado . "','" . $enlace_escapado . "','" . $idady_escapado . "')";
+				$tamano_fila = strlen($fila) + 2;
+
+				if (!empty($lote) && ($tamano_lote + $tamano_fila) > $limite_bytes) {
+					$chunks[] = "INSERT INTO adyacente (idsuperestructura, idnodo, enlace, idadyacente) VALUES " . implode(", ", $lote) . ";";
+					$lote = [];
+					$tamano_lote = 0;
+				}
+				$lote[] = $fila;
+				$tamano_lote += $tamano_fila;
+			}
+		}
+		if (!empty($lote)) {
+			$chunks[] = "INSERT INTO adyacente (idsuperestructura, idnodo, enlace, idadyacente) VALUES " . implode(", ", $lote) . ";";
+		}
+		return $chunks;
 	}
     /**
      * Elimina una superestructura de la base de datos.
@@ -329,12 +450,13 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 			self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre), el identificador pasado como parametro no es un string");
 			return null;
 		}
-		if (!$sql = self::crear_conexion_sql()) {
+		$sql = self::crear_conexion_sql();
+		if (!$sql) {
 			self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) no se pudo crear la conexion");
 			return null;
 		}
-		$sql = self::crear_conexion_sql();
-		if (!$rcontar = $sql->query("SELECT COUNT(*) FROM `nodo` WHERE `idsuperestructura`='" . $nombre . "';")) {
+		$nombre_escapado = $sql->real_escape_string((string)$nombre);
+		if (!$rcontar = $sql->query("SELECT COUNT(*) FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
 			self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) error intentado ver si la superestructura existe");
 			$sql->close();
 			return null;
@@ -342,8 +464,16 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 		$cant = $rcontar->fetch_assoc()['COUNT(*)'];
 		$r = false;
 		if ($cant > 0) {
-			$sql->query("DELETE FROM `nodo` WHERE `idsuperestructura`='" . $nombre . "';");
-			$sql->query("DELETE FROM `adyacente` WHERE `idsuperestructura`='" . $nombre . "';");
+			if (!$sql->query("DELETE FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+				self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) fallo DELETE en nodo: " . $sql->error);
+				$sql->close();
+				return null;
+			}
+			if (!$sql->query("DELETE FROM `adyacente` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+				self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) fallo DELETE en adyacente: " . $sql->error);
+				$sql->close();
+				return null;
+			}
 			$r = true;
 		} else {
 			self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) no existe superestructura con ese nombre");			
@@ -374,18 +504,22 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 			self::_error("PerdurarSuperestructuraString::cargar(nombre), el identificador pasado como parametro no es un string");
 			return false;
 		}
-		if (!$sql = self::crear_conexion_sql()) {
+		$sql = self::crear_conexion_sql();
+		if (!$sql) {
 			self::_error("PerdurarSuperestructuraString::cargar(nombre) no se pudo crear la conexion");
 			return null;
 		}
+		$nombre_escapado = $sql->real_escape_string((string)$nombre);
 
-		if (!$nodos = $sql->query("SELECT * FROM `nodo` WHERE `idsuperestructura`='" . $nombre . "';")) {
+		if (!$nodos = $sql->query("SELECT * FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
 			self::_error("PerdurarSuperestructuraString::cargar(nombre) no se pudo cargar, no cargo nada");
+			$sql->close();
 			return null;
 		}
 		$nodo = $nodos->fetch_assoc();
 		if (!$nodo) {
 			self::_alerta("alerta al cargar, no existe superestructura con el identificador pasado como parametro");
+			$sql->close();
 			return false;
 		}
 
@@ -406,7 +540,11 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 			$nodo = $nodos->fetch_assoc();
 		}
 
-		$adyacentes = $sql->query("SELECT * FROM `adyacente` WHERE `idsuperestructura`='" . $nombre . "';");
+		if (!$adyacentes = $sql->query("SELECT * FROM `adyacente` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+			self::_error("PerdurarSuperestructuraString::cargar(nombre) no se pudieron cargar los adyacentes: " . $sql->error);
+			$sql->close();
+			return null;
+		}
 
 		$adyacente = $adyacentes->fetch_assoc();
 		while ($adyacente != null) {
@@ -464,13 +602,16 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 			self::_error("PerdurarSuperestructuraString::existe_sql(nombre), el identificador pasado como parametro no es un string");
 			return null;
 		}
-		if (!$sql = self::crear_conexion_sql()) {
+		$sql = self::crear_conexion_sql();
+		if (!$sql) {
 			self::_error("PerdurarSuperestructuraString::existe_sql(nombre) no se pudo crear la conexion");
 			return null;
 		}
+		$nombre_escapado = $sql->real_escape_string((string)$nombre);
 
-		if (!$rcontar = $sql->query("SELECT COUNT(*) FROM `nodo` WHERE `idsuperestructura`='" . $nombre . "';")) {
+		if (!$rcontar = $sql->query("SELECT COUNT(*) FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
 			self::_error("PerdurarSuperestructuraString::existe_sql(nombre) no se pudo contar");
+			$sql->close();
 			return null;
 		}
 		$cant = $rcontar->fetch_assoc()['COUNT(*)'];

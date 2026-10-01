@@ -195,12 +195,20 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
         return (bool) static::delegar('guardar', $nombre);
     }
 
-    /** @return bool 
-     * @version 1.5i.4
-    */
-    public static function cargar($nombre): bool {
+    /**
+     * Carga una superestructura por nombre.
+     *
+     * Devuelve `true` si se cargo, `false` si no existe, `null` si hubo
+     * un error (conexion, query, etc.). No castear a bool: la diferencia
+     * entre "no existe" y "error" es importante para decidir si se crea
+     * una nueva o se muere con un mensaje claro.
+     *
+     * @return bool|null
+     * @version 1.5i.7a
+     */
+    public static function cargar($nombre): bool|null {
         Nodo::vaciar_superestructura(static::$token);
-        return (bool) static::delegar('cargar', $nombre);
+        return static::delegar('cargar', $nombre);
     }
 
     /** @return bool */

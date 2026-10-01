@@ -1,630 +1,682 @@
 {
     "metadata": {
-        "fecha_creacion": "2026-09-30T05:24:10+02:00",
-        "total_nodos": 111
+        "fecha_creacion": "2026-10-01T02:52:12+02:00",
+        "total_nodos": 121
     },
     "nodos": [
         {
-            "id": "4842",
+            "id": "2390",
             "dato": "Administrador",
             "adyacentes": {
-                "codigo_hash": "4843",
-                "ip_ultimo_acceso": "4870",
-                "ultimo_acceso": "4869"
+                "codigo_hash": "2391",
+                "ip_ultimo_acceso": "2418",
+                "ultimo_acceso": "2417"
             }
         },
         {
-            "id": "4843",
+            "id": "2391",
             "dato": "$2y$10$mZTYcg1eySceoJFiZ\/DM4.21e58XHTp8FuBUKQb.rp9kDkB8Ljmk2",
             "adyacentes": []
         },
         {
-            "id": "4844",
+            "id": "2392",
             "dato": "ignacio",
             "adyacentes": {
-                "codigo_hash": "4845"
+                "codigo_hash": "2393"
             }
         },
         {
-            "id": "4845",
+            "id": "2393",
             "dato": "$2y$10$Ow7R0qvNwqhki81DLiPIWel8nBkEVxbeugebhrxAqmSfKKwLvQF2S",
             "adyacentes": []
         },
         {
-            "id": "4846",
+            "id": "2394",
             "dato": "ignacio2",
             "adyacentes": {
-                "codigo_hash": "4847",
-                "contrasena": "4848"
+                "codigo_hash": "2395",
+                "contrasena": "2396",
+                "ip_ultimo_acceso": "2505",
+                "ultimo_acceso": "2504"
             }
         },
         {
-            "id": "4847",
+            "id": "2395",
             "dato": "$2y$10$Q6eXRvyhSNDJtHyMT4TNGOVx5Jv7sxOvOa7QMpisz\/qjzHFUqr6WW",
             "adyacentes": []
         },
         {
-            "id": "4848",
+            "id": "2396",
             "dato": "$2y$10$ZyxD.von2j7UX.OpTOQ0J.udvHH4fEg64\/u0muf65cPVQePeFFkBi",
             "adyacentes": []
         },
         {
-            "id": "4849",
+            "id": "2397",
             "dato": "manolo",
             "adyacentes": {
-                "codigo_hash": "4850",
-                "contrasena": "4851"
+                "codigo_hash": "2398",
+                "contrasena": "2399"
             }
         },
         {
-            "id": "4850",
+            "id": "2398",
             "dato": "$2y$10$8QZQV2trh.8vBGwRzoyILOnxzDXgp7dLjp3blQDDzz9KVuEzuPSrW",
             "adyacentes": []
         },
         {
-            "id": "4851",
+            "id": "2399",
             "dato": "$2y$10$nwikIw5lpEz5t4Hg0XUlmuTKjUxuMs63X6lKMMc82QyaXIkQpPugq",
             "adyacentes": []
         },
         {
-            "id": "4852",
+            "id": "2400",
             "dato": "Parroquia_del_Carmen",
             "adyacentes": {
-                "codigo_hash": "4853",
-                "ip_ultimo_acceso": "4890",
-                "ultimo_acceso": "4889"
+                "codigo_hash": "2401",
+                "ip_ultimo_acceso": "2438",
+                "ultimo_acceso": "2437"
             }
         },
         {
-            "id": "4853",
+            "id": "2401",
             "dato": "$2y$10$sMaUwcoDo9g\/dRlaBDdq7OR\/7LJ8Fi4OCaOt4GtEuowT8Xk3ACcQu",
             "adyacentes": []
         },
         {
-            "id": "4854",
+            "id": "2402",
             "dato": "secretaria_carmen",
             "adyacentes": {
-                "codigo_hash": "4855",
-                "ip_ultimo_acceso": "4941",
-                "ultimo_acceso": "4940"
+                "codigo_hash": "2403",
+                "ip_ultimo_acceso": "2488",
+                "ultimo_acceso": "2487"
             }
         },
         {
-            "id": "4855",
+            "id": "2403",
             "dato": "$2y$10$TrjVP.uMtOh3f0zwDZTsfOljVjDdxkA6SzOL0SPe2ENk9040ue\/Mu",
             "adyacentes": []
         },
         {
-            "id": "4856",
+            "id": "2404",
             "dato": "Secretaria_Lujan",
             "adyacentes": {
-                "codigo_hash": "4857"
+                "codigo_hash": "2405"
             }
         },
         {
-            "id": "4857",
+            "id": "2405",
             "dato": "$2y$10$WDmr3xwCCAJ8Py1D7l3d2.dwVRa7bmhPWWPeuqIyFGqzUW3Ros.ZK",
             "adyacentes": []
         },
         {
-            "id": "4858",
+            "id": "2406",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4859",
+            "id": "2407",
             "dato": "1790655930",
             "adyacentes": []
         },
         {
-            "id": "4860",
+            "id": "2408",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4861",
+            "id": "2409",
             "dato": "1790658997",
             "adyacentes": []
         },
         {
-            "id": "4862",
+            "id": "2410",
             "dato": "ignacio2",
             "adyacentes": []
         },
         {
-            "id": "4863",
+            "id": "2411",
             "dato": "1790659649",
             "adyacentes": []
         },
         {
-            "id": "4864",
+            "id": "2412",
             "dato": "ignacio2",
             "adyacentes": []
         },
         {
-            "id": "4865",
+            "id": "2413",
             "dato": "1790659651",
             "adyacentes": []
         },
         {
-            "id": "4866",
+            "id": "2414",
             "dato": "lila",
             "adyacentes": {
-                "codigo_hash": "4867",
-                "contrasena": "4868"
+                "codigo_hash": "2415",
+                "contrasena": "2416"
             }
         },
         {
-            "id": "4867",
+            "id": "2415",
             "dato": "$2y$10$jzawjKdrULYmFFrBSRVHheCVgB8TGjDNUOvFHQYCdf3ipZHY\/UWsG",
             "adyacentes": []
         },
         {
-            "id": "4868",
+            "id": "2416",
             "dato": "$2y$10$60CYBFqmCrH\/mmOUHDpAle.DHHOhjxIqzahzHhwXlQabNc7U39fVu",
             "adyacentes": []
         },
         {
-            "id": "4869",
-            "dato": "30\/09\/2026 05:23",
+            "id": "2417",
+            "dato": "30\/09\/2026 17:57",
             "adyacentes": []
         },
         {
-            "id": "4870",
+            "id": "2418",
             "dato": "::1",
             "adyacentes": []
         },
         {
-            "id": "4871",
+            "id": "2419",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4872",
+            "id": "2420",
             "dato": "1790703850",
             "adyacentes": []
         },
         {
-            "id": "4873",
+            "id": "2421",
             "dato": "manolo3",
             "adyacentes": {
-                "codigo_hash": "4874",
-                "contrasena": "4875",
-                "intentos_fallidos": "4876",
-                "ip_ultimo_acceso": "4878",
-                "ultimo_acceso": "4877"
+                "codigo_hash": "2422",
+                "contrasena": "2423",
+                "intentos_fallidos": "2424",
+                "ip_ultimo_acceso": "2426",
+                "ultimo_acceso": "2425"
             }
         },
         {
-            "id": "4874",
+            "id": "2422",
             "dato": "$2y$10$MTwmn6.iesk.NRLRzm6rVOxAGyRIXt9WXUi5ge.D8dIOnIx.9uEWa",
             "adyacentes": []
         },
         {
-            "id": "4875",
+            "id": "2423",
             "dato": "$2y$10$il8FEBnM5PkhyYAod\/vek.r5ZqW3ZkHMt\/kudxk26yU2OCSiiES3S",
             "adyacentes": []
         },
         {
-            "id": "4876",
+            "id": "2424",
             "dato": "0",
             "adyacentes": []
         },
         {
-            "id": "4877",
-            "dato": "30\/09\/2026 04:39",
+            "id": "2425",
+            "dato": "30\/09\/2026 17:59",
             "adyacentes": []
         },
         {
-            "id": "4878",
+            "id": "2426",
             "dato": "::1",
             "adyacentes": []
         },
         {
-            "id": "4879",
+            "id": "2427",
             "dato": "manolo3",
             "adyacentes": []
         },
         {
-            "id": "4880",
+            "id": "2428",
             "dato": "1790704793",
             "adyacentes": []
         },
         {
-            "id": "4881",
+            "id": "2429",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4882",
+            "id": "2430",
             "dato": "1790705138",
             "adyacentes": []
         },
         {
-            "id": "4883",
+            "id": "2431",
             "dato": "mama",
             "adyacentes": {
-                "codigo_hash": "4884",
-                "contrasena": "4885",
-                "intentos_fallidos": "4886"
+                "codigo_hash": "2432",
+                "contrasena": "2433",
+                "intentos_fallidos": "2434"
             }
         },
         {
-            "id": "4884",
+            "id": "2432",
             "dato": "$2y$10$n20CIGhuHQl4xUYUE8S8Fub3Ns6uhfaBvgNPgIT6X7.ngI5lDUwJS",
             "adyacentes": []
         },
         {
-            "id": "4885",
+            "id": "2433",
             "dato": "$2y$10$GSr9LlYKbM.Mqfhqv4B1M.QLEYVkGa8ujFB.jDYY4OXzWzzwPxj4.",
             "adyacentes": []
         },
         {
-            "id": "4886",
+            "id": "2434",
             "dato": "0",
             "adyacentes": []
         },
         {
-            "id": "4887",
+            "id": "2435",
             "dato": "manolo3",
             "adyacentes": []
         },
         {
-            "id": "4888",
+            "id": "2436",
             "dato": "1790705592",
             "adyacentes": []
         },
         {
-            "id": "4889",
+            "id": "2437",
             "dato": "30\/09\/2026 05:22",
             "adyacentes": []
         },
         {
-            "id": "4890",
+            "id": "2438",
             "dato": "::1",
             "adyacentes": []
         },
         {
-            "id": "4891",
+            "id": "2439",
             "dato": "Parroquia_del_Carmen",
             "adyacentes": []
         },
         {
-            "id": "4892",
+            "id": "2440",
             "dato": "1790706003",
             "adyacentes": []
         },
         {
-            "id": "4893",
+            "id": "2441",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4894",
+            "id": "2442",
             "dato": "1790710236",
             "adyacentes": []
         },
         {
-            "id": "4895",
+            "id": "2443",
             "dato": "manolo3",
             "adyacentes": []
         },
         {
-            "id": "4896",
+            "id": "2444",
             "dato": "1790729738",
             "adyacentes": []
         },
         {
-            "id": "4897",
+            "id": "2445",
             "dato": "Parroquia_del_Carmen",
             "adyacentes": []
         },
         {
-            "id": "4898",
+            "id": "2446",
             "dato": "1790730973",
             "adyacentes": []
         },
         {
-            "id": "4899",
+            "id": "2447",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4900",
+            "id": "2448",
             "dato": "1790731429",
             "adyacentes": []
         },
         {
-            "id": "4901",
+            "id": "2449",
             "dato": "Parroquia_del_Carmen",
             "adyacentes": []
         },
         {
-            "id": "4902",
+            "id": "2450",
             "dato": "1790732247",
             "adyacentes": []
         },
         {
-            "id": "4903",
+            "id": "2451",
             "dato": "mama2",
             "adyacentes": {
-                "codigo_hash": "4904",
-                "intentos_fallidos": "4905"
+                "codigo_hash": "2452",
+                "intentos_fallidos": "2453"
             }
         },
         {
-            "id": "4904",
+            "id": "2452",
             "dato": "$2y$10$gd7CKCiB0OOUwINglc1cVe.ZTFJOimCbm\/CqD3Se9ODupio8GyIiq",
             "adyacentes": []
         },
         {
-            "id": "4905",
+            "id": "2453",
             "dato": "0",
             "adyacentes": []
         },
         {
-            "id": "4906",
+            "id": "2454",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4907",
+            "id": "2455",
             "dato": "1790733881",
             "adyacentes": []
         },
         {
-            "id": "4908",
+            "id": "2456",
             "dato": "mama4",
             "adyacentes": {
-                "codigo_hash": "4909",
-                "intentos_fallidos": "4910"
+                "codigo_hash": "2457",
+                "intentos_fallidos": "2458"
             }
         },
         {
-            "id": "4909",
+            "id": "2457",
             "dato": "$2y$10$.c2MD3Qx6XHIs9gl5J\/PSuZ\/wD0koI8wF\/hiyP84b8LcIEZbGv41y",
             "adyacentes": []
         },
         {
-            "id": "4910",
+            "id": "2458",
             "dato": "0",
             "adyacentes": []
         },
         {
-            "id": "4911",
+            "id": "2459",
             "dato": "manolo3",
             "adyacentes": []
         },
         {
-            "id": "4912",
+            "id": "2460",
             "dato": "1790734124",
             "adyacentes": []
         },
         {
-            "id": "4913",
+            "id": "2461",
             "dato": "mama3",
             "adyacentes": {
-                "codigo_hash": "4914",
-                "contrasena": "4915",
-                "intentos_fallidos": "4916"
+                "codigo_hash": "2462",
+                "contrasena": "2463",
+                "intentos_fallidos": "2464"
             }
         },
         {
-            "id": "4914",
+            "id": "2462",
             "dato": "$2y$10$PhnjpFA1I5.z5r4RUf4VYOWspkCb2M1zm\/9pUWpXk1Ovs5NwK8kn6",
             "adyacentes": []
         },
         {
-            "id": "4915",
+            "id": "2463",
             "dato": "$2y$10$ccdhj0jjOohRsBasaw0A6eOcooXaz4xF4dx99FFXEhmZn04\/gD9fm",
             "adyacentes": []
         },
         {
-            "id": "4916",
+            "id": "2464",
             "dato": "0",
             "adyacentes": []
         },
         {
-            "id": "4917",
+            "id": "2465",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4918",
+            "id": "2466",
             "dato": "1790734183",
             "adyacentes": []
         },
         {
-            "id": "4919",
+            "id": "2467",
             "dato": "manolo3",
             "adyacentes": []
         },
         {
-            "id": "4920",
+            "id": "2468",
             "dato": "1790734241",
             "adyacentes": []
         },
         {
-            "id": "4921",
+            "id": "2469",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4922",
+            "id": "2470",
             "dato": "1790734273",
             "adyacentes": []
         },
         {
-            "id": "4923",
+            "id": "2471",
             "dato": "manolo3",
             "adyacentes": []
         },
         {
-            "id": "4924",
+            "id": "2472",
             "dato": "1790734299",
             "adyacentes": []
         },
         {
-            "id": "4925",
+            "id": "2473",
             "dato": "manolo3",
             "adyacentes": []
         },
         {
-            "id": "4926",
+            "id": "2474",
             "dato": "1790734439",
             "adyacentes": []
         },
         {
-            "id": "4927",
+            "id": "2475",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4928",
+            "id": "2476",
             "dato": "1790734458",
             "adyacentes": []
         },
         {
-            "id": "4929",
+            "id": "2477",
             "dato": "manolo3",
             "adyacentes": []
         },
         {
-            "id": "4930",
+            "id": "2478",
             "dato": "1790734472",
             "adyacentes": []
         },
         {
-            "id": "4931",
+            "id": "2479",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4932",
+            "id": "2480",
             "dato": "1790735057",
             "adyacentes": []
         },
         {
-            "id": "4933",
+            "id": "2481",
             "dato": "manolo3",
             "adyacentes": []
         },
         {
-            "id": "4934",
+            "id": "2482",
             "dato": "1790735187",
             "adyacentes": []
         },
         {
-            "id": "4935",
+            "id": "2483",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4936",
+            "id": "2484",
             "dato": "1790735899",
             "adyacentes": []
         },
         {
-            "id": "4937",
-            "dato": "",
-            "adyacentes": {
-                "creado_en": "4939",
-                "usuario": "4938"
-            }
-        },
-        {
-            "id": "4938",
+            "id": "2485",
             "dato": "manolo3",
             "adyacentes": []
         },
         {
-            "id": "4939",
+            "id": "2486",
             "dato": "1790735966",
             "adyacentes": []
         },
         {
-            "id": "4940",
-            "dato": "30\/09\/2026 05:23",
+            "id": "2487",
+            "dato": "01\/10\/2026 02:49",
             "adyacentes": []
         },
         {
-            "id": "4941",
+            "id": "2488",
             "dato": "::1",
             "adyacentes": []
         },
         {
-            "id": "4942",
+            "id": "2489",
             "dato": "secretaria_carmen",
             "adyacentes": []
         },
         {
-            "id": "4943",
+            "id": "2490",
             "dato": "1790738552",
             "adyacentes": []
         },
         {
-            "id": "4944",
+            "id": "2491",
             "dato": "Parroquia_del_Carmen",
             "adyacentes": []
         },
         {
-            "id": "4945",
+            "id": "2492",
             "dato": "1790738560",
             "adyacentes": []
         },
         {
-            "id": "4946",
+            "id": "2493",
             "dato": "secretaria_carmen",
             "adyacentes": []
         },
         {
-            "id": "4947",
+            "id": "2494",
             "dato": "1790738607",
             "adyacentes": []
         },
         {
-            "id": "4948",
-            "dato": "",
-            "adyacentes": {
-                "creado_en": "4950",
-                "usuario": "4949"
-            }
-        },
-        {
-            "id": "4949",
+            "id": "2495",
             "dato": "Administrador",
             "adyacentes": []
         },
         {
-            "id": "4950",
+            "id": "2496",
             "dato": "1790738616",
+            "adyacentes": []
+        },
+        {
+            "id": "2497",
+            "dato": "Administrador",
+            "adyacentes": []
+        },
+        {
+            "id": "2498",
+            "dato": "1790783874",
+            "adyacentes": []
+        },
+        {
+            "id": "2499",
+            "dato": "manolo3",
+            "adyacentes": []
+        },
+        {
+            "id": "2500",
+            "dato": "1790783976",
+            "adyacentes": []
+        },
+        {
+            "id": "2501",
+            "dato": "",
+            "adyacentes": {
+                "creado_en": "2503",
+                "usuario": "2502"
+            }
+        },
+        {
+            "id": "2502",
+            "dato": "secretaria_carmen",
+            "adyacentes": []
+        },
+        {
+            "id": "2503",
+            "dato": "1790815785",
+            "adyacentes": []
+        },
+        {
+            "id": "2504",
+            "dato": "01\/10\/2026 02:51",
+            "adyacentes": []
+        },
+        {
+            "id": "2505",
+            "dato": "::1",
+            "adyacentes": []
+        },
+        {
+            "id": "2506",
+            "dato": "",
+            "adyacentes": {
+                "creado_en": "2508",
+                "usuario": "2507"
+            }
+        },
+        {
+            "id": "2507",
+            "dato": "ignacio2",
+            "adyacentes": []
+        },
+        {
+            "id": "2508",
+            "dato": "1790815917",
             "adyacentes": []
         },
         {
             "id": "sesiones",
             "dato": "",
             "adyacentes": {
-                "2bcb6781c04892bb22657f9f3715db9d": "4937",
-                "e22ef92118dea1249ee7cc0149107b61": "4948"
+                "4b239b39023ee9fdea765f20b9bbd31f": "2506",
+                "5f93cc41f58bc46e422839a8b6525202": "2501"
             }
         },
         {
             "id": "usuarios",
             "dato": "",
             "adyacentes": {
-                "Administrador": "4842",
-                "ignacio": "4844",
-                "ignacio2": "4846",
-                "lila": "4866",
-                "mama": "4883",
-                "mama2": "4903",
-                "mama3": "4913",
-                "mama4": "4908",
-                "manolo": "4849",
-                "manolo3": "4873",
-                "Parroquia_del_Carmen": "4852",
-                "secretaria_carmen": "4854",
-                "Secretaria_Lujan": "4856"
+                "Administrador": "2390",
+                "ignacio": "2392",
+                "ignacio2": "2394",
+                "lila": "2414",
+                "mama": "2431",
+                "mama2": "2451",
+                "mama3": "2461",
+                "mama4": "2456",
+                "manolo": "2397",
+                "manolo3": "2421",
+                "Parroquia_del_Carmen": "2400",
+                "secretaria_carmen": "2402",
+                "Secretaria_Lujan": "2404"
             }
         }
     ]

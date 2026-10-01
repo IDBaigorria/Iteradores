@@ -591,6 +591,23 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   inicialización de la persistencia se reordenó después de los
   `require_once` para que `guardar_ambos` esté definida antes
   de usarse. Eliminado `Aplicacion/GuardarAmbos.php`.
+- **v73m**: fix del framework 1.5i.7a aplicado al piloto.
+  `Controlador::cargar` devuelve `bool|null` para distinguir
+  "no existe" de "error". SQL cierra conexiones en los
+  early-returns y escapa el nombre en todas las queries.
+  JSON escribe atómicamente y valida la estructura. Rehash
+  automático de credenciales en login exitoso: si el hash
+  quedó desactualizado, se regenera con la contraseña o
+  código recién verificado. Las tablas SQL fueron verificadas
+  con `CHECK`/`OPTIMIZE` en local y en producción el
+  30/09/2026, ambas OK.
+- **v73l**: fix del guardado SQL (framework 1.5i.7). `guardar`
+  usa transacción y divide los INSERT en chunks de ~200 KB para
+  no superar `max_allowed_packet` (1 MB en XAMPP). `guardar_ambos`
+  no guarda si la superestructura está vacía. `en_grafo_credenciales`
+  verifica la recarga y lanza excepción si falla. `index.php`
+  muere con mensaje claro si el grafo existe pero no se puede
+  cargar, en lugar de pisarlo con vacío.
 
 ---
 
@@ -609,6 +626,10 @@ La app tiene todo lo de v67 más:
 - **Respaldo JSON** con cada guardado (SQL principal).
 
 ### 8.2 Limpieza pendiente
+
+**Integridad de las tablas SQL:** verificada con `CHECK TABLE` y
+`OPTIMIZE TABLE` en local y en producción el 30/09/2026, ambas OK.
+No queda pendiente.
 
 Bloques y archivos de migración que se pueden eliminar cuando se
 confirmen en los 3 entornos:
@@ -865,9 +886,10 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73k (mover
-`guardar_ambos` a `FuncionesAuxiliares.php` y reordenar los includes
-de `index.php`).
+**Última actualización de este prompt:** v1.5piloto.73m (framework
+1.5i.7a: chequeos y escape en SQL, JSON atómico, `Controlador::cargar`
+con `bool|null`. Rehash automático de credenciales. Tablas SQL
+revisadas con `CHECK`/`OPTIMIZE` en los 3 entornos).
 
 **Estado de la conversación:**
 
@@ -880,6 +902,13 @@ de `index.php`).
   entre roles y falta de validación al cerrar sesión ajena).
 - Cerramos en v73k el fix del orden de includes en `index.php`
   y la mudanza de `guardar_ambos` a `FuncionesAuxiliares.php`.
+- Cerramos en v73l el fix del guardado SQL (framework 1.5i.7):
+  transacción + chunks. Era la causa raíz de las tablas corruptas
+  y del riesgo de que el grafo quede vacío.
+- Cerramos en v73m el fix del framework 1.5i.7a: chequeos y escape
+  en `cargar`/`existe`/`eliminar` de SQL, escritura atómica y
+  validación en JSON, `Controlador::cargar` distingue "no existe"
+  de "error", y rehash automático de credenciales en login exitoso.
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -937,8 +966,9 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.73k. Todo funcional.
-Listo para arrancar la diversificación por tipo de aplicación.
+**Estado del proyecto al cierre:** v1.5piloto.73m (framework 1.5i.7a).
+Todo funcional. Listo para arrancar la diversificación por tipo de
+aplicación.
 
 ---
 

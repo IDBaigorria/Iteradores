@@ -193,6 +193,13 @@ function guardar_ambos($nombre): bool {
         return false;
     }
 
+    // Defensa: no guardar si la superestructura esta vacia.
+    // Guardar vacio pisa el grafo con nada.
+    if (!Nodo::hay_nodos_en_superestructura()) {
+        Controlador::_error("guardar_ambos: superestructura vacia para \"$nombre\". Se aborta para no pisar el grafo.");
+        return false;
+    }
+
     // 1) Guardar en SQL (fuente de verdad).
     $ok_sql = Controlador::guardar($nombre);
     if (!$ok_sql) {

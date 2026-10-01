@@ -10,7 +10,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.73
+ * @version   1.5piloto.73m
  */
 
 use Iteradores\Configuracion\Conf;
@@ -62,7 +62,7 @@ function autenticar_por_codigo(string $codigo): ?array {
         }
 
         // Login exitoso: resetear intentos, registrar acceso, rehash.
-        _registrar_login_exitoso($encontrado_nodo, $ip_cliente);
+        _registrar_login_exitoso($encontrado_nodo, $ip_cliente, 'codigo_hash', $codigo);
         $nombre_usuario = $encontrado;
     });
 
@@ -114,7 +114,7 @@ function autenticar_por_usuario(string $nombre_usuario, string $contrasena): ?ar
         }
 
         // Login exitoso: resetear intentos, registrar acceso, rehash.
-        _registrar_login_exitoso($nodo_usuario, $ip_cliente);
+        _registrar_login_exitoso($nodo_usuario, $ip_cliente, 'contrasena', $contrasena);
         $verificado = true;
     });
 
@@ -232,7 +232,7 @@ function _registrar_intento_fallido(Nodo $nodo_usuario): void {
  * @param string $ip_cliente IP del cliente.
  * @return void
  */
-function _registrar_login_exitoso(Nodo $nodo_usuario, string $ip_cliente): void {
+function _registrar_login_exitoso(Nodo $nodo_usuario, string $ip_cliente, string $campo_rehash = '', string $valor_plano = ''): void {
     // Resetear intentos y bloqueo.
     $nodo_intentos = $nodo_usuario->adyacente('intentos_fallidos');
     if ($nodo_intentos) $nodo_intentos->_dato('0');
@@ -247,6 +247,16 @@ function _registrar_login_exitoso(Nodo $nodo_usuario, string $ip_cliente): void 
     $nodo_ip = $nodo_usuario->adyacente('ip_ultimo_acceso');
     if ($nodo_ip) $nodo_ip->_dato($ip_cliente);
     else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($ip_cliente), 'ip_ultimo_acceso');
+
+    // Rehash: si el hash quedo desactualizado (por ejemplo, cambio el
+    // algoritmo por defecto en una version nueva de PHP), se regenera
+    // con el mismo valor plano que acabamos de verificar.
+    if ($campo_rehash !== '' && $valor_plano !== '') {
+        $nodo_hash = $nodo_usuario->adyacente($campo_rehash);
+        if ($nodo_hash && password_needs_rehash($nodo_hash->dato(), PASSWORD_DEFAULT)) {
+            $nodo_hash->_dato(password_hash($valor_plano, PASSWORD_DEFAULT));
+        }
+    }
 }
 
 /**
