@@ -454,6 +454,11 @@ function migrar_xxx(): array {
   intentaba crear el mismo ID especial después de `cargar` (que
   reinserta el ID al recrear el nodo). Ahora verifica directamente
   `vaciar_superestructura`.
+- **1.5i.7e**: sin cambios funcionales al framework. Documentación:
+  en la sección 12 del prompt se aclaran los cambios del PHP que no
+  tienen análogo en JS (libxml, `glob()`, `real_escape_string`), y
+  se documenta que el bug latente `if ($elemento)` de `Iterador`
+  existe en AMBOS espejos (PHP y JS).
 
 El espejo JS también recibió mejoras en paralelo (ver sección 12).
 Su historial es: 1.5i.4 → 1.5i.5 (robustez de persistencia)
@@ -485,6 +490,19 @@ navegador.
 - **Métodos async:** IndexedDB es asíncrono. `Controlador.delegar`,
   `Controlador.guardar`, `Controlador.cargar`, `Controlador.existe`,
   `Controlador.eliminar` y `Controlador.ejecutar_prueba` son `async`.
+
+**Cambios del PHP sin análogo en JS.** No son gaps pendientes,
+son diferencias de plataforma:
+
+- `libxml_clear_errors()` y `libxml_use_internal_errors()`: JS no
+  tiene libxml. El parseo XML usa `DOMParser`, que no deja estado
+  acumulado entre llamadas.
+- `listar()` sobre JSON/XML: no aplica. El navegador no da acceso al
+  filesystem, así que no hay carpeta que listar. Los archivos se
+  descargan/cargan uno por uno vía interacción del usuario.
+- `real_escape_string` y todo lo relacionado con `mysqli`: no aplica.
+  No hay motor SQL. IndexedDB es un object store, no una base
+  relacional.
 
 ### 12.2 Persistencia en IndexedDB
 
@@ -534,10 +552,23 @@ verificar un campo privado de otra clase, en JS ese chequeo siempre
 es `false`.
 
 **`if (elemento)` descarta falsy.** `0`, `''`, `false` son falsy en
-ambos lenguajes, pero en JS es más fácil olvidarlo porque el tipo
-original puede cambiar entre llamadas. Pendiente en `Iterador.js`
-(bug latente): `if (elemento)` debería ser
-`if (elemento !== null && elemento !== undefined)`.
+ambos lenguajes. Este bug existe en los DOS espejos, en los mismos
+métodos de `Iterador`:
+
+- PHP: `Iterador::crear_interno`, `Iterador::cargar_interno` e
+  `Iterador::iterador_interno` usan `if ($elemento)`.
+- JS: `Iterador._crear_interno`, `Iterador._cargar_interno` e
+  `Iterador._iterador_interno` usan `if (elemento)`.
+
+En todos los casos, si el elemento inicial es `0`, `''` o `false`,
+el iterador se crea/carga sin posición actual. Es un bug latente
+(nadie inicializa iteradores con esos valores en la práctica), pero
+real. El fix es:
+
+- PHP: `if ($elemento !== null)`
+- JS: `if (elemento !== null && elemento !== undefined)`
+
+Pendiente en ambos espejos.
 
 ### 12.4 API del Controlador JS
 

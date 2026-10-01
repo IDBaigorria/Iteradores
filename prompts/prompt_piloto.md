@@ -623,6 +623,10 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   verifica directamente `vaciar_superestructura`. Se alineó
   `crear_chunks_insertar_adyacentes` con el espejo JS para no
   emitir alertas por cada nodo sin adyacentes.
+- **v73q**: tanda de documentación. Se aclaran en el prompt del
+  framework los cambios del PHP que no tienen análogo en JS, y se
+  documenta que el bug latente `if ($elemento)` de `Iterador`
+  existe en AMBOS espejos.
 - **v73l**: fix del guardado SQL (framework 1.5i.7). `guardar`
   usa transacción y divide los INSERT en chunks de ~200 KB para
   no superar `max_allowed_packet` (1 MB en XAMPP). `guardar_ambos`
@@ -908,9 +912,9 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73p (reescritura
-del test del depósito de IDs; alineación de las alertas de guardado
-SQL con el espejo JS).
+**Última actualización de este prompt:** v1.5piloto.73q (tanda de
+documentación: cambios sin análogo en JS; bug latente
+`if ($elemento)` en ambos espejos de `Iterador`).
 
 **Estado de la conversación:**
 
@@ -940,6 +944,8 @@ SQL con el espejo JS).
 - Cerramos en v73p la reescritura del test (el anterior daba falso
   positivo) y la alineación de `crear_chunks_insertar_adyacentes`
   con el espejo JS.
+- Cerramos en v73q la documentación del espejo JS y del bug
+  latente `if ($elemento)` de `Iterador`.
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -997,7 +1003,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.73p (framework 1.5i.7d).
+**Estado del proyecto al cierre:** v1.5piloto.73q (framework 1.5i.7e).
 Todo funcional. Listo para arrancar la diversificación por tipo de
 aplicación.
 

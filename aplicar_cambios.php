@@ -2,15 +2,12 @@
 /**
  * Aplicador de cambios automáticos — Framework Iteradores (PHP).
  *
- * Tanda V1.5i.7d:
- * - Reescritura de Pruebas/prueba_deposito.php con un test bien
- *   diseñado: verifica directamente que vaciar_superestructura
- *   limpia el depósito de IDs, sin pasar por cargar (que reinserta
- *   el ID y da un falso positivo).
- * - PerdurarSuperestructuraStringSQL.php: crear_chunks_insertar_adyacentes
- *   usa `adyacentes()` en lugar de `por_cada_adyacente_ejecutar` para
- *   no emitir una alerta por cada nodo sin adyacentes (alineación con
- *   el espejo JS).
+ * Tanda V1.5i.7e: documentación del espejo JS.
+ *
+ * - prompts/prompt_framework_iteradores.md: sección 12.1 ampliada
+ *   (cambios del PHP sin análogo en JS), sección 12.3 ampliada
+ *   (bug `if ($elemento)` en AMBOS espejos), historial 1.5i.7e.
+ * - prompts/prompt_piloto.md: historial v73q, Discusión actual.
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -30,164 +27,84 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ============================================================
-    // Pruebas/prueba_deposito.php (reescribir)
-    // ============================================================
-
-    [
-        'tipo' => 'crear',
-        'archivo' => 'Pruebas/prueba_deposito.php',
-        'descripcion' => 'Reescritura del test del depósito de IDs',
-        'contenido' => [
-            '<?php',
-            '/**',
-            ' * Prueba del depósito de IDs del framework Iteradores (PHP).',
-            ' *',
-            ' * Verifica que al vaciar la superestructura el depósito de IDs',
-            ' * especiales se limpia correctamente, permitiendo volver a crear',
-            ' * nodos con los mismos IDs especiales.',
-            ' *',
-            ' * Este test NO usa Controlador::cargar porque cargar reinserta los',
-            ' * IDs especiales en el depósito (los recrea). Un test que intente',
-            ' * crear el mismo ID después de cargar da un falso positivo: el',
-            ' * error "Ya existe ese id" es el comportamiento correcto.',
-            ' *',
-            ' * En cambio, se verifica que:',
-            ' *   1. Crear un ID especial funciona.',
-            ' *   2. Existe el nodo correspondiente.',
-            ' *   3. Al vaciar la superestructura, el nodo desaparece.',
-            ' *   4. Se puede volver a crear el mismo ID especial.',
-            ' *',
-            ' * Se ejecuta como bloque temporal desde index.php:',
-            ' *   http://localhost/.../index.php?probar_deposito=1',
-            ' *',
-            ' * @package   Iteradores',
-            ' * @since     1.5i.7d',
-            ' */',
-            '',
-            'require_once __DIR__ . \'/../Controlador/Controlador.php\';',
-            'require_once __DIR__ . \'/../Configuracion/Configuracion.php\';',
-            'require_once __DIR__ . \'/../Nodos/Nodo.php\';',
-            'require_once __DIR__ . \'/../Nucleo/Objeto.php\';',
-            '',
-            'use Iteradores\\Controlador\\Controlador;',
-            'use Iteradores\\Nodos\\Nodo;',
-            'use Iteradores\\Nucleo\\Objeto;',
-            '',
-            'header(\'Content-Type: text/plain; charset=utf-8\');',
-            '',
-            'echo "=== PRUEBA DEL DEPOSITO DE IDS (PHP) ===\\n\\n";',
-            '',
-            '$id_prueba = \'test_especial_deposito\';',
-            '',
-            'Controlador::ejecutar_prueba(function ($token) use ($id_prueba) {',
-            '',
-            '    // 1. Crear un nodo especial.',
-            '    $n1 = Nodo::crear_con_id($id_prueba);',
-            '    echo "1. Crear \'{$id_prueba}\' (1ra vez): " . ($n1 ? \'OK\' : \'FALLO\') . "\\n";',
-            '',
-            '    // 2. Verificar que existe.',
-            '    $existe1 = Nodo::nodo_por_id($id_prueba);',
-            '    echo "2. El nodo existe: " . ($existe1 ? \'OK\' : \'FALLO\') . "\\n";',
-            '',
-            '    // 3. Vaciar la superestructura.',
-            '    $vaciado = Nodo::vaciar_superestructura($token);',
-            '    echo "3. Vaciar superestructura: " . ($vaciado ? \'OK\' : \'FALLO\') . "\\n";',
-            '',
-            '    // 4. Verificar que el nodo ya no existe.',
-            '    $existe2 = Nodo::nodo_por_id($id_prueba);',
-            '    echo "4. El nodo ya no existe: " . (!$existe2 ? \'OK\' : \'FALLO\') . "\\n";',
-            '',
-            '    // 5. Crear el mismo id especial de nuevo.',
-            '    $n2 = Nodo::crear_con_id($id_prueba);',
-            '    echo "5. Crear \'{$id_prueba}\' (2da vez tras vaciar): " . ($n2 ? \'OK\' : \'FALLO\') . "\\n";',
-            '',
-            '    echo "\\n=== RESULTADO ===\\n";',
-            '    if ($n2) {',
-            '        echo "SIN BUG: vaciar_superestructura limpia el deposito de IDs.\\n";',
-            '    } else {',
-            '        echo "BUG PRESENTE: el deposito NO se limpio al vaciar.\\n";',
-            '        echo "El id \'{$id_prueba}\' sigue en Objeto::\\$deposito_de_ids.\\n";',
-            '        echo "\\nErrores:\\n";',
-            '        echo Objeto::json_errores() . "\\n";',
-            '    }',
-            '    echo "\\n=== FIN DE LA PRUEBA ===\\n";',
-            '});',
-        ],
-    ],
-
-    // ============================================================
-    // Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStringSQL.php
-    // ============================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStringSQL.php',
-        'descripcion' => 'Bump de version a 1.5i.7d',
-        'buscar' => [
-            ' * @version 1.5i.7a',
-        ],
-        'reemplazar' => [
-            ' * @version 1.5i.7d',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStringSQL.php',
-        'descripcion' => 'crear_chunks_insertar_adyacentes sin alertas',
-        'buscar' => [
-            '	static private function crear_chunks_insertar_adyacentes($sql, $nombre): array',
-            '	{',
-            '		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {',
-            '			return $nodo->por_cada_adyacente_ejecutar(function ($ady) {',
-            '				return $ady->id();',
-            '			});',
-            '		});',
-            '',
-            '		if (empty($datos)) return [];',
-        ],
-        'reemplazar' => [
-            '	static private function crear_chunks_insertar_adyacentes($sql, $nombre): array',
-            '	{',
-            '		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {',
-            '			$enlaces = [];',
-            '			// Usamos adyacentes() en lugar de por_cada_adyacente_ejecutar',
-            '			// porque el primero devuelve [] sin alerta cuando el nodo no',
-            '			// tiene adyacentes. El segundo emite una alerta por cada nodo',
-            '			// sin adyacentes, lo que llena la lista de alertas con ruido',
-            '			// (alineado con el espejo JS desde V1.5i.7).',
-            '			$ady = $nodo->adyacentes();',
-            '			if (is_array($ady)) {',
-            '				foreach ($ady as $enlace => $adyacente) {',
-            '					$enlaces[$enlace] = $adyacente->id();',
-            '				}',
-            '			}',
-            '			return $enlaces;',
-            '		});',
-            '',
-            '		if (empty($datos)) return [];',
-        ],
-    ],
-
-    // ============================================================
     // prompts/prompt_framework_iteradores.md
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_framework_iteradores.md',
-        'descripcion' => 'Framework historial: agregar 1.5i.7d',
+        'descripcion' => 'Seccion 12.1: agregar cambios sin analogo en JS',
         'buscar' => [
-            '- **1.5i.7c**: sin cambios funcionales al framework PHP. Se agrega',
-            '  `Pruebas/prueba_deposito.php` para verificar que el depósito de',
-            '  IDs se limpia correctamente al vaciar la superestructura. Se',
-            '  documenta el espejo JS en la sección 12 de este prompt.',
+            '- **Métodos async:** IndexedDB es asíncrono. `Controlador.delegar`,',
+            '  `Controlador.guardar`, `Controlador.cargar`, `Controlador.existe`,',
+            '  `Controlador.eliminar` y `Controlador.ejecutar_prueba` son `async`.',
+            '',
+            '### 12.2 Persistencia en IndexedDB',
         ],
         'reemplazar' => [
-            '- **1.5i.7c**: sin cambios funcionales al framework PHP. Se agrega',
-            '  `Pruebas/prueba_deposito.php` para verificar que el depósito de',
-            '  IDs se limpia correctamente al vaciar la superestructura. Se',
-            '  documenta el espejo JS en la sección 12 de este prompt.',
+            '- **Métodos async:** IndexedDB es asíncrono. `Controlador.delegar`,',
+            '  `Controlador.guardar`, `Controlador.cargar`, `Controlador.existe`,',
+            '  `Controlador.eliminar` y `Controlador.ejecutar_prueba` son `async`.',
+            '',
+            '**Cambios del PHP sin análogo en JS.** No son gaps pendientes,',
+            'son diferencias de plataforma:',
+            '',
+            '- `libxml_clear_errors()` y `libxml_use_internal_errors()`: JS no',
+            '  tiene libxml. El parseo XML usa `DOMParser`, que no deja estado',
+            '  acumulado entre llamadas.',
+            '- `listar()` sobre JSON/XML: no aplica. El navegador no da acceso al',
+            '  filesystem, así que no hay carpeta que listar. Los archivos se',
+            '  descargan/cargan uno por uno vía interacción del usuario.',
+            '- `real_escape_string` y todo lo relacionado con `mysqli`: no aplica.',
+            '  No hay motor SQL. IndexedDB es un object store, no una base',
+            '  relacional.',
+            '',
+            '### 12.2 Persistencia en IndexedDB',
+        ],
+    ],
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_framework_iteradores.md',
+        'descripcion' => 'Seccion 12.3: bug if(elemento) en ambos espejos',
+        'buscar' => [
+            '**`if (elemento)` descarta falsy.** `0`, `\'\'`, `false` son falsy en',
+            'ambos lenguajes, pero en JS es más fácil olvidarlo porque el tipo',
+            'original puede cambiar entre llamadas. Pendiente en `Iterador.js`',
+            '(bug latente): `if (elemento)` debería ser',
+            '`if (elemento !== null && elemento !== undefined)`.',
+            '',
+            '### 12.4 API del Controlador JS',
+        ],
+        'reemplazar' => [
+            '**`if (elemento)` descarta falsy.** `0`, `\'\'`, `false` son falsy en',
+            'ambos lenguajes. Este bug existe en los DOS espejos, en los mismos',
+            'métodos de `Iterador`:',
+            '',
+            '- PHP: `Iterador::crear_interno`, `Iterador::cargar_interno` e',
+            '  `Iterador::iterador_interno` usan `if ($elemento)`.',
+            '- JS: `Iterador._crear_interno`, `Iterador._cargar_interno` e',
+            '  `Iterador._iterador_interno` usan `if (elemento)`.',
+            '',
+            'En todos los casos, si el elemento inicial es `0`, `\'\'` o `false`,',
+            'el iterador se crea/carga sin posición actual. Es un bug latente',
+            '(nadie inicializa iteradores con esos valores en la práctica), pero',
+            'real. El fix es:',
+            '',
+            '- PHP: `if ($elemento !== null)`',
+            '- JS: `if (elemento !== null && elemento !== undefined)`',
+            '',
+            'Pendiente en ambos espejos.',
+            '',
+            '### 12.4 API del Controlador JS',
+        ],
+    ],
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_framework_iteradores.md',
+        'descripcion' => 'Historial framework: agregar 1.5i.7e',
+        'buscar' => [
             '- **1.5i.7d**: `PerdurarSuperestructuraStringSQL::crear_chunks_insertar_adyacentes`',
             '  usa `adyacentes()` en lugar de `por_cada_adyacente_ejecutar`, para',
             '  no emitir una alerta por cada nodo sin adyacentes (alineado con el',
@@ -196,6 +113,21 @@ $cambios = [
             '  intentaba crear el mismo ID especial después de `cargar` (que',
             '  reinserta el ID al recrear el nodo). Ahora verifica directamente',
             '  `vaciar_superestructura`.',
+        ],
+        'reemplazar' => [
+            '- **1.5i.7d**: `PerdurarSuperestructuraStringSQL::crear_chunks_insertar_adyacentes`',
+            '  usa `adyacentes()` en lugar de `por_cada_adyacente_ejecutar`, para',
+            '  no emitir una alerta por cada nodo sin adyacentes (alineado con el',
+            '  espejo JS). Reescritura de `Pruebas/prueba_deposito.php` con un',
+            '  test bien diseñado: el anterior daba un falso positivo porque',
+            '  intentaba crear el mismo ID especial después de `cargar` (que',
+            '  reinserta el ID al recrear el nodo). Ahora verifica directamente',
+            '  `vaciar_superestructura`.',
+            '- **1.5i.7e**: sin cambios funcionales al framework. Documentación:',
+            '  en la sección 12 del prompt se aclaran los cambios del PHP que no',
+            '  tienen análogo en JS (libxml, `glob()`, `real_escape_string`), y',
+            '  se documenta que el bug latente `if ($elemento)` de `Iterador`',
+            '  existe en AMBOS espejos (PHP y JS).',
         ],
     ],
 
@@ -206,22 +138,8 @@ $cambios = [
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'Piloto historial: agregar v73p',
+        'descripcion' => 'Piloto historial: agregar v73q',
         'buscar' => [
-            '- **v73o**: script de prueba del depósito de IDs en',
-            '  `Pruebas/prueba_deposito.php`, ejecutable con `?probar_deposito=1`',
-            '  desde `index.php`. Confirma que el framework PHP NO tiene el bug',
-            '  de limpieza de IDs que sí existió en el espejo JS hasta 1.5i.6.',
-            '  De paso, se documenta el espejo JS en el prompt del framework',
-            '  (sección 12).',
-        ],
-        'reemplazar' => [
-            '- **v73o**: script de prueba del depósito de IDs en',
-            '  `Pruebas/prueba_deposito.php`, ejecutable con `?probar_deposito=1`',
-            '  desde `index.php`. Confirma que el framework PHP NO tiene el bug',
-            '  de limpieza de IDs que sí existió en el espejo JS hasta 1.5i.6.',
-            '  De paso, se documenta el espejo JS en el prompt del framework',
-            '  (sección 12).',
             '- **v73p**: reescritura del test del depósito de IDs. El anterior',
             '  daba falso positivo porque intentaba recrear el ID después de',
             '  `cargar` (que reinserta el ID al recrear el nodo). El nuevo test',
@@ -229,56 +147,67 @@ $cambios = [
             '  `crear_chunks_insertar_adyacentes` con el espejo JS para no',
             '  emitir alertas por cada nodo sin adyacentes.',
         ],
+        'reemplazar' => [
+            '- **v73p**: reescritura del test del depósito de IDs. El anterior',
+            '  daba falso positivo porque intentaba recrear el ID después de',
+            '  `cargar` (que reinserta el ID al recrear el nodo). El nuevo test',
+            '  verifica directamente `vaciar_superestructura`. Se alineó',
+            '  `crear_chunks_insertar_adyacentes` con el espejo JS para no',
+            '  emitir alertas por cada nodo sin adyacentes.',
+            '- **v73q**: tanda de documentación. Se aclaran en el prompt del',
+            '  framework los cambios del PHP que no tienen análogo en JS, y se',
+            '  documenta que el bug latente `if ($elemento)` de `Iterador`',
+            '  existe en AMBOS espejos.',
+        ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'Piloto Discusion actual: bump a v73p',
+        'descripcion' => 'Piloto Discusion actual: bump a v73q',
         'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.73o (script de',
-            'prueba del depósito de IDs en `Pruebas/prueba_deposito.php`;',
-            'prompts actualizados para reflejar el espejo JS del framework).',
-        ],
-        'reemplazar' => [
             '**Última actualización de este prompt:** v1.5piloto.73p (reescritura',
             'del test del depósito de IDs; alineación de las alertas de guardado',
             'SQL con el espejo JS).',
         ],
+        'reemplazar' => [
+            '**Última actualización de este prompt:** v1.5piloto.73q (tanda de',
+            'documentación: cambios sin análogo en JS; bug latente',
+            '`if ($elemento)` en ambos espejos de `Iterador`).',
+        ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'Piloto Estado de la conversacion: agregar v73p',
+        'descripcion' => 'Piloto Estado de la conversacion: agregar v73q',
         'buscar' => [
-            '- Cerramos en v73o el script de prueba del depósito de IDs en',
-            '  `Pruebas/` y la documentación del espejo JS en el prompt del',
-            '  framework.',
-            '- No hay tandas en curso.',
-        ],
-        'reemplazar' => [
-            '- Cerramos en v73o el script de prueba del depósito de IDs en',
-            '  `Pruebas/` y la documentación del espejo JS en el prompt del',
-            '  framework.',
             '- Cerramos en v73p la reescritura del test (el anterior daba falso',
             '  positivo) y la alineación de `crear_chunks_insertar_adyacentes`',
             '  con el espejo JS.',
             '- No hay tandas en curso.',
         ],
+        'reemplazar' => [
+            '- Cerramos en v73p la reescritura del test (el anterior daba falso',
+            '  positivo) y la alineación de `crear_chunks_insertar_adyacentes`',
+            '  con el espejo JS.',
+            '- Cerramos en v73q la documentación del espejo JS y del bug',
+            '  latente `if ($elemento)` de `Iterador`.',
+            '- No hay tandas en curso.',
+        ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'Piloto estado al cierre: bump a v73p',
+        'descripcion' => 'Piloto estado al cierre: bump a v73q',
         'buscar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.73o (framework 1.5i.7c).',
+            '**Estado del proyecto al cierre:** v1.5piloto.73p (framework 1.5i.7d).',
             'Todo funcional. Listo para arrancar la diversificación por tipo de',
             'aplicación.',
         ],
         'reemplazar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.73p (framework 1.5i.7d).',
+            '**Estado del proyecto al cierre:** v1.5piloto.73q (framework 1.5i.7e).',
             'Todo funcional. Listo para arrancar la diversificación por tipo de',
             'aplicación.',
         ],
