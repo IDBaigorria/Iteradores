@@ -12,7 +12,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php"
 /**
  * Clase PerdurarSuperestructuraStringSQL
  * 
- * @version 1.5i.7a
+ * @version 1.5i.7d
  *
  * @author Ignacio David Baigorria
  *
@@ -393,9 +393,19 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 	static private function crear_chunks_insertar_adyacentes($sql, $nombre): array
 	{
 		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
-			return $nodo->por_cada_adyacente_ejecutar(function ($ady) {
-				return $ady->id();
-			});
+			$enlaces = [];
+			// Usamos adyacentes() en lugar de por_cada_adyacente_ejecutar
+			// porque el primero devuelve [] sin alerta cuando el nodo no
+			// tiene adyacentes. El segundo emite una alerta por cada nodo
+			// sin adyacentes, lo que llena la lista de alertas con ruido
+			// (alineado con el espejo JS desde V1.5i.7).
+			$ady = $nodo->adyacentes();
+			if (is_array($ady)) {
+				foreach ($ady as $enlace => $adyacente) {
+					$enlaces[$enlace] = $adyacente->id();
+				}
+			}
+			return $enlaces;
 		});
 
 		if (empty($datos)) return [];

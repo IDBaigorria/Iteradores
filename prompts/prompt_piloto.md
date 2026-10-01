@@ -617,6 +617,12 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   de limpieza de IDs que sí existió en el espejo JS hasta 1.5i.6.
   De paso, se documenta el espejo JS en el prompt del framework
   (sección 12).
+- **v73p**: reescritura del test del depósito de IDs. El anterior
+  daba falso positivo porque intentaba recrear el ID después de
+  `cargar` (que reinserta el ID al recrear el nodo). El nuevo test
+  verifica directamente `vaciar_superestructura`. Se alineó
+  `crear_chunks_insertar_adyacentes` con el espejo JS para no
+  emitir alertas por cada nodo sin adyacentes.
 - **v73l**: fix del guardado SQL (framework 1.5i.7). `guardar`
   usa transacción y divide los INSERT en chunks de ~200 KB para
   no superar `max_allowed_packet` (1 MB en XAMPP). `guardar_ambos`
@@ -902,9 +908,9 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73o (script de
-prueba del depósito de IDs en `Pruebas/prueba_deposito.php`;
-prompts actualizados para reflejar el espejo JS del framework).
+**Última actualización de este prompt:** v1.5piloto.73p (reescritura
+del test del depósito de IDs; alineación de las alertas de guardado
+SQL con el espejo JS).
 
 **Estado de la conversación:**
 
@@ -931,6 +937,9 @@ prompts actualizados para reflejar el espejo JS del framework).
 - Cerramos en v73o el script de prueba del depósito de IDs en
   `Pruebas/` y la documentación del espejo JS en el prompt del
   framework.
+- Cerramos en v73p la reescritura del test (el anterior daba falso
+  positivo) y la alineación de `crear_chunks_insertar_adyacentes`
+  con el espejo JS.
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -988,7 +997,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.73o (framework 1.5i.7c).
+**Estado del proyecto al cierre:** v1.5piloto.73p (framework 1.5i.7d).
 Todo funcional. Listo para arrancar la diversificación por tipo de
 aplicación.
 

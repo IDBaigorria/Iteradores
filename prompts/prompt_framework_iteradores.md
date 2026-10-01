@@ -446,6 +446,14 @@ function migrar_xxx(): array {
   `Pruebas/prueba_deposito.php` para verificar que el depósito de
   IDs se limpia correctamente al vaciar la superestructura. Se
   documenta el espejo JS en la sección 12 de este prompt.
+- **1.5i.7d**: `PerdurarSuperestructuraStringSQL::crear_chunks_insertar_adyacentes`
+  usa `adyacentes()` en lugar de `por_cada_adyacente_ejecutar`, para
+  no emitir una alerta por cada nodo sin adyacentes (alineado con el
+  espejo JS). Reescritura de `Pruebas/prueba_deposito.php` con un
+  test bien diseñado: el anterior daba un falso positivo porque
+  intentaba crear el mismo ID especial después de `cargar` (que
+  reinserta el ID al recrear el nodo). Ahora verifica directamente
+  `vaciar_superestructura`.
 
 El espejo JS también recibió mejoras en paralelo (ver sección 12).
 Su historial es: 1.5i.4 → 1.5i.5 (robustez de persistencia)
