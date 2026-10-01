@@ -9,6 +9,11 @@ conversación junto con `prompts/prompt_piloto.md` y
 Se actualiza cuando cambia el framework. No incluye nada específico del
 piloto: eso vive en `prompts/prompt_piloto.md`.
 
+El framework tiene un **espejo en JavaScript** para navegador (ver
+sección 12). Comparten la API conceptual, pero difieren en persistencia
+(SQL/JSON/XML en PHP, IndexedDB/JSON/XML en JS) y en detalles propios
+de cada lenguaje.
+
 ---
 
 ## 1. QUÉ ES ITERADORES
@@ -437,13 +442,128 @@ function migrar_xxx(): array {
   sin doble vaciado en `cargar`, `listar()` chequea `glob()`.
   `PerdurarSuperestructuraStringJSON::listar()` también chequea
   `glob()`. ESQL queda pendiente.
+- **1.5i.7c**: sin cambios funcionales al framework PHP. Se agrega
+  `Pruebas/prueba_deposito.php` para verificar que el depósito de
+  IDs se limpia correctamente al vaciar la superestructura. Se
+  documenta el espejo JS en la sección 12 de este prompt.
+
+El espejo JS también recibió mejoras en paralelo (ver sección 12).
+Su historial es: 1.5i.4 → 1.5i.5 (robustez de persistencia)
+→ 1.5i.6 (fix del depósito de IDs) → 1.5i.7 (alineación con PHP).
 
 El framework en sí no cambia mucho. La mayoría de los cambios son en el
 piloto.
 
 ---
 
-## 11. CIERRE
+## 12. ESPEJO EN JAVASCRIPT
+
+El framework Iteradores tiene un espejo en JavaScript para navegador.
+Vive en un proyecto separado (por ejemplo, `iteradoresJS/`) con la misma
+estructura de carpetas y las mismas clases, pero adaptado al entorno
+navegador.
+
+### 12.1 Qué cambia respecto al PHP
+
+- **Persistencia principal:** IndexedDB (`PerdurarSuperestructuraStringIndexedDB`).
+  No hay SQL. JSON y XML descargan/cargan archivos vía interacción del
+  usuario.
+- **Sin acceso al filesystem:** no se puede escribir atómicamente con
+  `.tmp` + `rename` como en PHP; el navegador genera el Blob completo o
+  no lo genera.
+- **Campos privados:** JS tiene `#privados` reales, más estrictos que los
+  `private` de PHP. Un `#privado` de una clase base NO es accesible desde
+  una subclase.
+- **Métodos async:** IndexedDB es asíncrono. `Controlador.delegar`,
+  `Controlador.guardar`, `Controlador.cargar`, `Controlador.existe`,
+  `Controlador.eliminar` y `Controlador.ejecutar_prueba` son `async`.
+
+### 12.2 Persistencia en IndexedDB
+
+IndexedDB tiene dos object stores: `nodos` y `adyacentes`. Cada uno
+indexado por `idsuperestructura`.
+
+**Guardar** se hace en **una sola transacción atómica**:
+1. `db.transaction([nodos, adyacentes], 'readwrite')`
+2. Recorrer los cursores del índice `idsuperestructura` y borrar los
+   registros con ese nombre.
+3. Cuando ambos cursores terminan, encolar los INSERT (`add`) en la
+   misma transacción.
+4. `tx.oncomplete` → commit. `tx.onerror`/`tx.onabort` → rollback.
+
+Si algo falla, la transacción se aborta y los datos previos quedan
+intactos. Es el equivalente JS de `begin_transaction/commit/rollback`
+en SQL.
+
+**Error que esto evita:** antes el DELETE y los INSERT iban en
+transacciones separadas. Un fallo a mitad dejaba el grafo a medio
+pisar. Igual que el bug de SQL pre-1.5i.7.
+
+**Cierre de conexión:** `db.close()` en `finally` en `guardar`,
+`cargar`, `existe` y `eliminar`.
+
+**Datos como strings:** los IDs y datos se guardan como strings, igual
+que en PHP. `String(id)`, `String(dato)` (o `''` si es null/undefined).
+
+### 12.3 Trampas PHP ↔ JS
+
+**Campos privados en la clase base.** En PHP, `private static
+$deposito_de_ids` en `Objeto` es accesible desde la propia clase (por
+ejemplo, desde un método `limpiar_ids_especiales()`). En JS,
+`#deposito_de_ids` es accesible solo desde la clase `Objeto`.
+
+**Regla:** si un campo privado tiene que ser limpiado desde una
+subclase o desde otra clase, **la clase dueña del campo debe exponer
+un método público**. En PHP:
+`Objeto::limpiar_ids_especiales()` (limpia solo los especiales). En JS:
+`Objeto.limpiar_deposito_ids()` (limpia solo los especiales, alineado
+con PHP desde V1.5i.7).
+
+**Nunca acceder a un `#privado` desde otra clase.** Aunque el
+traductor de PHP a JS lo haga "por analogía", no funciona. Si en el
+código original PHP hay `typeof $this->campo !== 'undefined'` para
+verificar un campo privado de otra clase, en JS ese chequeo siempre
+es `false`.
+
+**`if (elemento)` descarta falsy.** `0`, `''`, `false` son falsy en
+ambos lenguajes, pero en JS es más fácil olvidarlo porque el tipo
+original puede cambiar entre llamadas. Pendiente en `Iterador.js`
+(bug latente): `if (elemento)` debería ser
+`if (elemento !== null && elemento !== undefined)`.
+
+### 12.4 API del Controlador JS
+
+`Controlador.cargar(nombre)` devuelve una promesa que resuelve a:
+- `true`: cargó.
+- `false`: no existe.
+- `null`: error (conexión, query, transacción abortada).
+
+`Controlador.guardar(nombre)`, `Controlador.existe(nombre)` y
+`Controlador.eliminar(nombre)` también son `async`.
+
+`Controlador.ejecutar_prueba(callback)` es `async` y espera al
+callback. Si el callback es `async`, se resuelve cuando el callback
+termina. Antes no esperaba, y los tests imprimían "finalizado" antes
+de que terminara el trabajo.
+
+### 12.5 Estado del espejo JS
+
+Versiones recientes del espejo JS:
+- **1.5i.4**: base.
+- **1.5i.5**: robustez de persistencia (transacción atómica en
+  IndexedDB, casteo a string, `db.close()` en `finally`, `delegar`
+  async con validación, `existe` y `eliminar` async).
+- **1.5i.6**: fix del depósito de IDs (`Objeto.limpiar_deposito_ids`).
+- **1.5i.7**: alineación con PHP (`limpiar_deposito_ids` borra solo
+  especiales), test con comparación string/number, silencio de
+  alertas en `#crear_datos_insertar_adyacentes`.
+
+Cualquier cambio al framework PHP que toque la API compartida debe
+reflejarse también en el espejo JS.
+
+---
+
+## 13. CIERRE
 
 Este prompt es autocontenido sobre el framework. Con esta información más
 el `prompt_piloto.md` y el `prompt_sistema_scripts.md` podés retomar el

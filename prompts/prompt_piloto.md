@@ -106,6 +106,10 @@ Cuando llegue el momento, `Conf::NOMBRE_APP` se derivará del subdominio.
 **`miscelaneas/`**: `Arbol.php`, `benchmark.php`, `generarUUID.php`, y
 scripts de migración (`migrar_*.php`).
 
+**`Pruebas/`**: `prueba_deposito.php`, script de verificación del
+depósito de IDs (se ejecuta con `?probar_deposito=1` desde
+`index.php`).
+
 **`uploads/`**: `vehiculos/`, `declaraciones_juradas/{dueno}/`.
 
 **`JSON/`**: respaldo de cada grafo.
@@ -607,6 +611,12 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   `listar()` en JSON y XML ahora chequea el resultado de `glob()`.
   XML no se usa en el piloto; los fixes quedan aplicados por
   consistencia. ESQL sigue pendiente.
+- **v73o**: script de prueba del depósito de IDs en
+  `Pruebas/prueba_deposito.php`, ejecutable con `?probar_deposito=1`
+  desde `index.php`. Confirma que el framework PHP NO tiene el bug
+  de limpieza de IDs que sí existió en el espejo JS hasta 1.5i.6.
+  De paso, se documenta el espejo JS en el prompt del framework
+  (sección 12).
 - **v73l**: fix del guardado SQL (framework 1.5i.7). `guardar`
   usa transacción y divide los INSERT en chunks de ~200 KB para
   no superar `max_allowed_packet` (1 MB en XAMPP). `guardar_ambos`
@@ -892,10 +902,9 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73n (framework
-1.5i.7b: XML con escritura atómica, validación de `<nodos>`,
-`libxml_clear_errors`, sin doble vaciado. `listar()` en JSON y XML
-chequea `glob()`. ESQL pendiente).
+**Última actualización de este prompt:** v1.5piloto.73o (script de
+prueba del depósito de IDs en `Pruebas/prueba_deposito.php`;
+prompts actualizados para reflejar el espejo JS del framework).
 
 **Estado de la conversación:**
 
@@ -919,6 +928,9 @@ chequea `glob()`. ESQL pendiente).
   atómica, validación de `<nodos>`, `libxml_clear_errors`, sin
   doble vaciado. `listar()` en JSON y XML chequea `glob()`. ESQL
   queda pendiente para cuando se aborde.
+- Cerramos en v73o el script de prueba del depósito de IDs en
+  `Pruebas/` y la documentación del espejo JS en el prompt del
+  framework.
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -976,7 +988,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.73n (framework 1.5i.7b).
+**Estado del proyecto al cierre:** v1.5piloto.73o (framework 1.5i.7c).
 Todo funcional. Listo para arrancar la diversificación por tipo de
 aplicación.
 

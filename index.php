@@ -98,6 +98,12 @@ if (Controlador::existe($nombre_app)) {
     guardar_ambos($nombre_app);
 }
 
+// ==== Bloque temporal para prueba del depósito de IDs (v1.5i.7a) ====
+if (isset($_GET['probar_deposito'])) {
+    require_once __DIR__ . '/Pruebas/prueba_deposito.php';
+    exit;
+}
+
 // ==== Bloque temporal para pruebas de árbol ====
 if (isset($_GET['probar_arbol'])) {
     require_once __DIR__ . '/miscelaneas/Arbol.php';
