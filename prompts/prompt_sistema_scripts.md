@@ -47,6 +47,44 @@ A partir de v1.5piloto.71a, los prompts viven en el proyecto. Eso significa:
   `aplicar_cambios.php`** de la tanda, en un bloque tipo `crear` que sobrescribe el
   archivo. Es lo más simple.
 
+## ESPEJO JS DEL FRAMEWORK
+
+El framework Iteradores tiene **dos implementaciones** que deben
+mantenerse espejadas:
+
+- **PHP** (`iteradores/`): la implementación principal.
+- **JS** (`iteradoresJS/`): el espejo para navegador.
+
+**Regla sin excepción:** cada vez que se toca el framework en
+cualquiera de los dos proyectos, hay que reflejar el cambio en el
+otro, con:
+
+- **Dos `aplicar_cambios.php` distintos**, uno por proyecto.
+- **Dos commits distintos**, uno por proyecto.
+
+Los dos scripts se entregan en el mismo mensaje del asistente, pero
+se corren por separado y se commitean por separado. El motivo es que
+son repositorios independientes con historias independientes.
+
+**Los prompts viven únicamente en el proyecto PHP** (`prompts/`).
+El proyecto JS no tiene su propia copia de los prompts. Cuando se
+actualiza un prompt por un cambio en el framework, se hace en el
+`aplicar_cambios.php` del proyecto PHP.
+
+### Cuándo aplica esta regla
+
+- Cambios a `Nodo`, `Iterador`, `Controlador`, `Objeto`.
+- Cambios a las implementaciones de persistencia.
+- Cambios a cualquier helper del framework.
+
+### Cuándo NO aplica
+
+- Cambios al piloto (solo existen en el proyecto PHP).
+- Cambios a los prompts (solo existen en el proyecto PHP).
+- Cambios a la UI del piloto (solo existe en el proyecto PHP).
+
+---
+
 ## EL ARCHIVO `aplicar_cambios.php`
 
 Es un script PHP que vive en la raíz del proyecto. Tiene una estructura fija:
@@ -507,9 +545,10 @@ se actualizan los tres prompts. Es poco común, pero pasa.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.73l. Se agregó el
-tipo `eliminar` al runner, para poder borrar archivos que ya no se usan
-en una tanda.
+**Última actualización de este prompt:** v1.5piloto.73r. Se agregó la
+sección "ESPEJO JS DEL FRAMEWORK" (regla de mantener PHP y JS
+espejados con dos `aplicar_cambios.php` y dos commits distintos;
+prompts solo en PHP).
 
 Reglas incorporadas al método de trabajo en las últimas tandas:
 

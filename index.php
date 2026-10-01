@@ -110,201 +110,24 @@ if (isset($_GET['probar_arbol'])) {
     require_once __DIR__ . '/miscelaneas/pruebas_arbol.php';
     exit;
 }
-// ==== Bloque temporal para migración de micros (versión 1.5piloto.27) ====
-if (isset($_GET['migrar_micros'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_micros.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_micros_empresa();
-    echo "Migración completada.\n";
-    echo "Dueños procesados: {$res['duenos_procesados']}\n";
-    echo "Micros procesados: {$res['micros_procesados']}\n";
-    echo "Micros migrados:   {$res['micros_migrados']}\n";
-    echo "Sin cambios:       {$res['micros_sin_cambio']}\n";
-    echo "Sin empresa:       {$res['micros_sin_empresa']}\n";
-    echo "Sin match:         {$res['micros_sin_match']}\n";
-    exit;
-}
-// ==== Bloque temporal para migración de patente en micros (v1.5piloto.27) ====
-if (isset($_GET['migrar_micros_patente'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_micros_patente.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_micros_patente();
-    echo "Migración de patente completada.\n";
-    echo "Micros procesados:  {$res['micros_procesados']}\n";
-    echo "Micros limpiados:   {$res['micros_limpiados']}\n";
-    echo "Sin enlace previo:  {$res['micros_sin_enlace']}\n";
-    echo "Sin copia:          {$res['micros_sin_copia']}\n";
-    exit;
-}
-// ==== Bloque temporal para migración de terminales autorizadas (v1.5piloto.31) ====
-// Convierte los enlaces directos al Nodo Usuario terminal en nodos intermedios
-// "TerminalViaje", que cuelgan del contenedor `terminales_autorizadas`.
-// Es idempotente: si un enlace ya apunta a un TerminalViaje, lo saltea.
-if (isset($_GET['migrar_terminales_autorizadas'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_terminales_autorizadas.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_terminales_autorizadas();
-    echo "Migración de terminales autorizadas completada.\n";
-    echo "Dueños procesados:         {$res['duenos_procesados']}\n";
-    echo "Viajes procesados:         {$res['viajes_procesados']}\n";
-    echo "Terminales migradas:       {$res['terminales_migradas']}\n";
-    echo "Terminales sin cambio:     {$res['terminales_sin_cambio']}\n";
-    echo "Terminales sin nodo usuario: {$res['terminales_sin_nodo_usuario']}\n";
-    exit;
-}
-// ==== Bloque temporal para migración de cupones (v1.5piloto.44) ====
-// Crea el contenedor `cupones` en cada venta existente que no lo tenga.
-// Es idempotente: si una venta ya tiene cupones, la saltea.
-if (isset($_GET['migrar_cupones'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_cupones.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_cupones();
-    echo "Migración de cupones completada.\n";
-    echo "Dueños procesados:    {$res['duenos_procesados']}\n";
-    echo "Ventas procesadas:    {$res['ventas_procesadas']}\n";
-    echo "Ventas migradas:      {$res['ventas_migradas']}\n";
-    echo "Ventas ya migradas:   {$res['ventas_ya_migradas']}\n";
-    echo "Ventas sin datos:     {$res['ventas_sin_datos']}\n";
-    exit;
-}
+// (bloque ?migrar_micros eliminado en v73r)
+// (bloque ?migrar_micros_patente eliminado en v73r)
+// (bloque ?migrar_terminales_autorizadas eliminado en v73r)
+// (bloque ?migrar_cupones eliminado en v73r)
 
-// ==== Bloque temporal para migración de nombres de pasajeros (v1.5piloto.36) ====
-// Separa el campo `nombre` de cada pasajero en dos enlaces: `nombres` y `apellido`.
-// Toma la última palabra como apellido y el resto como nombres. Si el nombre
-// original tiene una sola palabra, el apellido queda vacío.
-// Es idempotente: si un pasajero ya está migrado, lo saltea.
-if (isset($_GET['migrar_nombres_pasajeros'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_nombres_pasajeros.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_nombres_pasajeros();
-    echo "Migración de nombres de pasajeros completada.\n";
-    echo "Dueños procesados:    {$res['duenos_procesados']}\n";
-    echo "Pasajeros procesados: {$res['pasajeros_procesados']}\n";
-    echo "Migrados:             {$res['migrados']}\n";
-    echo "Sin cambio:           {$res['sin_cambio']}\n";
-    echo "Sin nombre:           {$res['sin_nombre']}\n";
-    echo "Sin apellido:         {$res['sin_apellido']}\n";
-    exit;
-}
+// (bloque ?migrar_nombres_pasajeros eliminado en v73r)
 
-// ==== Bloque temporal para migración de fecha_ultima_modificacion de pasajeros (v1.5piloto.58) ====
-// Siembra el enlace `fecha_ultima_modificacion` en los pasajeros existentes.
-// Los que aparecen en alguna venta toman la fecha de la venta más reciente
-// (formato ISO). Los que no, quedan con "2000-01-01".
-// Es idempotente: si un pasajero ya tiene el enlace, lo saltea.
-if (isset($_GET['migrar_fecha_ultima_modificacion_pasajeros'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_fecha_ultima_modificacion_pasajeros.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_fecha_ultima_modificacion_pasajeros();
-    echo "Migración de fecha_ultima_modificacion de pasajeros completada.\n";
-    echo "Dueños procesados:      {$res['duenos_procesados']}\n";
-    echo "Pasajeros procesados:   {$res['pasajeros_procesados']}\n";
-    echo "Migrados con venta:     {$res['migrados_con_venta']}\n";
-    echo "Migrados fecha vieja:   {$res['migrados_con_fecha_vieja']}\n";
-    echo "Ya migrados:            {$res['ya_migrados']}\n";
-    exit;
-}
+// (bloque ?migrar_fecha_ultima_modificacion_pasajeros eliminado en v73r)
 
-// ==== Bloque temporal para migración de declaraciones juradas v2 (v1.5piloto.62b) ====
-// Actualiza los fragmentos de texto por defecto del consentimiento de las
-// declaraciones juradas, SOLO si el contenido actual coincide con el texto
-// por defecto anterior. Si el dueño ya editó el texto, no lo toca.
-// Es idempotente: si se corre dos veces, la segunda no hace nada.
-if (isset($_GET['migrar_declaraciones_juradas_v2'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_declaraciones_juradas_v2.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_declaraciones_juradas_v2();
-    echo "Migración de declaraciones juradas v2 completada.\n";
-    echo "Dueños procesados:         {$res['duenos_procesados']}\n";
-    echo "Viajes procesados:         {$res['viajes_procesados']}\n";
-    echo "--- Anexo I (mayor) ---\n";
-    echo "Migrados:                  {$res['mayor_migrados']}\n";
-    echo "Sin cambio (por defecto):  {$res['mayor_sin_cambio']}\n";
-    echo "Personalizados:            {$res['mayor_personalizados']}\n";
-    echo "--- Anexo II (menor) ---\n";
-    echo "Migrados:                  {$res['menor_migrados']}\n";
-    echo "Sin cambio (por defecto):  {$res['menor_sin_cambio']}\n";
-    echo "Personalizados:            {$res['menor_personalizados']}\n";
-    exit;
-}
+// (bloque ?migrar_declaraciones_juradas_v2 eliminado en v73r)
 
-// ==== Bloque temporal para migración de declaraciones juradas v3 (v1.5piloto.62d) ====
-// Reemplaza "a realizarse en [puntos]," por "a realizarse en {{DESTINO_VIAJE}},"
-// en los textos guardados, y agrega la leyenda "(tildar o marcar con una X)"
-// al bloque de checkboxes padre/madre/tutor del Anexo II.
-// Solo actúa si encuentra el patrón exacto. Si el dueño personalizó esas
-// partes, no las toca. Es idempotente.
-if (isset($_GET['migrar_declaraciones_juradas_v3'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_declaraciones_juradas_v3.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_declaraciones_juradas_v3();
-    echo "Migración de declaraciones juradas v3 completada.\n";
-    echo "Dueños procesados:         {$res['duenos_procesados']}\n";
-    echo "Viajes procesados:         {$res['viajes_procesados']}\n";
-    echo "--- Anexo I (mayor) ---\n";
-    echo "Migrados:                  {$res['mayor_migrados']}\n";
-    echo "Sin cambio:                {$res['mayor_sin_cambio']}\n";
-    echo "--- Anexo II (menor) ---\n";
-    echo "Migrados:                  {$res['menor_migrados']}\n";
-    echo "Sin cambio:                {$res['menor_sin_cambio']}\n";
-    exit;
-}
+// (bloque ?migrar_declaraciones_juradas_v3 eliminado en v73r)
 
-// ==== Bloque temporal para migración de fichas médicas (v1.5piloto.68) ====
-// Recorre todos los pasajeros y elimina el nodo `ficha_salud` (con sus
-// hijos) si existe. Recorre todos los viajes y elimina el enlace
-// `mostrar_ficha_medica` de sus opciones avanzadas si existe.
-// Es idempotente: si se corre dos veces, la segunda no hace nada.
-if (isset($_GET['migrar_fichas_medicas'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_fichas_medicas.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_fichas_medicas();
-    echo "Migración de fichas médicas completada.\n";
-    echo "--- Fichas de salud ---\n";
-    echo "Dueños procesados:              {$res['duenos_procesados']}\n";
-    echo "Pasajeros procesados:           {$res['pasajeros_procesados']}\n";
-    echo "Fichas eliminadas:              {$res['fichas_eliminadas']}\n";
-    echo "Sin ficha (ya limpios):         {$res['sin_ficha']}\n";
-    echo "--- Opciones de viaje ---\n";
-    echo "Viajes procesados:              {$res['viajes_procesados']}\n";
-    echo "Enlaces mostrar_ficha_medica:   {$res['mostrar_ficha_eliminados']}\n";
-    echo "Sin enlace (ya limpios):        {$res['sin_mostrar_ficha']}\n";
-    exit;
-}
+// (bloque ?migrar_fichas_medicas eliminado en v73r)
 
-// ==== Bloque temporal para migración de hasheo de credenciales (v1.5piloto.68) ====
-// Recorre todos los usuarios y convierte el `codigo_acceso` en texto plano
-// a `codigo_hash` con password_hash(). Elimina el enlace viejo.
-// Es idempotente: si un usuario ya tiene codigo_hash, lo saltea.
-if (isset($_GET['migrar_hashear_credenciales'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_hashear_credenciales.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_hashear_credenciales();
-    echo "Migración de hasheo de credenciales completada.\n";
-    echo "Usuarios procesados: {$res['usuarios_procesados']}\n";
-    echo "Migrados:            {$res['migrados']}\n";
-    echo "Ya migrados:         {$res['ya_migrados']}\n";
-    echo "Sin código:          {$res['sin_codigo']}\n";
-    exit;
-}
+// (bloque ?migrar_hashear_credenciales eliminado en v73r)
 
-// ==== Bloque temporal para migración de separación de grafos (v1.5piloto.69) ====
-// Copia codigo_hash y contrasena de cada usuario al grafo de credenciales
-// y los elimina del grafo de la aplicación.
-// Es idempotente: si un usuario ya está migrado, lo saltea.
-if (isset($_GET['migrar_separar_grafos'])) {
-    require_once __DIR__ . '/miscelaneas/migrar_separar_grafos.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    $res = migrar_separar_grafos();
-    echo "Migración de separación de grafos completada.\n";
-    echo "Usuarios procesados:    {$res['usuarios_procesados']}\n";
-    echo "Credenciales copiadas:  {$res['credenciales_copiadas']}\n";
-    echo "Códigos copiados:       {$res['codigos_copiados']}\n";
-    echo "Contraseñas copiadas:   {$res['contrasenas_copiadas']}\n";
-    echo "Ya migrados:            {$res['ya_migrados']}\n";
-    echo "Sin credenciales:       {$res['sin_credenciales']}\n";
-    exit;
-}
+// (bloque ?migrar_separar_grafos eliminado en v73r)
 
 // Crear usuario administrador si no existe (en ambos grafos).
 $raiz_usuarios = Nodo::nodo_por_id('usuarios');

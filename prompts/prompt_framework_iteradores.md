@@ -459,6 +459,11 @@ function migrar_xxx(): array {
   tienen análogo en JS (libxml, `glob()`, `real_escape_string`), y
   se documenta que el bug latente `if ($elemento)` de `Iterador`
   existe en AMBOS espejos (PHP y JS).
+- **1.5i.7f**: fix del bug latente `if ($elemento)` en `Iterador.php`.
+  Los 4 usos (en `crear_interno`, `cargar_interno` y
+  `iterador_interno` dos veces) se cambian por `if ($elemento !==
+  null)`. Así los valores falsy (`0`, `''`, `false`) ya no se
+  descartan. Mismo fix aplicado al espejo JS (V1.5i.7f).
 
 El espejo JS también recibió mejoras en paralelo (ver sección 12).
 Su historial es: 1.5i.4 → 1.5i.5 (robustez de persistencia)
@@ -568,7 +573,7 @@ real. El fix es:
 - PHP: `if ($elemento !== null)`
 - JS: `if (elemento !== null && elemento !== undefined)`
 
-Pendiente en ambos espejos.
+**Resuelto** en v73r (PHP) y V1.5i.7f (JS).
 
 ### 12.4 API del Controlador JS
 
@@ -596,6 +601,9 @@ Versiones recientes del espejo JS:
 - **1.5i.7**: alineación con PHP (`limpiar_deposito_ids` borra solo
   especiales), test con comparación string/number, silencio de
   alertas en `#crear_datos_insertar_adyacentes`.
+- **1.5i.7f**: fix del bug latente `if (elemento)` en
+  `_crear_interno`, `_cargar_interno` y `_iterador_interno`
+  (dos veces). Espejo del fix PHP 1.5i.7f.
 
 Cualquier cambio al framework PHP que toque la API compartida debe
 reflejarse también en el espejo JS.

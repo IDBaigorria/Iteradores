@@ -53,7 +53,7 @@ use Iteradores\Nodos\Nodo;
  *
  * @package Iteradores\Iteradores
  * @since 1.0 (versión original consolidada)
- * @version 1.5i.4 (inicio de refactorización)
+ * @version 1.5i.7f (fix bug if($elemento) -> if($elemento!==null))
  * @author Ignacio David Baigorria
  * @extends Objeto
  */
@@ -290,8 +290,9 @@ class Iterador extends Objeto
         $cuerpo->_adyacente_en($cuerpo, "ocupado");
 
         // asigno el actual en el caso de que sea valido
+        // NOTA: el chequeo es `!== null` para no descartar falsy (0, '', false).
         $nodo = null;
-        if ($elemento) {
+        if ($elemento !== null) {
             if (!$nodo = $iterador->nodo($elemento, $es_nodo)) {
                 Iterador::_error("Iterador::crear_interno(nombre, iterador, elemento=null, &es_nodo=null) el elemento que intenta asignar con la creacion de " . $nombre . " no es valido");
                 Iterador::destruir_interno($iterador);
@@ -427,7 +428,8 @@ class Iterador extends Objeto
         $cuerpo->_adyacente_en($cuerpo, "ocupado");
 
         // verifico que el elemento de entrada sea valido
-        if ($elemento) {
+        // NOTA: el chequeo es `!== null` para no descartar falsy (0, '', false).
+        if ($elemento !== null) {
             $nodo = null;
             if (!$nodo = $iterador->nodo($elemento, $es_nodo)) {
                 Iterador::_error("Iterador::cargar_interno(nombre, iterador, elemento=null, &es_nodo=null) el elemento que intenta asignar con la carga de " . $nombre . " no es valido");
@@ -498,7 +500,8 @@ class Iterador extends Objeto
             $cuerpo->_adyacente_en($cuerpo, "ocupado");
 
             // elemento actual
-            if ($elemento) {
+            // NOTA: el chequeo es `!== null` para no descartar falsy (0, '', false).
+            if ($elemento !== null) {
                 $nodo = null;
                 if (!$nodo = $iterador->nodo($elemento, $es_nodo)) {
                     Iterador::_error("Iterador::iterador_interno(nombre, iterador, &nuevo=null, elemento=null, &es_nodo=null) el elemento que intenta asignar con la carga de " . $nombre . " no es valido");
@@ -524,7 +527,8 @@ class Iterador extends Objeto
 
             $cuerpo->_adyacente_en($cuerpo, "ocupado");
 
-            if ($elemento) {
+            // NOTA: el chequeo es `!== null` para no descartar falsy (0, '', false).
+            if ($elemento !== null) {
                 if (!$nodo = $iterador->nodo($elemento, $es_nodo)) {
                     Iterador::_error("Iterador::iterador_interno(nombre, iterador, &nuevo=null, elemento=null, &es_nodo=null) el elemento que intenta asignar con la creacion de " . $nombre . " no es valido");
                     Iterador::destruir_interno($iterador);

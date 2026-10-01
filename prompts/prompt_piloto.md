@@ -103,8 +103,8 @@ Cuando llegue el momento, `Conf::NOMBRE_APP` se derivará del subdominio.
 
 **`Configuracion/Configuracion.php`**: clase `Conf`.
 
-**`miscelaneas/`**: `Arbol.php`, `benchmark.php`, `generarUUID.php`, y
-scripts de migración (`migrar_*.php`).
+**`miscelaneas/`**: `Arbol.php`, `benchmark.php`, `generarUUID.php`.
+(Los scripts `migrar_*.php` se eliminaron en v73r.)
 
 **`Pruebas/`**: `prueba_deposito.php`, script de verificación del
 depósito de IDs (se ejecuta con `?probar_deposito=1` desde
@@ -627,6 +627,12 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   framework los cambios del PHP que no tienen análogo en JS, y se
   documenta que el bug latente `if ($elemento)` de `Iterador`
   existe en AMBOS espejos.
+- **v73r**: fix del bug latente `if ($elemento)` en `Iterador.php`
+  (framework 1.5i.7f). Limpieza completa de migraciones: se
+  eliminaron los bloques `?migrar_*=1` de `index.php` y los
+  archivos `miscelaneas/migrar_*.php` (11 en total). Se conserva
+  `migrar_pasajeros.php`. Prompts: se documenta que los prompts
+  viven únicamente en el proyecto PHP y la regla de espejo JS.
 - **v73l**: fix del guardado SQL (framework 1.5i.7). `guardar`
   usa transacción y divide los INSERT en chunks de ~200 KB para
   no superar `max_allowed_packet` (1 MB en XAMPP). `guardar_ambos`
@@ -651,30 +657,25 @@ La app tiene todo lo de v67 más:
 - **Auditoría de accesos**: `ultimo_acceso` e `ip_ultimo_acceso`.
 - **Respaldo JSON** con cada guardado (SQL principal).
 
-### 8.2 Limpieza pendiente
+### 8.2 Limpieza de migraciones
 
 **Integridad de las tablas SQL:** verificada con `CHECK TABLE` y
 `OPTIMIZE TABLE` en local y en producción el 30/09/2026, ambas OK.
-No queda pendiente.
 
-Bloques y archivos de migración que se pueden eliminar cuando se
-confirmen en los 3 entornos:
+**Limpieza de migraciones: completada en v73r.** Se eliminaron los
+bloques `?migrar_*=1` de `index.php` y los archivos
+`miscelaneas/migrar_*.php`:
 
-- `miscelaneas/migrar_fichas_medicas.php` + bloque
-  `?migrar_fichas_medicas=1`.
-- `miscelaneas/migrar_hashear_credenciales.php` + bloque
-  `?migrar_hashear_credenciales=1`.
-- `miscelaneas/migrar_separar_grafos.php` + bloque
-  `?migrar_separar_grafos=1`.
+- `migrar_micros`, `migrar_micros_patente`,
+  `migrar_terminales_autorizadas`, `migrar_cupones`,
+  `migrar_nombres_pasajeros`,
+  `migrar_fecha_ultima_modificacion_pasajeros`,
+  `migrar_declaraciones_juradas_v2`,
+  `migrar_declaraciones_juradas_v3`, `migrar_fichas_medicas`,
+  `migrar_hashear_credenciales`, `migrar_separar_grafos`.
 
-Migraciones más viejas que también se pueden limpiar: `migrar_micros`,
-`migrar_micros_patente`, `migrar_terminales_autorizadas`,
-`migrar_cupones`, `migrar_nombres_pasajeros`,
-`migrar_fecha_ultima_modificacion_pasajeros`,
-`migrar_declaraciones_juradas_v2`, `migrar_declaraciones_juradas_v3`.
-
-`migrar_pasajeros.php` sigue usando `Controlador::guardar($nombre_app)`
-directo. Es histórico, no vale la pena migrarlo.
+`migrar_pasajeros.php` se conserva: es histórico y no vale la pena
+migrarlo. No se toca.
 
 ### 8.3 Próximos pasos posibles
 
@@ -912,9 +913,8 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73q (tanda de
-documentación: cambios sin análogo en JS; bug latente
-`if ($elemento)` en ambos espejos de `Iterador`).
+**Última actualización de este prompt:** v1.5piloto.73r (fix del
+bug `if ($elemento)` en `Iterador.php`; limpieza de migraciones).
 
 **Estado de la conversación:**
 
@@ -946,6 +946,8 @@ documentación: cambios sin análogo en JS; bug latente
   con el espejo JS.
 - Cerramos en v73q la documentación del espejo JS y del bug
   latente `if ($elemento)` de `Iterador`.
+- Cerramos en v73r el fix del bug `if ($elemento)` (PHP y JS) y la
+  limpieza completa de migraciones.
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -1003,7 +1005,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.73q (framework 1.5i.7e).
+**Estado del proyecto al cierre:** v1.5piloto.73r (framework 1.5i.7f).
 Todo funcional. Listo para arrancar la diversificación por tipo de
 aplicación.
 
