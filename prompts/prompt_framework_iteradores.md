@@ -266,6 +266,24 @@ Ver `prompts/prompt_piloto.md` para el detalle.
   intacto.
 - **Validación desde 1.5i.7a:** al cargar se chequea que exista la
   clave `nodos`. Si no, se devuelve `null` y se loguea error.
+- **`listar()` desde 1.5i.7b:** chequea el resultado de `glob()`.
+  Si falla, devuelve `null` y registra el error.
+
+### 6.6 XML
+
+`PerdurarSuperestructuraStringXML` sigue el mismo diseño que JSON,
+con los mismos fixes aplicados desde 1.5i.7b:
+
+- Escritura atómica (`.tmp` + `rename`).
+- `cargar` valida que exista el nodo `<nodos>` antes de procesar.
+- `cargar` no vacía dos veces (la vacía `Controlador::cargar`).
+- `libxml_clear_errors()` después de parsear.
+- `listar()` chequea el resultado de `glob()`.
+- `cargar_desde_xml` (método público, no llamado por el
+  `Controlador`) mantiene su `vaciar_superestructura` propio.
+
+**XML no se usa en el piloto.** Los fixes están aplicados por
+consistencia con JSON, para que el día que se use esté listo.
 
 ---
 
@@ -414,6 +432,11 @@ function migrar_xxx(): array {
   todos los early-returns. JSON con escritura atómica (`.tmp` +
   `rename`) y validación de la clave `nodos`. `Controlador::cargar`
   devuelve `bool|null` para distinguir "no existe" de "error".
+- **1.5i.7b**: XML recibe los mismos fixes que JSON: escritura
+  atómica, validación de `<nodos>`, `libxml_clear_errors`,
+  sin doble vaciado en `cargar`, `listar()` chequea `glob()`.
+  `PerdurarSuperestructuraStringJSON::listar()` también chequea
+  `glob()`. ESQL queda pendiente.
 
 El framework en sí no cambia mucho. La mayoría de los cambios son en el
 piloto.

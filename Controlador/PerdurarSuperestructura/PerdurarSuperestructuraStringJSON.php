@@ -12,7 +12,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php"
 /**
  * Clase PerdurarSuperestructuraJSON
  * 
- * @version 1.0.3 (Última revisión: 30/09/2026)
+ * @version 1.0.4 (Última revisión: 30/09/2026)
  *
  * @author Ignacio David Baigorria
  *
@@ -395,7 +395,11 @@ class PerdurarSuperestructuraStringJSON extends Objeto implements PerdurarSupere
 
         $carpeta = self::obtener_carpeta_absoluta();
         $archivos = glob($carpeta . DIRECTORY_SEPARATOR . '*.json');
-        
+        if ($archivos === false) {
+            self::_error("No se pudo listar los archivos JSON en: " . $carpeta);
+            return null;
+        }
+
         $superestructuras = [];
         foreach ($archivos as $archivo) {
             $nombre = pathinfo($archivo, PATHINFO_FILENAME);

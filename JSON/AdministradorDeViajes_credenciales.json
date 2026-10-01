@@ -1,7 +1,7 @@
 {
     "metadata": {
-        "fecha_creacion": "2026-10-01T02:52:12+02:00",
-        "total_nodos": 121
+        "fecha_creacion": "2026-10-01T03:06:31+02:00",
+        "total_nodos": 123
     },
     "nodos": [
         {
@@ -36,8 +36,8 @@
             "adyacentes": {
                 "codigo_hash": "2395",
                 "contrasena": "2396",
-                "ip_ultimo_acceso": "2505",
-                "ultimo_acceso": "2504"
+                "ip_ultimo_acceso": "2504",
+                "ultimo_acceso": "2503"
             }
         },
         {
@@ -538,7 +538,7 @@
         },
         {
             "id": "2487",
-            "dato": "01\/10\/2026 02:49",
+            "dato": "01\/10\/2026 02:58",
             "adyacentes": []
         },
         {
@@ -608,56 +608,66 @@
         },
         {
             "id": "2501",
-            "dato": "",
-            "adyacentes": {
-                "creado_en": "2503",
-                "usuario": "2502"
-            }
-        },
-        {
-            "id": "2502",
             "dato": "secretaria_carmen",
             "adyacentes": []
         },
         {
-            "id": "2503",
+            "id": "2502",
             "dato": "1790815785",
             "adyacentes": []
         },
         {
-            "id": "2504",
+            "id": "2503",
             "dato": "01\/10\/2026 02:51",
             "adyacentes": []
         },
         {
-            "id": "2505",
+            "id": "2504",
             "dato": "::1",
             "adyacentes": []
         },
         {
-            "id": "2506",
+            "id": "2505",
             "dato": "",
             "adyacentes": {
-                "creado_en": "2508",
-                "usuario": "2507"
+                "creado_en": "2507",
+                "usuario": "2506"
             }
         },
         {
-            "id": "2507",
+            "id": "2506",
             "dato": "ignacio2",
             "adyacentes": []
         },
         {
-            "id": "2508",
+            "id": "2507",
             "dato": "1790815917",
+            "adyacentes": []
+        },
+        {
+            "id": "2508",
+            "dato": "",
+            "adyacentes": {
+                "creado_en": "2510",
+                "usuario": "2509"
+            }
+        },
+        {
+            "id": "2509",
+            "dato": "secretaria_carmen",
+            "adyacentes": []
+        },
+        {
+            "id": "2510",
+            "dato": "1790816336",
             "adyacentes": []
         },
         {
             "id": "sesiones",
             "dato": "",
             "adyacentes": {
-                "4b239b39023ee9fdea765f20b9bbd31f": "2506",
-                "5f93cc41f58bc46e422839a8b6525202": "2501"
+                "1333ecf2f9efe958e70be406d5102f0b": "2508",
+                "4b239b39023ee9fdea765f20b9bbd31f": "2505"
             }
         },
         {

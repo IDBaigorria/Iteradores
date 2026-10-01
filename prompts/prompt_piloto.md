@@ -601,6 +601,12 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   código recién verificado. Las tablas SQL fueron verificadas
   con `CHECK`/`OPTIMIZE` en local y en producción el
   30/09/2026, ambas OK.
+- **v73n**: fix del framework 1.5i.7b aplicado al método de
+  persistencia XML (escritura atómica, validación de `<nodos>`,
+  `libxml_clear_errors`, sin doble vaciado en `cargar`). De paso,
+  `listar()` en JSON y XML ahora chequea el resultado de `glob()`.
+  XML no se usa en el piloto; los fixes quedan aplicados por
+  consistencia. ESQL sigue pendiente.
 - **v73l**: fix del guardado SQL (framework 1.5i.7). `guardar`
   usa transacción y divide los INSERT en chunks de ~200 KB para
   no superar `max_allowed_packet` (1 MB en XAMPP). `guardar_ambos`
@@ -886,10 +892,10 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73m (framework
-1.5i.7a: chequeos y escape en SQL, JSON atómico, `Controlador::cargar`
-con `bool|null`. Rehash automático de credenciales. Tablas SQL
-revisadas con `CHECK`/`OPTIMIZE` en los 3 entornos).
+**Última actualización de este prompt:** v1.5piloto.73n (framework
+1.5i.7b: XML con escritura atómica, validación de `<nodos>`,
+`libxml_clear_errors`, sin doble vaciado. `listar()` en JSON y XML
+chequea `glob()`. ESQL pendiente).
 
 **Estado de la conversación:**
 
@@ -909,6 +915,10 @@ revisadas con `CHECK`/`OPTIMIZE` en los 3 entornos).
   en `cargar`/`existe`/`eliminar` de SQL, escritura atómica y
   validación en JSON, `Controlador::cargar` distingue "no existe"
   de "error", y rehash automático de credenciales en login exitoso.
+- Cerramos en v73n el fix del framework 1.5i.7b: XML con escritura
+  atómica, validación de `<nodos>`, `libxml_clear_errors`, sin
+  doble vaciado. `listar()` en JSON y XML chequea `glob()`. ESQL
+  queda pendiente para cuando se aborde.
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -966,7 +976,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.73m (framework 1.5i.7a).
+**Estado del proyecto al cierre:** v1.5piloto.73n (framework 1.5i.7b).
 Todo funcional. Listo para arrancar la diversificación por tipo de
 aplicación.
 

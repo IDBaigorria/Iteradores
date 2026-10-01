@@ -11,7 +11,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php"
 /**
  * Clase PerdurarSuperestructuraXML
  * 
- * @version 1.0.0 (Última revisión: 01/09/2025)
+ * @version 1.0.1 (Última revisión: 30/09/2026)
  *
  * @author Ignacio David Baigorria
  *
@@ -207,8 +207,15 @@ class PerdurarSuperestructuraStringXML extends Objeto implements PerdurarSuperes
         $ruta_archivo = self::obtener_ruta_archivo($nombre);
         $xml = self::construir_estructura_xml();
 
-        if (file_put_contents($ruta_archivo, $xml) === false) {
-            self::_error("No se pudo guardar el archivo XML: " . $ruta_archivo);
+        // Escritura atomica: escribir a .tmp y renombrar.
+        $ruta_temporal = $ruta_archivo . '.tmp';
+        if (file_put_contents($ruta_temporal, $xml) === false) {
+            self::_error("No se pudo guardar el archivo XML temporal: " . $ruta_temporal);
+            return false;
+        }
+        if (!rename($ruta_temporal, $ruta_archivo)) {
+            self::_error("No se pudo renombrar el archivo XML temporal: " . $ruta_temporal);
+            @unlink($ruta_temporal);
             return false;
         }
 
@@ -298,12 +305,21 @@ class PerdurarSuperestructuraStringXML extends Objeto implements PerdurarSuperes
             foreach ($errors as $error) {
                 $error_messages[] = $error->message;
             }
+            libxml_clear_errors();
             self::_error("Error al decodificar el archivo XML: " . implode('; ', $error_messages));
             return null;
         }
+        libxml_clear_errors();
 
-        // Limpiar la superestructura actual antes de cargar
-        Nodo::vaciar_superestructura(static::$token);
+        // Validar que el XML tenga la estructura esperada.
+        if (!isset($xml->nodos)) {
+            self::_error("El XML no tiene el nodo <nodos> esperado: " . $ruta_archivo);
+            return null;
+        }
+
+        // La superestructura ya fue vaciada por Controlador::cargar.
+        // No vaciar de nuevo: si algo fallara entre las dos limpiezas,
+        // quedaria una superestructura vacia sin que nadie lo note.
 
         $equivalencias = [];
 
@@ -395,7 +411,11 @@ class PerdurarSuperestructuraStringXML extends Objeto implements PerdurarSuperes
 
         $carpeta = Conf::SUPERESTRUCTURA_CARPETA_GUARDAR_XML;
         $archivos = glob($carpeta . DIRECTORY_SEPARATOR . '*.xml');
-        
+        if ($archivos === false) {
+            self::_error("No se pudo listar los archivos XML en: " . $carpeta);
+            return null;
+        }
+
         $superestructuras = [];
         foreach ($archivos as $archivo) {
             $nombre = pathinfo($archivo, PATHINFO_FILENAME);
@@ -429,11 +449,21 @@ class PerdurarSuperestructuraStringXML extends Objeto implements PerdurarSuperes
             foreach ($errors as $error) {
                 $error_messages[] = $error->message;
             }
+            libxml_clear_errors();
             self::_error("Error al decodificar el XML: " . implode('; ', $error_messages));
             return false;
         }
+        libxml_clear_errors();
 
-        // Limpiar la superestructura actual antes de cargar
+        // Validar que el XML tenga la estructura esperada.
+        if (!isset($xml->nodos)) {
+            self::_error("El XML no tiene el nodo <nodos> esperado.");
+            return false;
+        }
+
+        // Limpiar la superestructura actual antes de cargar.
+        // Esta funcion se llama desde fuera del Controlador (por ejemplo,
+        // desde codigo de pruebas), por eso mantiene el vaciado propio.
         Nodo::vaciar_superestructura(static::$token);
 
         $equivalencias = [];
