@@ -710,6 +710,19 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74a**: fix del retroactivo de opciones de cobro. En v74,
+  `_aplicar_retroactivo_a_ventas_del_viaje` y
+  `_aplicar_retroactivo_a_ventas_de_terminal` leían la config
+  nueva con `_config_pago_resuelta_para_venta`, que devuelve
+  el `opciones_cobro` congelado de la venta. Resultado: si la
+  venta ya tenía `opciones_cobro`, el retroactivo no hacía
+  nada (los `permite_*` no cambiaban). Fix: resolver con
+  `_config_pago_resuelta_para_viaje_terminal`, que mira el
+  viaje + override del TerminalViaje en vivo, ignorando el
+  `opciones_cobro` de la venta. El flujo de migración de
+  ventas viejas sin `opciones_cobro` no estaba afectado
+  (resolvía en vivo, que post-save ya devolvía la config
+  nueva). Solo backend.
 
 ---
 
@@ -1050,10 +1063,9 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74 (Bug 1:
-opciones de cobro congeladas al vender + retroactivo opcional al
-editar las condiciones de pago del viaje o el override de
-TerminalViaje).
+**Última actualización de este prompt:** v1.5piloto.74a (fix del
+retroactivo: la config nueva se resuelve en vivo, no desde el
+`opciones_cobro` ya congelado de la venta).
 
 **Estado de la conversación:**
 
@@ -1107,6 +1119,10 @@ TerminalViaje).
   Sin botón ni submodal en el modal de pago de cupón: la
   decisión de aplicar retroactivo se toma al editar las
   condiciones de pago (del viaje o del override de TerminalViaje).
+- Cerramos en v74a el fix del retroactivo: la config nueva se
+  resuelve en vivo (viaje + terminal), ignorando el
+  `opciones_cobro` que ya tiene la venta. El flujo de migración
+  de ventas viejas no estaba afectado.
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -1211,7 +1227,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74 (framework 1.5i.7f).
+**Estado del proyecto al cierre:** v1.5piloto.74a (framework 1.5i.7f).
 Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad
 alta pendientes.
 

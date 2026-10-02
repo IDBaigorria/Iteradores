@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.74
+ * @version   1.5piloto.74a
  */
 
 
@@ -1571,16 +1571,20 @@ function _snapshot_config_ventas_de_terminal(string $nombre_dueno, string $nombr
  * @return void
  */
 function _aplicar_retroactivo_a_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje, array $snapshots, bool $aplicar_retroactivo): void {
-    _recorrer_ventas_del_viaje($nombre_dueno, $nombre_viaje, function(Nodo $v) use ($snapshots, $aplicar_retroactivo) {
+    _recorrer_ventas_del_viaje($nombre_dueno, $nombre_viaje, function(Nodo $v) use ($nombre_dueno, $nombre_viaje, $snapshots, $aplicar_retroactivo) {
         $id = $v->id();
+        // Resolver la config NUEVA del viaje + override del
+        // TerminalViaje en vivo, ignorando el opciones_cobro que
+        // ya tiene la venta.
+        $nodo_terminal = $v->adyacente('terminal');
+        $nombre_terminal = $nodo_terminal ? $nodo_terminal->dato() : '';
+        $nueva = _config_pago_resuelta_para_viaje_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal);
         $nodo_opc = $v->adyacente('opciones_cobro');
         if ($nodo_opc) {
             if ($aplicar_retroactivo) {
-                $nueva = _config_pago_resuelta_para_venta($v);
                 _actualizar_permite_opciones_cobro_venta($v, $nueva['permite_efectivo'], $nueva['permite_transferencia']);
             }
         } else {
-            $nueva = _config_pago_resuelta_para_venta($v);
             $vieja = $snapshots[$id] ?? $nueva;
             $a_fijar = $aplicar_retroactivo ? $nueva : $vieja;
             _crear_opciones_cobro_venta($v, $a_fijar);
@@ -1600,16 +1604,18 @@ function _aplicar_retroactivo_a_ventas_del_viaje(string $nombre_dueno, string $n
  * @return void
  */
 function _aplicar_retroactivo_a_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, array $snapshots, bool $aplicar_retroactivo): void {
-    _recorrer_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal, function(Nodo $v) use ($snapshots, $aplicar_retroactivo) {
+    _recorrer_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal, function(Nodo $v) use ($nombre_dueno, $nombre_viaje, $nombre_terminal, $snapshots, $aplicar_retroactivo) {
         $id = $v->id();
+        // Resolver la config NUEVA del viaje + override del
+        // TerminalViaje en vivo, ignorando el opciones_cobro que
+        // ya tiene la venta.
+        $nueva = _config_pago_resuelta_para_viaje_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal);
         $nodo_opc = $v->adyacente('opciones_cobro');
         if ($nodo_opc) {
             if ($aplicar_retroactivo) {
-                $nueva = _config_pago_resuelta_para_venta($v);
                 _actualizar_permite_opciones_cobro_venta($v, $nueva['permite_efectivo'], $nueva['permite_transferencia']);
             }
         } else {
-            $nueva = _config_pago_resuelta_para_venta($v);
             $vieja = $snapshots[$id] ?? $nueva;
             $a_fijar = $aplicar_retroactivo ? $nueva : $vieja;
             _crear_opciones_cobro_venta($v, $a_fijar);
