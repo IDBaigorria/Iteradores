@@ -1,6 +1,6 @@
 /***
  * Modal de alta/edición de viaje, opciones avanzadas y condiciones de pago.
- * @version 1.5piloto.66
+ * @version 1.5piloto.74
  */
 
 async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
@@ -98,6 +98,10 @@ async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
                     <label>Máximo de cuotas (transferencia):</label>
                     <input type="number" id="modal_viaje_cuotas_transferencia_max" value="${datos.cuotas_transferencia_max}" min="1" max="12" style="max-width:100px;">
                 </div>
+            </div>
+            <div style="margin-top:12px;">
+                <label><input type="checkbox" id="modal_viaje_aplicar_retroactivo"> Aplicar cambios de método de pago a los cupones pendientes de ventas ya hechas (no afecta la cantidad de cuotas pactadas)</label>
+                <div class="small muted" style="margin-left:20px; margin-top:4px;">Solo afecta a las ventas del viaje que todavía tienen cuotas pendientes de pago. No cambia la cantidad de cuotas ya pactadas en cada venta.</div>
             </div>
         </div>
 
@@ -203,6 +207,7 @@ async function abrir_modal_viaje(modo, viaje = null, on_volver = null) {
             permite_transferencia,
             cuotas_transferencia_max: document.getElementById('modal_viaje_cuotas_transferencia_max').value,
             mostrar_dj_en_terminales: document.getElementById('modal_viaje_mostrar_dj_terminales').checked ? '1' : '0',
+            aplicar_retroactivo: document.getElementById('modal_viaje_aplicar_retroactivo').checked ? '1' : '0',
             paradas_intermedias: JSON.stringify(paradas)
         };
 

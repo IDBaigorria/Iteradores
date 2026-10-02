@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.70
+ * @version   1.5piloto.74
  */
 
 
@@ -358,6 +358,17 @@ function confirmar_venta_actual(
     $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)$cuotas), 'cuotas');
     $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)$monto_pagado), 'pagado');
     $nodo_venta->_adyacente_en(Nodo::crear_con_dato((string)$cuotas_restantes), 'cuotas_restantes');
+
+    // A partir de v74: congelar las opciones de cobro vigentes
+    // al momento de la venta. Desde acá, estas son las opciones
+    // que se usan al cobrar los cupones, en lugar de resolver
+    // en vivo contra el viaje/TerminalViaje.
+    _crear_opciones_cobro_venta($nodo_venta, [
+        'permite_efectivo' => $permite_efectivo,
+        'cuotas_efectivo_max' => (string)$cuotas_efectivo_max,
+        'permite_transferencia' => $permite_transferencia,
+        'cuotas_transferencia_max' => (string)$cuotas_transferencia_max,
+    ]);
 
     // Obtener o crear comprador
     $comprador_datos = [
@@ -1305,59 +1316,305 @@ function cancelar_venta(string $id_venta, string $motivo = ''): array {
 }
 
 /**
- * Resuelve la lista de métodos de pago permitidos para una venta,
- * según el override del TerminalViaje > configuración del viaje >
- * default. Devuelve un array con "efectivo" y/o "transferencia".
+ * Resuelve la lista de métodos de pago permitidos para una venta.
+ *
+ * A partir de v74: primero se leen las opciones de cobro congeladas
+ * en el sub-nodo `opciones_cobro` del nodo venta. Si la venta es
+ * vieja (no tiene ese nodo), se cae a la resolución en vivo contra
+ * viaje/TerminalViaje.
  *
  * @param Nodo $nodo_venta
  * @return array<int, string>
  */
 function _resolver_metodos_permitidos_venta(Nodo $nodo_venta): array {
-    $nodo_viaje = $nodo_venta->adyacente('viaje');
-    $nodo_terminal = $nodo_venta->adyacente('terminal');
-    if (!$nodo_viaje || !$nodo_terminal) return [];
+    $opciones = _leer_opciones_cobro_venta($nodo_venta);
+    if ($opciones === null) {
+        $opciones = _config_pago_resuelta_para_venta($nodo_venta);
+    }
 
-    $nombre_viaje = $nodo_viaje->dato();
-    $nombre_terminal = $nodo_terminal->dato();
-    $nodo_dueno = $nodo_viaje->adyacente('dueno');
-    $nombre_dueno = $nodo_dueno ? $nodo_dueno->dato() : '';
-    if ($nombre_dueno === '') return [];
+    $metodos = [];
+    if (($opciones['permite_efectivo'] ?? '1') === '1') $metodos[] = 'efectivo';
+    if (($opciones['permite_transferencia'] ?? '1') === '1') $metodos[] = 'transferencia';
+    return $metodos;
+}
 
-    // Cuotas pactadas de la venta. Se usan para validar que el método
-    // elegido soporte esa cantidad de cuotas según la configuración
-    // del viaje o de la terminal.
-    $cuotas_pactadas = (int)($nodo_venta->adyacente('cuotas') ? $nodo_venta->adyacente('cuotas')->dato() : '1');
-    if ($cuotas_pactadas < 1) $cuotas_pactadas = 1;
+/**
+ * Lee las opciones de cobro congeladas en el nodo venta. Devuelve
+ * null si el nodo `opciones_cobro` no existe (venta anterior a
+ * v74). En caso contrario, devuelve los 4 campos como strings.
+ *
+ * @param Nodo $nodo_venta
+ * @return array|null
+ */
+function _leer_opciones_cobro_venta(Nodo $nodo_venta): ?array {
+    $nodo_opciones = $nodo_venta->adyacente('opciones_cobro');
+    if (!$nodo_opciones) return null;
 
+    $valores = [
+        'permite_efectivo' => '1',
+        'cuotas_efectivo_max' => '3',
+        'permite_transferencia' => '1',
+        'cuotas_transferencia_max' => '1',
+    ];
+    foreach (array_keys($valores) as $campo) {
+        $nodo_campo = $nodo_opciones->adyacente($campo);
+        if ($nodo_campo) $valores[$campo] = $nodo_campo->dato();
+    }
+    return $valores;
+}
+
+/**
+ * Crea (o actualiza) el sub-nodo `opciones_cobro` en el nodo venta
+ * con los 4 campos congelados al momento de la venta.
+ *
+ * @param Nodo  $nodo_venta
+ * @param array $opciones Array con los 4 campos.
+ * @return void
+ */
+function _crear_opciones_cobro_venta(Nodo $nodo_venta, array $opciones): void {
+    $nodo_opciones = $nodo_venta->adyacente('opciones_cobro');
+    if (!$nodo_opciones) {
+        $nodo_opciones = Nodo::crear_con_dato('');
+        $nodo_venta->_adyacente_en($nodo_opciones, 'opciones_cobro');
+    }
+    $campos = ['permite_efectivo', 'cuotas_efectivo_max', 'permite_transferencia', 'cuotas_transferencia_max'];
+    foreach ($campos as $campo) {
+        $valor = (string)($opciones[$campo] ?? '');
+        _actualizar_o_crear_campo($nodo_opciones, $campo, $valor);
+    }
+}
+
+/**
+ * Actualiza solo los `permite_*` de las opciones de cobro de una
+ * venta. No toca los `cuotas_*_max` (respeta la cantidad de cuotas
+ * pactadas). Si el nodo `opciones_cobro` no existe, no hace nada.
+ *
+ * @param Nodo   $nodo_venta
+ * @param string $permite_efectivo
+ * @param string $permite_transferencia
+ * @return void
+ */
+function _actualizar_permite_opciones_cobro_venta(Nodo $nodo_venta, string $permite_efectivo, string $permite_transferencia): void {
+    $nodo_opciones = $nodo_venta->adyacente('opciones_cobro');
+    if (!$nodo_opciones) return;
+
+    _actualizar_o_crear_campo($nodo_opciones, 'permite_efectivo', $permite_efectivo);
+    _actualizar_o_crear_campo($nodo_opciones, 'permite_transferencia', $permite_transferencia);
+}
+
+/**
+ * Resuelve la configuración de pago efectiva para una combinación
+ * viaje + terminal con la lógica de override del TerminalViaje >
+ * viaje > default. Devuelve los 4 campos como strings.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $nombre_terminal
+ * @return array
+ */
+function _config_pago_resuelta_para_viaje_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal): array {
+    $defaults = [
+        'permite_efectivo' => '1',
+        'cuotas_efectivo_max' => '3',
+        'permite_transferencia' => '1',
+        'cuotas_transferencia_max' => '1',
+    ];
     $opciones_viaje = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
     $opciones_terminal = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal);
 
-    $resolver = function(string $campo, string $default) use ($opciones_viaje, $opciones_terminal) {
+    $resolver = function(string $campo) use ($opciones_viaje, $opciones_terminal, $defaults) {
         if (isset($opciones_terminal[$campo]) && trim((string)$opciones_terminal[$campo]) !== '') {
             return (string)$opciones_terminal[$campo];
         }
         if (isset($opciones_viaje[$campo]) && trim((string)$opciones_viaje[$campo]) !== '') {
             return (string)$opciones_viaje[$campo];
         }
-        return $default;
+        return $defaults[$campo];
     };
 
-    $metodos = [];
+    return [
+        'permite_efectivo' => $resolver('permite_efectivo'),
+        'cuotas_efectivo_max' => $resolver('cuotas_efectivo_max'),
+        'permite_transferencia' => $resolver('permite_transferencia'),
+        'cuotas_transferencia_max' => $resolver('cuotas_transferencia_max'),
+    ];
+}
 
-    // Efectivo: se ofrece si está permitido y el máximo de cuotas
-    // configurado alcanza para las cuotas pactadas.
-    if ($resolver('permite_efectivo', '1') === '1') {
-        $max_efectivo = (int)$resolver('cuotas_efectivo_max', '3');
-        if ($max_efectivo >= $cuotas_pactadas) $metodos[] = 'efectivo';
+/**
+ * Devuelve la configuración efectiva de pago para una venta:
+ * primero `opciones_cobro` si existe; si no, resolución en vivo.
+ *
+ * @param Nodo $nodo_venta
+ * @return array
+ */
+function _config_pago_resuelta_para_venta(Nodo $nodo_venta): array {
+    $opciones = _leer_opciones_cobro_venta($nodo_venta);
+    if ($opciones !== null) return $opciones;
+
+    $nodo_viaje = $nodo_venta->adyacente('viaje');
+    $nodo_terminal = $nodo_venta->adyacente('terminal');
+    $defaults = [
+        'permite_efectivo' => '1',
+        'cuotas_efectivo_max' => '3',
+        'permite_transferencia' => '1',
+        'cuotas_transferencia_max' => '1',
+    ];
+    if (!$nodo_viaje || !$nodo_terminal) return $defaults;
+
+    $nombre_viaje = $nodo_viaje->dato();
+    $nombre_terminal = $nodo_terminal->dato();
+    $nodo_dueno = $nodo_viaje->adyacente('dueno');
+    $nombre_dueno = $nodo_dueno ? $nodo_dueno->dato() : '';
+    if ($nombre_dueno === '') return $defaults;
+
+    return _config_pago_resuelta_para_viaje_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal);
+}
+
+/**
+ * Recorre las ventas de un dueño que pertenecen a un viaje,
+ * ejecutando un callback por cada nodo venta.
+ *
+ * @param string   $nombre_dueno
+ * @param string   $nombre_viaje
+ * @param callable $callback function(Nodo $nodo_venta): void
+ * @return void
+ */
+function _recorrer_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje, callable $callback): void {
+    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if (!$contenedor) return;
+    $actual = hmi($contenedor);
+    $seg = 0;
+    while ($actual && $seg < 2000) {
+        $nodo_viaje = $actual->adyacente('viaje');
+        if ($nodo_viaje && $nodo_viaje->dato() === $nombre_viaje) {
+            $callback($actual);
+        }
+        $actual = hd($actual);
+        $seg++;
     }
+}
 
-    // Transferencia: mismo criterio.
-    if ($resolver('permite_transferencia', '1') === '1') {
-        $max_transferencia = (int)$resolver('cuotas_transferencia_max', '1');
-        if ($max_transferencia >= $cuotas_pactadas) $metodos[] = 'transferencia';
+/**
+ * Recorre las ventas de un dueño que pertenecen a un viaje Y una
+ * terminal específicos.
+ *
+ * @param string   $nombre_dueno
+ * @param string   $nombre_viaje
+ * @param string   $nombre_terminal
+ * @param callable $callback function(Nodo $nodo_venta): void
+ * @return void
+ */
+function _recorrer_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, callable $callback): void {
+    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if (!$contenedor) return;
+    $actual = hmi($contenedor);
+    $seg = 0;
+    while ($actual && $seg < 2000) {
+        $nodo_viaje = $actual->adyacente('viaje');
+        $nodo_terminal = $actual->adyacente('terminal');
+        if ($nodo_viaje && $nodo_viaje->dato() === $nombre_viaje
+            && $nodo_terminal && $nodo_terminal->dato() === $nombre_terminal) {
+            $callback($actual);
+        }
+        $actual = hd($actual);
+        $seg++;
     }
+}
 
-    return $metodos;
+/**
+ * Toma un snapshot de la configuración de cobro de cada venta
+ * del viaje. Se usa antes de guardar opciones, para preservar la
+ * config vieja si el usuario NO tilda el retroactivo.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @return array Mapa id_venta => config (4 campos).
+ */
+function _snapshot_config_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje): array {
+    $snap = [];
+    _recorrer_ventas_del_viaje($nombre_dueno, $nombre_viaje, function(Nodo $v) use (&$snap) {
+        $snap[$v->id()] = _config_pago_resuelta_para_venta($v);
+    });
+    return $snap;
+}
+
+/**
+ * Toma un snapshot de la configuración de cobro de cada venta
+ * de la terminal en el viaje.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $nombre_terminal
+ * @return array Mapa id_venta => config (4 campos).
+ */
+function _snapshot_config_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal): array {
+    $snap = [];
+    _recorrer_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal, function(Nodo $v) use (&$snap) {
+        $snap[$v->id()] = _config_pago_resuelta_para_venta($v);
+    });
+    return $snap;
+}
+
+/**
+ * Aplica los cambios de opciones de cobro a las ventas del viaje
+ * después de guardar. Reglas:
+ *  - Ventas sin `opciones_cobro` (viejas): se les fija la config.
+ *    Si el flag está: config nueva. Si no: config vieja (snapshot).
+ *  - Ventas con `opciones_cobro`:
+ *      Si el flag está: se actualizan solo los `permite_*`.
+ *      Si no: no se tocan.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param array  $snapshots Mapa id_venta => config vieja.
+ * @param bool   $aplicar_retroactivo
+ * @return void
+ */
+function _aplicar_retroactivo_a_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje, array $snapshots, bool $aplicar_retroactivo): void {
+    _recorrer_ventas_del_viaje($nombre_dueno, $nombre_viaje, function(Nodo $v) use ($snapshots, $aplicar_retroactivo) {
+        $id = $v->id();
+        $nodo_opc = $v->adyacente('opciones_cobro');
+        if ($nodo_opc) {
+            if ($aplicar_retroactivo) {
+                $nueva = _config_pago_resuelta_para_venta($v);
+                _actualizar_permite_opciones_cobro_venta($v, $nueva['permite_efectivo'], $nueva['permite_transferencia']);
+            }
+        } else {
+            $nueva = _config_pago_resuelta_para_venta($v);
+            $vieja = $snapshots[$id] ?? $nueva;
+            $a_fijar = $aplicar_retroactivo ? $nueva : $vieja;
+            _crear_opciones_cobro_venta($v, $a_fijar);
+        }
+    });
+}
+
+/**
+ * Igual que el anterior, pero aplicado a las ventas de una
+ * terminal específica dentro de un viaje.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $nombre_terminal
+ * @param array  $snapshots
+ * @param bool   $aplicar_retroactivo
+ * @return void
+ */
+function _aplicar_retroactivo_a_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, array $snapshots, bool $aplicar_retroactivo): void {
+    _recorrer_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal, function(Nodo $v) use ($snapshots, $aplicar_retroactivo) {
+        $id = $v->id();
+        $nodo_opc = $v->adyacente('opciones_cobro');
+        if ($nodo_opc) {
+            if ($aplicar_retroactivo) {
+                $nueva = _config_pago_resuelta_para_venta($v);
+                _actualizar_permite_opciones_cobro_venta($v, $nueva['permite_efectivo'], $nueva['permite_transferencia']);
+            }
+        } else {
+            $nueva = _config_pago_resuelta_para_venta($v);
+            $vieja = $snapshots[$id] ?? $nueva;
+            $a_fijar = $aplicar_retroactivo ? $nueva : $vieja;
+            _crear_opciones_cobro_venta($v, $a_fijar);
+        }
+    });
 }
 
 /**

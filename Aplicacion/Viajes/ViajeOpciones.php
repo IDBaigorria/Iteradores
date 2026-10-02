@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.12
- * @version   1.5piloto.70
+ * @version   1.5piloto.74
  */
 
 use Iteradores\Nodos\Nodo;
@@ -65,7 +65,7 @@ function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
 /**
  * Guarda las opciones avanzadas de un viaje.
  */
-function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, array $opciones): array {
+function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, array $opciones, bool $aplicar_retroactivo = false): array {
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
@@ -77,6 +77,19 @@ function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
         $nodo_opciones = Nodo::crear_con_dato('');
         $nodo_viaje->_adyacente_en($nodo_opciones, 'opciones_avanzadas');
     }
+
+    // Capturar los valores viejos de permite_* para detectar si
+    // cambian y, si hace falta, migrar/actualizar las ventas.
+    $nodo_perm_e_viejo = $nodo_opciones->adyacente('permite_efectivo');
+    $permite_efectivo_viejo = $nodo_perm_e_viejo ? $nodo_perm_e_viejo->dato() : '1';
+    $nodo_perm_t_viejo = $nodo_opciones->adyacente('permite_transferencia');
+    $permite_transferencia_viejo = $nodo_perm_t_viejo ? $nodo_perm_t_viejo->dato() : '1';
+
+    // Snapshot de la config de cobro de cada venta del viaje,
+    // antes de tocar las opciones. Se usa para fijar la config
+    // vieja en las ventas sin opciones_cobro cuando el usuario
+    // NO tilda el retroactivo.
+    $snapshot_ventas = _snapshot_config_ventas_del_viaje($nombre_dueno, $nombre_viaje);
 
     // Sanitizar valores
     $restriccion = ($opciones['restriccion_edad'] ?? '0') === '1' ? '1' : '0';
@@ -107,6 +120,16 @@ function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
     _actualizar_o_crear_campo($nodo_opciones, 'permite_transferencia', $permite_transferencia);
     _actualizar_o_crear_campo($nodo_opciones, 'cuotas_transferencia_max', $cuotas_transferencia_max);
     _actualizar_o_crear_campo($nodo_opciones, 'mostrar_dj_en_terminales', $mostrar_dj_en_terminales);
+
+    // A partir de v74: si los permite_* del viaje cambiaron,
+    // migrar las ventas viejas del viaje sin opciones_cobro
+    // (fijarles la config) y, si el flag está activo, actualizar
+    // los permite_* de las ventas que ya tienen opciones_cobro.
+    $cambio_permite_viaje = ($permite_efectivo !== $permite_efectivo_viejo
+        || $permite_transferencia !== $permite_transferencia_viejo);
+    if ($cambio_permite_viaje) {
+        _aplicar_retroactivo_a_ventas_del_viaje($nombre_dueno, $nombre_viaje, $snapshot_ventas, $aplicar_retroactivo);
+    }
 
     guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];

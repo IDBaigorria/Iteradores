@@ -272,7 +272,24 @@ Enlaces: `terminal`, `micro`, `viaje`, `asientos` (cabeza lista circular).
 
 Enlaces: `terminal`, `viaje`, `micro`, `fecha_hora`, `fecha_ultimo_pago`,
 `metodo_pago`, `total`, `cuotas`, `pagado`, `cuotas_restantes`,
-`comprador`, `asientos` (cabeza lista simple), `cupones` (contenedor).
+`comprador`, `asientos` (cabeza lista simple), `cupones` (contenedor),
+`opciones_cobro` (contenedor, desde v74).
+
+**`opciones_cobro` (desde v74):** sub-nodo que congela la config
+de pago vigente al momento de la venta. Es la fuente de verdad
+para cobrar los cupones de esta venta. Estructura:
+
+- `permite_efectivo` → "0"/"1"
+- `cuotas_efectivo_max` → "1".."12"
+- `permite_transferencia` → "0"/"1"
+- `cuotas_transferencia_max` → "1".."12"
+
+Al editar las opciones de pago del viaje o el override del
+TerminalViaje, un checkbox permite actualizar los `permite_*`
+de las ventas afectadas con cupones pendientes. Los
+`cuotas_*_max` no se tocan retroactivamente. Ventas viejas
+sin `opciones_cobro`: se migran al guardar opciones (config
+vieja si no se tildó el check, nueva si se tildó).
 
 ### 4.16 Nodo Asiento-en-Venta Persistente
 
@@ -680,6 +697,19 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   del último autocompletado exitoso). Se eliminó el botón
   "Usar primer pasajero" del modal de venta: obsoleto desde que
   la atadura funciona en ambos sentidos.
+- **v74**: fix del Bug 1 (opciones de cobro). Al confirmar la
+  venta, se congela la config de pago vigente en un sub-nodo
+  `opciones_cobro` del nodo venta. Al cobrar un cupón, se leen
+  las opciones de la venta, no la config viva del viaje. Los
+  modales del viaje y del override de TerminalViaje tienen un
+  checkbox "Aplicar cambios de método de pago a los cupones
+  pendientes...": si se tilda, se actualizan los `permite_*`
+  de las ventas afectadas con cupones pendientes (los
+  `cuotas_*_max` no se tocan, respetando la cantidad de cuotas
+  pactadas). Si no se tilda, las ventas ya hechas no se
+  modifican. Las ventas viejas sin `opciones_cobro` se migran
+  al guardar opciones: con la config vieja si no se tildó el
+  check, con la nueva si se tildó. Backend y frontend.
 
 ---
 
@@ -752,7 +782,21 @@ pasajero y del comprador, para no arrastrar datos del DNI
 anterior. También se eliminó el botón "Usar primer pasajero",
 obsoleto.
 
-**Bug 1 queda pendiente de resolver.**
+**Bug 1 — Opciones de cobro de cupones. Resuelto en v74.**
+Diseño: al confirmar la venta se congela la config de pago
+vigente en un sub-nodo `opciones_cobro` del nodo venta. Al
+cobrar un cupón se leen las opciones de la venta, no la config
+viva del viaje. El modal del viaje y el del override del
+TerminalViaje tienen un checkbox "Aplicar cambios de método de
+pago a los cupones pendientes de ventas ya hechas (no afecta
+la cantidad de cuotas pactadas)". Si se tilda, se actualizan
+los `permite_*` de las ventas afectadas con cupones pendientes.
+Los `cuotas_*_max` nunca se tocan retroactivamente. Las ventas
+viejas sin `opciones_cobro` se migran al guardar opciones:
+con la config vieja si no se tildó el check, con la nueva si
+se tildó. No hay botón ni submodal en el modal de pago de
+cupón: la decisión se toma siempre en el momento de editar
+las condiciones de pago.
 
 ### 8.4 Pestaña especial: visualizador del grafo (futuro)
 
@@ -1006,10 +1050,10 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73x (dos bugs
-de la ligadura comprador-pasajero: no se activa con pasajeros
-duplicados y se limpian los campos al corregir el DNI por uno
-no registrado).
+**Última actualización de este prompt:** v1.5piloto.74 (Bug 1:
+opciones de cobro congeladas al vender + retroactivo opcional al
+editar las condiciones de pago del viaje o el override de
+TerminalViaje).
 
 **Estado de la conversación:**
 
@@ -1058,6 +1102,11 @@ no registrado).
   no registrado, se limpian los campos del pasajero y del
   comprador que habían sido autocompletados. Se eliminó el botón
   "Usar primer pasajero" (obsoleto desde que la atadura funciona).
+- Cerramos en v74 el fix del Bug 1 (opciones de cobro congeladas
+  al vender + retroactivo opcional al editar condiciones de pago).
+  Sin botón ni submodal en el modal de pago de cupón: la
+  decisión de aplicar retroactivo se toma al editar las
+  condiciones de pago (del viaje o del override de TerminalViaje).
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -1079,18 +1128,9 @@ no registrado).
 - **La sección "Discusión actual"** de este prompt es lo primero que se
   actualiza al cerrar una tanda.
 
-**Bugs conocidos (prioridad alta, antes de todo lo demás):**
+**Bugs conocidos (prioridad alta):**
 
-- **Bug de cupones.** Ver sección 8.3, "Bug 1". Opciones de cobro en
-  dos niveles: individuales (fijadas al momento de la venta) pisan
-  a generales (del viaje). Requiere:
-  - Al confirmar venta, copiar las opciones de cobro vigentes al
-    nodo de la venta (nuevo sub-nodo `opciones_cobro` o similar).
-  - Al cobrar una cuota, leer primero las individuales. Si no hay,
-    caer a las generales.
-  - Botón "Cambiar método de cobro" en el modal de pago de cupón,
-    que abre otro modal para editar las opciones individuales.
-  - Confirmar el formato exacto con el usuario antes de codear.
+- **Bug de cupones: resuelto en v74.** Ver sección 8.3, "Bug 1".
 
 - **Bug de ligadura comprador-pasajero: resuelto en v73v.** Ver
   sección 8.3, "Bug 2".
@@ -1171,10 +1211,9 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.73x (framework 1.5i.7f).
-Todo funcional. Bug 2 resuelto en su totalidad, incluyendo los casos
-de duplicado y corrección de DNI. Pendiente el Bug 1 (opciones de
-cobro de cupones en dos niveles).
+**Estado del proyecto al cierre:** v1.5piloto.74 (framework 1.5i.7f).
+Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad
+alta pendientes.
 
 ---
 

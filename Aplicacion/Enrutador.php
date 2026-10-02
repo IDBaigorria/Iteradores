@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.73j
+ * @version   1.5piloto.74
  */
 
 use Iteradores\Nodos\Nodo;
@@ -676,7 +676,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         'permite_transferencia' => $post['permite_transferencia'] ?? '',
                         'cuotas_transferencia_max' => $post['cuotas_transferencia_max'] ?? '',
                     ];
-                    $resultado = guardar_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal, $opciones);
+                    $aplicar_retroactivo = (($post['aplicar_retroactivo'] ?? '') === '1');
+                    $resultado = guardar_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal, $opciones, $aplicar_retroactivo);
                     responder_json($resultado);
                     break;
 

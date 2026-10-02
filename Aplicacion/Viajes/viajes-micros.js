@@ -1,6 +1,6 @@
 /**
  * Micros y terminales dentro de viajes.
- * @version 1.5piloto.41
+ * @version 1.5piloto.74
  */
 
 function renderizar_micros_viaje(micros) {
@@ -514,6 +514,10 @@ async function abrir_modal_opciones_terminal(nombre_terminal) {
                         <input type="number" id="opciones_terminal_cuotas_transferencia_max" value="${cuotas_transferencia_max_val}" min="1" max="12" style="max-width:100px;">
                     </div>
                 </div>
+                <div style="margin-top:12px;">
+                    <label><input type="checkbox" id="opciones_terminal_aplicar_retroactivo"> Aplicar cambios de método de pago a los cupones pendientes de ventas ya hechas (no afecta la cantidad de cuotas pactadas)</label>
+                    <div class="small muted" style="margin-left:20px; margin-top:4px;">Solo afecta a las ventas de esta terminal en este viaje que todavía tienen cuotas pendientes de pago. No cambia la cantidad de cuotas ya pactadas.</div>
+                </div>
             </div>
         </div>
 
@@ -591,7 +595,8 @@ async function abrir_modal_opciones_terminal(nombre_terminal) {
                 permite_efectivo,
                 cuotas_efectivo_max,
                 permite_transferencia,
-                cuotas_transferencia_max
+                cuotas_transferencia_max,
+                aplicar_retroactivo: document.getElementById('opciones_terminal_aplicar_retroactivo').checked ? '1' : '0'
             })
         });
         const resultado = await resp.json();

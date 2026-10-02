@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.70
+ * @version   1.5piloto.74
  */
 
 use Iteradores\Nodos\Nodo;
@@ -848,7 +848,7 @@ function obtener_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
  * @param array  $opciones         Datos a guardar.
  * @return array Resultado.
  */
-function guardar_opciones_terminal_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, array $opciones): array {
+function guardar_opciones_terminal_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, array $opciones, bool $aplicar_retroactivo = false): array {
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
@@ -862,6 +862,11 @@ function guardar_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
     if (!$nodo_terminal_viaje) {
         return ['exito' => false, 'error' => 'La terminal no está autorizada en este viaje'];
     }
+
+    // Snapshot de la config de cobro de las ventas de esta terminal,
+    // antes de tocar el override.
+    $snapshot_ventas = _snapshot_config_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal);
+    $config_antes = _config_pago_resuelta_para_viaje_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal);
 
     // === Punto de subida/bajada ===
     $cambiar = ($opciones['cambiar_punto_predeterminado'] ?? '0') === '1' ? '1' : '0';
@@ -931,6 +936,17 @@ function guardar_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
         _actualizar_o_crear_campo($nodo_terminal_viaje, 'cuotas_efectivo_max', $cuotas_efectivo_max);
         _actualizar_o_crear_campo($nodo_terminal_viaje, 'permite_transferencia', $permite_transferencia);
         _actualizar_o_crear_campo($nodo_terminal_viaje, 'cuotas_transferencia_max', $cuotas_transferencia_max);
+    }
+
+    // A partir de v74: si la config efectiva de pago de las ventas
+    // de esta terminal cambió en algún permite_*, migrar las ventas
+    // viejas y (si el flag está activo) aplicar retroactivo a las
+    // que ya tienen opciones_cobro.
+    $config_despues = _config_pago_resuelta_para_viaje_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal);
+    $cambio_permite_terminal = ($config_antes['permite_efectivo'] !== $config_despues['permite_efectivo']
+        || $config_antes['permite_transferencia'] !== $config_despues['permite_transferencia']);
+    if ($cambio_permite_terminal) {
+        _aplicar_retroactivo_a_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal, $snapshot_ventas, $aplicar_retroactivo);
     }
 
     guardar_ambos(Conf::NOMBRE_APP);
@@ -1004,7 +1020,8 @@ function guardar_viaje_completo(array $datos): array {
         'cuotas_transferencia_max' => $datos['cuotas_transferencia_max'] ?? '1',
         'mostrar_dj_en_terminales' => $datos['mostrar_dj_en_terminales'] ?? '0',
     ];
-    $resultado_opciones = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones);
+    $aplicar_retroactivo = (($datos['aplicar_retroactivo'] ?? '') === '1');
+    $resultado_opciones = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones, $aplicar_retroactivo);
     if (!$resultado_opciones['exito']) {
         return $resultado_opciones;
     }
