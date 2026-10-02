@@ -610,7 +610,79 @@ reflejarse también en el espejo JS.
 
 ---
 
-## 13. CIERRE
+## 13. APRENDIZAJES A LA FUERZA (FRAMEWORK)
+
+Lecciones acumuladas en el desarrollo y corrección del framework.
+Cada una costó un bug en producción o en pruebas.
+
+**Persistencia:**
+
+1. **Todo `guardar` sobre SQL debe ser transaccional.** `begin_transaction`
+   → DELETE → INSERT por chunks → `commit`. Si algo falla, `rollback`.
+   Sin esto, un grafo grande pisa el anterior a medias.
+2. **Dividir los INSERT en chunks.** `max_allowed_packet` en XAMPP
+   es 1 MB. Chunks de ~200 KB. Sin esto, MySQL crashea la tabla.
+3. **Nunca guardar vacío.** Si la superestructura no tiene nodos,
+   `guardar_ambos` aborta. Guardar vacío pisa el grafo bueno.
+4. **Los IDs numéricos cambian entre cargas.** Si un nodo debe
+   sobrevivir, usar ID especial (`crear_con_id` o
+   `crear_con_dato_e_id`).
+5. **Los datos se guardan como strings.** Números también.
+6. **Cuidado con `cargar` + `vaciar_superestructura`.** Si se
+   vacía dos veces (una en `Controlador::cargar` y otra en la
+   implementación), y algo falla entre medio, queda vacío.
+7. **La transacción de IndexedDB (JS) reemplaza a la de SQL.**
+   DELETE + INSERT en la misma `db.transaction`, resolver en
+   `tx.oncomplete`, rechazar en `tx.onerror`/`onabort`.
+8. **Escritura atómica en JSON/XML:** `.tmp` + `rename`. El
+   navegador no puede; PHP sí.
+
+**Campos privados y visibilidad:**
+
+9. **PHP `private static` es accesible desde la propia clase.**
+   Un método público dentro de la misma clase puede limpiar el
+   campo. Es la solución correcta.
+10. **JS `#privado` no es accesible desde subclases.** Si una
+    subclase necesita operar sobre el campo, la clase base debe
+    exponer un método público.
+11. **Cuidado al traducir PHP → JS:** un bloque que usa
+    `typeof $this->campo !== 'undefined'` desde otra clase
+    siempre da `false` en JS. Bug histórico del depósito de IDs.
+
+**Nodos y enlaces:**
+
+12. **Todos los enlaces son strings.** Los números se convierten.
+13. **Comparar nodos por `->id()`.** Nunca con `===`.
+14. **Antes de eliminar un nodo, desenlazar.** `Nodo::eliminar`
+    falla si hay referencias entrantes.
+15. **`Nodo::nodo_por_id` alerta si no encuentra.** El patrón
+    "buscar y crear si no existe" debería usar `Nodo::existe`
+    para evitar ruido.
+16. **PHP convierte claves de array string numéricas a int.**
+    Castear a string al iterar.
+
+**Iterador:**
+
+17. **`if ($elemento)` descarta falsy (`0`, `""`, `false`).**
+    Usar `!== null` cuando el valor puede ser falsy legítimo.
+    Bug latente arreglado en framework 1.5i.7f.
+
+**Controlador y async (JS):**
+
+18. **`delegar` debe esperar a las implementaciones async.**
+    `await` funciona tanto si la implementación es sync como
+    async.
+19. **`ejecutar_prueba` debe esperar al callback.** Si no, los
+    tests imprimen "finalizado" antes de que termine el trabajo.
+20. **`db.close()` en `finally`.** Las conexiones abiertas se
+    acumulan hasta que el navegador las recolecte.
+
+**Regla de oro:** cualquier cambio al framework PHP se refleja en
+JS en la misma tanda, con dos scripts y dos commits.
+
+---
+
+## 14. CIERRE
 
 Este prompt es autocontenido sobre el framework. Con esta información más
 el `prompt_piloto.md` y el `prompt_sistema_scripts.md` podés retomar el

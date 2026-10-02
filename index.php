@@ -104,6 +104,32 @@ if (isset($_GET['probar_deposito'])) {
     exit;
 }
 
+// ==== Bloque temporal para prueba de persistencia del iterador (v73s) ====
+if (isset($_GET['probar_iterador'])) {
+    require_once __DIR__ . '/Pruebas/pruebas_iterador_persistencia.php';
+    exit;
+}
+
+// ==== Bloque temporal para verificar el fix if($elemento) en Iterador (v73s) ====
+if (isset($_GET['probar_elemento_cero'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    require_once __DIR__ . '/Iteradores/Iterador.php';
+    $iter = \Iteradores\Iteradores\Iterador::crear('test_cero', 0);
+    if (!$iter) {
+        echo "FALLO: no se pudo crear el iterador\n";
+        exit;
+    }
+    $dato = $iter->dato();
+    echo "dato() = " . var_export($dato, true) . "\n";
+    if ($dato === 0) {
+        echo "SIN BUG: el elemento 0 se asignó correctamente.\n";
+    } else {
+        echo "BUG PRESENTE: el elemento 0 se descartó.\n";
+    }
+    $iter->destruir();
+    exit;
+}
+
 // ==== Bloque temporal para pruebas de árbol ====
 if (isset($_GET['probar_arbol'])) {
     require_once __DIR__ . '/miscelaneas/Arbol.php';

@@ -633,6 +633,10 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   archivos `miscelaneas/migrar_*.php` (11 en total). Se conserva
   `migrar_pasajeros.php`. Prompts: se documenta que los prompts
   viven únicamente en el proyecto PHP y la regla de espejo JS.
+- **v73t**: ajuste de la impresión de la declaración jurada.
+  El `font-size` pasa de 12px a 11pt (equivalente al "tamaño 11"
+  de Word) y el `line-height` de 1.6 a 1.5. Solo afecta a
+  `imprimir_declaracion_jurada` en `Impresion.php`.
 - **v73l**: fix del guardado SQL (framework 1.5i.7). `guardar`
   usa transacción y divide los INSERT en chunks de ~200 KB para
   no superar `max_allowed_packet` (1 MB en XAMPP). `guardar_ambos`
@@ -640,6 +644,42 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   verifica la recarga y lanza excepción si falla. `index.php`
   muere con mensaje claro si el grafo existe pero no se puede
   cargar, en lugar de pisarlo con vacío.
+- **v73v**: fix del Bug 2 (ligadura comprador-pasajero). Los
+  tres lugares del frontend donde se escribía sobre un campo
+  pisando con vacíos ahora escriben solo si el valor entrante
+  no está vacío: `_aplicar_datos_comprador`,
+  `_aplicar_datos_pasajero` y la copia inicial de
+  `_activar_atadura` en `ventas.js`. Se confirmó que la
+  comparación contra todos los pasajeros ya estaba bien
+  implementada en `_verificar_atadura_por_dni`. Solo frontend,
+  no se tocó backend.
+- **v73w**: fix del caso restante del Bug 2. Cuando el comprador
+  tiene datos cargados y el pasajero está vacío (típico cuando
+  el comprador también viaja y no estaba registrado), la
+  activación de la atadura ahora copia en la dirección correcta.
+  La copia inicial en `_activar_atadura` es bidireccional
+  simétrica: rellena vacíos y, cuando hay conflicto entre
+  valores no vacíos, gana el lado que el usuario escribió por
+  última vez (registrado por campo en
+  `window.atadura_ultimo_campo`). Los listeners de atadura
+  también registran el último campo editado por el usuario.
+  Solo frontend.
+- **v73x**: dos bugs relacionados con la ligadura y la corrección
+  de DNI. (1) `_verificar_atadura_por_dni` ahora respeta el
+  estado `duplicado` del pasajero: si el pasajero está marcado
+  como duplicado (ya asignado a otro asiento del mismo viaje, o
+  repetido en otro formulario de esta misma venta), la atadura
+  no se activa. Además, si la atadura estaba apuntando a ese
+  pasajero, se rompe al momento de detectar el duplicado. (2)
+  Al corregir el DNI del pasajero por uno no registrado, se
+  limpian los campos no-DNI antes de habilitarlos (antes
+  quedaban los del DNI previo y se propagaban por ligadura).
+  Lo mismo para el comprador: si antes se habían autocompletado
+  datos desde otro DNI y el nuevo no está registrado, se limpian
+  los campos (`window.comprador_dni_con_datos` trackea el DNI
+  del último autocompletado exitoso). Se eliminó el botón
+  "Usar primer pasajero" del modal de venta: obsoleto desde que
+  la atadura funciona en ambos sentidos.
 
 ---
 
@@ -677,7 +717,60 @@ bloques `?migrar_*=1` de `index.php` y los archivos
 `migrar_pasajeros.php` se conserva: es histórico y no vale la pena
 migrarlo. No se toca.
 
-### 8.3 Próximos pasos posibles
+### 8.3 Bugs conocidos (prioridad alta)
+
+**Bug 1 — Opciones de cobro de cupones.** Las opciones generales
+de pago (del viaje) se usan al cobrar cuotas, sin considerar las
+opciones individuales de la venta. Si el dueño cambia las generales
+después de la venta, el cobro toma las nuevas, lo cual es incorrecto.
+
+Diseño acordado: **opciones en dos niveles, individuales pisan a
+generales**. Al confirmar la venta, se guardan copias de las
+opciones de cobro vigentes en ese momento como opciones individuales
+de la venta. Los cambios posteriores en las generales no afectan a
+las ventas ya hechas. En el modal de pago de cupón, agregar un
+botón "Cambiar método de cobro" que abra otro modal para editar
+esas opciones individuales.
+
+**Bug 2 — Ligadura comprador ↔ pasajero en el alta de venta.**
+**Resuelto.** v73v fixeó los tres puntos donde se escribía
+pisando con vacíos. v73w fixeó el caso restante: cuando el
+comprador tiene datos y el pasajero está vacío (típico cuando
+el comprador también viaja y no estaba registrado), la atadura
+ahora copia en la dirección correcta. La copia inicial de
+`_activar_atadura` es bidireccional simétrica con resolución de
+conflictos por último escrito del usuario
+(`window.atadura_ultimo_campo`). Los listeners de atadura
+registran el último campo editado por el usuario en cada lado.
+
+v73x cerró dos bugs relacionados: (1) la atadura ya no se
+activa cuando el pasajero está marcado como duplicado (ya
+asignado a otro asiento del mismo viaje, o repetido en otro
+formulario de esta misma venta); (2) al corregir el DNI por
+uno no registrado, se limpian los campos autocompletados del
+pasajero y del comprador, para no arrastrar datos del DNI
+anterior. También se eliminó el botón "Usar primer pasajero",
+obsoleto.
+
+**Bug 1 queda pendiente de resolver.**
+
+### 8.4 Pestaña especial: visualizador del grafo (futuro)
+
+Pestaña nueva que verán **admin y soporte**. Objetivo: dar una
+interfaz amigable para inspeccionar la estructura de nodos y
+enlaces, sin depender de `imprimir_superestructura` ni de la
+consola. Incluye:
+
+- Navegación por la superestructura desde la raíz.
+- Vista de nodos con sus datos y enlaces salientes.
+- Listado de iteradores creados con sus cuerpos, alias y posición
+  actual.
+- Acciones sobre iteradores (crear, destruir, desocupar, ver
+  caminos registrados).
+
+Se implementa **después** de los bugs y los pendientes menores.
+
+### 8.5 Próximos pasos posibles
 
 **Diversificación por tipo de aplicación** (próximo gran frente):
 
@@ -913,8 +1006,10 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.73r (fix del
-bug `if ($elemento)` en `Iterador.php`; limpieza de migraciones).
+**Última actualización de este prompt:** v1.5piloto.73x (dos bugs
+de la ligadura comprador-pasajero: no se activa con pasajeros
+duplicados y se limpian los campos al corregir el DNI por uno
+no registrado).
 
 **Estado de la conversación:**
 
@@ -948,6 +1043,21 @@ bug `if ($elemento)` en `Iterador.php`; limpieza de migraciones).
   latente `if ($elemento)` de `Iterador`.
 - Cerramos en v73r el fix del bug `if ($elemento)` (PHP y JS) y la
   limpieza completa de migraciones.
+- Cerramos en v73t el ajuste de tamaño de letra de la DJ impresa.
+- Cerramos en v73v el fix del Bug 2: la ligadura comprador-pasajero
+  ya no pisa con vacíos. Se confirmó que la comparación contra todos
+  los pasajeros ya estaba bien implementada en `_verificar_atadura_por_dni`.
+- Cerramos en v73w el caso restante del Bug 2: cuando el comprador
+  tiene datos y el pasajero está vacío, la atadura ahora copia en
+  la dirección correcta. La copia inicial es bidireccional con
+  prioridad al último escrito por el usuario.
+- Cerramos en v73x dos bugs relacionados con la ligadura y la
+  corrección de DNI: (1) la atadura ya no se activa cuando el
+  pasajero está marcado como duplicado (ya asignado a otro asiento
+  o repetido en otro formulario); (2) al corregir el DNI por uno
+  no registrado, se limpian los campos del pasajero y del
+  comprador que habían sido autocompletados. Se eliminó el botón
+  "Usar primer pasajero" (obsoleto desde que la atadura funciona).
 - No hay tandas en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -969,6 +1079,22 @@ bug `if ($elemento)` en `Iterador.php`; limpieza de migraciones).
 - **La sección "Discusión actual"** de este prompt es lo primero que se
   actualiza al cerrar una tanda.
 
+**Bugs conocidos (prioridad alta, antes de todo lo demás):**
+
+- **Bug de cupones.** Ver sección 8.3, "Bug 1". Opciones de cobro en
+  dos niveles: individuales (fijadas al momento de la venta) pisan
+  a generales (del viaje). Requiere:
+  - Al confirmar venta, copiar las opciones de cobro vigentes al
+    nodo de la venta (nuevo sub-nodo `opciones_cobro` o similar).
+  - Al cobrar una cuota, leer primero las individuales. Si no hay,
+    caer a las generales.
+  - Botón "Cambiar método de cobro" en el modal de pago de cupón,
+    que abre otro modal para editar las opciones individuales.
+  - Confirmar el formato exacto con el usuario antes de codear.
+
+- **Bug de ligadura comprador-pasajero: resuelto en v73v.** Ver
+  sección 8.3, "Bug 2".
+
 **Decisiones abiertas / temas pendientes sin consensuar:**
 
 - **Rehash automático**: lo mencionamos como parte de la Tanda C pero
@@ -981,6 +1107,46 @@ bug `if ($elemento)` en `Iterador.php`; limpieza de migraciones).
 - **Diversificación por tipo de aplicación**: próximo gran frente. Ya
   hay un diseño inicial consensuado (nodo `tipos_de_aplicacion`, enlace
   `tipo_app` en el dueño). Falta ver el código antes de arrancar.
+
+**Aprendizajes a la fuerza del piloto:**
+
+1. **Los datos del framework viajan como strings.** Números también.
+   Al comparar, castear. Ejemplo: `"2" !== 2` en JS.
+2. **PHP convierte claves de array string numéricas a int.** Forzar
+   `(string)$clave` en los foreach que iteran sobre DNI o patentes.
+3. **Los IDs sin ID especial cambian entre cargas.** Si un nodo debe
+   sobrevivir a guardar/cargar y ser referenciado, usar ID especial.
+4. **La prueba del depósito de IDs dio un falso positivo** la primera
+   vez. Moraleja: diseñar el test para que no dependa del estado
+   intermedio que el propio `cargar` reconstruye.
+5. **Nunca confiar en datos que el cliente manda** cuando hay una
+   fuente de verdad del lado del servidor. Bug de
+   `dueno/listar_sesiones_terminales` (fix en v73j): el cliente
+   mandaba la lista de terminales y el backend la usaba sin validar.
+6. **`sesiones/cerrar` debe validar el ámbito del solicitante.** El
+   fix v73j agregó `_puede_cerrar_sesion`. Regla: cualquier acción
+   sobre recursos de otros usuarios pasa por un chequeo explícito.
+7. **El guardado SQL debe ser transaccional y por chunks.** El fix
+   v73l usó `begin_transaction` + DELETE + INSERT por chunks de
+   ~200 KB + `commit`. Antes, un grafo grande crasheaba MySQL.
+8. **El guardado nunca debe pisar el grafo con vacío.**
+   `guardar_ambos` aborta si `Nodo::hay_nodos_en_superestructura()`
+   devuelve false.
+9. **Los includes importan.** `guardar_ambos` debe estar disponible
+   antes de usarse. Bug v73k: fatal error por orden de includes.
+10. **Los tests con callbacks async deben esperar el callback.**
+    `Controlador::ejecutar_prueba` en JS ahora es async y espera.
+11. **`if ($elemento)` descarta falsy** (`0`, `""`, `false`). Usar
+    `!== null` cuando el valor puede ser falsy legítimamente.
+12. **En PHP, `private` de una clase base NO es accesible desde una
+    subclase.** Pero `private static` sí es accesible desde dentro
+    de la misma clase, aunque sea por un método público.
+13. **En JS, `#privado` es más estricto que `private` de PHP.**
+    Nunca accesible desde una subclase, ni siquiera con trucos.
+    Regla: exponer un método público para operar sobre el campo.
+14. **PHP y JS deben ir espejados.** Cualquier cambio al framework
+    PHP se refleja en JS, con dos `aplicar_cambios.php` y dos
+    commits distintos.
 
 **Preguntas abiertas para el usuario:**
 
@@ -1005,9 +1171,10 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.73r (framework 1.5i.7f).
-Todo funcional. Listo para arrancar la diversificación por tipo de
-aplicación.
+**Estado del proyecto al cierre:** v1.5piloto.73x (framework 1.5i.7f).
+Todo funcional. Bug 2 resuelto en su totalidad, incluyendo los casos
+de duplicado y corrección de DNI. Pendiente el Bug 1 (opciones de
+cobro de cupones en dos niveles).
 
 ---
 

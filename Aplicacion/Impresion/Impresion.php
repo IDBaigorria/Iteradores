@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.67b
+ * @version   1.5piloto.67c
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -2207,8 +2207,8 @@ function imprimir_declaracion_jurada(string $nombre_dueno, string $nombre_viaje,
             background: white;
             color: black;
             font-family: "Times New Roman", Georgia, serif;
-            font-size: 12px;
-            line-height: 1.6;
+            font-size: 11pt;
+            line-height: 1.5;
         }
         body { padding: 10px 15px; }
         .contenido-dj {

@@ -422,15 +422,15 @@ Antes de escribir el script, si necesitás ver archivos actualizados, pedilos
 explícitamente. **Nunca asumas que un archivo no cambió.**
 
 **Regla del entorno de trabajo:** durante la conversación, el usuario NO
-modifica archivos por su cuenta. Si te pasó un archivo al principio de
-la sesión, ese archivo está vigente hasta que él te diga lo contrario.
-Esto significa que:
+modifica archivos por su cuenta. Si ya te pasó un archivo —al principio
+de la sesión o en cualquier momento—, ese archivo está vigente. No hace
+falta volver a pedirlo aunque hayan pasado muchas tandas.
 
-- **Las versiones de los archivos que tenés son siempre las últimas.**
-  No hace falta volver a pedirlas "por si acaso".
-- **Igual conviene pedir los archivos que vas a tocar si no los tenés
-  a mano.** Especialmente los HTML, porque los `?v=` viven ahí y son
-  fáciles de olvidar.
+- **Asumí que los archivos que ya te pasó están actualizados.** No los
+  vuelvas a pedir "por si acaso". Esto ahorra tiempo y memoria.
+- **Solo pedí archivos que nunca aparecieron en la conversación.** Por
+  ejemplo, un HTML que nunca se mostró, o un archivo de otro módulo
+  que todavía no se tocó.
 - **Si el usuario cambia algo, te lo avisa.** Vos no tenés que
   preguntar en cada tanda.
 
@@ -531,6 +531,49 @@ Si el cambio toca el framework Y el piloto (por ejemplo, una nueva
 versión del framework que agrega funcionalidad y el piloto la usa),
 se actualizan los tres prompts. Es poco común, pero pasa.
 
+## APRENDIZAJES A LA FUERZA (SISTEMA DE SCRIPTS)
+
+Lecciones acumuladas en las tandas largas del proyecto. Cada una
+costó un fallo real del runner y una iteración extra.
+
+1. **Bloques con caracteres especiales son frágiles.** Tildes, `°`,
+   `\s`, `\.` y otros similares pueden no matchear por
+   codificación. Preferir anclas cortas sin esos caracteres.
+   Ejemplo: en vez de matchear la línea del `preg_match` completa,
+   matchear solo el `return` que viene después.
+2. **Verificar la unicidad antes de entregar.** Un bloque
+   `@version 1.5i.4` puede aparecer 4 veces en el mismo archivo.
+   Desambiguar con el contexto (por ejemplo, la línea siguiente
+   `class X extends ...`).
+3. **Bumps obligatorios siempre.** Cada archivo modificado se
+   bumpea, tanto en `@version` como en `?v=` del HTML. Si falta
+   el HTML, pedirlo antes de entregar el script.
+4. **Vigencia de archivos.** Durante la conversación, el usuario
+   no modifica archivos por su cuenta. Las versiones que el
+   asistente tiene son las últimas. Si el usuario cambia algo,
+   avisa.
+5. **Tipo `eliminar` en `$cambios`.** El runner lo soporta. Es
+   idempotente: si el archivo no existe, lo reporta y sigue.
+6. **Dos proyectos = dos scripts.** Cambios al framework PHP y al
+   espejo JS van en dos `aplicar_cambios.php` distintos, con dos
+   commits distintos. Los prompts viven solo en el proyecto PHP.
+7. **Formato del título de commit:** siempre `V1.5piloto.XX:` o
+   `V1.5i.XX:`, con `V` mayúscula y versión completa.
+8. **Tanda chica, tandas limpias.** Preferir varias tandas
+   chicas a una gigante. Es más fácil de debuggear y de revertir.
+9. **Modo estricto, sin backups.** Si algún bloque falla, no se
+   escribe nada. El usuario deshace a mano con git.
+10. **Los tests deben correr con `await` si son async.** En JS,
+    `Controlador.ejecutar_prueba` es async desde V1.5i.7. Si no
+    se espera, los prints de errores se pierden.
+11. **Anunciar los riesgos.** Si un bloque es propenso a fallar
+    por indentación o espacios trailing, avisarlo antes de
+    entregar.
+12. **No asumir la estructura de un archivo.** Pedirlo siempre
+    antes de tocarlo, aunque parezca conocido.
+
+---
+
 ## RECORDATORIOS FINALES
 
 - No escribas código sin consensuar primero.
@@ -545,10 +588,12 @@ se actualizan los tres prompts. Es poco común, pero pasa.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.73r. Se agregó la
-sección "ESPEJO JS DEL FRAMEWORK" (regla de mantener PHP y JS
-espejados con dos `aplicar_cambios.php` y dos commits distintos;
-prompts solo en PHP).
+**Última actualización de este prompt:** v1.5piloto.73v. Se ajustó
+la regla de vigencia de archivos: durante la conversación, el
+asistente debe asumir que los archivos ya pasados están vigentes
+y no volver a pedirlos. Solo se piden archivos que nunca
+aparecieron en el hilo. La sección "APRENDIZAJES A LA FUERZA
+(SISTEMA DE SCRIPTS)" se mantiene tal cual.
 
 Reglas incorporadas al método de trabajo en las últimas tandas:
 

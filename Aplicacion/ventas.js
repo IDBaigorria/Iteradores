@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.66
+ * @version 1.5piloto.73x
  */
 
 // (aplicar_cambios.php funcionó)
@@ -35,8 +35,12 @@ function tiene_asientos_seleccionados_propios() {
 async function abrir_modal_confirmacion_venta() {
     if (!microSyncActual || !viaje_seleccionado) return;
 
-    // Resetear el estado de atadura por si quedo de una apertura previa.
+    // Resetear el estado de atadura y del comprador por si quedo
+    // algo de una apertura previa.
     window.atadura_actual = null;
+    window.atadura_ultimo_campo = {};
+    window.comprador_autocompletado_dni = null;
+    window.comprador_dni_con_datos = null;
 
     const asientos_seleccionados = estados_asientos_actuales.filter(a => a.estado === 'seleccionado' && a.seleccionado_por === usuario_actual.nombre_usuario);
     if (asientos_seleccionados.length === 0) {
@@ -124,7 +128,6 @@ async function abrir_modal_confirmacion_venta() {
                 <div class="field"><label>Email</label><input id="comprador_email"></div>
                 <div class="field"><label>Celular *</label><input id="comprador_celular"></div>
             </div>
-            <button class="btn small" id="usar_pasajero_como_comprador">Usar primer pasajero</button>
         </div>
         <div id="pasajeros_venta" style="margin-top:20px;"></div>
         <div class="actions" style="margin-top:20px;">
@@ -161,55 +164,6 @@ async function abrir_modal_confirmacion_venta() {
     });
     $("#cuotas_venta").addEventListener("change", function() {
         actualizar_visibilidad_cuotas();
-    });
-
-    $("#usar_pasajero_como_comprador").addEventListener("click", async () => {
-        const r = recolectar_datos_pasajero(0, {
-            incluir_selector_sb: true
-        });
-        if (!r.ok) {
-            mostrar_aviso(r.error, 'error');
-            return;
-        }
-        const datos_pas = r.datos;
-
-        // Guardar el pasajero 0 en el sistema. Si ya existe, no
-        // pasa nada (el error de DNI duplicado se ignora).
-        const nombre_dueno_pas = (usuario_actual.nivel === 'terminal')
-            ? viaje_seleccionado.dueno
-            : obtener_nombre_dueno_actual();
-        try {
-            const resp = await fetch("index.php", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({
-                    accion: "pasajeros/crear",
-                    nombre_dueno: nombre_dueno_pas,
-                    dni: datos_pas.dni,
-                    apellido: datos_pas.apellido,
-                    nombres: datos_pas.nombres,
-                    email: datos_pas.email,
-                    celular: datos_pas.celular,
-                    celular_emergencia: datos_pas.celular_emergencia,
-                    fecha_nacimiento: datos_pas.fecha_nacimiento,
-                    direccion: datos_pas.direccion,
-                    localidad: datos_pas.localidad
-                })
-            });
-            const resultado = await resp.json();
-            if (!resultado.exito && !/ya existe/i.test(resultado.error || '')) {
-                mostrar_aviso(resultado.error || "Error al guardar el pasajero", 'error');
-                return;
-            }
-        } catch (e) {
-            mostrar_aviso("Error de comunicacion al guardar el pasajero", 'error');
-            return;
-        }
-
-        // Copiar solo el DNI al comprador y disparar la busqueda.
-        const input_dni_comp = $("#comprador_dni");
-        input_dni_comp.value = datos_pas.dni;
-        await _buscar_comprador_por_dni(true);
     });
 
     // Listener del DNI del comprador: mismo comportamiento que los
@@ -2904,6 +2858,7 @@ if (!window.pasajeros_autocompletado_estado) {
     window.pasajeros_autocompletado_estado = {};
 }
 window.comprador_autocompletado_dni = null;
+window.comprador_dni_con_datos = null;
 
 /**
  * Normaliza un DNI dejando solo digitos.
@@ -3035,18 +2990,19 @@ function _calcular_antiguedad_datos(fecha_iso) {
  * formulario y muestra el cartel de antiguedad.
  */
 function _aplicar_datos_pasajero(index, datos) {
-    const set = (id, valor) => {
+    const set_si_no_vacio = (id, valor) => {
+        if (valor === undefined || valor === null || valor === '') return;
         const el = document.getElementById(id);
-        if (el) el.value = valor || '';
+        if (el) el.value = valor;
     };
-    set(`pasajero_apellido_${index}`, datos.apellido);
-    set(`pasajero_nombres_${index}`, datos.nombres);
-    set(`pasajero_email_${index}`, datos.email);
-    set(`pasajero_celular_${index}`, datos.celular);
-    set(`pasajero_emergencia_${index}`, datos.celular_emergencia);
-    set(`pasajero_fecha_nacimiento_${index}`, datos.fecha_nacimiento);
-    set(`pasajero_direccion_${index}`, datos.direccion);
-    set(`pasajero_localidad_${index}`, datos.localidad);
+    set_si_no_vacio(`pasajero_apellido_${index}`, datos.apellido);
+    set_si_no_vacio(`pasajero_nombres_${index}`, datos.nombres);
+    set_si_no_vacio(`pasajero_email_${index}`, datos.email);
+    set_si_no_vacio(`pasajero_celular_${index}`, datos.celular);
+    set_si_no_vacio(`pasajero_emergencia_${index}`, datos.celular_emergencia);
+    set_si_no_vacio(`pasajero_fecha_nacimiento_${index}`, datos.fecha_nacimiento);
+    set_si_no_vacio(`pasajero_direccion_${index}`, datos.direccion);
+    set_si_no_vacio(`pasajero_localidad_${index}`, datos.localidad);
 
     _habilitar_campos_pasajero(index, true);
 
@@ -3120,6 +3076,10 @@ async function _buscar_pasajero_por_dni(index) {
         _mostrar_aviso_en_formulario(index, 'Ese DNI ya esta cargado en otro pasajero de esta venta.', 'rojo');
         _resetear_campos_pasajero(index);
         window.pasajeros_autocompletado_estado[index] = { dni_buscado: dni_norm, duplicado: true };
+        // Si la atadura estaba apuntando a este pasajero, romperla.
+        if (window.atadura_actual && window.atadura_actual.indice_pasajero === index) {
+            _romper_atadura();
+        }
         mostrar_aviso('DNI duplicado en otro pasajero de esta venta', 'error');
         return;
     }
@@ -3128,6 +3088,10 @@ async function _buscar_pasajero_por_dni(index) {
         _mostrar_aviso_en_formulario(index, 'Ese DNI ya esta asignado a otro asiento de este viaje.', 'rojo');
         _resetear_campos_pasajero(index);
         window.pasajeros_autocompletado_estado[index] = { dni_buscado: dni_norm, duplicado: true };
+        // Si la atadura estaba apuntando a este pasajero, romperla.
+        if (window.atadura_actual && window.atadura_actual.indice_pasajero === index) {
+            _romper_atadura();
+        }
         mostrar_aviso('DNI ya asignado a otro asiento de este viaje', 'error');
         return;
     }
@@ -3158,6 +3122,11 @@ async function _buscar_pasajero_por_dni(index) {
                 fecha_modificacion: datos.pasajero.fecha_ultima_modificacion || ''
             };
         } else {
+            // Limpiar los campos no-DNI antes de habilitar. Si el
+            // usuario habia autocompletado un DNI previo y ahora
+            // corrige por uno no registrado, los datos viejos no
+            // deben quedar ni propagarse por ligadura.
+            _limpiar_campos_pasajero(index);
             _habilitar_campos_pasajero(index, true);
             _mostrar_aviso_en_formulario(index, 'DNI no registrado. Complete los datos.', 'gris');
             window.pasajeros_autocompletado_estado[index] = {
@@ -3207,9 +3176,18 @@ async function _buscar_comprador_por_dni(forzar = false) {
 
         if (datos.exito && datos.pasajero) {
             _aplicar_datos_comprador(datos.pasajero);
+            window.comprador_dni_con_datos = dni_norm;
             const antiguedad = _calcular_antiguedad_datos(datos.pasajero.fecha_ultima_modificacion);
             _mostrar_aviso_comprador(antiguedad.texto, antiguedad.clase);
         } else {
+            // Si antes se habian autocompletado datos para otro DNI
+            // y ahora el DNI cambio por uno no registrado, limpiar
+            // los campos del comprador para no arrastrar los datos
+            // del DNI anterior.
+            if (window.comprador_dni_con_datos && window.comprador_dni_con_datos !== dni_norm) {
+                _limpiar_campos_comprador();
+                window.comprador_dni_con_datos = null;
+            }
             _mostrar_aviso_comprador('DNI no registrado. Complete los datos.', 'gris');
         }
     } catch (e) {
@@ -3225,14 +3203,33 @@ async function _buscar_comprador_por_dni(forzar = false) {
  * comprador.
  */
 function _aplicar_datos_comprador(datos) {
-    const set = (id, valor) => {
+    const set_si_no_vacio = (id, valor) => {
+        if (valor === undefined || valor === null || valor === '') return;
         const el = document.getElementById(id);
-        if (el) el.value = valor || '';
+        if (el) el.value = valor;
     };
-    set('comprador_apellido', datos.apellido);
-    set('comprador_nombres', datos.nombres);
-    set('comprador_email', datos.email);
-    set('comprador_celular', datos.celular);
+    set_si_no_vacio('comprador_apellido', datos.apellido);
+    set_si_no_vacio('comprador_nombres', datos.nombres);
+    set_si_no_vacio('comprador_email', datos.email);
+    set_si_no_vacio('comprador_celular', datos.celular);
+}
+
+/**
+ * Limpia los campos no-DNI del comprador. Se usa cuando el
+ * usuario corrige el DNI por uno no registrado y antes se
+ * habian autocompletado datos para el DNI previo.
+ */
+function _limpiar_campos_comprador() {
+    const ids = [
+        'comprador_apellido',
+        'comprador_nombres',
+        'comprador_email',
+        'comprador_celular'
+    ];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
 }
 
 /**
@@ -3275,6 +3272,7 @@ function _limpiar_aviso_comprador() {
 // ============================================================
 
 if (!window.atadura_actual) window.atadura_actual = null;
+if (!window.atadura_ultimo_campo) window.atadura_ultimo_campo = {};
 
 /**
  * Conecta los listeners de atadura en los campos comunes del
@@ -3291,6 +3289,9 @@ function _conectar_listeners_atadura_comprador() {
         const el = document.getElementById(id_comp);
         if (!el) return;
         el.addEventListener('input', function() {
+            // Registrar que el usuario escribio en el comprador.
+            // Se usa al activar la atadura para resolver conflictos.
+            window.atadura_ultimo_campo[campo] = { lado: 'comprador', indice: null };
             if (!window.atadura_actual) return;
             const idx = window.atadura_actual.indice_pasajero;
             const el_pas = document.getElementById(`pasajero_${campo}_${idx}`);
@@ -3307,15 +3308,18 @@ function _conectar_listeners_atadura_comprador() {
  */
 function _conectar_listeners_atadura_pasajero(index) {
     const pares = [
-        [`pasajero_apellido_${index}`, 'comprador_apellido'],
-        [`pasajero_nombres_${index}`, 'comprador_nombres'],
-        [`pasajero_email_${index}`, 'comprador_email'],
-        [`pasajero_celular_${index}`, 'comprador_celular']
+        [`pasajero_apellido_${index}`, 'comprador_apellido', 'apellido'],
+        [`pasajero_nombres_${index}`, 'comprador_nombres', 'nombres'],
+        [`pasajero_email_${index}`, 'comprador_email', 'email'],
+        [`pasajero_celular_${index}`, 'comprador_celular', 'celular']
     ];
-    pares.forEach(([id_pas, id_comp]) => {
+    pares.forEach(([id_pas, id_comp, campo]) => {
         const el = document.getElementById(id_pas);
         if (!el) return;
         el.addEventListener('input', function() {
+            // Registrar que el usuario escribio en este pasajero.
+            // Se usa al activar la atadura para resolver conflictos.
+            window.atadura_ultimo_campo[campo] = { lado: 'pasajero', indice: index };
             if (!window.atadura_actual) return;
             if (window.atadura_actual.indice_pasajero !== index) return;
             const el_comp = document.getElementById(id_comp);
@@ -3344,6 +3348,14 @@ function _verificar_atadura_por_dni() {
             if (!el) continue;
             const dni_pas = _normalizar_dni_input(el.value);
             if (dni_pas === comp_dni) {
+                // No activar la atadura si el pasajero esta marcado
+                // como duplicado (ya asignado a otro asiento del
+                // mismo viaje, o repetido en otro formulario de
+                // esta misma venta).
+                const estado_pas = window.pasajeros_autocompletado_estado[i];
+                if (estado_pas && estado_pas.duplicado) {
+                    continue;
+                }
                 indice_coincidente = i;
                 break;
             }
@@ -3371,18 +3383,47 @@ function _verificar_atadura_por_dni() {
 function _activar_atadura(index_pasajero) {
     window.atadura_actual = { indice_pasajero: index_pasajero };
 
-    // Copia inicial: del pasajero al comprador. Solo los campos
-    // comunes (los que existen en ambos formularios).
+    // Copia inicial bidireccional entre comprador y pasajero.
+    //
+    // Reglas para cada campo comun:
+    //   1. Si un lado esta vacio y el otro no, se copia el no
+    //      vacio al vacio (v73v: nunca pisar con vacio).
+    //   2. Si ambos tienen valor y son iguales, no se hace nada.
+    //   3. Si ambos tienen valor y difieren, gana el lado que el
+    //      usuario escribio por ultima vez (registrado por campo
+    //      en window.atadura_ultimo_campo). Se copia ese lado al
+    //      otro, asi el usuario ve el cambio en el input que no
+    //      toco.
+    //   4. Si hay conflicto y no hay registro del ultimo escrito,
+    //      no se toca ninguno.
     const pares = [
-        [`pasajero_apellido_${index_pasajero}`, 'comprador_apellido'],
-        [`pasajero_nombres_${index_pasajero}`, 'comprador_nombres'],
-        [`pasajero_email_${index_pasajero}`, 'comprador_email'],
-        [`pasajero_celular_${index_pasajero}`, 'comprador_celular']
+        [`pasajero_apellido_${index_pasajero}`, 'comprador_apellido', 'apellido'],
+        [`pasajero_nombres_${index_pasajero}`, 'comprador_nombres', 'nombres'],
+        [`pasajero_email_${index_pasajero}`, 'comprador_email', 'email'],
+        [`pasajero_celular_${index_pasajero}`, 'comprador_celular', 'celular']
     ];
-    pares.forEach(([id_pas, id_comp]) => {
+    pares.forEach(([id_pas, id_comp, campo]) => {
         const el_pas = document.getElementById(id_pas);
         const el_comp = document.getElementById(id_comp);
-        if (el_pas && el_comp) el_comp.value = el_pas.value;
+        if (!el_pas || !el_comp) return;
+
+        const val_pas = el_pas.value;
+        const val_comp = el_comp.value;
+        const pas_vacio = (val_pas === undefined || val_pas === null || val_pas === '');
+        const comp_vacio = (val_comp === undefined || val_comp === null || val_comp === '');
+
+        if (pas_vacio && comp_vacio) return;
+        if (pas_vacio) { el_pas.value = val_comp; return; }
+        if (comp_vacio) { el_comp.value = val_pas; return; }
+        if (val_pas === val_comp) return;
+
+        const ult = window.atadura_ultimo_campo[campo];
+        if (!ult) return;
+        if (ult.lado === 'comprador') {
+            el_pas.value = val_comp;
+        } else if (ult.lado === 'pasajero' && ult.indice === index_pasajero) {
+            el_comp.value = val_pas;
+        }
     });
 
     // Badges.
