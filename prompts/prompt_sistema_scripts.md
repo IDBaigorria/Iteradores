@@ -623,12 +623,28 @@ que viene justo después.
 - Los bloques de reemplazo sobre los prompts son chicos y estables. En
   general se puede hacer todo en el mismo `aplicar_cambios.php`.
 
+**Proyecto nuevo: plugin de Chrome sobre Iteradores JS.**
+
+A partir de v1.5piloto.74b arranca un segundo piloto: un plugin
+de Chrome (manifest v3) que usa el framework Iteradores JS para
+persistir su propia info y corre pruebas automatizadas sobre la
+página del piloto PHP. Vive dentro del proyecto `iteradoresJS/`,
+en una carpeta `Aplicacion/`. Tiene su propia carpeta `prompts/`
+con un único archivo por ahora: `prompt_plugin_piloto.md`.
+
+Los scripts de aplicación de cambios se ejecutan con el mismo
+flujo y el mismo runner, pero parados en el directorio del
+proyecto `iteradoresJS/`. Los prompts del framework y del
+sistema de scripts siguen viviendo en el proyecto PHP.
+
 **Para el asistente de la próxima sesión:**
 
 - Si vas a cerrar una tanda, además del código, actualizá el prompt de continuidad.
 - La sección "Discusión actual" del prompt de continuidad es la fuente de verdad
   sobre dónde quedamos.
 - Este prompt (el de scripts) casi no se toca. Solo si cambia el método de trabajo.
+- Si la tanda es sobre el plugin JS, actualizá `iteradoresJS/prompts/prompt_plugin_piloto.md`
+  en vez de (o además de) este prompt.
 
 ---
 

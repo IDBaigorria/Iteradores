@@ -2,17 +2,16 @@
 /**
  * Aplicador de cambios automáticos — Piloto agencia de viajes.
  *
- * Tanda v1.5piloto.74a:
- * - Fix del retroactivo de opciones de cobro. En v74, los helpers
- *   `_aplicar_retroactivo_a_ventas_del_viaje` y
- *   `_aplicar_retroactivo_a_ventas_de_terminal` leían la config
- *   nueva con `_config_pago_resuelta_para_venta`, que devuelve el
- *   `opciones_cobro` congelado de la venta. Resultado: si la venta
- *   ya tenía opciones_cobro, nunca veía el cambio. Fix: resolver
- *   con `_config_pago_resuelta_para_viaje_terminal`, que mira el
- *   viaje y el override del TerminalViaje en vivo.
+ * Tanda v1.5piloto.74b — solo documentación.
  *
- * Asume v74 ya aplicado.
+ * Registra en los prompts la decisión de arrancar un segundo piloto:
+ * un plugin de Chrome (MV3) sobre el framework Iteradores JS. Vive
+ * dentro de iteradoresJS/, en Aplicacion/. Tiene su propia carpeta
+ * prompts/ con un prompt del plugin. Los scripts de aplicación de
+ * cambios se ejecutan con el mismo flujo, parados en el directorio
+ * de iteradoresJS/.
+ *
+ * No toca código.
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -35,196 +34,125 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ============================================================
-    // Aplicacion/Ventas/Venta.php
-    // ============================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Ventas/Venta.php',
-        'descripcion' => 'Venta.php: bump de version 74 a 74a',
-        'buscar' => [
-            ' * @since     1.5piloto.14',
-            ' * @version   1.5piloto.74',
-        ],
-        'reemplazar' => [
-            ' * @since     1.5piloto.14',
-            ' * @version   1.5piloto.74a',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Ventas/Venta.php',
-        'descripcion' => 'Venta.php: fix _aplicar_retroactivo_a_ventas_del_viaje',
-        'buscar' => [
-            'function _aplicar_retroactivo_a_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje, array $snapshots, bool $aplicar_retroactivo): void {',
-            '    _recorrer_ventas_del_viaje($nombre_dueno, $nombre_viaje, function(Nodo $v) use ($snapshots, $aplicar_retroactivo) {',
-            '        $id = $v->id();',
-            "        \$nodo_opc = \$v->adyacente('opciones_cobro');",
-            '        if ($nodo_opc) {',
-            '            if ($aplicar_retroactivo) {',
-            '                $nueva = _config_pago_resuelta_para_venta($v);',
-            "                _actualizar_permite_opciones_cobro_venta(\$v, \$nueva['permite_efectivo'], \$nueva['permite_transferencia']);",
-            '            }',
-            '        } else {',
-            '            $nueva = _config_pago_resuelta_para_venta($v);',
-            '            $vieja = $snapshots[$id] ?? $nueva;',
-            '            $a_fijar = $aplicar_retroactivo ? $nueva : $vieja;',
-            '            _crear_opciones_cobro_venta($v, $a_fijar);',
-            '        }',
-            '    });',
-            '}',
-        ],
-        'reemplazar' => [
-            'function _aplicar_retroactivo_a_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje, array $snapshots, bool $aplicar_retroactivo): void {',
-            '    _recorrer_ventas_del_viaje($nombre_dueno, $nombre_viaje, function(Nodo $v) use ($nombre_dueno, $nombre_viaje, $snapshots, $aplicar_retroactivo) {',
-            '        $id = $v->id();',
-            '        // Resolver la config NUEVA del viaje + override del',
-            '        // TerminalViaje en vivo, ignorando el opciones_cobro que',
-            '        // ya tiene la venta.',
-            "        \$nodo_terminal = \$v->adyacente('terminal');",
-            "        \$nombre_terminal = \$nodo_terminal ? \$nodo_terminal->dato() : '';",
-            '        $nueva = _config_pago_resuelta_para_viaje_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal);',
-            "        \$nodo_opc = \$v->adyacente('opciones_cobro');",
-            '        if ($nodo_opc) {',
-            '            if ($aplicar_retroactivo) {',
-            "                _actualizar_permite_opciones_cobro_venta(\$v, \$nueva['permite_efectivo'], \$nueva['permite_transferencia']);",
-            '            }',
-            '        } else {',
-            '            $vieja = $snapshots[$id] ?? $nueva;',
-            '            $a_fijar = $aplicar_retroactivo ? $nueva : $vieja;',
-            '            _crear_opciones_cobro_venta($v, $a_fijar);',
-            '        }',
-            '    });',
-            '}',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Ventas/Venta.php',
-        'descripcion' => 'Venta.php: fix _aplicar_retroactivo_a_ventas_de_terminal',
-        'buscar' => [
-            'function _aplicar_retroactivo_a_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, array $snapshots, bool $aplicar_retroactivo): void {',
-            '    _recorrer_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal, function(Nodo $v) use ($snapshots, $aplicar_retroactivo) {',
-            '        $id = $v->id();',
-            "        \$nodo_opc = \$v->adyacente('opciones_cobro');",
-            '        if ($nodo_opc) {',
-            '            if ($aplicar_retroactivo) {',
-            '                $nueva = _config_pago_resuelta_para_venta($v);',
-            "                _actualizar_permite_opciones_cobro_venta(\$v, \$nueva['permite_efectivo'], \$nueva['permite_transferencia']);",
-            '            }',
-            '        } else {',
-            '            $nueva = _config_pago_resuelta_para_venta($v);',
-            '            $vieja = $snapshots[$id] ?? $nueva;',
-            '            $a_fijar = $aplicar_retroactivo ? $nueva : $vieja;',
-            '            _crear_opciones_cobro_venta($v, $a_fijar);',
-            '        }',
-            '    });',
-            '}',
-        ],
-        'reemplazar' => [
-            'function _aplicar_retroactivo_a_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, array $snapshots, bool $aplicar_retroactivo): void {',
-            '    _recorrer_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal, function(Nodo $v) use ($nombre_dueno, $nombre_viaje, $nombre_terminal, $snapshots, $aplicar_retroactivo) {',
-            '        $id = $v->id();',
-            '        // Resolver la config NUEVA del viaje + override del',
-            '        // TerminalViaje en vivo, ignorando el opciones_cobro que',
-            '        // ya tiene la venta.',
-            '        $nueva = _config_pago_resuelta_para_viaje_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal);',
-            "        \$nodo_opc = \$v->adyacente('opciones_cobro');",
-            '        if ($nodo_opc) {',
-            '            if ($aplicar_retroactivo) {',
-            "                _actualizar_permite_opciones_cobro_venta(\$v, \$nueva['permite_efectivo'], \$nueva['permite_transferencia']);",
-            '            }',
-            '        } else {',
-            '            $vieja = $snapshots[$id] ?? $nueva;',
-            '            $a_fijar = $aplicar_retroactivo ? $nueva : $vieja;',
-            '            _crear_opciones_cobro_venta($v, $a_fijar);',
-            '        }',
-            '    });',
-            '}',
-        ],
-    ],
-
-    // ============================================================
     // prompts/prompt_piloto.md
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: ultima actualizacion a v74a',
+        'descripcion' => 'prompt piloto: ultima actualizacion a v74b',
         'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.74 (Bug 1:',
-            'opciones de cobro congeladas al vender + retroactivo opcional al',
-            'editar las condiciones de pago del viaje o el override de',
-            'TerminalViaje).',
-        ],
-        'reemplazar' => [
             '**Última actualización de este prompt:** v1.5piloto.74a (fix del',
             'retroactivo: la config nueva se resuelve en vivo, no desde el',
             '`opciones_cobro` ya congelado de la venta).',
         ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: agregar v74a al historial',
-        'buscar' => [
-            '  check, con la nueva si se tildó. Backend y frontend.',
-        ],
         'reemplazar' => [
-            '  check, con la nueva si se tildó. Backend y frontend.',
-            '- **v74a**: fix del retroactivo de opciones de cobro. En v74,',
-            '  `_aplicar_retroactivo_a_ventas_del_viaje` y',
-            '  `_aplicar_retroactivo_a_ventas_de_terminal` leían la config',
-            '  nueva con `_config_pago_resuelta_para_venta`, que devuelve',
-            '  el `opciones_cobro` congelado de la venta. Resultado: si la',
-            '  venta ya tenía `opciones_cobro`, el retroactivo no hacía',
-            '  nada (los `permite_*` no cambiaban). Fix: resolver con',
-            '  `_config_pago_resuelta_para_viaje_terminal`, que mira el',
-            '  viaje + override del TerminalViaje en vivo, ignorando el',
-            '  `opciones_cobro` de la venta. El flujo de migración de',
-            '  ventas viejas sin `opciones_cobro` no estaba afectado',
-            '  (resolvía en vivo, que post-save ya devolvía la config',
-            '  nueva). Solo backend.',
+            '**Última actualización de este prompt:** v1.5piloto.74b. Se dejó',
+            'asentado el arranque de un segundo piloto: un plugin de Chrome',
+            '(manifest v3) que usa el framework Iteradores JS y corre pruebas',
+            'automatizadas sobre la página del piloto PHP. Vive dentro del',
+            'proyecto `iteradoresJS/`, en una carpeta `Aplicacion/`. Tiene su',
+            'propia carpeta `prompts/` (con un único archivo por ahora,',
+            '`prompt_plugin_piloto.md`). Los scripts de aplicación de cambios',
+            'se ejecutan con el mismo flujo, parados en el directorio del',
+            'proyecto `iteradoresJS/`. El prompt del framework Iteradores y',
+            'este prompt siguen viviendo en el proyecto PHP.',
         ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: estado de la conversacion v74a',
+        'descripcion' => 'prompt piloto: estado de la conversacion v74b',
         'buscar' => [
-            '  decisión de aplicar retroactivo se toma al editar las',
-            '  condiciones de pago (del viaje o del override de TerminalViaje).',
-            '- No hay tandas en curso.',
-        ],
-        'reemplazar' => [
-            '  decisión de aplicar retroactivo se toma al editar las',
-            '  condiciones de pago (del viaje o del override de TerminalViaje).',
             '- Cerramos en v74a el fix del retroactivo: la config nueva se',
             '  resuelve en vivo (viaje + terminal), ignorando el',
             '  `opciones_cobro` que ya tiene la venta. El flujo de migración',
             '  de ventas viejas no estaba afectado.',
             '- No hay tandas en curso.',
         ],
+        'reemplazar' => [
+            '- Cerramos en v74a el fix del retroactivo: la config nueva se',
+            '  resuelve en vivo (viaje + terminal), ignorando el',
+            '  `opciones_cobro` que ya tiene la venta. El flujo de migración',
+            '  de ventas viejas no estaba afectado. Todas las pruebas del',
+            '  Bug 1 pasaron.',
+            '- Arrancamos el diseño de un **segundo piloto**: un plugin de',
+            '  Chrome (manifest v3) que corre pruebas automatizadas sobre la',
+            '  página del piloto PHP. Vive dentro del proyecto `iteradoresJS/`,',
+            '  en una nueva carpeta `Aplicacion/`. Usa el framework Iteradores',
+            '  JS para persistir su propia info (IndexedDB del contexto de la',
+            '  extensión). El botón play del plugin dispara un script que',
+            '  escribe el asistente, que actúa sobre la página del piloto.',
+            '  Aplica el mismo flujo de trabajo: scripts PHP de aplicación de',
+            '  cambios, ejecutados en el directorio del proyecto `iteradoresJS/`,',
+            '  bump de versiones y actualización del prompt del plugin.',
+            '- El proyecto `iteradoresJS/` tiene su propia carpeta `prompts/`,',
+            '  con un único archivo por ahora: `prompt_plugin_piloto.md`. El',
+            '  prompt del framework Iteradores y el del sistema de scripts',
+            '  siguen viviendo en el proyecto PHP.',
+            '- Pendiente: ver los archivos del framework JS para diseñar el',
+            '  plugin (estructura, pruebas iniciales, sistema de persistencia).',
+            '- No hay tandas de código en curso.',
+        ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: estado del proyecto al cierre v74a',
+        'descripcion' => 'prompt piloto: estado del proyecto al cierre v74b',
         'buscar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.74 (framework 1.5i.7f).',
+            '**Estado del proyecto al cierre:** v1.5piloto.74a (framework 1.5i.7f).',
             'Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad',
             'alta pendientes.',
         ],
         'reemplazar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.74a (framework 1.5i.7f).',
+            '**Estado del proyecto al cierre:** v1.5piloto.74b (framework 1.5i.7f).',
             'Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad',
-            'alta pendientes.',
+            'alta pendientes. Arranca el diseño del segundo piloto: plugin de',
+            'Chrome sobre el framework Iteradores JS, para automatizar pruebas.',
+        ],
+    ],
+
+    // ============================================================
+    // prompts/prompt_sistema_scripts.md
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_sistema_scripts.md',
+        'descripcion' => 'prompt scripts: nota sobre el proyecto plugin',
+        'buscar' => [
+            '**Para el asistente de la próxima sesión:**',
+            '',
+            '- Si vas a cerrar una tanda, además del código, actualizá el prompt de continuidad.',
+            '- La sección "Discusión actual" del prompt de continuidad es la fuente de verdad',
+            '  sobre dónde quedamos.',
+            '- Este prompt (el de scripts) casi no se toca. Solo si cambia el método de trabajo.',
+        ],
+        'reemplazar' => [
+            '**Proyecto nuevo: plugin de Chrome sobre Iteradores JS.**',
+            '',
+            'A partir de v1.5piloto.74b arranca un segundo piloto: un plugin',
+            'de Chrome (manifest v3) que usa el framework Iteradores JS para',
+            'persistir su propia info y corre pruebas automatizadas sobre la',
+            'página del piloto PHP. Vive dentro del proyecto `iteradoresJS/`,',
+            'en una carpeta `Aplicacion/`. Tiene su propia carpeta `prompts/`',
+            'con un único archivo por ahora: `prompt_plugin_piloto.md`.',
+            '',
+            'Los scripts de aplicación de cambios se ejecutan con el mismo',
+            'flujo y el mismo runner, pero parados en el directorio del',
+            'proyecto `iteradoresJS/`. Los prompts del framework y del',
+            'sistema de scripts siguen viviendo en el proyecto PHP.',
+            '',
+            '**Para el asistente de la próxima sesión:**',
+            '',
+            '- Si vas a cerrar una tanda, además del código, actualizá el prompt de continuidad.',
+            '- La sección "Discusión actual" del prompt de continuidad es la fuente de verdad',
+            '  sobre dónde quedamos.',
+            '- Este prompt (el de scripts) casi no se toca. Solo si cambia el método de trabajo.',
+            '- Si la tanda es sobre el plugin JS, actualizá `iteradoresJS/prompts/prompt_plugin_piloto.md`',
+            '  en vez de (o además de) este prompt.',
         ],
     ],
 

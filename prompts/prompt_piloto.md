@@ -1063,9 +1063,16 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74a (fix del
-retroactivo: la config nueva se resuelve en vivo, no desde el
-`opciones_cobro` ya congelado de la venta).
+**Última actualización de este prompt:** v1.5piloto.74b. Se dejó
+asentado el arranque de un segundo piloto: un plugin de Chrome
+(manifest v3) que usa el framework Iteradores JS y corre pruebas
+automatizadas sobre la página del piloto PHP. Vive dentro del
+proyecto `iteradoresJS/`, en una carpeta `Aplicacion/`. Tiene su
+propia carpeta `prompts/` (con un único archivo por ahora,
+`prompt_plugin_piloto.md`). Los scripts de aplicación de cambios
+se ejecutan con el mismo flujo, parados en el directorio del
+proyecto `iteradoresJS/`. El prompt del framework Iteradores y
+este prompt siguen viviendo en el proyecto PHP.
 
 **Estado de la conversación:**
 
@@ -1122,8 +1129,25 @@ retroactivo: la config nueva se resuelve en vivo, no desde el
 - Cerramos en v74a el fix del retroactivo: la config nueva se
   resuelve en vivo (viaje + terminal), ignorando el
   `opciones_cobro` que ya tiene la venta. El flujo de migración
-  de ventas viejas no estaba afectado.
-- No hay tandas en curso.
+  de ventas viejas no estaba afectado. Todas las pruebas del
+  Bug 1 pasaron.
+- Arrancamos el diseño de un **segundo piloto**: un plugin de
+  Chrome (manifest v3) que corre pruebas automatizadas sobre la
+  página del piloto PHP. Vive dentro del proyecto `iteradoresJS/`,
+  en una nueva carpeta `Aplicacion/`. Usa el framework Iteradores
+  JS para persistir su propia info (IndexedDB del contexto de la
+  extensión). El botón play del plugin dispara un script que
+  escribe el asistente, que actúa sobre la página del piloto.
+  Aplica el mismo flujo de trabajo: scripts PHP de aplicación de
+  cambios, ejecutados en el directorio del proyecto `iteradoresJS/`,
+  bump de versiones y actualización del prompt del plugin.
+- El proyecto `iteradoresJS/` tiene su propia carpeta `prompts/`,
+  con un único archivo por ahora: `prompt_plugin_piloto.md`. El
+  prompt del framework Iteradores y el del sistema de scripts
+  siguen viviendo en el proyecto PHP.
+- Pendiente: ver los archivos del framework JS para diseñar el
+  plugin (estructura, pruebas iniciales, sistema de persistencia).
+- No hay tandas de código en curso.
 
 **Decisiones de diseño tomadas y en vigor:**
 
@@ -1227,9 +1251,10 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74a (framework 1.5i.7f).
+**Estado del proyecto al cierre:** v1.5piloto.74b (framework 1.5i.7f).
 Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad
-alta pendientes.
+alta pendientes. Arranca el diseño del segundo piloto: plugin de
+Chrome sobre el framework Iteradores JS, para automatizar pruebas.
 
 ---
 
