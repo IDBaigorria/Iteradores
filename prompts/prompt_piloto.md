@@ -710,6 +710,21 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74c**: solo documentación. Se formalizó el arranque del
+  proyecto plugin (segundo piloto). Decisiones tomadas:
+  manifest en la raíz de `iteradoresJS/` y código en
+  `Aplicacion/` (opción A), versión `v1.5plugin.0` para el
+  plugin, persistencia con `PerdurarSuperestructuraStringIndexedDB`,
+  salida en modo consola dentro del service worker (evita los
+  caminos que tocan `document`), content script clásico
+  (sin imports) comunicado por `chrome.runtime.sendMessage`,
+  pruebas declarativas con objeto `{id, nombre, ejecutar(ctx)}`.
+  El asistente leyó el framework JS (`Objeto`, `Nodo`,
+  `Iterador`, `Controlador`, `Entorno`, `Conf`, persistencia,
+  `Comando`). Se aclaró que `MOTOR_MAX_CICLOS` son ciclos
+  totales del motor, no comandos por ciclo ni ciclos por
+  minuto. El token de seguridad no lo maneja el plugin:
+  todo pasa por `Controlador.ejecutar_prueba(cb)`.
 - **v74a**: fix del retroactivo de opciones de cobro. En v74,
   `_aplicar_retroactivo_a_ventas_del_viaje` y
   `_aplicar_retroactivo_a_ventas_de_terminal` leían la config
@@ -1063,16 +1078,15 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74b. Se dejó
-asentado el arranque de un segundo piloto: un plugin de Chrome
-(manifest v3) que usa el framework Iteradores JS y corre pruebas
-automatizadas sobre la página del piloto PHP. Vive dentro del
-proyecto `iteradoresJS/`, en una carpeta `Aplicacion/`. Tiene su
-propia carpeta `prompts/` (con un único archivo por ahora,
-`prompt_plugin_piloto.md`). Los scripts de aplicación de cambios
-se ejecutan con el mismo flujo, parados en el directorio del
-proyecto `iteradoresJS/`. El prompt del framework Iteradores y
-este prompt siguen viviendo en el proyecto PHP.
+**Última actualización de este prompt:** v1.5piloto.74c. Se
+terminó de consensuar el diseño del plugin de Chrome: manifest
+en la raíz de `iteradoresJS/`, código en `Aplicacion/`,
+persistencia con el framework Iteradores JS vía IndexedDB,
+pruebas declarativas que el popup lista y dispara. La versión
+del plugin arranca en v1.5plugin.0 (prefijo distinto al del
+piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
+`Nodo`, `Iterador`, `Controlador`, `Entorno`, `Conf`,
+`PerdurarSuperestructuraStringIndexedDB` y `Comando`.
 
 **Estado de la conversación:**
 
@@ -1145,9 +1159,25 @@ este prompt siguen viviendo en el proyecto PHP.
   con un único archivo por ahora: `prompt_plugin_piloto.md`. El
   prompt del framework Iteradores y el del sistema de scripts
   siguen viviendo en el proyecto PHP.
-- Pendiente: ver los archivos del framework JS para diseñar el
-  plugin (estructura, pruebas iniciales, sistema de persistencia).
-- No hay tandas de código en curso.
+- Se leyeron los archivos clave del framework JS: `Objeto`,
+  `Nodo`, `Iterador`, `Controlador`, `Entorno`, `Conf`,
+  `PerdurarSuperestructuraStringIndexedDB` y `Comando`.
+  El framework está más avanzado que el espejo PHP: tiene
+  sistema de comandos, motor con péndulo, dominios, reloj
+  astronómico, tálamo y señal. El plugin no los usa en su
+  primera versión, pero quedan disponibles.
+- Cerramos en v74c el diseño del plugin. Decisiones: manifest
+  en la raíz de `iteradoresJS/`, código en `Aplicacion/`,
+  persistencia IndexedDB, content script clásico, salida en
+  modo consola en el service worker, nombre de versión
+  `v1.5plugin.0`. La próxima tanda es la creación del
+  esqueleto del plugin (manifest + SW + content + popup +
+  bootstrap + ConfPlugin + GrafoPlugin + primera prueba
+  smoke).
+- Pendiente: escribir el código del plugin. El prompt del
+  plugin vive en `iteradoresJS/prompts/prompt_plugin_piloto.md`
+  y se creó en esta misma tanda.
+- No hay tandas de código en curso en este proyecto.
 
 **Decisiones de diseño tomadas y en vigor:**
 
@@ -1251,10 +1281,12 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74b (framework 1.5i.7f).
+**Estado del proyecto al cierre:** v1.5piloto.74c (framework 1.5i.7f).
 Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad
-alta pendientes. Arranca el diseño del segundo piloto: plugin de
-Chrome sobre el framework Iteradores JS, para automatizar pruebas.
+alta pendientes. El segundo piloto (plugin de Chrome sobre el
+framework Iteradores JS) tiene el diseño cerrado; el código del
+plugin se escribe en la próxima tanda, en el proyecto
+`iteradoresJS/`.
 
 ---
 

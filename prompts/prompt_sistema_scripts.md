@@ -588,12 +588,13 @@ costó un fallo real del runner y una iteración extra.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.73v. Se ajustó
-la regla de vigencia de archivos: durante la conversación, el
-asistente debe asumir que los archivos ya pasados están vigentes
-y no volver a pedirlos. Solo se piden archivos que nunca
-aparecieron en el hilo. La sección "APRENDIZAJES A LA FUERZA
-(SISTEMA DE SCRIPTS)" se mantiene tal cual.
+**Última actualización de este prompt:** v1.5piloto.74c. Se
+amplió la nota del proyecto plugin con las decisiones de
+estructura (manifest en la raíz de `iteradoresJS/`, versión
+`v1.5plugin.0`, salida consola en el SW, content script
+clásico, formato de prueba). Sigue vigente la regla de
+vigencia de archivos de v74b: el asistente asume que los
+archivos ya pasados están vigentes.
 
 Reglas incorporadas al método de trabajo en las últimas tandas:
 
@@ -631,6 +632,45 @@ persistir su propia info y corre pruebas automatizadas sobre la
 página del piloto PHP. Vive dentro del proyecto `iteradoresJS/`,
 en una carpeta `Aplicacion/`. Tiene su propia carpeta `prompts/`
 con un único archivo por ahora: `prompt_plugin_piloto.md`.
+
+**Estructura y decisiones (v1.5piloto.74c):**
+
+- **Manifest en la raíz de `iteradoresJS/`** (no en
+  `Aplicacion/`): MV3 exige que `manifest.json` esté en la
+  raíz del directorio cargado como extensión. El código del
+  plugin vive en `Aplicacion/` y usa paths relativos a la raíz.
+  Esto permite importar `../Nodos/Nodo.js` y el resto del
+  framework sin duplicar archivos.
+- **Nombre de versión del plugin:** `v1.5plugin.0` para el
+  arranque, y luego `v1.5plugin.1`, `.2`, `74a`, etc. con el
+  mismo criterio que el piloto PHP. Prefijo distinto para no
+  confundir con `v1.5piloto.*`.
+- **Persistencia:** `PerdurarSuperestructuraStringIndexedDB`.
+  El plugin no maneja el token: usa `Controlador.guardar`,
+  `Controlador.cargar`, `Controlador.existe` (todas async) y
+  `Controlador.ejecutar_prueba(cb)` cuando necesita el token.
+- **Service worker con salida en modo consola.** Los caminos
+  HTML del framework (`_imprimir_errores_html`, `html_errores`,
+  `_imprimir_alertas_html`, `html_alertas`,
+  `Nodo._imprimir_html`, `Controlador.imprimir_superestructura`)
+  tocan `document`, que no existe en el service worker. Se
+  evitan asegurando que `Entorno.es_consola()` devuelva `true`
+  al arrancar el SW.
+- **Content script clásico.** Los content scripts de MV3 no
+  pueden importar módulos ES. Se comunican con el SW por
+  `chrome.runtime.sendMessage` / `chrome.tabs.sendMessage`.
+  El SW (module) importa el framework y las pruebas.
+- **Formato de prueba:** objeto `{id, nombre, descripcion,
+  ejecutar(ctx)}`. `ctx` incluye helpers para hablar con la
+  página (`click`, `esperar`, `fetch`) y un `assert`. El
+  resultado se persiste en el grafo del plugin.
+- **Motor (comandos + péndulo):** no se usa en la primera
+  versión. `MOTOR_MAX_CICLOS` son ciclos totales del motor,
+  no comandos por ciclo ni ciclos por minuto. Con los defaults
+  (`MOTOR_MAX_CICLOS=2`, `MOTOR_QUANTUM=20`,
+  `MOTOR_CICLOS_POR_MINUTO=20`), el motor corre 2 ciclos de
+  20 comandos cada 3 segundos y se detiene. Se puede usar
+  más adelante si hace falta ejecución por fases.
 
 Los scripts de aplicación de cambios se ejecutan con el mismo
 flujo y el mismo runner, pero parados en el directorio del
