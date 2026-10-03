@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.73x
+ * @version 1.5piloto.74d
  */
 
 // (aplicar_cambios.php funcionó)
@@ -1753,6 +1753,12 @@ async function cancelar_venta(id_venta) {
 
         const motivo = (contenedor.querySelector('#cancelacion_motivo')?.value || '').trim();
 
+        // Capturar el micro/viaje abiertos ANTES de cerrar el modal,
+        // porque `cerrar_modal_generico()` los resetea. Se usan
+        // despues para forzar un refresh del estado de asientos.
+        const micro_previo = (typeof micro_seleccionado !== 'undefined') ? micro_seleccionado : null;
+        const viaje_previo = (typeof viaje_seleccionado !== 'undefined' && viaje_seleccionado) ? viaje_seleccionado : null;
+
         const resp2 = await fetch("index.php", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1763,6 +1769,34 @@ async function cancelar_venta(id_venta) {
             mostrar_aviso("Venta cancelada", 'exito');
             cerrar_modal_generico();
             if (typeof cargar_ventas === 'function') cargar_ventas();
+
+            // Refrescar el estado global de los asientos del micro
+            // abierto. El backend ya liberó los asientos en el
+            // grafo, pero el frontend los tenía cacheados en
+            // `estados_asientos_actuales`. Sin esto, el croquis
+            // puede mostrar asientos vendidos que ya no lo están
+            // hasta el próximo polling (hasta 15s, pausado si
+            // hubo inactividad).
+            if (micro_previo && viaje_previo) {
+                try {
+                    const resp_estados = await fetch("index.php", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                        body: new URLSearchParams({
+                            accion: "viajes/estado_asientos",
+                            nombre_viaje: viaje_previo.nombre_viaje,
+                            nombre_micro: micro_previo,
+                            nombre_dueno: viaje_previo.dueno
+                        })
+                    });
+                    const datos_estados = await resp_estados.json();
+                    if (datos_estados.exito && Array.isArray(datos_estados.asientos)) {
+                        estados_asientos_actuales = datos_estados.asientos;
+                    }
+                } catch (e) {
+                    console.error("Error refrescando asientos tras cancelar:", e);
+                }
+            }
 
             // Modal chico para ofrecer la impresión del informe.
             if (resultado.id_cancelacion) {

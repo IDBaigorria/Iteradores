@@ -710,6 +710,15 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74d**: fix de refresco del croquis tras cancelar venta.
+  Al cancelar, el backend liberaba los asientos pero el
+  frontend seguía mostrando el croquis viejo hasta el próximo
+  polling (`SYNC_INTERVALO_MS`, hasta 15s, pausado si hubo
+  inactividad). Ahora `cancelar_venta` captura el micro y el
+  viaje abiertos antes de cerrar el modal, y después del
+  éxito fuerza un fetch a `viajes/estado_asientos` para
+  actualizar `estados_asientos_actuales`. Detectado por las
+  pruebas automáticas del plugin.
 - **v74c**: solo documentación. Se formalizó el arranque del
   proyecto plugin (segundo piloto). Decisiones tomadas:
   manifest en la raíz de `iteradoresJS/` y código en
@@ -1078,7 +1087,13 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74c. Se
+**Última actualización de este prompt:** v1.5piloto.74d (fix de
+refresco del croquis tras cancelar venta: al cancelar una venta,
+el backend libera los asientos pero el frontend seguía mostrando
+el croquis viejo hasta el próximo polling. Ahora se captura el
+micro y el viaje abiertos antes de cerrar el modal, y después
+del éxito se fuerza un fetch a `viajes/estado_asientos` para
+actualizar `estados_asientos_actuales`). Antes: v1.5piloto.74c. Se
 terminó de consensuar el diseño del plugin de Chrome: manifest
 en la raíz de `iteradoresJS/`, código en `Aplicacion/`,
 persistencia con el framework Iteradores JS vía IndexedDB,
@@ -1177,6 +1192,10 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
 - Pendiente: escribir el código del plugin. El prompt del
   plugin vive en `iteradoresJS/prompts/prompt_plugin_piloto.md`
   y se creó en esta misma tanda.
+- Cerramos en v74d el fix del refresco del croquis tras
+  cancelar venta. Reportado por las pruebas del plugin:
+  los asientos cancelados seguían viéndose como vendidos
+  hasta el próximo polling.
 - No hay tandas de código en curso en este proyecto.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -1281,7 +1300,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74c (framework 1.5i.7f).
+**Estado del proyecto al cierre:** v1.5piloto.74d (framework 1.5i.7f).
 Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad
 alta pendientes. El segundo piloto (plugin de Chrome sobre el
 framework Iteradores JS) tiene el diseño cerrado; el código del
