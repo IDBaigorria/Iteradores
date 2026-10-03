@@ -2,18 +2,10 @@
 /**
  * Aplicador de cambios automáticos — Piloto agencia de viajes.
  *
- * Tanda v1.5piloto.74e — fix de condicion de carrera en polling de asientos.
+ * Tanda v1.5piloto.74f — cerrar el modal del viaje al cambiar de pestaña.
  *
- * Problema: cuando el usuario hace clic en un asiento, se dispara
- * `seleccionar_asiento_pasaje`, que suspende el polling con
- * `detener_sync_asientos()`. Pero si un fetch del polling ya estaba
- * en vuelo, sigue corriendo y puede volver DESPUES del clic, pisando
- * el estado recien seleccionado con el estado viejo del backend.
- * Efecto visible: el asiento aparece seleccionado y se deselecciona
- * solo. Detectado por las pruebas automaticas del plugin.
- *
- * Fix: en `solicitar_estado_asientos`, despues del fetch, descartar
- * la respuesta si `operacion_asiento_en_curso` es true.
+ * Corrige el path de `aplicacion.js` (raíz del proyecto, no en
+ * Aplicacion/).
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -33,75 +25,61 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ============================================================
-    // Aplicacion/Viajes/viajes-asientos.js
+    // aplicacion.js (raíz del proyecto)
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-        'descripcion' => 'viajes-asientos.js: bump a 1.5piloto.74e',
+        'archivo' => 'aplicacion.js',
+        'descripcion' => 'aplicacion.js: bump a 1.5piloto.74f',
         'buscar' => [
-            '/***',
-            ' * Asientos y pasaje del micro.',
-            ' * @version 1.5piloto.59f',
-            ' */',
+            ' * @version 1.5piloto.73i',
         ],
         'reemplazar' => [
-            '/***',
-            ' * Asientos y pasaje del micro.',
-            ' * @version 1.5piloto.74e',
-            ' */',
+            ' * @version 1.5piloto.74f',
         ],
     ],
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-        'descripcion' => 'viajes-asientos.js: solicitar_estado_asientos descarta si hay operacion en curso',
+        'archivo' => 'aplicacion.js',
+        'descripcion' => 'aplicacion.js: cerrar modal del viaje al cambiar de pestaña',
         'buscar' => [
-            '    const datos = await respuesta.json();',
-            '    if (datos.exito) {',
-            '        estados_asientos_actuales = datos.asientos;',
-            '        actualizar_colores_asientos(datos.asientos);',
-            '        refrescar_info_asientos_propios(info_asiento_modo === null);',
+            'function activar_pestana(id_pestana) {',
+            "    if (id_pestana !== 'viajes') {",
+            '        ocultar_detalle_viaje();',
             '    }',
-            '',
-            '    sync_contador_sin_actividad++;',
         ],
         'reemplazar' => [
-            '    const datos = await respuesta.json();',
-            '',
-            '    // Condicion de carrera: si mientras el fetch estaba en vuelo',
-            '    // se inicio una operacion de asiento (clic, reserva, etc.),',
-            '    // descartar la respuesta. El estado que devuelve el backend',
-            '    // es de antes de esa operacion y pisaria el estado mas nuevo.',
-            '    if (operacion_asiento_en_curso) {',
-            '        return;',
+            'function activar_pestana(id_pestana) {',
+            "    if (id_pestana !== 'viajes') {",
+            '        // Si hay un modal abierto con el detalle del viaje, cerrarlo',
+            '        // antes de cambiar de pestaña, para no dejar el croquis',
+            '        // congelado en pantalla con datos viejos.',
+            "        const modal = document.getElementById('modal_generico');",
+            "        const modal_abierto = modal && !modal.classList.contains('hidden');",
+            "        const es_detalle_viaje = modal_abierto && document.getElementById('lista_micros_viaje');",
+            '        if (es_detalle_viaje) {',
+            '            cerrar_modal_generico();',
+            '        }',
+            '        ocultar_detalle_viaje();',
             '    }',
-            '',
-            '    if (datos.exito) {',
-            '        estados_asientos_actuales = datos.asientos;',
-            '        actualizar_colores_asientos(datos.asientos);',
-            '        refrescar_info_asientos_propios(info_asiento_modo === null);',
-            '    }',
-            '',
-            '    sync_contador_sin_actividad++;',
         ],
     ],
 
     // ============================================================
-    // aplicacion_GET.html — bump del ?v= de viajes-asientos.js
+    // aplicacion_GET.html — bump del ?v= de aplicacion.js
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'HTML: bump del ?v= de viajes-asientos.js a 74e',
+        'descripcion' => 'HTML: bump del ?v= de aplicacion.js a 74f',
         'buscar' => [
-            '<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.73d"></script>',
+            '<script src="aplicacion.js?v=1.5piloto.73i"></script>',
         ],
         'reemplazar' => [
-            '<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.74e"></script>',
+            '<script src="aplicacion.js?v=1.5piloto.74f"></script>',
         ],
     ],
 
@@ -112,74 +90,76 @@ $cambios = [
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: ultima actualizacion a v74e',
+        'descripcion' => 'prompt piloto: ultima actualizacion a v74f',
         'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.74d (fix de',
-        ],
-        'reemplazar' => [
             '**Última actualización de este prompt:** v1.5piloto.74e (fix de',
-            'condición de carrera en `solicitar_estado_asientos`: si un',
-            'fetch del polling estaba en vuelo cuando se iniciaba una',
-            'operación de asiento, el polling pisaba el estado nuevo con',
-            'el viejo. El asiento se veía seleccionado y se deseleccionaba',
-            'solo. Fix: descartar la respuesta del polling si',
-            '`operacion_asiento_en_curso` es true. Detectado por las',
-            'pruebas automáticas del plugin). Antes: v1.5piloto.74d (fix de',
+        ],
+        'reemplazar' => [
+            '**Última actualización de este prompt:** v1.5piloto.74f (cerrar',
+            'el modal del viaje al cambiar de pestaña. Si el usuario o una',
+            'prueba automática cambia de pestaña con el modal del detalle',
+            'del viaje abierto, `ocultar_detalle_viaje` mataba el polling',
+            'pero dejaba el modal con el croquis congelado. Fix: en',
+            '`activar_pestana`, si la pestaña destino no es "viajes" y hay',
+            'un modal con `#lista_micros_viaje`, cerrarlo antes de ocultar',
+            'el detalle. Detectado por las pruebas del plugin).',
+            'Antes: v1.5piloto.74e (fix de',
         ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: agregar v74e al historial',
+        'descripcion' => 'prompt piloto: agregar v74f al historial',
         'buscar' => [
-            '- **v74d**: fix de refresco del croquis tras cancelar venta.',
-        ],
-        'reemplazar' => [
             '- **v74e**: fix de condición de carrera entre el polling de',
-            '  asientos y el clic. Si el fetch del polling estaba en vuelo',
-            '  cuando se iniciaba una operación de asiento, el polling',
-            '  pisaba el estado nuevo con el viejo. El asiento se veía',
-            '  seleccionado y se deseleccionaba solo. Fix: descartar la',
-            '  respuesta del polling si `operacion_asiento_en_curso`.',
-            '  Detectado por las pruebas del plugin.',
-            '- **v74d**: fix de refresco del croquis tras cancelar venta.',
+        ],
+        'reemplazar' => [
+            '- **v74f**: cerrar el modal del viaje al cambiar de pestaña.',
+            '  Si el usuario o una prueba automática cambia de pestaña con',
+            '  el modal del detalle del viaje abierto, `ocultar_detalle_viaje`',
+            '  mataba el polling pero dejaba el modal con el croquis',
+            '  congelado en pantalla con datos viejos. Fix: en',
+            '  `activar_pestana`, si la pestaña destino no es "viajes" y',
+            '  hay un modal con `#lista_micros_viaje`, cerrarlo antes de',
+            '  ocultar el detalle. Detectado por las pruebas del plugin.',
+            '- **v74e**: fix de condición de carrera entre el polling de',
         ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: estado de la conversacion v74e',
+        'descripcion' => 'prompt piloto: estado de la conversacion v74f',
         'buscar' => [
-            '- Cerramos en v74d el fix del refresco del croquis tras',
-            '  cancelar venta. Reportado por las pruebas del plugin:',
-            '  los asientos cancelados seguían viéndose como vendidos',
-            '  hasta el próximo polling.',
-            '- No hay tandas de código en curso en este proyecto.',
-        ],
-        'reemplazar' => [
-            '- Cerramos en v74d el fix del refresco del croquis tras',
-            '  cancelar venta. Reportado por las pruebas del plugin:',
-            '  los asientos cancelados seguían viéndose como vendidos',
-            '  hasta el próximo polling.',
             '- Cerramos en v74e el fix de condición de carrera entre el',
             '  polling de asientos y el clic. También reportado por las',
             '  pruebas del plugin: un asiento recién seleccionado volvía a',
             '  verse libre por el polling en vuelo.',
             '- No hay tandas de código en curso en este proyecto.',
         ],
+        'reemplazar' => [
+            '- Cerramos en v74e el fix de condición de carrera entre el',
+            '  polling de asientos y el clic. También reportado por las',
+            '  pruebas del plugin: un asiento recién seleccionado volvía a',
+            '  verse libre por el polling en vuelo.',
+            '- Cerramos en v74f el fix de "modal del viaje abierto al',
+            '  cambiar de pestaña". El croquis quedaba congelado en',
+            '  pantalla tras cancelar una venta desde una prueba',
+            '  automática. También reportado por las pruebas del plugin.',
+            '- No hay tandas de código en curso en este proyecto.',
+        ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: estado al cierre v74e',
+        'descripcion' => 'prompt piloto: estado al cierre v74f',
         'buscar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.74d (framework 1.5i.7f).',
+            '**Estado del proyecto al cierre:** v1.5piloto.74e (framework 1.5i.7f).',
         ],
         'reemplazar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.74e (framework 1.5i.7f).',
+            '**Estado del proyecto al cierre:** v1.5piloto.74f (framework 1.5i.7f).',
         ],
     ],
 

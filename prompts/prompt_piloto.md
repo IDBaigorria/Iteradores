@@ -710,6 +710,14 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74f**: cerrar el modal del viaje al cambiar de pestaña.
+  Si el usuario o una prueba automática cambia de pestaña con
+  el modal del detalle del viaje abierto, `ocultar_detalle_viaje`
+  mataba el polling pero dejaba el modal con el croquis
+  congelado en pantalla con datos viejos. Fix: en
+  `activar_pestana`, si la pestaña destino no es "viajes" y
+  hay un modal con `#lista_micros_viaje`, cerrarlo antes de
+  ocultar el detalle. Detectado por las pruebas del plugin.
 - **v74e**: fix de condición de carrera entre el polling de
   asientos y el clic. Si el fetch del polling estaba en vuelo
   cuando se iniciaba una operación de asiento, el polling
@@ -1094,7 +1102,15 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74e (fix de
+**Última actualización de este prompt:** v1.5piloto.74f (cerrar
+el modal del viaje al cambiar de pestaña. Si el usuario o una
+prueba automática cambia de pestaña con el modal del detalle
+del viaje abierto, `ocultar_detalle_viaje` mataba el polling
+pero dejaba el modal con el croquis congelado. Fix: en
+`activar_pestana`, si la pestaña destino no es "viajes" y hay
+un modal con `#lista_micros_viaje`, cerrarlo antes de ocultar
+el detalle. Detectado por las pruebas del plugin).
+Antes: v1.5piloto.74e (fix de
 condición de carrera en `solicitar_estado_asientos`: si un
 fetch del polling estaba en vuelo cuando se iniciaba una
 operación de asiento, el polling pisaba el estado nuevo con
@@ -1214,6 +1230,10 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   polling de asientos y el clic. También reportado por las
   pruebas del plugin: un asiento recién seleccionado volvía a
   verse libre por el polling en vuelo.
+- Cerramos en v74f el fix de "modal del viaje abierto al
+  cambiar de pestaña". El croquis quedaba congelado en
+  pantalla tras cancelar una venta desde una prueba
+  automática. También reportado por las pruebas del plugin.
 - No hay tandas de código en curso en este proyecto.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -1318,7 +1338,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74e (framework 1.5i.7f).
+**Estado del proyecto al cierre:** v1.5piloto.74f (framework 1.5i.7f).
 Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad
 alta pendientes. El segundo piloto (plugin de Chrome sobre el
 framework Iteradores JS) tiene el diseño cerrado; el código del

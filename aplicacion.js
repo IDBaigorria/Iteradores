@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.73i
+ * @version 1.5piloto.74f
  */
 
 // Utilidades
@@ -138,6 +138,15 @@ function configurar_pestanas_segun_nivel(nivel) {
  */
 function activar_pestana(id_pestana) {
     if (id_pestana !== 'viajes') {
+        // Si hay un modal abierto con el detalle del viaje, cerrarlo
+        // antes de cambiar de pestaña, para no dejar el croquis
+        // congelado en pantalla con datos viejos.
+        const modal = document.getElementById('modal_generico');
+        const modal_abierto = modal && !modal.classList.contains('hidden');
+        const es_detalle_viaje = modal_abierto && document.getElementById('lista_micros_viaje');
+        if (es_detalle_viaje) {
+            cerrar_modal_generico();
+        }
         ocultar_detalle_viaje();
     }
     $$(".tab").forEach(boton => boton.classList.remove("active"));
