@@ -1,7 +1,7 @@
 {
     "metadata": {
-        "fecha_creacion": "2026-10-03T23:33:05+02:00",
-        "total_nodos": 199
+        "fecha_creacion": "2026-10-04T00:12:05+02:00",
+        "total_nodos": 201
     },
     "nodos": [
         {
@@ -540,7 +540,7 @@
         },
         {
             "id": "3075",
-            "dato": "03\/10\/2026 23:28",
+            "dato": "04\/10\/2026 00:08",
             "adyacentes": []
         },
         {
@@ -1028,28 +1028,38 @@
         },
         {
             "id": "3172",
-            "dato": "",
-            "adyacentes": {
-                "creado_en": "3174",
-                "usuario": "3173"
-            }
-        },
-        {
-            "id": "3173",
             "dato": "secretaria_carmen",
             "adyacentes": []
         },
         {
-            "id": "3174",
+            "id": "3173",
             "dato": "1791062885",
+            "adyacentes": []
+        },
+        {
+            "id": "3174",
+            "dato": "",
+            "adyacentes": {
+                "creado_en": "3176",
+                "usuario": "3175"
+            }
+        },
+        {
+            "id": "3175",
+            "dato": "secretaria_carmen",
+            "adyacentes": []
+        },
+        {
+            "id": "3176",
+            "dato": "1791065339",
             "adyacentes": []
         },
         {
             "id": "sesiones",
             "dato": "",
             "adyacentes": {
-                "07b53605151445f6d3f666149ed8efe4": "3172",
-                "4b239b39023ee9fdea765f20b9bbd31f": "3093"
+                "4b239b39023ee9fdea765f20b9bbd31f": "3093",
+                "d46a66f3ef615a8f9da09c74051495d3": "3174"
             }
         },
         {

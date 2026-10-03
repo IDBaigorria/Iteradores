@@ -710,6 +710,13 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74e**: fix de condición de carrera entre el polling de
+  asientos y el clic. Si el fetch del polling estaba en vuelo
+  cuando se iniciaba una operación de asiento, el polling
+  pisaba el estado nuevo con el viejo. El asiento se veía
+  seleccionado y se deseleccionaba solo. Fix: descartar la
+  respuesta del polling si `operacion_asiento_en_curso`.
+  Detectado por las pruebas del plugin.
 - **v74d**: fix de refresco del croquis tras cancelar venta.
   Al cancelar, el backend liberaba los asientos pero el
   frontend seguía mostrando el croquis viejo hasta el próximo
@@ -1087,7 +1094,14 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74d (fix de
+**Última actualización de este prompt:** v1.5piloto.74e (fix de
+condición de carrera en `solicitar_estado_asientos`: si un
+fetch del polling estaba en vuelo cuando se iniciaba una
+operación de asiento, el polling pisaba el estado nuevo con
+el viejo. El asiento se veía seleccionado y se deseleccionaba
+solo. Fix: descartar la respuesta del polling si
+`operacion_asiento_en_curso` es true. Detectado por las
+pruebas automáticas del plugin). Antes: v1.5piloto.74d (fix de
 refresco del croquis tras cancelar venta: al cancelar una venta,
 el backend libera los asientos pero el frontend seguía mostrando
 el croquis viejo hasta el próximo polling. Ahora se captura el
@@ -1196,6 +1210,10 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   cancelar venta. Reportado por las pruebas del plugin:
   los asientos cancelados seguían viéndose como vendidos
   hasta el próximo polling.
+- Cerramos en v74e el fix de condición de carrera entre el
+  polling de asientos y el clic. También reportado por las
+  pruebas del plugin: un asiento recién seleccionado volvía a
+  verse libre por el polling en vuelo.
 - No hay tandas de código en curso en este proyecto.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -1300,7 +1318,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74d (framework 1.5i.7f).
+**Estado del proyecto al cierre:** v1.5piloto.74e (framework 1.5i.7f).
 Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad
 alta pendientes. El segundo piloto (plugin de Chrome sobre el
 framework Iteradores JS) tiene el diseño cerrado; el código del

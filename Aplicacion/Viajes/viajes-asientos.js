@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.59f
+ * @version 1.5piloto.74e
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -76,6 +76,15 @@ async function solicitar_estado_asientos() {
         })
     });
     const datos = await respuesta.json();
+
+    // Condicion de carrera: si mientras el fetch estaba en vuelo
+    // se inicio una operacion de asiento (clic, reserva, etc.),
+    // descartar la respuesta. El estado que devuelve el backend
+    // es de antes de esa operacion y pisaria el estado mas nuevo.
+    if (operacion_asiento_en_curso) {
+        return;
+    }
+
     if (datos.exito) {
         estados_asientos_actuales = datos.asientos;
         actualizar_colores_asientos(datos.asientos);
