@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.74d
+ * @version 1.5piloto.74e
  */
 
 // (aplicar_cambios.php funcionó)
@@ -3132,8 +3132,14 @@ async function _buscar_pasajero_por_dni(index) {
 
     _mostrar_aviso_en_formulario(index, 'Buscando...', 'gris');
 
+    // Resolver el dueno del pasajero. Desde el modal de venta el
+    // viaje esta seleccionado; desde el modal de alta de Clientes
+    // (que no siempre tiene viaje) se usa usuario_actual.dueno.
+    // Sin este fallback, la busqueda fallaba cuando un terminal
+    // abria el modal desde la pestana Clientes sin haber
+    // seleccionado un viaje.
     const nombre_dueno = (usuario_actual.nivel === 'terminal')
-        ? viaje_seleccionado.dueno
+        ? ((viaje_seleccionado && viaje_seleccionado.dueno) ? viaje_seleccionado.dueno : (usuario_actual.dueno || ''))
         : obtener_nombre_dueno_actual();
 
     try {

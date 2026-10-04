@@ -1,18 +1,25 @@
 <?php
 /**
- * Aplicador de cambios automáticos — Piloto agencia de viajes.
+ * Aplicador de cambios automáticos — proyecto Iteradores (piloto PHP).
  *
- * Tanda v1.5piloto.74g — documentación.
+ * Tanda v1.5piloto.74h: cierre de auditoría.
  *
- * Actualiza el prompt del piloto con:
- * - Los bugs v74d/e/f detectados por las pruebas del plugin.
- * - Nota sobre el proyecto plugin en iteradoresJS/.
- *
- * Actualiza el prompt del sistema de scripts con:
- * - Nota sobre el sub-prompt del plugin en iteradoresJS/prompts/.
+ * - Fix del autocompletado por DNI cuando el usuario es terminal y
+ *   no hay viaje seleccionado (modal de alta de pasajero desde la
+ *   pestaña Clientes). El dueño se resuelve desde `usuario_actual.dueno`
+ *   como fallback.
+ * - Bump de `?v=` de `ventas.js` en `aplicacion_GET.html` (estaba en
+ *   `.73x`, corresponde `.74e`).
+ * - Correcciones al `prompts/prompt_piloto.md`: eliminar referencias
+ *   a archivos que ya no existen, marcar como implementados varios
+ *   ítems que figuraban como pendientes, y agregar entrada al
+ *   historial.
  *
  * Uso:
  *   php aplicar_cambios.php
+ *
+ * Si PHP no está en el PATH del sistema:
+ *   C:\xampp8\php\php.exe aplicar_cambios.php
  */
 
 // ============================================================
@@ -28,34 +35,172 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
 
-    // ============================================================
-    // prompts/prompt_piloto.md
-    // ============================================================
+    // --------------------------------------------------------
+    // Aplicacion/ventas.js — fix del autocompletado por DNI
+    // --------------------------------------------------------
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: ultima actualizacion a v74g',
+        'archivo' => 'Aplicacion/ventas.js',
+        'descripcion' => 'Fix: resolver dueno en _buscar_pasajero_por_dni con fallback a usuario_actual.dueno',
         'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.74f (cerrar',
+            "    _mostrar_aviso_en_formulario(index, 'Buscando...', 'gris');",
+            "",
+            "    const nombre_dueno = (usuario_actual.nivel === 'terminal')",
+            "        ? viaje_seleccionado.dueno",
+            "        : obtener_nombre_dueno_actual();",
         ],
         'reemplazar' => [
-            '**Última actualización de este prompt:** v1.5piloto.74g (solo',
-            'documentación: se registran los bugs del piloto detectados',
-            'por las pruebas automáticas del plugin en `iteradoresJS/`,',
-            'y se aclara la relación con el proyecto plugin).',
-            'Antes: v1.5piloto.74f (cerrar',
+            "    _mostrar_aviso_en_formulario(index, 'Buscando...', 'gris');",
+            "",
+            "    // Resolver el dueno del pasajero. Desde el modal de venta el",
+            "    // viaje esta seleccionado; desde el modal de alta de Clientes",
+            "    // (que no siempre tiene viaje) se usa usuario_actual.dueno.",
+            "    // Sin este fallback, la busqueda fallaba cuando un terminal",
+            "    // abria el modal desde la pestana Clientes sin haber",
+            "    // seleccionado un viaje.",
+            "    const nombre_dueno = (usuario_actual.nivel === 'terminal')",
+            "        ? ((viaje_seleccionado && viaje_seleccionado.dueno) ? viaje_seleccionado.dueno : (usuario_actual.dueno || ''))",
+            "        : obtener_nombre_dueno_actual();",
         ],
     ],
 
+    // --------------------------------------------------------
+    // Aplicacion/ventas.js — bump de version
+    // --------------------------------------------------------
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/ventas.js',
+        'descripcion' => 'Bump @version a 1.5piloto.74e',
+        'buscar' => [
+            " * Funciones de venta, confirmación, listado y cancelación.",
+            " * @version 1.5piloto.74d",
+        ],
+        'reemplazar' => [
+            " * Funciones de venta, confirmación, listado y cancelación.",
+            " * @version 1.5piloto.74e",
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // aplicacion_GET.html — bump del ?v= de ventas.js
+    // --------------------------------------------------------
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_GET.html',
+        'descripcion' => 'Bump ?v= de ventas.js a 1.5piloto.74e',
+        'buscar' => [
+            '<script src="Aplicacion/ventas.js?v=1.5piloto.73x"></script>',
+        ],
+        'reemplazar' => [
+            '<script src="Aplicacion/ventas.js?v=1.5piloto.74e"></script>',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // prompts/prompt_piloto.md — §5.15: GuardarAmbos → FuncionesAuxiliares
+    // --------------------------------------------------------
+
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: agregar v74g al historial',
+        'descripcion' => '§5.15: eliminar referencia a GuardarAmbos.php',
         'buscar' => [
-            '- **v74f**: cerrar el modal del viaje al cambiar de pestaña.',
+            '- Requiere `Aplicacion/GuardarAmbos.php` antes que todo lo demás.',
         ],
         'reemplazar' => [
+            '- Requiere `Aplicacion/FuncionesAuxiliares.php` (que define',
+            '  `guardar_ambos`) antes que todo lo demás.',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // prompts/prompt_piloto.md — §8.2: eliminar migrar_pasajeros
+    // --------------------------------------------------------
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_piloto.md',
+        'descripcion' => '§8.2: eliminar linea sobre migrar_pasajeros.php',
+        'buscar' => [
+            '`migrar_pasajeros.php` se conserva: es histórico y no vale la pena',
+            'migrarlo. No se toca.',
+        ],
+        'reemplazar' => [
+            '(No quedan archivos `migrar_*.php` en el proyecto.)',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // prompts/prompt_piloto.md — §8.5: actualizar lista de "Otros"
+    // --------------------------------------------------------
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_piloto.md',
+        'descripcion' => '§8.5: reescribir lista de Otros + agregar Implementados',
+        'buscar' => [
+            '**Otros**:',
+            '',
+            '- Panel de super admin.',
+            '- Autocompletado de pasajeros por DNI en el alta desde la pestaña',
+            '  Clientes.',
+            '- `boton_reiniciar_numeracion`: agregarlo al HTML.',
+            '- `ver_compra_asiento`: modal con el detalle completo.',
+            '- Métricas / reportes adicionales.',
+        ],
+        'reemplazar' => [
+            '**Otros**:',
+            '',
+            '- Panel de super admin (incremental al admin actual; alcance a',
+            '  consensuar).',
+            '- Métricas / reportes adicionales: solo ocupación por viaje y',
+            '  consolidado de liquidaciones.',
+            '',
+            '**Implementados (ya no son pendientes):**',
+            '',
+            '- Autocompletado de pasajeros por DNI en el alta desde la pestaña',
+            '  Clientes: los listeners de `conectar_listeners_formulario_pasajero`',
+            '  ya autocompletan. Fix v74h: cuando el usuario es terminal y no',
+            '  hay viaje seleccionado, el dueño se resuelve desde',
+            '  `usuario_actual.dueno`.',
+            '- `boton_reiniciar_numeracion`: existe como botón dinámico dentro',
+            '  del modal de "números de asiento duplicados"',
+            '  (`mostrar_aviso_numeros_duplicados`). No se agrega al HTML',
+            '  estático.',
+            '- `ver_compra_asiento`: implementado como navegación a la pestaña',
+            '  Vendidos con resaltado (vía `ir_a_venta_en_vendidos`). No es',
+            '  modal.',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // prompts/prompt_piloto.md — §11: quitar GuardarAmbos
+    // --------------------------------------------------------
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_piloto.md',
+        'descripcion' => '§11: quitar GuardarAmbos.php de archivos pasables',
+        'buscar' => [
+            '- `Aplicacion/GrafoCredenciales.php`, `Aplicacion/GuardarAmbos.php`.',
+        ],
+        'reemplazar' => [
+            '- `Aplicacion/GrafoCredenciales.php`.',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // prompts/prompt_piloto.md — §7: agregar entrada v74h
+    // --------------------------------------------------------
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_piloto.md',
+        'descripcion' => '§7: agregar v74h al historial',
+        'buscar' => [
             '- **v74g**: solo documentación. Se registran los bugs del',
             '  piloto detectados por las pruebas automáticas del plugin',
             '  (`iteradoresJS/`): v74d (refresco del croquis tras cancelar',
@@ -64,117 +209,143 @@ $cambios = [
             '  cambiar de pestaña). Se aclara que el plugin es un',
             '  proyecto independiente en `iteradoresJS/` con su propio',
             '  prompt en `iteradoresJS/prompts/prompt_plugin_piloto.md`.',
-            '- **v74f**: cerrar el modal del viaje al cambiar de pestaña.',
+        ],
+        'reemplazar' => [
+            '- **v74h**: cierre de auditoría de pendientes. Fix del',
+            '  autocompletado por DNI cuando el usuario es terminal y no',
+            '  hay viaje seleccionado (modal de alta de pasajero desde',
+            '  la pestaña Clientes): el dueño se resuelve desde',
+            '  `usuario_actual.dueno` como fallback. Bump de `?v=` de',
+            '  `ventas.js` en `aplicacion_GET.html` (estaba en `.73x`).',
+            '  Correcciones al prompt: rehash automático y limpieza de',
+            '  migraciones ya estaban implementados;',
+            '  `boton_reiniciar_numeracion` y `ver_compra_asiento`',
+            '  también; el autocompletado por DNI desde Clientes ya',
+            '  funciona; `migrar_pasajeros.php` ya no existe;',
+            '  `GuardarAmbos.php` fue eliminado en v73k.',
+            '- **v74g**: solo documentación. Se registran los bugs del',
+            '  piloto detectados por las pruebas automáticas del plugin',
+            '  (`iteradoresJS/`): v74d (refresco del croquis tras cancelar',
+            '  venta), v74e (condición de carrera entre el polling de',
+            '  asientos y el clic), v74f (modal del viaje abierto al',
+            '  cambiar de pestaña). Se aclara que el plugin es un',
+            '  proyecto independiente en `iteradoresJS/` con su propio',
+            '  prompt en `iteradoresJS/prompts/prompt_plugin_piloto.md`.',
         ],
     ],
+
+    // --------------------------------------------------------
+    // prompts/prompt_piloto.md — §12: bloque "Última actualización"
+    // --------------------------------------------------------
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: estado al cierre v74g',
+        'descripcion' => '§12: actualizar bloque Ultima actualizacion del prompt',
         'buscar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.74f (framework 1.5i.7f).',
+            '**Última actualización de este prompt:** v1.5piloto.74g (solo',
+            'documentación: se registran los bugs del piloto detectados',
+            'por las pruebas automáticas del plugin en `iteradoresJS/`,',
+            'y se aclara la relación con el proyecto plugin).',
         ],
         'reemplazar' => [
+            '**Última actualización de este prompt:** v1.5piloto.74h (fix del',
+            'autocompletado por DNI cuando el usuario es terminal y no hay viaje',
+            'seleccionado; el dueño se resuelve desde `usuario_actual.dueno`.',
+            'Bump de `?v=` de `ventas.js` en `aplicacion_GET.html`. Corrección',
+            'de documentación: rehash automático y limpieza de migraciones',
+            'ya están implementados, `boton_reiniciar_numeracion` y',
+            '`ver_compra_asiento` también; `migrar_pasajeros.php` ya no existe;',
+            '`GuardarAmbos.php` fue eliminado en v73k).',
+            'Antes: v1.5piloto.74g (solo',
+            'documentación: se registran los bugs del piloto detectados',
+            'por las pruebas automáticas del plugin en `iteradoresJS/`,',
+            'y se aclara la relación con el proyecto plugin).',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // prompts/prompt_piloto.md — §12: eliminar rehash y migraciones
+    //                        de "Decisiones abiertas"
+    // --------------------------------------------------------
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_piloto.md',
+        'descripcion' => '§12: quitar rehash y migraciones de Decisiones abiertas',
+        'buscar' => [
+            '**Decisiones abiertas / temas pendientes sin consensuar:**',
+            '',
+            '- **Rehash automático**: lo mencionamos como parte de la Tanda C pero',
+            '  quedó fuera de la implementación. No se agregó el chequeo',
+            '  `password_needs_rehash`. Se puede agregar en un bloque chico dentro',
+            '  de `_registrar_login_exitoso`.',
+            '- **Limpieza de migraciones**: hay varias tandas de migración que se',
+            '  pueden eliminar cuando se confirmen en los 3 entornos. Ver sección',
+            '  8.2.',
+            '- **Diversificación por tipo de aplicación**: próximo gran frente. Ya',
+            '  hay un diseño inicial consensuado (nodo `tipos_de_aplicacion`, enlace',
+            '  `tipo_app` en el dueño). Falta ver el código antes de arrancar.',
+        ],
+        'reemplazar' => [
+            '**Decisiones abiertas / temas pendientes sin consensuar:**',
+            '',
+            '- **Diversificación por tipo de aplicación**: próximo gran frente. Ya',
+            '  hay un diseño inicial consensuado (nodo `tipos_de_aplicacion`, enlace',
+            '  `tipo_app` en el dueño). Falta ver el código antes de arrancar.',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // prompts/prompt_piloto.md — §12: agregar cierre de v74h en
+    //                        "Estado de la conversación"
+    // --------------------------------------------------------
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_piloto.md',
+        'descripcion' => '§12: agregar cierre de v74h a Estado de la conversacion',
+        'buscar' => [
+            '- No hay tandas de código en curso en este proyecto.',
+        ],
+        'reemplazar' => [
+            '- Cerramos en v74h la tanda chica de cierre: fix del autocompletado',
+            '  por DNI para terminal sin viaje seleccionado, bump de `?v=` de',
+            '  `ventas.js` en `aplicacion_GET.html`, y corrección de contradicciones',
+            '  en este prompt (rehash, migraciones, botones, autocompletado,',
+            '  `GuardarAmbos.php`, `migrar_pasajeros.php`).',
+            '- No hay tandas de código en curso en este proyecto.',
+        ],
+    ],
+
+    // --------------------------------------------------------
+    // prompts/prompt_piloto.md — §13: actualizar estado al cierre
+    // --------------------------------------------------------
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_piloto.md',
+        'descripcion' => '§13: actualizar estado del proyecto al cierre',
+        'buscar' => [
             '**Estado del proyecto al cierre:** v1.5piloto.74g (framework 1.5i.7f).',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: relacion con el plugin',
-        'buscar' => [
-            '### 1.3 Arquitectura multi-cliente (multi-aplicación)',
-        ],
-        'reemplazar' => [
-            '### 1.3 Plugin de pruebas (proyecto separado)',
-            '',
-            'El piloto tiene un **plugin de pruebas automatizadas** que vive',
-            'en un proyecto separado: `iteradoresJS/`. Es una extensión de',
-            'Chrome (MV3) que corre pruebas contra la página del piloto,',
-            'usando el framework Iteradores JS para persistir sus',
-            'resultados.',
-            '',
-            'El plugin tiene su propio prompt,',
-            '`iteradoresJS/prompts/prompt_plugin_piloto.md`, que se',
-            'actualiza con cada tanda de código del plugin. **Este prompt',
-            '(el del piloto) no se toca cuando se toca solo el plugin.**',
-            '',
-            'Bugs del piloto descubiertos por las pruebas del plugin:',
-            '- v74d: refresco del croquis tras cancelar venta.',
-            '- v74e: condición de carrera entre el polling de asientos y',
-            '  el clic.',
-            '- v74f: modal del viaje abierto al cambiar de pestaña.',
-            '',
-            '### 1.4 Arquitectura multi-cliente (multi-aplicación)',
-        ],
-    ],
-
-    // ============================================================
-    // prompts/prompt_sistema_scripts.md
-    // ============================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_sistema_scripts.md',
-        'descripcion' => 'prompt scripts: nota sobre el sub-prompt del plugin',
-        'buscar' => [
-            '**Los prompts viven únicamente en el proyecto PHP** (`prompts/`).',
-            'El proyecto JS no tiene su propia copia de los prompts. Cuando se',
-            'actualiza un prompt por un cambio en el framework, se hace en el',
-            '`aplicar_cambios.php` del proyecto PHP.',
-        ],
-        'reemplazar' => [
-            '**Los prompts del framework, del piloto y del sistema de scripts**',
-            'viven en el proyecto PHP (`prompts/`). El proyecto `iteradoresJS/`',
-            'tiene, además, su propio sub-prompt en',
-            '`iteradoresJS/prompts/prompt_plugin_piloto.md`, que se actualiza',
-            'con el `aplicar_cambios.php` del proyecto JS cuando se toca',
-            'solo el plugin.',
-            '',
-            '**Regla de oro:** si el cambio toca el **framework** en cualquiera',
-            'de los dos lenguajes, se actualizan los prompts del proyecto PHP',
-            'y, si aplica, el sub-prompt del plugin. Si el cambio toca solo el',
-            '**piloto PHP**, se actualiza `prompt_piloto.md`. Si toca solo el',
-            '**plugin JS**, se actualiza `prompt_plugin_piloto.md` en',
+            'Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad',
+            'alta pendientes. El segundo piloto (plugin de Chrome sobre el',
+            'framework Iteradores JS) tiene el diseño cerrado; el código del',
+            'plugin se escribe en la próxima tanda, en el proyecto',
             '`iteradoresJS/`.',
         ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_sistema_scripts.md',
-        'descripcion' => 'prompt scripts: nota extendida del plugin',
-        'buscar' => [
-            '**Proyecto nuevo: plugin de Chrome sobre Iteradores JS.**',
-        ],
         'reemplazar' => [
-            '**Proyecto plugin: estado (v1.5plugin.4m).**',
-            '',
-            'El plugin tiene 17 pruebas agrupadas en secciones (base,',
-            'ventas). La ventana del popup tiene un botón "Correr todas"',
-            'por sección. Los `aplicar_cambios.php` del proyecto JS se',
-            'corren parados en `iteradoresJS/` y usan el mismo runner.',
-            'El sub-prompt del plugin es',
-            '`iteradoresJS/prompts/prompt_plugin_piloto.md`.',
-            '',
-            '**Proyecto nuevo: plugin de Chrome sobre Iteradores JS.**',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_sistema_scripts.md',
-        'descripcion' => 'prompt scripts: ultima actualizacion a v74g',
-        'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.74c. Se',
-        ],
-        'reemplazar' => [
-            '**Última actualización de este prompt:** v1.5piloto.74g. Se',
-            'actualizó la nota sobre el proyecto plugin con el estado',
-            'actual y la regla de qué prompt tocar según el proyecto.',
-            'Antes: v1.5piloto.74c. Se',
+            '**Estado del proyecto al cierre:** v1.5piloto.74h (framework 1.5i.7f).',
+            'Todo funcional. Bug 1 y Bug 2 resueltos. Auditoría de pendientes',
+            'cerrada: los ítems listados como "abiertos" en prompts anteriores',
+            '(rehash automático, limpieza de migraciones,',
+            '`boton_reiniciar_numeracion`, `ver_compra_asiento`, autocompletado',
+            'por DNI desde Clientes) ya estaban implementados o fueron',
+            'corregidos. Fix v74h: el autocompletado por DNI usa',
+            '`usuario_actual.dueno` como fallback cuando el usuario es terminal',
+            'y no hay viaje seleccionado. El segundo piloto (plugin de Chrome',
+            'sobre el framework Iteradores JS) tiene el esqueleto armado y',
+            'funcional, con 17 pruebas corriendo.',
         ],
     ],
 

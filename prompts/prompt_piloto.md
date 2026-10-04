@@ -497,7 +497,8 @@ Módulos: `autenticar`, `administrador`, `dueno`, `sesiones`,
 
 - Carga framework, persistencia (SQL principal), módulos de
   `Aplicacion/`.
-- Requiere `Aplicacion/GuardarAmbos.php` antes que todo lo demás.
+- Requiere `Aplicacion/FuncionesAuxiliares.php` (que define
+  `guardar_ambos`) antes que todo lo demás.
 - Crea admin en ambos grafos si no existe.
 - Bloques temporales de migración.
 - Enrutado POST con `enrutar_peticion_post`.
@@ -729,6 +730,18 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74h**: cierre de auditoría de pendientes. Fix del
+  autocompletado por DNI cuando el usuario es terminal y no
+  hay viaje seleccionado (modal de alta de pasajero desde
+  la pestaña Clientes): el dueño se resuelve desde
+  `usuario_actual.dueno` como fallback. Bump de `?v=` de
+  `ventas.js` en `aplicacion_GET.html` (estaba en `.73x`).
+  Correcciones al prompt: rehash automático y limpieza de
+  migraciones ya estaban implementados;
+  `boton_reiniciar_numeracion` y `ver_compra_asiento`
+  también; el autocompletado por DNI desde Clientes ya
+  funciona; `migrar_pasajeros.php` ya no existe;
+  `GuardarAmbos.php` fue eliminado en v73k.
 - **v74g**: solo documentación. Se registran los bugs del
   piloto detectados por las pruebas automáticas del plugin
   (`iteradoresJS/`): v74d (refresco del croquis tras cancelar
@@ -823,8 +836,7 @@ bloques `?migrar_*=1` de `index.php` y los archivos
   `migrar_declaraciones_juradas_v3`, `migrar_fichas_medicas`,
   `migrar_hashear_credenciales`, `migrar_separar_grafos`.
 
-`migrar_pasajeros.php` se conserva: es histórico y no vale la pena
-migrarlo. No se toca.
+(No quedan archivos `migrar_*.php` en el proyecto.)
 
 ### 8.3 Bugs conocidos (prioridad alta)
 
@@ -909,12 +921,25 @@ y liquidaciones.
 
 **Otros**:
 
-- Panel de super admin.
+- Panel de super admin (incremental al admin actual; alcance a
+  consensuar).
+- Métricas / reportes adicionales: solo ocupación por viaje y
+  consolidado de liquidaciones.
+
+**Implementados (ya no son pendientes):**
+
 - Autocompletado de pasajeros por DNI en el alta desde la pestaña
-  Clientes.
-- `boton_reiniciar_numeracion`: agregarlo al HTML.
-- `ver_compra_asiento`: modal con el detalle completo.
-- Métricas / reportes adicionales.
+  Clientes: los listeners de `conectar_listeners_formulario_pasajero`
+  ya autocompletan. Fix v74h: cuando el usuario es terminal y no
+  hay viaje seleccionado, el dueño se resuelve desde
+  `usuario_actual.dueno`.
+- `boton_reiniciar_numeracion`: existe como botón dinámico dentro
+  del modal de "números de asiento duplicados"
+  (`mostrar_aviso_numeros_duplicados`). No se agrega al HTML
+  estático.
+- `ver_compra_asiento`: implementado como navegación a la pestaña
+  Vendidos con resaltado (vía `ir_a_venta_en_vendidos`). No es
+  modal.
 
 ---
 
@@ -1087,7 +1112,7 @@ function _venta_en_curso() {
 **Backend:**
 - `index.php`, `aplicacion_POST.php`, `aplicacion_GET.html`.
 - `Aplicacion/Enrutador.php`, `Aplicacion/FuncionesAuxiliares.php`.
-- `Aplicacion/GrafoCredenciales.php`, `Aplicacion/GuardarAmbos.php`.
+- `Aplicacion/GrafoCredenciales.php`.
 - `Aplicacion/Viajes/Viaje.php`, `ViajeMicros.php`, `ViajeAsientos.php`,
   `ViajeOpciones.php`.
 - `Aplicacion/Ventas/Venta.php`.
@@ -1129,7 +1154,15 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74g (solo
+**Última actualización de este prompt:** v1.5piloto.74h (fix del
+autocompletado por DNI cuando el usuario es terminal y no hay viaje
+seleccionado; el dueño se resuelve desde `usuario_actual.dueno`.
+Bump de `?v=` de `ventas.js` en `aplicacion_GET.html`. Corrección
+de documentación: rehash automático y limpieza de migraciones
+ya están implementados, `boton_reiniciar_numeracion` y
+`ver_compra_asiento` también; `migrar_pasajeros.php` ya no existe;
+`GuardarAmbos.php` fue eliminado en v73k).
+Antes: v1.5piloto.74g (solo
 documentación: se registran los bugs del piloto detectados
 por las pruebas automáticas del plugin en `iteradoresJS/`,
 y se aclara la relación con el proyecto plugin).
@@ -1265,6 +1298,11 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   cambiar de pestaña". El croquis quedaba congelado en
   pantalla tras cancelar una venta desde una prueba
   automática. También reportado por las pruebas del plugin.
+- Cerramos en v74h la tanda chica de cierre: fix del autocompletado
+  por DNI para terminal sin viaje seleccionado, bump de `?v=` de
+  `ventas.js` en `aplicacion_GET.html`, y corrección de contradicciones
+  en este prompt (rehash, migraciones, botones, autocompletado,
+  `GuardarAmbos.php`, `migrar_pasajeros.php`).
 - No hay tandas de código en curso en este proyecto.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -1295,13 +1333,6 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
 
 **Decisiones abiertas / temas pendientes sin consensuar:**
 
-- **Rehash automático**: lo mencionamos como parte de la Tanda C pero
-  quedó fuera de la implementación. No se agregó el chequeo
-  `password_needs_rehash`. Se puede agregar en un bloque chico dentro
-  de `_registrar_login_exitoso`.
-- **Limpieza de migraciones**: hay varias tandas de migración que se
-  pueden eliminar cuando se confirmen en los 3 entornos. Ver sección
-  8.2.
 - **Diversificación por tipo de aplicación**: próximo gran frente. Ya
   hay un diseño inicial consensuado (nodo `tipos_de_aplicacion`, enlace
   `tipo_app` en el dueño). Falta ver el código antes de arrancar.
@@ -1369,12 +1400,17 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74g (framework 1.5i.7f).
-Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad
-alta pendientes. El segundo piloto (plugin de Chrome sobre el
-framework Iteradores JS) tiene el diseño cerrado; el código del
-plugin se escribe en la próxima tanda, en el proyecto
-`iteradoresJS/`.
+**Estado del proyecto al cierre:** v1.5piloto.74h (framework 1.5i.7f).
+Todo funcional. Bug 1 y Bug 2 resueltos. Auditoría de pendientes
+cerrada: los ítems listados como "abiertos" en prompts anteriores
+(rehash automático, limpieza de migraciones,
+`boton_reiniciar_numeracion`, `ver_compra_asiento`, autocompletado
+por DNI desde Clientes) ya estaban implementados o fueron
+corregidos. Fix v74h: el autocompletado por DNI usa
+`usuario_actual.dueno` como fallback cuando el usuario es terminal
+y no hay viaje seleccionado. El segundo piloto (plugin de Chrome
+sobre el framework Iteradores JS) tiene el esqueleto armado y
+funcional, con 17 pruebas corriendo.
 
 ---
 
