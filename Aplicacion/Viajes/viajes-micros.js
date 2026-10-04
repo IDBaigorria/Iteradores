@@ -1,6 +1,6 @@
 /**
  * Micros y terminales dentro de viajes.
- * @version 1.5piloto.74
+ * @version 1.5piloto.74k
  */
 
 function renderizar_micros_viaje(micros) {
@@ -284,7 +284,18 @@ async function abrir_formulario_agregar_micro() {
                 datosV.vehiculos.forEach(vehiculo => {
                     const opcion = document.createElement('option');
                     opcion.value = vehiculo.nombre_vehiculo;
-                    opcion.textContent = vehiculo.nombre;
+                    // Los vehículos sin asientos configurados se
+                    // muestran deshabilitados: si se agregaran al
+                    // viaje, el micro quedaría inutilizable. El
+                    // backend igual los rechaza (defensa en
+                    // profundidad).
+                    const asientos = parseInt(vehiculo.asientos, 10) || 0;
+                    if (asientos <= 0) {
+                        opcion.textContent = vehiculo.nombre + ' — Sin asientos configurados';
+                        opcion.disabled = true;
+                    } else {
+                        opcion.textContent = vehiculo.nombre;
+                    }
                     selectVehiculo.appendChild(opcion);
                 });
             }
@@ -307,6 +318,13 @@ async function confirmar_agregar_micro() {
     }
     if (monto === '' || isNaN(parseFloat(monto)) || parseFloat(monto) < 0) {
         mostrar_aviso("Ingrese un monto válido", 'error');
+        return;
+    }
+    // Defensa: verificar que la opción elegida no esté disabled
+    // (por ejemplo, vehículo sin asientos configurados).
+    const sel_veh = document.getElementById('selector_vehiculo_micro_viaje');
+    if (sel_veh && sel_veh.selectedOptions.length > 0 && sel_veh.selectedOptions[0].disabled) {
+        mostrar_aviso("Ese vehículo no tiene asientos configurados", 'error');
         return;
     }
 

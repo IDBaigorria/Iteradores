@@ -730,6 +730,26 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74k**: fixes de validación en el alta de micro.
+  `agregar_micro_a_viaje` (en `ViajeMicros.php`) rechaza
+  vehículos sin asientos configurados y vehículos ya
+  agregados al mismo viaje (comparación case-insensitive
+  con `strcasecmp`). El nombre del micro se calcula con
+  `max(existentes) + 1` en vez de `count + 1`, para evitar
+  colisiones cuando se borra un micro del medio; y se
+  chequea el resultado de `_adyacente_en`. En el frontend
+  (`viajes-micros.js`), los vehículos sin asientos
+  aparecen deshabilitados en el select con sufijo
+  "— Sin asientos configurados"; el botón Confirmar
+  también valida que no se haya elegido uno disabled.
+- **v74j**: modo prueba para alertas críticas. Nuevo helper
+  `_mostrar_alerta_critica()` en `aplicacion.js`: solo
+  dispara `alert()` si `window.__iteradores_modo_prueba`
+  NO está en `true`. Los dos `alert("Código de acceso: ...")`
+  (alta y edición de usuarios/terminales) usan el helper.
+  El plugin `iteradoresJS/` activa el modo prueba antes de
+  ejecutar flujos que disparan el alert, para no bloquear
+  el page context durante las pruebas.
 - **v74h**: cierre de auditoría de pendientes. Fix del
   autocompletado por DNI cuando el usuario es terminal y no
   hay viaje seleccionado (modal de alta de pasajero desde
@@ -1154,7 +1174,21 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74h (fix del
+**Última actualización de este prompt:** v1.5piloto.74k (fixes
+de validación en el alta de micro. `agregar_micro_a_viaje`
+rechaza vehículos sin asientos y vehículos duplicados en el
+mismo viaje; nombre del micro con `max+1` para evitar
+colisiones. Frontend: vehículos sin asientos aparecen
+deshabilitados en el select).
+Antes: v1.5piloto.74j (modo
+prueba para alertas críticas: nuevo helper
+`_mostrar_alerta_critica()` en `aplicacion.js` que solo
+dispara `alert()` si `window.__iteradores_modo_prueba` no
+está activo. Los dos `alert("Código de acceso: ...")` (alta
+y edición de usuarios/terminales) usan el helper. El plugin
+de `iteradoresJS/` activa el modo prueba antes de los flujos
+que disparan el alert, para no bloquear el page context).
+Antes: v1.5piloto.74h (fix del
 autocompletado por DNI cuando el usuario es terminal y no hay viaje
 seleccionado; el dueño se resuelve desde `usuario_actual.dueno`.
 Bump de `?v=` de `ventas.js` en `aplicacion_GET.html`. Corrección
@@ -1298,6 +1332,20 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   cambiar de pestaña". El croquis quedaba congelado en
   pantalla tras cancelar una venta desde una prueba
   automática. También reportado por las pruebas del plugin.
+- Cerramos en v74k los fixes de validación del alta de micro:
+  el backend rechaza vehículos sin asientos y duplicados en el
+  mismo viaje, el nombre del micro se calcula con `max+1` para
+  evitar colisiones cuando se quita uno del medio, y el
+  frontend filtra los vehículos sin asientos del select.
+  Estos fixes surgieron de la batería de pruebas del plugin
+  (v1.5plugin.4y): `micro_mismo_vehiculo_dos_veces` (verifica
+  rechazo de duplicados), `micro_vehiculo_sin_asientos`
+  (verifica filtro del select) y `micro_colision_numeracion`
+  (reproduce el bug de colisión).
+- Cerramos en v74j el modo prueba para alertas críticas: el
+  helper `_mostrar_alerta_critica()` respeta la bandera
+  `window.__iteradores_modo_prueba` que el plugin setea antes
+  de los flujos que disparan `alert()`.
 - Cerramos en v74h la tanda chica de cierre: fix del autocompletado
   por DNI para terminal sin viaje seleccionado, bump de `?v=` de
   `ventas.js` en `aplicacion_GET.html`, y corrección de contradicciones
@@ -1400,17 +1448,13 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74h (framework 1.5i.7f).
-Todo funcional. Bug 1 y Bug 2 resueltos. Auditoría de pendientes
-cerrada: los ítems listados como "abiertos" en prompts anteriores
-(rehash automático, limpieza de migraciones,
-`boton_reiniciar_numeracion`, `ver_compra_asiento`, autocompletado
-por DNI desde Clientes) ya estaban implementados o fueron
-corregidos. Fix v74h: el autocompletado por DNI usa
-`usuario_actual.dueno` como fallback cuando el usuario es terminal
-y no hay viaje seleccionado. El segundo piloto (plugin de Chrome
-sobre el framework Iteradores JS) tiene el esqueleto armado y
-funcional, con 17 pruebas corriendo.
+**Estado del proyecto al cierre:** v1.5piloto.74k (framework 1.5i.7f).
+Todo funcional. Bug 1 y Bug 2 resueltos. Los fixes de v74k
+endurecen el alta de micro: rechaza vehículos sin asientos y
+duplicados en el mismo viaje, y evita colisiones de numeración
+al quitar un micro del medio. El plugin de pruebas
+(`iteradoresJS/`, v1.5plugin.4z) tiene 29 pruebas corriendo,
+incluidas las tres que verifiquen estos fixes.
 
 ---
 

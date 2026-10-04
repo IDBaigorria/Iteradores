@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.70
+ * @version   1.5piloto.74k
  */
 
 use Iteradores\Nodos\Nodo;
@@ -115,13 +115,53 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
     $nodo_vehiculo = $nodo_vehiculos->adyacente($nombre_vehiculo);
     if (!$nodo_vehiculo) return ['exito' => false, 'error' => 'Vehículo no encontrado'];
 
-    $nodo_copia = clonar_vehiculo($nodo_vehiculo);
-
+    // Validar monto antes de cualquier creación de nodos.
     $monto = (string) $monto;
     if (!is_numeric($monto) || (float)$monto < 0) {
         return ['exito' => false, 'error' => 'Monto inválido'];
     }
 
+    // Validar que el vehículo tenga asientos configurados.
+    // Un micro sin asientos no se puede usar: no se pueden
+    // seleccionar ni vender asientos. El frontend ya filtra
+    // los vehículos sin configurar del select, pero se
+    // refuerza acá por si algo se saltea.
+    $nodo_asientos_orig = $nodo_vehiculo->adyacente('asientos');
+    $tiene_asientos = false;
+    if ($nodo_asientos_orig) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos_orig->adyacente("piso_$i");
+            if (!$piso) continue;
+            $cabeza = $piso->adyacente('asientos');
+            if ($cabeza && $cabeza->adyacente('primer')) {
+                $tiene_asientos = true;
+                break;
+            }
+        }
+    }
+    if (!$tiene_asientos) {
+        return ['exito' => false, 'error' => 'El vehículo "' . $nombre_vehiculo . '" no tiene asientos configurados'];
+    }
+
+    // Validar que el vehículo no esté ya agregado al viaje.
+    // Los micros se diferencian por la patente del vehículo
+    // original; dos copias del mismo vehículo son duplicados.
+    // Comparación case-insensitive, igual que subir_foto_vehiculo.
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if ($nodo_micros) {
+        $micros_existentes = (array) $nodo_micros->adyacentes();
+        foreach ($micros_existentes as $nodo_micro_existente) {
+            $copia = $nodo_micro_existente->adyacente('vehiculo_copia');
+            if ($copia && strcasecmp($copia->dato(), $nombre_vehiculo) === 0) {
+                return ['exito' => false, 'error' => 'Ese vehículo ya está agregado a este viaje'];
+            }
+        }
+    }
+
+    // Clonar el vehículo.
+    $nodo_copia = clonar_vehiculo($nodo_vehiculo);
+
+    // Crear el nodo micro.
     $nodo_micro = Nodo::crear_con_dato('');
     $nodo_micro->_adyacente_en($nodo_empresa, 'empresa');
     $nodo_micro->_adyacente_en($nodo_copia, 'vehiculo_copia');
@@ -133,16 +173,33 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
     $nodo_micro->_adyacente_en(Nodo::crear_con_dato('0'), 'disponibles');
     $nodo_micro->_adyacente_en($nodo_viaje, 'viaje');
 
-    $nodo_micros = $nodo_viaje->adyacente('micros');
+    // Nombre del micro: max(existentes) + 1.
+    // No se usa count+1 porque si se elimina un micro del medio,
+    // el próximo nombre calculado puede colisionar con uno ya
+    // existente (ej: micro_1, micro_3 tras borrar micro_2;
+    // count+1 daría micro_3, que ya existe).
     if (!$nodo_micros) {
         $nodo_micros = Nodo::crear_con_dato('');
         $nodo_viaje->_adyacente_en($nodo_micros, 'micros');
     }
-
     $adyacentes_micros = (array) $nodo_micros->adyacentes();
-    $indice = count($adyacentes_micros) + 1;
-    $nombre_micro = 'micro_' . $indice;
+    $max_indice = 0;
+    foreach (array_keys($adyacentes_micros) as $clave) {
+        if (preg_match('/^micro_(\d+)$/', (string)$clave, $m)) {
+            $n = (int)$m[1];
+            if ($n > $max_indice) $max_indice = $n;
+        }
+    }
+    $nombre_micro = 'micro_' . ($max_indice + 1);
+
+    // Chequear el resultado del enlace. Con max+1 no debería
+    // colisionar, pero por defensa: si _adyacente_en falla
+    // silenciosamente, el nodo del micro queda huérfano y el
+    // micro nunca aparece en el viaje.
     $nodo_micros->_adyacente_en($nodo_micro, $nombre_micro);
+    if (!$nodo_micros->adyacente($nombre_micro)) {
+        return ['exito' => false, 'error' => 'No se pudo asignar un nombre libre al micro (colisión con ' . $nombre_micro . ')'];
+    }
 
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
