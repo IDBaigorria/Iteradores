@@ -1,6 +1,6 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.66
+ * @version 1.5piloto.74o
  */
 /**
  * Normaliza un DNI dejando solo dígitos.
@@ -43,9 +43,13 @@ async function cargar_pasajeros() {
 
     const nombre_dueno = obtener_nombre_dueno_pasajeros();
     if (!nombre_dueno) {
+        _actualizar_visibilidad_boton_limpiar_pasajeros();
         mostrar_aviso('Seleccione un dueño para ver pasajeros', 'info');
         return;
     }
+
+    // Actualizar visibilidad del botón de limpieza (solo admin + modo pruebas).
+    _actualizar_visibilidad_boton_limpiar_pasajeros();
 
     const respuesta = await fetch("index.php", {
         method: "POST",
@@ -856,8 +860,67 @@ async function _subir_declaracion_jurada(dni, nombre_dueno, archivo) {
     }
 }
 
+// ============================================================
+// Limpieza de pasajeros de prueba (solo admin, modo pruebas).
+// ============================================================
+
+function _actualizar_visibilidad_boton_limpiar_pasajeros() {
+    if (!usuario_actual || usuario_actual.nivel !== 'admin') return;
+    // Solo en modo pruebas (bandera inyectada por index.php).
+    if (window.entorno_es_pruebas !== true) return;
+    const btn = document.getElementById('boton_limpiar_pasajeros_prueba');
+    if (!btn) return;
+    // Solo cuando hay un dueño seleccionado.
+    const nombre_dueno = obtener_nombre_dueno_pasajeros();
+    btn.style.display = nombre_dueno ? 'inline-block' : 'none';
+}
+
+async function limpiar_pasajeros_de_prueba_ui() {
+    if (!usuario_actual || usuario_actual.nivel !== 'admin') {
+        mostrar_aviso("Solo el admin puede ejecutar esta acción", 'error');
+        return;
+    }
+    const nombre_dueno = obtener_nombre_dueno_pasajeros();
+    if (!nombre_dueno) {
+        mostrar_aviso("Seleccione un dueño primero", 'error');
+        return;
+    }
+    const ok = confirm(
+        "¿Eliminar todos los pasajeros de prueba del dueño \"" + nombre_dueno + "\"?\n\n"
+        + "Se consideran de prueba los que tienen email @test.local.\n"
+        + "Se conservan los que tengan ventas o reservas asociadas.\n\n"
+        + "Esta acción no se puede deshacer."
+    );
+    if (!ok) return;
+
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "pasajeros/limpiar_prueba",
+            nombre_dueno,
+            nombre_solicitante: usuario_actual.nombre_usuario
+        })
+    });
+    const datos = await resp.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al limpiar pasajeros", 'error');
+        return;
+    }
+    let msg = "Se eliminaron " + datos.cantidad_borrados + " pasajero(s) de prueba.";
+    const cons = (datos.conservados_con_referencias || []).length;
+    if (cons > 0) {
+        msg += " " + cons + " se conservaron por tener ventas o reservas.";
+    }
+    mostrar_aviso(msg, 'exito');
+    await cargar_pasajeros();
+}
+
 // ===== Inicializacion de listeners del panel Pasajeros =====
 (function() {
     const btn = document.getElementById('boton_agregar_pasajero');
     if (btn) btn.addEventListener('click', abrir_modal_agregar_pasajero);
+
+    const btn_limpiar = document.getElementById('boton_limpiar_pasajeros_prueba');
+    if (btn_limpiar) btn_limpiar.addEventListener('click', limpiar_pasajeros_de_prueba_ui);
 })();

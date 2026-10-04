@@ -545,7 +545,10 @@
       <div class="panel">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
           <h2 style="margin:0;">Pasajeros / Clientes</h2>
-          <button class="btn primary" id="boton_agregar_pasajero">Agregar pasajero/cliente</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn primary" id="boton_agregar_pasajero">Agregar pasajero/cliente</button>
+            <button class="btn danger" id="boton_limpiar_pasajeros_prueba" style="display:none;">Limpiar pasajeros de prueba</button>
+          </div>
         </div>
         <div class="table-wrap" style="width: 100%;">
           <div class="panel" id="panel_selector_dueno_pasajeros" style="display:none;">
@@ -648,17 +651,18 @@
     <div class="modal-body" id="modal_apilado_contenido"></div>
   </div>
 </div>
+<!-- MODO_PRUEBAS_PLACEHOLDER -->
 <script src="aplicacion.js?v=1.5piloto.74f"></script>
 <script src="Aplicacion/admin.js?v=1.5piloto.73j"></script>
 <script src="Aplicacion/terminales.js?v=1.5piloto.73j"></script>
 <script src="Aplicacion/micros.js?v=1.5piloto.73d"></script>
-<script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.74n"></script>
+<script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.74o"></script>
 <script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.74k"></script>
 <script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.74e"></script>
 <script src="Aplicacion/Viajes/viajes-opciones.js?v=1.5piloto.74"></script>
 <script src="Aplicacion/ventas.js?v=1.5piloto.74e"></script>
 <script src="Aplicacion/rendiciones.js?v=1.5piloto.73d"></script>
 <script src="Aplicacion/liquidaciones.js?v=1.5piloto.73d"></script>
-<script src="Aplicacion/pasajeros.js?v=1.5piloto.73d"></script>
+<script src="Aplicacion/pasajeros.js?v=1.5piloto.74o"></script>
 </body>
 </html>

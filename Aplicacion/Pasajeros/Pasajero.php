@@ -4,12 +4,13 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.70
+ * @version   1.5piloto.74o
  */
 
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
 use Iteradores\Configuracion\Conf;
+use Iteradores\Configuracion\Entorno;
 include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
@@ -516,6 +517,135 @@ function eliminar_pasajero(string $nombre_dueno, string $dni): array {
 
     guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
+}
+
+/**
+ * Elimina los pasajeros "de prueba" de un dueño.
+ *
+ * Criterio: el email termina en "@test.local". Esa es la
+ * marca que dejan las pruebas automáticas del plugin. Los
+ * pasajeros reales no usan ese dominio.
+ *
+ * Conserva los pasajeros que tengan referencias entrantes:
+ * ventas (comprador o asiento con pasajero) o reservas
+ * (asientos de micros de viajes). Nodo::eliminar falla si
+ * hay referencias entrantes; el enlace del contenedor se
+ * rompería igual pero el nodo quedaría huérfano. Preferimos
+ * conservar y avisar.
+ *
+ * Disponible solo en modo pruebas.
+ *
+ * @param string $nombre_dueno
+ * @return array
+ */
+function limpiar_pasajeros_de_prueba(string $nombre_dueno): array {
+    if (!Entorno::es_pruebas()) {
+        return ['exito' => false, 'error' => 'Disponible solo en modo pruebas'];
+    }
+
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+    if (!$contenedor) {
+        return ['exito' => false, 'error' => 'Dueño no encontrado o sin pasajeros'];
+    }
+
+    // Pre-pasada 1: DNIs referenciados desde ventas.
+    $dnis_referenciados = [];
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if ($contenedor_ventas) {
+        $venta = hmi($contenedor_ventas);
+        $seg = 0;
+        while ($venta && $seg < 500) {
+            $comprador = $venta->adyacente('comprador');
+            if ($comprador) $dnis_referenciados[$comprador->dato()] = true;
+
+            $cabeza_asientos = $venta->adyacente('asientos');
+            if ($cabeza_asientos) {
+                $asiento = $cabeza_asientos->adyacente('primer');
+                $seg2 = 0;
+                while ($asiento && $seg2 < 200) {
+                    $pas = $asiento->adyacente('pasajero');
+                    if ($pas) $dnis_referenciados[$pas->dato()] = true;
+                    $asiento = $asiento->adyacente('siguiente');
+                    $seg2++;
+                }
+            }
+            $venta = hd($venta);
+            $seg++;
+        }
+    }
+
+    // Pre-pasada 2: DNIs referenciados desde asientos de micros
+    // (reservas del equipo).
+    $contenedor_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if ($contenedor_viajes) {
+        $adyacentes_viajes = (array) $contenedor_viajes->adyacentes();
+        foreach ($adyacentes_viajes as $nodo_viaje) {
+            $micros = $nodo_viaje->adyacente('micros');
+            if (!$micros) continue;
+            $adyacentes_micros = (array) $micros->adyacentes();
+            foreach ($adyacentes_micros as $nodo_micro) {
+                $copia = $nodo_micro->adyacente('vehiculo_copia');
+                if (!$copia) continue;
+                $asientos = $copia->adyacente('asientos');
+                if (!$asientos) continue;
+                for ($i = 1; $i <= 2; $i++) {
+                    $piso = $asientos->adyacente("piso_$i");
+                    if (!$piso) continue;
+                    $cabeza = $piso->adyacente('asientos');
+                    if (!$cabeza) continue;
+                    $asiento = $cabeza->adyacente('primer');
+                    $seg3 = 0;
+                    while ($asiento && $asiento->id() !== $cabeza->id() && $seg3 < 200) {
+                        $pas = $asiento->adyacente('pasajero');
+                        if ($pas) $dnis_referenciados[$pas->dato()] = true;
+                        $asiento = $asiento->adyacente('siguiente');
+                        $seg3++;
+                    }
+                }
+            }
+        }
+    }
+
+    // Loop principal.
+    $adyacentes = (array) $contenedor->adyacentes();
+    $borrados = [];
+    $conservados_con_referencias = [];
+    $conservados_no_prueba = [];
+
+    foreach ($adyacentes as $dni => $nodo_pasajero) {
+        $dni = (string)$dni;
+        $nodo_email = $nodo_pasajero->adyacente('email');
+        $email = $nodo_email ? $nodo_email->dato() : '';
+
+        // ¿Es de prueba?
+        if (substr($email, -11) !== '@test.local') {
+            $conservados_no_prueba[] = $dni;
+            continue;
+        }
+
+        // ¿Tiene referencias entrantes?
+        if (isset($dnis_referenciados[$dni])) {
+            $conservados_con_referencias[] = $dni;
+            continue;
+        }
+
+        // Desenlazar y eliminar. Si Nodo::eliminar falla
+        // (referencias residuales que se nos escaparon), el
+        // enlace ya está roto y el nodo queda huérfano.
+        $contenedor->eliminar_adyacente($dni);
+        Nodo::eliminar($nodo_pasajero);
+        $borrados[] = $dni;
+    }
+
+    guardar_ambos(Conf::NOMBRE_APP);
+
+    return [
+        'exito' => true,
+        'borrados' => $borrados,
+        'cantidad_borrados' => count($borrados),
+        'conservados_con_referencias' => $conservados_con_referencias,
+        'conservados_no_prueba' => $conservados_no_prueba,
+    ];
 }
 
 /**

@@ -4,6 +4,7 @@ header("Cache-control: no-cache, must-revalidate");
 
 use Iteradores\Controlador\Controlador;
 use Iteradores\Configuracion\Conf;
+use Iteradores\Configuracion\Entorno;
 use Iteradores\Nodos\Nodo;
 
 /**
@@ -79,6 +80,12 @@ require_once __DIR__ . '/Aplicacion/Pasajeros/Pasajero.php';
 require_once __DIR__ . '/Aplicacion/Rendiciones/Rendicion.php';
 require_once __DIR__ . '/Aplicacion/Liquidaciones/Liquidacion.php';
 require_once __DIR__ . '/Aplicacion/Enrutador.php';
+
+// Modo de ejecución. En local se considera modo pruebas
+// (habilita los botones de limpieza del admin). En
+// producción, modo producción (los botones quedan
+// ocultos porque el HTML no incluye la bandera JS).
+Entorno::establecer_modo(Conf::LOCAL ? Entorno::MODO_PRUEBAS : Entorno::MODO_PRODUCCION);
 
 // Inicialización de la persistencia.
 // Va después de los require_once para que `guardar_ambos` esté
@@ -285,5 +292,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     exit;
 }
 
-// Si es GET, mostrar la interfaz
-readfile(__DIR__ . '/aplicacion_GET.html');
+// Si es GET, mostrar la interfaz.
+// Se inyecta el modo de pruebas en el HTML (placeholder
+// MODO_PRUEBAS_PLACEHOLDER en aplicacion_GET.html). Los
+// botones de limpieza del admin consultan esa bandera
+// vía `window.entorno_es_pruebas`.
+$html = file_get_contents(__DIR__ . '/aplicacion_GET.html');
+$es_pruebas_js = Entorno::es_pruebas() ? 'true' : 'false';
+$html = str_replace(
+    '<!-- MODO_PRUEBAS_PLACEHOLDER -->',
+    '<script>window.entorno_es_pruebas = ' . $es_pruebas_js . ';</script>',
+    $html
+);
+echo $html;

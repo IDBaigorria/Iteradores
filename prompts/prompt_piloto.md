@@ -487,6 +487,12 @@ se reordenaron los `require_once` en `index.php` para que
   `pasajero_tiene_ventas_activas`, `pasajero_tiene_reservas_activas`.
 - `obtener_reservas_de_pasajero`, `formatear_venta_para_pasajero`,
   `eliminar_pasajero`.
+- `limpiar_pasajeros_de_prueba($nombre_dueno)`: elimina los
+  pasajeros cuyo email termina en `@test.local` (marca que
+  dejan las pruebas del plugin). Conserva los que tengan
+  referencias entrantes (ventas o reservas). Disponible solo
+  en modo pruebas. Pensada para el botón de limpieza del
+  admin.
 
 ### 5.13 `Impresion.php`
 
@@ -506,8 +512,15 @@ Módulos: `autenticar`, `administrador`, `dueno`, `sesiones`,
 `empresas`, `vehiculos`, `viajes`, `ventas`, `pasajeros`,
 `rendiciones`, `liquidaciones`, `cancelaciones`.
 
-Subacción especial: `viajes/limpiar_prueba` (solo admin).
-Elimina los viajes de prueba del dueño seleccionado.
+Subacciones especiales:
+- `viajes/limpiar_prueba` (admin + modo pruebas): elimina los
+  viajes de prueba del dueño seleccionado.
+- `pasajeros/limpiar_prueba` (admin + modo pruebas): elimina
+  los pasajeros con email `@test.local` que no tengan
+  referencias entrantes.
+- `entorno/info`: devuelve `{modo, es_pruebas}`. Público, sin
+  permisos. Lo consume el frontend para saber si mostrar los
+  botones de limpieza.
 
 ### 5.15 `index.php`
 
@@ -746,6 +759,18 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74o**: botón "Limpiar pasajeros de prueba" en la pestaña
+  Pasajeros/Clientes. Nueva función
+  `limpiar_pasajeros_de_prueba($nombre_dueno)` en
+  `Pasajero.php` y subacción `pasajeros/limpiar_prueba` en el
+  enrutador. Criterio: email termina en `@test.local`.
+  Conserva los pasajeros con referencias entrantes (ventas
+  o reservas). También se agregó: `index.php` establece
+  `Entorno::MODO_PRUEBAS` o `MODO_PRODUCCION` según
+  `Conf::LOCAL` e inyecta `window.entorno_es_pruebas` en el
+  HTML; nueva subacción `entorno/info`; los botones de
+  limpieza (viajes y pasajeros) ahora aparecen solo si el
+  admin está en modo pruebas.
 - **v74n**: botón "Limpiar viajes de prueba" en la pestaña
   Viajes (solo admin). Nueva función
   `limpiar_viajes_de_prueba($nombre_dueno)` en `Viaje.php` y
@@ -1213,7 +1238,16 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74n
+**Última actualización de este prompt:** v1.5piloto.74o
+(botón "Limpiar pasajeros de prueba" en la pestaña
+Pasajeros/Clientes. Nueva función
+`limpiar_pasajeros_de_prueba` en `Pasajero.php` y subacción
+`pasajeros/limpiar_prueba`. Los botones de limpieza (viajes
+y pasajeros) ahora aparecen solo si el admin está en modo
+pruebas (`Entorno::es_pruebas()`). Nuevo endpoint
+`entorno/info` y bandera `window.entorno_es_pruebas`
+inyectada por `index.php`).
+Antes: v1.5piloto.74n
 (botón "Limpiar viajes de prueba" en la pestaña Viajes para
 el admin. Nueva función `limpiar_viajes_de_prueba` en
 `Viaje.php` y subacción `viajes/limpiar_prueba` en el
@@ -1401,6 +1435,27 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   helper `_mostrar_alerta_critica()` respeta la bandera
   `window.__iteradores_modo_prueba` que el plugin setea antes
   de los flujos que disparan `alert()`.
+- Cerramos en v74o el botón "Limpiar pasajeros de prueba"
+  para el admin (solo en modo pruebas). Criterio: email
+  termina en `@test.local`. Conserva los que tienen
+  referencias entrantes. También: `index.php` establece
+  `Entorno::MODO_PRUEBAS`/`MODO_PRODUCCION` según
+  `Conf::LOCAL`, e inyecta `window.entorno_es_pruebas` en
+  el HTML. Los dos botones de limpieza (viajes y pasajeros)
+  aparecen solo si el admin está en modo pruebas.
+- **Decisión anotada como pendiente de prioridad alta:**
+  **fuga de nodos**. Cuando se elimina una venta, un
+  pasajero, un viaje o cualquier entidad, el nodo se
+  descuelga del contenedor pero no se destruye. Como el
+  framework no permite eliminar un nodo con referencias
+  entrantes, esos nodos quedan huérfanos y el grafo crece
+  indefinidamente. Afecta la performance de todo. Los
+  botones de limpieza son paliativos. La solución de fondo
+  requiere auditar cada flujo de eliminación y desenlazar
+  progresivamente antes de llamar a `Nodo::eliminar`.
+  También conviene revisar si el framework podría soportar
+  carga parcial del grafo (traer solo la rama de interés
+  en vez del grafo entero).
 - Cerramos en v74n el botón "Limpiar viajes de prueba" para
   el admin. El grafo del dueño `carmen1` tenía 21 viajes
   (20 de ellos de pruebas anteriores), y `formatear_viaje`
@@ -1523,23 +1578,35 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74n (framework 1.5i.7f).
+**Estado del proyecto al cierre:** v1.5piloto.74o (framework 1.5i.7f).
 Todo funcional. Bug 1 y Bug 2 resueltos. Fixes de v74k
 endurecen el alta de micro. Fix de v74m: `guardar_ambos`
 deja de guardar el JSON de respaldo automático. Fix de
-v74n: botón "Limpiar viajes de prueba" para el admin, que
-borra los viajes acumulados por las pruebas del plugin
-(conserva el viaje principal). El plugin de pruebas
+v74n: botón "Limpiar viajes de prueba". Fix de v74o: botón
+"Limpiar pasajeros de prueba" y control de modo
+(`Entorno::es_pruebas()`). El plugin de pruebas
 (`iteradoresJS/`, v1.5plugin.5d) tiene 29 pruebas
 corriendo.
 
-**Deuda técnica pendiente:** `formatear_viaje` en `Viaje.php`
-escala como O(V × W): por cada viaje, recorre todas las ventas
-del dueño para calcular `viaje_tiene_ventas` y
-`vendidos_por_micró`. Con muchos viajes y ventas, el costo
-crece. La limpieza de viajes mitiga el problema pero no lo
-elimina. La optimización real (índice de ventas por viaje +
-cacheo de contadores) queda para una tanda dedicada.
+**Deuda técnica pendiente (prioridad alta):**
+**fuga de nodos**. Cuando se elimina una venta, un pasajero,
+un viaje o cualquier entidad, el nodo se descuelga del
+contenedor pero no se destruye. Como el framework no
+permite eliminar un nodo con referencias entrantes, esos
+nodos quedan huérfanos y el grafo crece indefinidamente.
+La aplicación se vuelve lenta porque todo itera sobre el
+grafo completo. La limpieza manual (botones de admin) es
+paliativa. La solución requiere auditar cada flujo de
+eliminación y desenlazar progresivamente antes de llamar
+a `Nodo::eliminar`. Requiere también revisar la
+arquitectura del framework para permitir carga parcial
+del grafo (cargar solo la rama de interés).
+
+**Deuda técnica pendiente (prioridad media):**
+`formatear_viaje` en `Viaje.php` escala como O(V × W): por
+cada viaje, recorre todas las ventas del dueño. Optimización
+real pendiente: índice de ventas por viaje + cacheo de
+contadores.
 
 ---
 

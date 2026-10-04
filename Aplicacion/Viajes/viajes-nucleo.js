@@ -1,6 +1,6 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.74n
+ * @version 1.5piloto.74o
  */
 
 function obtener_nombre_dueno_actual() {
@@ -14,6 +14,8 @@ function obtener_nombre_dueno_actual() {
  */
 function _actualizar_visibilidad_boton_limpiar_viajes(visible) {
     if (!usuario_actual || usuario_actual.nivel !== 'admin') return;
+    // Solo en modo pruebas (bandera inyectada por index.php).
+    if (window.entorno_es_pruebas !== true) return;
     const btn = document.getElementById('boton_limpiar_viajes_prueba');
     if (!btn) return;
     btn.style.display = visible ? 'inline-block' : 'none';

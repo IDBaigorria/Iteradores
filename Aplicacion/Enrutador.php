@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.74n
+ * @version   1.5piloto.74o
  */
 
 use Iteradores\Nodos\Nodo;
@@ -910,6 +910,28 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = eliminar_pasajero($nombre_dueno, $dni);
                     responder_json($resultado);
                     break;
+
+                case 'limpiar_prueba':
+                    // Solo admin y solo en modo pruebas.
+                    if (!\Iteradores\Configuracion\Entorno::es_pruebas()) {
+                        responder_json(['exito' => false, 'error' => 'Disponible solo en modo pruebas']);
+                    }
+                    $nombre_sol_lpp = $post['nombre_solicitante'] ?? '';
+                    $raiz_sol_lpp = Nodo::nodo_por_id('usuarios');
+                    $nodo_sol_lpp = ($raiz_sol_lpp && $nombre_sol_lpp !== '') ? $raiz_sol_lpp->adyacente($nombre_sol_lpp) : null;
+                    $nodo_nivel_lpp = $nodo_sol_lpp ? $nodo_sol_lpp->adyacente('nivel') : null;
+                    $nivel_sol_lpp = $nodo_nivel_lpp ? $nodo_nivel_lpp->dato() : '';
+                    if ($nivel_sol_lpp !== 'admin') {
+                        responder_json(['exito' => false, 'error' => 'Solo el administrador puede ejecutar esta acción']);
+                    }
+                    $nombre_dueno_lpp = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno_lpp)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado_lpp = limpiar_pasajeros_de_prueba($nombre_dueno_lpp);
+                    responder_json($resultado_lpp);
+                    break;
+
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de pasajeros no válida']);
             }
@@ -1100,6 +1122,20 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de usuarios no válida']);
+            }
+            break;
+
+        case 'entorno':
+            switch ($subaccion) {
+                case 'info':
+                    responder_json([
+                        'exito' => true,
+                        'modo' => \Iteradores\Configuracion\Entorno::modo(),
+                        'es_pruebas' => \Iteradores\Configuracion\Entorno::es_pruebas(),
+                    ]);
+                    break;
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de entorno no válida']);
             }
             break;
 
