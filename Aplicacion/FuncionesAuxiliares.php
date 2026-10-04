@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.37
- * @version   1.5piloto.73k
+ * @version   1.5piloto.74m
  */
 
 use Iteradores\Controlador\Controlador;
@@ -178,11 +178,19 @@ function validar_direccion(string $valor): ?string {
 // ============================================================
 
 /**
- * Guarda una superestructura en SQL y después en JSON.
+ * Guarda una superestructura solo en SQL.
  *
- * El JSON es solo respaldo. Si falla, se registra el error con el
- * sistema centralizado de Objeto y la operación sigue siendo exitosa
- * porque SQL ya persistió.
+ * Hasta v74j esta función también escribía un respaldo JSON
+ * automático (json_encode de todo el grafo en cada guardado).
+ * Cuando el grafo creció (varias terminales, vehículos, ventas,
+ * cupones), ese encode se volvió el cuello de botella: cada
+ * operación tardaba segundos y rompía los timeouts de las
+ * pruebas del plugin. Desde v74m se eliminó.
+ *
+ * La implementación `PerdurarSuperestructuraStringJSON` sigue
+ * disponible en el framework. El respaldo en formatos
+ * alternativos pasa a ser una acción manual del admin, a
+ * implementar en el rediseño del panel.
  *
  * @param string $nombre Nombre de la superestructura.
  * @return bool True si el guardado en SQL fue exitoso.
@@ -200,24 +208,6 @@ function guardar_ambos($nombre): bool {
         return false;
     }
 
-    // 1) Guardar en SQL (fuente de verdad).
-    $ok_sql = Controlador::guardar($nombre);
-    if (!$ok_sql) {
-        return false;
-    }
-
-    // 2) Guardar en JSON (respaldo). No debe romper la operación.
-    try {
-        Controlador::establecer_metodo('JSON');
-        $ok_json = Controlador::guardar($nombre);
-        if (!$ok_json) {
-            Controlador::_error("guardar_ambos: fallo el guardado JSON para el grafo \"$nombre\"");
-        }
-    } catch (\Throwable $e) {
-        Controlador::_error("guardar_ambos: excepcion al guardar JSON para \"$nombre\": " . $e->getMessage());
-    } finally {
-        Controlador::establecer_metodo('SQL');
-    }
-
-    return true;
+    // Guardar en SQL (única fuente de verdad).
+    return (bool) Controlador::guardar($nombre);
 }

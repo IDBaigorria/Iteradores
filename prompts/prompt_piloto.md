@@ -360,8 +360,11 @@ Enlaces: `usuario` (string), `creado_en` (timestamp Unix).
   `validar_nombre_o_apellido`, `validar_fecha_nacimiento`,
   `validar_localidad`, `validar_direccion`.
 - `guardar_ambos($nombre)`: guarda la superestructura en SQL
-  (fuente de verdad) y después en JSON (respaldo). Desde v73k
-  vive acá, no en `GuardarAmbos.php`.
+  (única fuente de verdad). Desde v73k vive acá, no en
+  `GuardarAmbos.php`. Desde v74m ya NO guarda el JSON de
+  respaldo automático: el `json_encode` de todo el grafo
+  se volvió el cuello de botella del guardado cuando el
+  grafo creció.
 
 ### 5.2 `Aplicacion/Autenticacion/Autenticacion.php`
 
@@ -395,9 +398,13 @@ Enlaces: `usuario` (string), `creado_en` (timestamp Unix).
 ### 5.5 Persistencia SQL + JSON
 
 `guardar_ambos($nombre)` vive en `FuncionesAuxiliares.php`
-(ver 5.1). Guarda la superestructura en SQL (fuente de verdad)
-y después en JSON (respaldo). Si JSON falla, `Controlador::_error()`.
-Devuelve true si SQL fue exitoso.
+(ver 5.1). Guarda la superestructura en SQL (única fuente
+de verdad). Desde v74m ya no guarda el JSON de respaldo:
+el `json_encode` de todo el grafo se volvió el cuello de
+botella cuando el grafo creció (varias terminales,
+vehículos, ventas). El respaldo en otros formatos pasa a
+ser una acción manual del admin, a implementar en el
+rediseño del panel.
 
 El archivo `Aplicacion/GuardarAmbos.php` existió hasta v73j. Se
 eliminó en v73k: el helper se movió a `FuncionesAuxiliares.php` y
@@ -730,6 +737,17 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74m**: eliminado el respaldo JSON automático de
+  `guardar_ambos`. Motivo: el `json_encode` de todo el
+  grafo se volvió el cuello de botella del guardado cuando
+  el grafo creció (3 terminales, varios vehículos, ventas,
+  cupones). Cada operación tardaba segundos, y eso rompía
+  los timeouts de las pruebas del plugin. Ahora
+  `guardar_ambos` solo guarda SQL. La implementación
+  `PerdurarSuperestructuraStringJSON` sigue disponible en
+  el framework. El respaldo en formatos alternativos
+  (JSON, XML) pasa a ser una acción manual del admin, a
+  implementar en el rediseño del panel.
 - **v74k**: fixes de validación en el alta de micro.
   `agregar_micro_a_viaje` (en `ViajeMicros.php`) rechaza
   vehículos sin asientos configurados y vehículos ya
@@ -1174,7 +1192,16 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74k (fixes
+**Última actualización de este prompt:** v1.5piloto.74m
+(eliminado el respaldo JSON automático de `guardar_ambos`.
+El `json_encode` de todo el grafo se volvió el cuello de
+botella cuando el grafo creció con terminales, vehículos y
+ventas: cada operación de guardado tardaba segundos y
+rompía los timeouts de las pruebas del plugin. Ahora
+`guardar_ambos` solo guarda SQL. El respaldo en otros
+formatos pasa a ser una acción manual del admin, a
+implementar en el rediseño del panel).
+Antes: v1.5piloto.74k (fixes
 de validación en el alta de micro. `agregar_micro_a_viaje`
 rechaza vehículos sin asientos y vehículos duplicados en el
 mismo viaje; nombre del micro con `max+1` para evitar
@@ -1346,6 +1373,12 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   helper `_mostrar_alerta_critica()` respeta la bandera
   `window.__iteradores_modo_prueba` que el plugin setea antes
   de los flujos que disparan `alert()`.
+- Cerramos en v74m el fix de performance: `guardar_ambos` ya
+  no guarda el JSON de respaldo automático. El `json_encode`
+  de todo el grafo se volvió el cuello de botella cuando
+  creció (3 terminales, varios vehículos, ventas). El
+  respaldo JSON pasa a ser acción manual del admin (a
+  implementar en el rediseño del panel).
 - Cerramos en v74h la tanda chica de cierre: fix del autocompletado
   por DNI para terminal sin viaje seleccionado, bump de `?v=` de
   `ventas.js` en `aplicacion_GET.html`, y corrección de contradicciones
@@ -1357,6 +1390,13 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
 
 - **SQL es siempre el método principal.** El JSON es solo respaldo.
   `Conf::LOCAL` ya no decide el método de persistencia.
+- **El respaldo JSON automático se eliminó en v74m.**
+  `guardar_ambos` solo guarda SQL. Motivo: el `json_encode`
+  de todo el grafo se volvió el cuello de botella del
+  guardado cuando el grafo creció (varias terminales,
+  vehículos, ventas). El respaldo en formatos alternativos
+  (JSON, XML) pasa a ser una acción manual del admin, a
+  implementar en el rediseño del panel admin.
 - **Host y credenciales viven en `config_servidor.php`** en la raíz del
   proyecto. Es el único archivo que no se toca al desplegar. `Conf`
   hereda de `ConfServidor`.
@@ -1448,13 +1488,15 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74k (framework 1.5i.7f).
-Todo funcional. Bug 1 y Bug 2 resueltos. Los fixes de v74k
+**Estado del proyecto al cierre:** v1.5piloto.74m (framework 1.5i.7f).
+Todo funcional. Bug 1 y Bug 2 resueltos. Fixes de v74k
 endurecen el alta de micro: rechaza vehículos sin asientos y
 duplicados en el mismo viaje, y evita colisiones de numeración
-al quitar un micro del medio. El plugin de pruebas
-(`iteradoresJS/`, v1.5plugin.4z) tiene 29 pruebas corriendo,
-incluidas las tres que verifiquen estos fixes.
+al quitar un micro del medio. Fix de v74m: `guardar_ambos`
+deja de guardar el JSON de respaldo automático, que se había
+vuelto el cuello de botella del guardado cuando el grafo
+creció. El plugin de pruebas (`iteradoresJS/`,
+v1.5plugin.5c) tiene 29 pruebas corriendo.
 
 ---
 
