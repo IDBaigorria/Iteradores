@@ -580,6 +580,22 @@ costó un fallo real del runner y una iteración extra.
     entregar.
 12. **No asumir la estructura de un archivo.** Pedirlo siempre
     antes de tocarlo, aunque parezca conocido.
+13. **Cada `aplicar_cambios.php` va acompañado de un commit
+    sugerido.** Siempre, sin excepción, en cualquiera de los
+    dos proyectos. El commit arranca con `V1.5piloto.XX:` o
+    `V1.5plugin.XX:` según corresponda, y separa los cambios
+    en las secciones conocidas (Servidor, Interfaz,
+    Documentación, Plugin, etc.).
+14. **Cada cambio al piloto PHP lleva su espejo de pruebas en
+    el plugin JS.** Cuando la tanda toca el piloto (backend o
+    frontend), se entrega además un `aplicar_cambios.php` para
+    `iteradoresJS/` que agregue las pruebas del plugin que
+    verifiquen los cambios. Dos scripts, dos commits, dos
+    repos. La única excepción es cuando el cambio del piloto
+    no es verificable desde el plugin (por ejemplo, cambios
+    de estilo visual interno o refactors sin cambio de
+    comportamiento). Aun así, avisar al usuario que no se
+    agregan pruebas y por qué.
 
 ---
 
@@ -592,12 +608,21 @@ costó un fallo real del runner y una iteración extra.
 - Modo estricto, sin backups.
 - Bump de versiones siempre.
 - Actualizar prompts al cerrar cada tanda.
+- Cada `aplicar_cambios.php` va con un commit sugerido.
+- Cada cambio al piloto lleva su espejo de pruebas del plugin
+  en `iteradoresJS/` (salvo excepción justificada).
 
 ---
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.74g. Se
+**Última actualización de este prompt:** v1.5piloto.74i. Se
+incorporan dos reglas nuevas al método de trabajo:
+(13) cada `aplicar_cambios.php` va acompañado de un commit
+sugerido; (14) cada cambio al piloto PHP lleva su espejo de
+pruebas en el plugin JS de `iteradoresJS/`, con dos scripts y
+dos commits.
+Antes: v1.5piloto.74g. Se
 actualizó la nota sobre el proyecto plugin con el estado
 actual y la regla de qué prompt tocar según el proyecto.
 Antes: v1.5piloto.74c. Se
