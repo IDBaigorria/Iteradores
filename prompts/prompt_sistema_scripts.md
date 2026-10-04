@@ -66,10 +66,19 @@ Los dos scripts se entregan en el mismo mensaje del asistente, pero
 se corren por separado y se commitean por separado. El motivo es que
 son repositorios independientes con historias independientes.
 
-**Los prompts viven únicamente en el proyecto PHP** (`prompts/`).
-El proyecto JS no tiene su propia copia de los prompts. Cuando se
-actualiza un prompt por un cambio en el framework, se hace en el
-`aplicar_cambios.php` del proyecto PHP.
+**Los prompts del framework, del piloto y del sistema de scripts**
+viven en el proyecto PHP (`prompts/`). El proyecto `iteradoresJS/`
+tiene, además, su propio sub-prompt en
+`iteradoresJS/prompts/prompt_plugin_piloto.md`, que se actualiza
+con el `aplicar_cambios.php` del proyecto JS cuando se toca
+solo el plugin.
+
+**Regla de oro:** si el cambio toca el **framework** en cualquiera
+de los dos lenguajes, se actualizan los prompts del proyecto PHP
+y, si aplica, el sub-prompt del plugin. Si el cambio toca solo el
+**piloto PHP**, se actualiza `prompt_piloto.md`. Si toca solo el
+**plugin JS**, se actualiza `prompt_plugin_piloto.md` en
+`iteradoresJS/`.
 
 ### Cuándo aplica esta regla
 
@@ -588,7 +597,10 @@ costó un fallo real del runner y una iteración extra.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.74c. Se
+**Última actualización de este prompt:** v1.5piloto.74g. Se
+actualizó la nota sobre el proyecto plugin con el estado
+actual y la regla de qué prompt tocar según el proyecto.
+Antes: v1.5piloto.74c. Se
 amplió la nota del proyecto plugin con las decisiones de
 estructura (manifest en la raíz de `iteradoresJS/`, versión
 `v1.5plugin.0`, salida consola en el SW, content script
@@ -623,6 +635,15 @@ que viene justo después.
   sección "Actualización de los prompts con cada cambio".
 - Los bloques de reemplazo sobre los prompts son chicos y estables. En
   general se puede hacer todo en el mismo `aplicar_cambios.php`.
+
+**Proyecto plugin: estado (v1.5plugin.4m).**
+
+El plugin tiene 17 pruebas agrupadas en secciones (base,
+ventas). La ventana del popup tiene un botón "Correr todas"
+por sección. Los `aplicar_cambios.php` del proyecto JS se
+corren parados en `iteradoresJS/` y usan el mismo runner.
+El sub-prompt del plugin es
+`iteradoresJS/prompts/prompt_plugin_piloto.md`.
 
 **Proyecto nuevo: plugin de Chrome sobre Iteradores JS.**
 

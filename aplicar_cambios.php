@@ -2,10 +2,14 @@
 /**
  * Aplicador de cambios automáticos — Piloto agencia de viajes.
  *
- * Tanda v1.5piloto.74f — cerrar el modal del viaje al cambiar de pestaña.
+ * Tanda v1.5piloto.74g — documentación.
  *
- * Corrige el path de `aplicacion.js` (raíz del proyecto, no en
- * Aplicacion/).
+ * Actualiza el prompt del piloto con:
+ * - Los bugs v74d/e/f detectados por las pruebas del plugin.
+ * - Nota sobre el proyecto plugin en iteradoresJS/.
+ *
+ * Actualiza el prompt del sistema de scripts con:
+ * - Nota sobre el sub-prompt del plugin en iteradoresJS/prompts/.
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -25,141 +29,152 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ============================================================
-    // aplicacion.js (raíz del proyecto)
-    // ============================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion.js',
-        'descripcion' => 'aplicacion.js: bump a 1.5piloto.74f',
-        'buscar' => [
-            ' * @version 1.5piloto.73i',
-        ],
-        'reemplazar' => [
-            ' * @version 1.5piloto.74f',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion.js',
-        'descripcion' => 'aplicacion.js: cerrar modal del viaje al cambiar de pestaña',
-        'buscar' => [
-            'function activar_pestana(id_pestana) {',
-            "    if (id_pestana !== 'viajes') {",
-            '        ocultar_detalle_viaje();',
-            '    }',
-        ],
-        'reemplazar' => [
-            'function activar_pestana(id_pestana) {',
-            "    if (id_pestana !== 'viajes') {",
-            '        // Si hay un modal abierto con el detalle del viaje, cerrarlo',
-            '        // antes de cambiar de pestaña, para no dejar el croquis',
-            '        // congelado en pantalla con datos viejos.',
-            "        const modal = document.getElementById('modal_generico');",
-            "        const modal_abierto = modal && !modal.classList.contains('hidden');",
-            "        const es_detalle_viaje = modal_abierto && document.getElementById('lista_micros_viaje');",
-            '        if (es_detalle_viaje) {',
-            '            cerrar_modal_generico();',
-            '        }',
-            '        ocultar_detalle_viaje();',
-            '    }',
-        ],
-    ],
-
-    // ============================================================
-    // aplicacion_GET.html — bump del ?v= de aplicacion.js
-    // ============================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'HTML: bump del ?v= de aplicacion.js a 74f',
-        'buscar' => [
-            '<script src="aplicacion.js?v=1.5piloto.73i"></script>',
-        ],
-        'reemplazar' => [
-            '<script src="aplicacion.js?v=1.5piloto.74f"></script>',
-        ],
-    ],
-
-    // ============================================================
     // prompts/prompt_piloto.md
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: ultima actualizacion a v74f',
+        'descripcion' => 'prompt piloto: ultima actualizacion a v74g',
         'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.74e (fix de',
-        ],
-        'reemplazar' => [
             '**Última actualización de este prompt:** v1.5piloto.74f (cerrar',
-            'el modal del viaje al cambiar de pestaña. Si el usuario o una',
-            'prueba automática cambia de pestaña con el modal del detalle',
-            'del viaje abierto, `ocultar_detalle_viaje` mataba el polling',
-            'pero dejaba el modal con el croquis congelado. Fix: en',
-            '`activar_pestana`, si la pestaña destino no es "viajes" y hay',
-            'un modal con `#lista_micros_viaje`, cerrarlo antes de ocultar',
-            'el detalle. Detectado por las pruebas del plugin).',
-            'Antes: v1.5piloto.74e (fix de',
+        ],
+        'reemplazar' => [
+            '**Última actualización de este prompt:** v1.5piloto.74g (solo',
+            'documentación: se registran los bugs del piloto detectados',
+            'por las pruebas automáticas del plugin en `iteradoresJS/`,',
+            'y se aclara la relación con el proyecto plugin).',
+            'Antes: v1.5piloto.74f (cerrar',
         ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: agregar v74f al historial',
+        'descripcion' => 'prompt piloto: agregar v74g al historial',
         'buscar' => [
-            '- **v74e**: fix de condición de carrera entre el polling de',
-        ],
-        'reemplazar' => [
             '- **v74f**: cerrar el modal del viaje al cambiar de pestaña.',
-            '  Si el usuario o una prueba automática cambia de pestaña con',
-            '  el modal del detalle del viaje abierto, `ocultar_detalle_viaje`',
-            '  mataba el polling pero dejaba el modal con el croquis',
-            '  congelado en pantalla con datos viejos. Fix: en',
-            '  `activar_pestana`, si la pestaña destino no es "viajes" y',
-            '  hay un modal con `#lista_micros_viaje`, cerrarlo antes de',
-            '  ocultar el detalle. Detectado por las pruebas del plugin.',
-            '- **v74e**: fix de condición de carrera entre el polling de',
+        ],
+        'reemplazar' => [
+            '- **v74g**: solo documentación. Se registran los bugs del',
+            '  piloto detectados por las pruebas automáticas del plugin',
+            '  (`iteradoresJS/`): v74d (refresco del croquis tras cancelar',
+            '  venta), v74e (condición de carrera entre el polling de',
+            '  asientos y el clic), v74f (modal del viaje abierto al',
+            '  cambiar de pestaña). Se aclara que el plugin es un',
+            '  proyecto independiente en `iteradoresJS/` con su propio',
+            '  prompt en `iteradoresJS/prompts/prompt_plugin_piloto.md`.',
+            '- **v74f**: cerrar el modal del viaje al cambiar de pestaña.',
         ],
     ],
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: estado de la conversacion v74f',
+        'descripcion' => 'prompt piloto: estado al cierre v74g',
         'buscar' => [
-            '- Cerramos en v74e el fix de condición de carrera entre el',
-            '  polling de asientos y el clic. También reportado por las',
-            '  pruebas del plugin: un asiento recién seleccionado volvía a',
-            '  verse libre por el polling en vuelo.',
-            '- No hay tandas de código en curso en este proyecto.',
-        ],
-        'reemplazar' => [
-            '- Cerramos en v74e el fix de condición de carrera entre el',
-            '  polling de asientos y el clic. También reportado por las',
-            '  pruebas del plugin: un asiento recién seleccionado volvía a',
-            '  verse libre por el polling en vuelo.',
-            '- Cerramos en v74f el fix de "modal del viaje abierto al',
-            '  cambiar de pestaña". El croquis quedaba congelado en',
-            '  pantalla tras cancelar una venta desde una prueba',
-            '  automática. También reportado por las pruebas del plugin.',
-            '- No hay tandas de código en curso en este proyecto.',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt piloto: estado al cierre v74f',
-        'buscar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.74e (framework 1.5i.7f).',
-        ],
-        'reemplazar' => [
             '**Estado del proyecto al cierre:** v1.5piloto.74f (framework 1.5i.7f).',
+        ],
+        'reemplazar' => [
+            '**Estado del proyecto al cierre:** v1.5piloto.74g (framework 1.5i.7f).',
+        ],
+    ],
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_piloto.md',
+        'descripcion' => 'prompt piloto: relacion con el plugin',
+        'buscar' => [
+            '### 1.3 Arquitectura multi-cliente (multi-aplicación)',
+        ],
+        'reemplazar' => [
+            '### 1.3 Plugin de pruebas (proyecto separado)',
+            '',
+            'El piloto tiene un **plugin de pruebas automatizadas** que vive',
+            'en un proyecto separado: `iteradoresJS/`. Es una extensión de',
+            'Chrome (MV3) que corre pruebas contra la página del piloto,',
+            'usando el framework Iteradores JS para persistir sus',
+            'resultados.',
+            '',
+            'El plugin tiene su propio prompt,',
+            '`iteradoresJS/prompts/prompt_plugin_piloto.md`, que se',
+            'actualiza con cada tanda de código del plugin. **Este prompt',
+            '(el del piloto) no se toca cuando se toca solo el plugin.**',
+            '',
+            'Bugs del piloto descubiertos por las pruebas del plugin:',
+            '- v74d: refresco del croquis tras cancelar venta.',
+            '- v74e: condición de carrera entre el polling de asientos y',
+            '  el clic.',
+            '- v74f: modal del viaje abierto al cambiar de pestaña.',
+            '',
+            '### 1.4 Arquitectura multi-cliente (multi-aplicación)',
+        ],
+    ],
+
+    // ============================================================
+    // prompts/prompt_sistema_scripts.md
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_sistema_scripts.md',
+        'descripcion' => 'prompt scripts: nota sobre el sub-prompt del plugin',
+        'buscar' => [
+            '**Los prompts viven únicamente en el proyecto PHP** (`prompts/`).',
+            'El proyecto JS no tiene su propia copia de los prompts. Cuando se',
+            'actualiza un prompt por un cambio en el framework, se hace en el',
+            '`aplicar_cambios.php` del proyecto PHP.',
+        ],
+        'reemplazar' => [
+            '**Los prompts del framework, del piloto y del sistema de scripts**',
+            'viven en el proyecto PHP (`prompts/`). El proyecto `iteradoresJS/`',
+            'tiene, además, su propio sub-prompt en',
+            '`iteradoresJS/prompts/prompt_plugin_piloto.md`, que se actualiza',
+            'con el `aplicar_cambios.php` del proyecto JS cuando se toca',
+            'solo el plugin.',
+            '',
+            '**Regla de oro:** si el cambio toca el **framework** en cualquiera',
+            'de los dos lenguajes, se actualizan los prompts del proyecto PHP',
+            'y, si aplica, el sub-prompt del plugin. Si el cambio toca solo el',
+            '**piloto PHP**, se actualiza `prompt_piloto.md`. Si toca solo el',
+            '**plugin JS**, se actualiza `prompt_plugin_piloto.md` en',
+            '`iteradoresJS/`.',
+        ],
+    ],
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_sistema_scripts.md',
+        'descripcion' => 'prompt scripts: nota extendida del plugin',
+        'buscar' => [
+            '**Proyecto nuevo: plugin de Chrome sobre Iteradores JS.**',
+        ],
+        'reemplazar' => [
+            '**Proyecto plugin: estado (v1.5plugin.4m).**',
+            '',
+            'El plugin tiene 17 pruebas agrupadas en secciones (base,',
+            'ventas). La ventana del popup tiene un botón "Correr todas"',
+            'por sección. Los `aplicar_cambios.php` del proyecto JS se',
+            'corren parados en `iteradoresJS/` y usan el mismo runner.',
+            'El sub-prompt del plugin es',
+            '`iteradoresJS/prompts/prompt_plugin_piloto.md`.',
+            '',
+            '**Proyecto nuevo: plugin de Chrome sobre Iteradores JS.**',
+        ],
+    ],
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_sistema_scripts.md',
+        'descripcion' => 'prompt scripts: ultima actualizacion a v74g',
+        'buscar' => [
+            '**Última actualización de este prompt:** v1.5piloto.74c. Se',
+        ],
+        'reemplazar' => [
+            '**Última actualización de este prompt:** v1.5piloto.74g. Se',
+            'actualizó la nota sobre el proyecto plugin con el estado',
+            'actual y la regla de qué prompt tocar según el proyecto.',
+            'Antes: v1.5piloto.74c. Se',
         ],
     ],
 

@@ -36,7 +36,26 @@ a soportar múltiples **tipos de aplicación**:
 
 El plan de diversificación está en la sección 8.
 
-### 1.3 Arquitectura multi-cliente (multi-aplicación)
+### 1.3 Plugin de pruebas (proyecto separado)
+
+El piloto tiene un **plugin de pruebas automatizadas** que vive
+en un proyecto separado: `iteradoresJS/`. Es una extensión de
+Chrome (MV3) que corre pruebas contra la página del piloto,
+usando el framework Iteradores JS para persistir sus
+resultados.
+
+El plugin tiene su propio prompt,
+`iteradoresJS/prompts/prompt_plugin_piloto.md`, que se
+actualiza con cada tanda de código del plugin. **Este prompt
+(el del piloto) no se toca cuando se toca solo el plugin.**
+
+Bugs del piloto descubiertos por las pruebas del plugin:
+- v74d: refresco del croquis tras cancelar venta.
+- v74e: condición de carrera entre el polling de asientos y
+  el clic.
+- v74f: modal del viaje abierto al cambiar de pestaña.
+
+### 1.4 Arquitectura multi-cliente (multi-aplicación)
 
 A futuro se planea que cada cliente tenga su propio subdominio y su propio
 grafo, con la misma base de código. Los grafos actuales ya están pensados
@@ -710,6 +729,14 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74g**: solo documentación. Se registran los bugs del
+  piloto detectados por las pruebas automáticas del plugin
+  (`iteradoresJS/`): v74d (refresco del croquis tras cancelar
+  venta), v74e (condición de carrera entre el polling de
+  asientos y el clic), v74f (modal del viaje abierto al
+  cambiar de pestaña). Se aclara que el plugin es un
+  proyecto independiente en `iteradoresJS/` con su propio
+  prompt en `iteradoresJS/prompts/prompt_plugin_piloto.md`.
 - **v74f**: cerrar el modal del viaje al cambiar de pestaña.
   Si el usuario o una prueba automática cambia de pestaña con
   el modal del detalle del viaje abierto, `ocultar_detalle_viaje`
@@ -1102,7 +1129,11 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74f (cerrar
+**Última actualización de este prompt:** v1.5piloto.74g (solo
+documentación: se registran los bugs del piloto detectados
+por las pruebas automáticas del plugin en `iteradoresJS/`,
+y se aclara la relación con el proyecto plugin).
+Antes: v1.5piloto.74f (cerrar
 el modal del viaje al cambiar de pestaña. Si el usuario o una
 prueba automática cambia de pestaña con el modal del detalle
 del viaje abierto, `ocultar_detalle_viaje` mataba el polling
@@ -1338,7 +1369,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74f (framework 1.5i.7f).
+**Estado del proyecto al cierre:** v1.5piloto.74g (framework 1.5i.7f).
 Todo funcional. Bug 1 y Bug 2 resueltos. No hay bugs de prioridad
 alta pendientes. El segundo piloto (plugin de Chrome sobre el
 framework Iteradores JS) tiene el diseño cerrado; el código del
