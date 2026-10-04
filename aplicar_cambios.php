@@ -2,13 +2,12 @@
 /**
  * Aplicador de cambios automáticos — proyecto Iteradores (piloto PHP).
  *
- * Tanda v1.5piloto.74m: eliminar el respaldo JSON automático.
+ * Tanda v1.5piloto.74n: limpieza de viajes de prueba.
  *
- * El `json_encode` de todo el grafo en cada guardado se volvió el
- * cuello de botella de la app cuando el grafo creció (3 terminales,
- * varios vehículos, ventas, cupones). Cada operación tardaba segundos.
- * `guardar_ambos` ahora solo guarda SQL (fuente de verdad única). El
- * respaldo en otros formatos pasa a ser una acción manual del admin.
+ * - Viaje.php: nueva función limpiar_viajes_de_prueba($nombre_dueno).
+ * - Enrutador.php: nueva subacción viajes/limpiar_prueba (solo admin).
+ * - aplicacion_GET.html: nuevo botón "Limpiar viajes de prueba".
+ * - viajes-nucleo.js: listener + lógica de visibilidad del botón.
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -20,186 +19,435 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ========================================================
-    // FuncionesAuxiliares.php — reescribir guardar_ambos
+    // Viaje.php — nueva función limpiar_viajes_de_prueba
     // ========================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/FuncionesAuxiliares.php',
-        'descripcion' => 'FuncionesAuxiliares: guardar_ambos solo SQL',
+        'archivo' => 'Aplicacion/Viajes/Viaje.php',
+        'descripcion' => 'Viaje: agregar limpiar_viajes_de_prueba',
         'buscar' => [
+            '// Incluir submódulos de viajes',
+            'require_once __DIR__ . \'/ViajeMicros.php\';',
+            'require_once __DIR__ . \'/ViajeAsientos.php\';',
+            'require_once __DIR__ . \'/ViajeOpciones.php\';',
+        ],
+        'reemplazar' => [
             '/**',
-            ' * Guarda una superestructura en SQL y después en JSON.',
+            ' * Elimina los viajes "de prueba" de un dueño.',
             ' *',
-            ' * El JSON es solo respaldo. Si falla, se registra el error con el',
-            ' * sistema centralizado de Objeto y la operación sigue siendo exitosa',
-            ' * porque SQL ya persistió.',
+            ' * Conserva el viaje principal (por nombre visible:',
+            ' * "Peregrinación a la Visita del Papa León XIV a Luján")',
+            ' * y cualquier viaje que no tenga un prefijo conocido de',
+            ' * prueba en su identificador (viajeprueba, viajemicro,',
+            ' * viajeval, viajedup, viajecol, viajesin).',
             ' *',
-            ' * @param string $nombre Nombre de la superestructura.',
-            ' * @return bool True si el guardado en SQL fue exitoso.',
+            ' * No elimina viajes con ventas registradas.',
+            ' *',
+            ' * Pensado para el botón de limpieza del admin. Se usa',
+            ' * cuando las pruebas automáticas acumulan viajes que',
+            ' * ralentizan los listados.',
+            ' *',
+            ' * @param string $nombre_dueno',
+            ' * @return array',
             ' */',
-            'function guardar_ambos($nombre): bool {',
-            '    if (!is_string($nombre) || $nombre === \'\') {',
-            '        Controlador::_error("guardar_ambos: nombre invalido");',
-            '        return false;',
+            'function limpiar_viajes_de_prueba(string $nombre_dueno): array {',
+            '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);',
+            '    if (!$nodo_viajes) {',
+            '        return [\'exito\' => false, \'error\' => \'Dueño no encontrado o sin viajes\'];',
             '    }',
             '',
-            '    // Defensa: no guardar si la superestructura esta vacia.',
-            '    // Guardar vacio pisa el grafo con nada.',
-            '    if (!Nodo::hay_nodos_en_superestructura()) {',
-            '        Controlador::_error("guardar_ambos: superestructura vacia para \"$nombre\". Se aborta para no pisar el grafo.");',
-            '        return false;',
-            '    }',
+            '    $prefijos = [\'viajeprueba\', \'viajemicro\', \'viajeval\', \'viajedup\', \'viajecol\', \'viajesin\'];',
+            '    $nombre_principal = \'Peregrinación a la Visita del Papa León XIV a Luján\';',
             '',
-            '    // 1) Guardar en SQL (fuente de verdad).',
-            '    $ok_sql = Controlador::guardar($nombre);',
-            '    if (!$ok_sql) {',
-            '        return false;',
-            '    }',
+            '    $adyacentes = (array) $nodo_viajes->adyacentes();',
+            '    $borrados = [];',
+            '    $conservados = [];',
+            '    $con_ventas = [];',
             '',
-            '    // 2) Guardar en JSON (respaldo). No debe romper la operación.',
-            '    try {',
-            '        Controlador::establecer_metodo(\'JSON\');',
-            '        $ok_json = Controlador::guardar($nombre);',
-            '        if (!$ok_json) {',
-            '            Controlador::_error("guardar_ambos: fallo el guardado JSON para el grafo \"$nombre\"");',
+            '    foreach ($adyacentes as $nombre_viaje => $nodo_viaje) {',
+            '        $nombre_viaje = (string)$nombre_viaje;',
+            '',
+            '        // Conservar el viaje principal (por nombre visible).',
+            '        $nombre_visible = $nodo_viaje->adyacente(\'nombre\')',
+            '            ? $nodo_viaje->adyacente(\'nombre\')->dato()',
+            '            : \'\';',
+            '        if ($nombre_visible === $nombre_principal) {',
+            '            $conservados[] = $nombre_viaje;',
+            '            continue;',
             '        }',
-            '    } catch (\\Throwable $e) {',
-            '        Controlador::_error("guardar_ambos: excepcion al guardar JSON para \"$nombre\": " . $e->getMessage());',
-            '    } finally {',
-            '        Controlador::establecer_metodo(\'SQL\');',
+            '',
+            '        // Conservar cualquier viaje que no tenga prefijo de prueba.',
+            '        $es_de_prueba = false;',
+            '        foreach ($prefijos as $p) {',
+            '            if (strpos($nombre_viaje, $p) === 0) {',
+            '                $es_de_prueba = true;',
+            '                break;',
+            '            }',
+            '        }',
+            '        if (!$es_de_prueba) {',
+            '            $conservados[] = $nombre_viaje;',
+            '            continue;',
+            '        }',
+            '',
+            '        // No eliminar si tiene ventas registradas.',
+            '        if (viaje_tiene_ventas($nombre_dueno, $nombre_viaje)) {',
+            '            $con_ventas[] = $nombre_viaje;',
+            '            continue;',
+            '        }',
+            '',
+            '        $nodo_viajes->eliminar_adyacente($nombre_viaje);',
+            '        $borrados[] = $nombre_viaje;',
             '    }',
             '',
-            '    return true;',
+            '    guardar_ambos(Conf::NOMBRE_APP);',
+            '',
+            '    return [',
+            '        \'exito\' => true,',
+            '        \'borrados\' => $borrados,',
+            '        \'cantidad_borrados\' => count($borrados),',
+            '        \'conservados\' => $conservados,',
+            '        \'con_ventas\' => $con_ventas,',
+            '    ];',
+            '}',
+            '',
+            '// Incluir submódulos de viajes',
+            'require_once __DIR__ . \'/ViajeMicros.php\';',
+            'require_once __DIR__ . \'/ViajeAsientos.php\';',
+            'require_once __DIR__ . \'/ViajeOpciones.php\';',
+        ],
+    ],
+
+    // ========================================================
+    // Viaje.php — bump @version
+    // ========================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/Viaje.php',
+        'descripcion' => 'Viaje: bump @version a 1.5piloto.74n',
+        'buscar' => [
+            ' * @version   1.5piloto.74',
+        ],
+        'reemplazar' => [
+            ' * @version   1.5piloto.74n',
+        ],
+    ],
+
+    // ========================================================
+    // Enrutador.php — nueva subacción viajes/limpiar_prueba
+    // ========================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Enrutador.php',
+        'descripcion' => 'Enrutador: agregar viajes/limpiar_prueba',
+        'buscar' => [
+            '                case \'listar_por_terminal\':',
+            '                    $nombre_terminal = $post[\'nombre_terminal\'] ?? \'\';',
+            '                    if (empty($nombre_terminal)) {',
+            '                        responder_json([\'exito\' => false, \'error\' => \'Terminal no especificada\']);',
+            '                    }',
+            '                    $viajes = listar_viajes_de_terminal($nombre_terminal);',
+            '                    responder_json([\'exito\' => true, \'viajes\' => $viajes]);',
+            '                    break;',
+        ],
+        'reemplazar' => [
+            '                case \'listar_por_terminal\':',
+            '                    $nombre_terminal = $post[\'nombre_terminal\'] ?? \'\';',
+            '                    if (empty($nombre_terminal)) {',
+            '                        responder_json([\'exito\' => false, \'error\' => \'Terminal no especificada\']);',
+            '                    }',
+            '                    $viajes = listar_viajes_de_terminal($nombre_terminal);',
+            '                    responder_json([\'exito\' => true, \'viajes\' => $viajes]);',
+            '                    break;',
+            '',
+            '                case \'limpiar_prueba\':',
+            '                    // Solo admin.',
+            '                    $nombre_sol_lp = $post[\'nombre_solicitante\'] ?? \'\';',
+            '                    $raiz_sol_lp = Nodo::nodo_por_id(\'usuarios\');',
+            '                    $nodo_sol_lp = ($raiz_sol_lp && $nombre_sol_lp !== \'\') ? $raiz_sol_lp->adyacente($nombre_sol_lp) : null;',
+            '                    $nodo_nivel_lp = $nodo_sol_lp ? $nodo_sol_lp->adyacente(\'nivel\') : null;',
+            '                    $nivel_sol_lp = $nodo_nivel_lp ? $nodo_nivel_lp->dato() : \'\';',
+            '                    if ($nivel_sol_lp !== \'admin\') {',
+            '                        responder_json([\'exito\' => false, \'error\' => \'Solo el administrador puede ejecutar esta acción\']);',
+            '                    }',
+            '                    $nombre_dueno_lp = $post[\'nombre_dueno\'] ?? \'\';',
+            '                    if (empty($nombre_dueno_lp)) {',
+            '                        responder_json([\'exito\' => false, \'error\' => \'Dueño no especificado\']);',
+            '                    }',
+            '                    $resultado_lp = limpiar_viajes_de_prueba($nombre_dueno_lp);',
+            '                    responder_json($resultado_lp);',
+            '                    break;',
+        ],
+    ],
+
+    // ========================================================
+    // Enrutador.php — bump @version
+    // ========================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Enrutador.php',
+        'descripcion' => 'Enrutador: bump @version a 1.5piloto.74n',
+        'buscar' => [
+            ' * @version   1.5piloto.74',
+        ],
+        'reemplazar' => [
+            ' * @version   1.5piloto.74n',
+        ],
+    ],
+
+    // ========================================================
+    // aplicacion_GET.html — nuevo botón
+    // ========================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_GET.html',
+        'descripcion' => 'HTML: agregar boton limpiar viajes de prueba',
+        'buscar' => [
+            '      <div class="panel" id="panel_viajes">',
+            '        <div class="row" style="justify-content:space-between;">',
+            '          <h2>Viajes</h2>',
+            '          <button class="btn primary" id="boton_agregar_viaje" style="display:none;">Agregar viaje</button>',
+            '        </div>',
+            '        <div id="lista_viajes"></div>',
+            '      </div>',
+        ],
+        'reemplazar' => [
+            '      <div class="panel" id="panel_viajes">',
+            '        <div class="row" style="justify-content:space-between;">',
+            '          <h2>Viajes</h2>',
+            '          <div style="display:flex; gap:8px;">',
+            '            <button class="btn primary" id="boton_agregar_viaje" style="display:none;">Agregar viaje</button>',
+            '            <button class="btn danger" id="boton_limpiar_viajes_prueba" style="display:none;">Limpiar viajes de prueba</button>',
+            '          </div>',
+            '        </div>',
+            '        <div id="lista_viajes"></div>',
+            '      </div>',
+        ],
+    ],
+
+    // ========================================================
+    // aplicacion_GET.html — bump ?v= de viajes-nucleo.js
+    // ========================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_GET.html',
+        'descripcion' => 'HTML: bump ?v= de viajes-nucleo.js a 1.5piloto.74n',
+        'buscar' => [
+            '<script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.73d"></script>',
+        ],
+        'reemplazar' => [
+            '<script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.74n"></script>',
+        ],
+    ],
+
+    // ========================================================
+    // viajes-nucleo.js — visibilidad del botón + función + listener
+    // ========================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/viajes-nucleo.js',
+        'descripcion' => 'viajes-nucleo: mostrar boton limpiar si hay dueno seleccionado',
+        'buscar' => [
+            '        select.onchange = async () => {',
+            '            ocultar_detalle_viaje();',
+            '            if (select.value) {',
+            '                await listar_viajes(select.value, \'dueno\');',
+            '                $("#boton_agregar_viaje").style.display = \'inline-block\';',
+            '            } else {',
+            '                $("#lista_viajes").innerHTML = \'\';',
+            '                $("#boton_agregar_viaje").style.display = \'none\';',
+            '            }',
+            '        };',
+        ],
+        'reemplazar' => [
+            '        select.onchange = async () => {',
+            '            ocultar_detalle_viaje();',
+            '            if (select.value) {',
+            '                await listar_viajes(select.value, \'dueno\');',
+            '                $("#boton_agregar_viaje").style.display = \'inline-block\';',
+            '                _actualizar_visibilidad_boton_limpiar_viajes(true);',
+            '            } else {',
+            '                $("#lista_viajes").innerHTML = \'\';',
+            '                $("#boton_agregar_viaje").style.display = \'none\';',
+            '                _actualizar_visibilidad_boton_limpiar_viajes(false);',
+            '            }',
+            '        };',
+        ],
+    ],
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/viajes-nucleo.js',
+        'descripcion' => 'viajes-nucleo: agregar funciones de limpieza',
+        'buscar' => [
+            'function obtener_nombre_dueno_actual() {',
+            '    return es_admin_o_soporte() ? $("#selector_dueno_viajes").value : usuario_actual.nombre_usuario;',
             '}',
         ],
         'reemplazar' => [
+            'function obtener_nombre_dueno_actual() {',
+            '    return es_admin_o_soporte() ? $("#selector_dueno_viajes").value : usuario_actual.nombre_usuario;',
+            '}',
+            '',
             '/**',
-            ' * Guarda una superestructura solo en SQL.',
-            ' *',
-            ' * Hasta v74j esta función también escribía un respaldo JSON',
-            ' * automático (json_encode de todo el grafo en cada guardado).',
-            ' * Cuando el grafo creció (varias terminales, vehículos, ventas,',
-            ' * cupones), ese encode se volvió el cuello de botella: cada',
-            ' * operación tardaba segundos y rompía los timeouts de las',
-            ' * pruebas del plugin. Desde v74m se eliminó.',
-            ' *',
-            ' * La implementación `PerdurarSuperestructuraStringJSON` sigue',
-            ' * disponible en el framework. El respaldo en formatos',
-            ' * alternativos pasa a ser una acción manual del admin, a',
-            ' * implementar en el rediseño del panel.',
-            ' *',
-            ' * @param string $nombre Nombre de la superestructura.',
-            ' * @return bool True si el guardado en SQL fue exitoso.',
+            ' * Muestra u oculta el botón "Limpiar viajes de prueba".',
+            ' * Solo visible para admin, y solo cuando hay un dueño',
+            ' * seleccionado en el selector.',
             ' */',
-            'function guardar_ambos($nombre): bool {',
-            '    if (!is_string($nombre) || $nombre === \'\') {',
-            '        Controlador::_error("guardar_ambos: nombre invalido");',
-            '        return false;',
-            '    }',
-            '',
-            '    // Defensa: no guardar si la superestructura esta vacia.',
-            '    // Guardar vacio pisa el grafo con nada.',
-            '    if (!Nodo::hay_nodos_en_superestructura()) {',
-            '        Controlador::_error("guardar_ambos: superestructura vacia para \"$nombre\". Se aborta para no pisar el grafo.");',
-            '        return false;',
-            '    }',
-            '',
-            '    // Guardar en SQL (única fuente de verdad).',
-            '    return (bool) Controlador::guardar($nombre);',
+            'function _actualizar_visibilidad_boton_limpiar_viajes(visible) {',
+            '    if (!usuario_actual || usuario_actual.nivel !== \'admin\') return;',
+            '    const btn = document.getElementById(\'boton_limpiar_viajes_prueba\');',
+            '    if (!btn) return;',
+            '    btn.style.display = visible ? \'inline-block\' : \'none\';',
             '}',
+            '',
+            '/**',
+            ' * Ejecuta la limpieza de viajes de prueba del dueño',
+            ' * seleccionado. El backend se encarga de preservar el viaje',
+            ' * principal y los que no tengan prefijo de prueba.',
+            ' */',
+            'async function limpiar_viajes_de_prueba_ui() {',
+            '    if (!usuario_actual || usuario_actual.nivel !== \'admin\') {',
+            '        mostrar_aviso("Solo el admin puede ejecutar esta acción", \'error\');',
+            '        return;',
+            '    }',
+            '    const select = document.getElementById("selector_dueno_viajes");',
+            '    const nombre_dueno = select ? select.value : \'\';',
+            '    if (!nombre_dueno) {',
+            '        mostrar_aviso("Seleccione un dueño primero", \'error\');',
+            '        return;',
+            '    }',
+            '    const ok = confirm(',
+            '        "¿Eliminar todos los viajes de prueba del dueño \\"" + nombre_dueno + "\\"?\\n\\n"',
+            '        + "Se conserva el viaje principal y cualquier viaje que no tenga prefijo de prueba. Los viajes con ventas no se eliminan.\\n\\n"',
+            '        + "Esta acción no se puede deshacer."',
+            '    );',
+            '    if (!ok) return;',
+            '',
+            '    const resp = await fetch("index.php", {',
+            '        method: "POST",',
+            '        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
+            '        body: new URLSearchParams({',
+            '            accion: "viajes/limpiar_prueba",',
+            '            nombre_dueno,',
+            '            nombre_solicitante: usuario_actual.nombre_usuario',
+            '        })',
+            '    });',
+            '    const datos = await resp.json();',
+            '    if (!datos.exito) {',
+            '        mostrar_aviso(datos.error || "Error al limpiar viajes", \'error\');',
+            '        return;',
+            '    }',
+            '    let msg = "Se eliminaron " + datos.cantidad_borrados + " viaje(s) de prueba.";',
+            '    if (datos.con_ventas && datos.con_ventas.length > 0) {',
+            '        msg += " " + datos.con_ventas.length + " no se pudieron eliminar (tienen ventas).";',
+            '    }',
+            '    mostrar_aviso(msg, \'exito\');',
+            '    await listar_viajes(nombre_dueno, \'dueno\');',
+            '}',
+            '',
+            'document.getElementById(\'boton_limpiar_viajes_prueba\')?.addEventListener(\'click\', limpiar_viajes_de_prueba_ui);',
         ],
     ],
 
     // ========================================================
-    // FuncionesAuxiliares.php — bump @version
+    // viajes-nucleo.js — bump @version
     // ========================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/FuncionesAuxiliares.php',
-        'descripcion' => 'FuncionesAuxiliares: bump @version a 1.5piloto.74m',
+        'archivo' => 'Aplicacion/Viajes/viajes-nucleo.js',
+        'descripcion' => 'viajes-nucleo: bump @version a 1.5piloto.74n',
         'buscar' => [
-            ' * @version   1.5piloto.73k',
+            ' * Núcleo de viajes: carga, listado, detalle en modal y eliminación.',
+            ' * @version 1.5piloto.65',
         ],
         'reemplazar' => [
-            ' * @version   1.5piloto.74m',
+            ' * Núcleo de viajes: carga, listado, detalle en modal y eliminación.',
+            ' * @version 1.5piloto.74n',
         ],
     ],
 
     // ========================================================
-    // prompt_piloto.md — §5.1 guardar_ambos
+    // prompt_piloto.md — §5.7 Viaje.php
     // ========================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt: §5.1 guardar_ambos ya no guarda JSON',
+        'descripcion' => 'prompt: §5.7 agregar limpiar_viajes_de_prueba',
         'buscar' => [
-            '- `guardar_ambos($nombre)`: guarda la superestructura en SQL',
-            '  (fuente de verdad) y después en JSON (respaldo). Desde v73k',
-            '  vive acá, no en `GuardarAmbos.php`.',
+            '- `obtener_declaracion_jurada`, `guardar_declaracion_jurada`.',
+            '- `_sustituir_placeholders_dj`.',
+            '- Constantes `TEXTO_DJ_MAYOR_DEFAULT`, `TEXTO_DJ_MENOR_DEFAULT`.',
         ],
         'reemplazar' => [
-            '- `guardar_ambos($nombre)`: guarda la superestructura en SQL',
-            '  (única fuente de verdad). Desde v73k vive acá, no en',
-            '  `GuardarAmbos.php`. Desde v74m ya NO guarda el JSON de',
-            '  respaldo automático: el `json_encode` de todo el grafo',
-            '  se volvió el cuello de botella del guardado cuando el',
-            '  grafo creció.',
+            '- `obtener_declaracion_jurada`, `guardar_declaracion_jurada`.',
+            '- `_sustituir_placeholders_dj`.',
+            '- `limpiar_viajes_de_prueba($nombre_dueno)`: elimina los viajes',
+            '  de prueba de un dueño, conservando el viaje principal (por',
+            '  nombre visible) y los que no tengan prefijo de prueba',
+            '  (`viajeprueba`, `viajemicro`, `viajeval`, `viajedup`,',
+            '  `viajecol`, `viajesin`). No elimina viajes con ventas.',
+            '  Pensada para el botón de limpieza del admin.',
+            '- Constantes `TEXTO_DJ_MAYOR_DEFAULT`, `TEXTO_DJ_MENOR_DEFAULT`.',
         ],
     ],
 
     // ========================================================
-    // prompt_piloto.md — §5.5 Persistencia SQL + JSON
+    // prompt_piloto.md — §5.14 Enrutador
     // ========================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt: §5.5 persistencia solo SQL',
+        'descripcion' => 'prompt: §5.14 agregar subaccion limpiar_prueba',
         'buscar' => [
-            '`guardar_ambos($nombre)` vive en `FuncionesAuxiliares.php`',
-            '(ver 5.1). Guarda la superestructura en SQL (fuente de verdad)',
-            'y después en JSON (respaldo). Si JSON falla, `Controlador::_error()`.',
-            'Devuelve true si SQL fue exitoso.',
+            'Módulos: `autenticar`, `administrador`, `dueno`, `sesiones`,',
+            '`empresas`, `vehiculos`, `viajes`, `ventas`, `pasajeros`,',
+            '`rendiciones`, `liquidaciones`, `cancelaciones`.',
         ],
         'reemplazar' => [
-            '`guardar_ambos($nombre)` vive en `FuncionesAuxiliares.php`',
-            '(ver 5.1). Guarda la superestructura en SQL (única fuente',
-            'de verdad). Desde v74m ya no guarda el JSON de respaldo:',
-            'el `json_encode` de todo el grafo se volvió el cuello de',
-            'botella cuando el grafo creció (varias terminales,',
-            'vehículos, ventas). El respaldo en otros formatos pasa a',
-            'ser una acción manual del admin, a implementar en el',
-            'rediseño del panel.',
+            'Módulos: `autenticar`, `administrador`, `dueno`, `sesiones`,',
+            '`empresas`, `vehiculos`, `viajes`, `ventas`, `pasajeros`,',
+            '`rendiciones`, `liquidaciones`, `cancelaciones`.',
+            '',
+            'Subacción especial: `viajes/limpiar_prueba` (solo admin).',
+            'Elimina los viajes de prueba del dueño seleccionado.',
         ],
     ],
 
     // ========================================================
-    // prompt_piloto.md — historial v74m
+    // prompt_piloto.md — historial v74n
     // ========================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt: agregar v74m al historial',
+        'descripcion' => 'prompt: agregar v74n al historial',
         'buscar' => [
-            '- **v74k**: fixes de validación en el alta de micro.',
-        ],
-        'reemplazar' => [
             '- **v74m**: eliminado el respaldo JSON automático de',
-            '  `guardar_ambos`. Motivo: el `json_encode` de todo el',
-            '  grafo se volvió el cuello de botella del guardado cuando',
-            '  el grafo creció (3 terminales, varios vehículos, ventas,',
-            '  cupones). Cada operación tardaba segundos, y eso rompía',
-            '  los timeouts de las pruebas del plugin. Ahora',
-            '  `guardar_ambos` solo guarda SQL. La implementación',
-            '  `PerdurarSuperestructuraStringJSON` sigue disponible en',
-            '  el framework. El respaldo en formatos alternativos',
-            '  (JSON, XML) pasa a ser una acción manual del admin, a',
-            '  implementar en el rediseño del panel.',
-            '- **v74k**: fixes de validación en el alta de micro.',
+        ],
+        'reemplazar' => [
+            '- **v74n**: botón "Limpiar viajes de prueba" en la pestaña',
+            '  Viajes (solo admin). Nueva función',
+            '  `limpiar_viajes_de_prueba($nombre_dueno)` en `Viaje.php` y',
+            '  subacción `viajes/limpiar_prueba` en el enrutador.',
+            '  Conserva el viaje principal "Peregrinación a la Visita',
+            '  del Papa León XIV a Luján" (por nombre visible) y los',
+            '  viajes que no tengan prefijo de prueba. No elimina',
+            '  viajes con ventas. Motivo: las pruebas automáticas del',
+            '  plugin acumulan viajes (20 con el grafo actual) que',
+            '  ralentizan los listados: `formatear_viaje` recorre todas',
+            '  las ventas del dueño por cada viaje, así que el costo de',
+            '  `cargar_viajes` escala con V × W.',
+            '- **v74m**: eliminado el respaldo JSON automático de',
         ],
     ],
 
@@ -210,16 +458,8 @@ $cambios = [
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt: §12 cabecera a v74m',
+        'descripcion' => 'prompt: §12 cabecera a v74n',
         'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.74k (fixes',
-            'de validación en el alta de micro. `agregar_micro_a_viaje`',
-            'rechaza vehículos sin asientos y vehículos duplicados en el',
-            'mismo viaje; nombre del micro con `max+1` para evitar',
-            'colisiones. Frontend: vehículos sin asientos aparecen',
-            'deshabilitados en el select).',
-        ],
-        'reemplazar' => [
             '**Última actualización de este prompt:** v1.5piloto.74m',
             '(eliminado el respaldo JSON automático de `guardar_ambos`.',
             'El `json_encode` de todo el grafo se volvió el cuello de',
@@ -229,12 +469,24 @@ $cambios = [
             '`guardar_ambos` solo guarda SQL. El respaldo en otros',
             'formatos pasa a ser una acción manual del admin, a',
             'implementar en el rediseño del panel).',
-            'Antes: v1.5piloto.74k (fixes',
-            'de validación en el alta de micro. `agregar_micro_a_viaje`',
-            'rechaza vehículos sin asientos y vehículos duplicados en el',
-            'mismo viaje; nombre del micro con `max+1` para evitar',
-            'colisiones. Frontend: vehículos sin asientos aparecen',
-            'deshabilitados en el select).',
+        ],
+        'reemplazar' => [
+            '**Última actualización de este prompt:** v1.5piloto.74n',
+            '(botón "Limpiar viajes de prueba" en la pestaña Viajes para',
+            'el admin. Nueva función `limpiar_viajes_de_prueba` en',
+            '`Viaje.php` y subacción `viajes/limpiar_prueba` en el',
+            'enrutador. Conserva el viaje principal y los que no tengan',
+            'prefijo de prueba. Motivo: las pruebas del plugin acumulan',
+            'viajes que ralentizan `cargar_viajes`).',
+            'Antes: v1.5piloto.74m',
+            '(eliminado el respaldo JSON automático de `guardar_ambos`.',
+            'El `json_encode` de todo el grafo se volvió el cuello de',
+            'botella cuando el grafo creció con terminales, vehículos y',
+            'ventas: cada operación de guardado tardaba segundos y',
+            'rompía los timeouts de las pruebas del plugin. Ahora',
+            '`guardar_ambos` solo guarda SQL. El respaldo en otros',
+            'formatos pasa a ser una acción manual del admin, a',
+            'implementar en el rediseño del panel).',
         ],
     ],
 
@@ -245,16 +497,8 @@ $cambios = [
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt: §12 agregar v74m al estado',
+        'descripcion' => 'prompt: §12 agregar v74n al estado',
         'buscar' => [
-            '- Cerramos en v74h la tanda chica de cierre: fix del autocompletado',
-            '  por DNI para terminal sin viaje seleccionado, bump de `?v=` de',
-            '  `ventas.js` en `aplicacion_GET.html`, y corrección de contradicciones',
-            '  en este prompt (rehash, migraciones, botones, autocompletado,',
-            '  `GuardarAmbos.php`, `migrar_pasajeros.php`).',
-            '- No hay tandas de código en curso en este proyecto.',
-        ],
-        'reemplazar' => [
             '- Cerramos en v74m el fix de performance: `guardar_ambos` ya',
             '  no guarda el JSON de respaldo automático. El `json_encode`',
             '  de todo el grafo se volvió el cuello de botella cuando',
@@ -262,36 +506,22 @@ $cambios = [
             '  respaldo JSON pasa a ser acción manual del admin (a',
             '  implementar en el rediseño del panel).',
             '- Cerramos en v74h la tanda chica de cierre: fix del autocompletado',
-            '  por DNI para terminal sin viaje seleccionado, bump de `?v=` de',
-            '  `ventas.js` en `aplicacion_GET.html`, y corrección de contradicciones',
-            '  en este prompt (rehash, migraciones, botones, autocompletado,',
-            '  `GuardarAmbos.php`, `migrar_pasajeros.php`).',
-            '- No hay tandas de código en curso en este proyecto.',
-        ],
-    ],
-
-    // ========================================================
-    // prompt_piloto.md — §12 decisiones de diseño
-    // ========================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt: §12 agregar decision del respaldo JSON',
-        'buscar' => [
-            '- **SQL es siempre el método principal.** El JSON es solo respaldo.',
-            '  `Conf::LOCAL` ya no decide el método de persistencia.',
         ],
         'reemplazar' => [
-            '- **SQL es siempre el método principal.** El JSON es solo respaldo.',
-            '  `Conf::LOCAL` ya no decide el método de persistencia.',
-            '- **El respaldo JSON automático se eliminó en v74m.**',
-            '  `guardar_ambos` solo guarda SQL. Motivo: el `json_encode`',
-            '  de todo el grafo se volvió el cuello de botella del',
-            '  guardado cuando el grafo creció (varias terminales,',
-            '  vehículos, ventas). El respaldo en formatos alternativos',
-            '  (JSON, XML) pasa a ser una acción manual del admin, a',
-            '  implementar en el rediseño del panel admin.',
+            '- Cerramos en v74n el botón "Limpiar viajes de prueba" para',
+            '  el admin. El grafo del dueño `carmen1` tenía 21 viajes',
+            '  (20 de ellos de pruebas anteriores), y `formatear_viaje`',
+            '  escala con V × W (viajes × ventas). El botón borra los',
+            '  viajes de prueba conservando el viaje principal',
+            '  "Peregrinación a la Visita del Papa León XIV a Luján" y',
+            '  los que no tengan prefijo de prueba.',
+            '- Cerramos en v74m el fix de performance: `guardar_ambos` ya',
+            '  no guarda el JSON de respaldo automático. El `json_encode`',
+            '  de todo el grafo se volvió el cuello de botella cuando',
+            '  creció (3 terminales, varios vehículos, ventas). El',
+            '  respaldo JSON pasa a ser acción manual del admin (a',
+            '  implementar en el rediseño del panel).',
+            '- Cerramos en v74h la tanda chica de cierre: fix del autocompletado',
         ],
     ],
 
@@ -302,17 +532,8 @@ $cambios = [
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt: §13 estado a v74m',
+        'descripcion' => 'prompt: §13 estado a v74n',
         'buscar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.74k (framework 1.5i.7f).',
-            'Todo funcional. Bug 1 y Bug 2 resueltos. Los fixes de v74k',
-            'endurecen el alta de micro: rechaza vehículos sin asientos y',
-            'duplicados en el mismo viaje, y evita colisiones de numeración',
-            'al quitar un micro del medio. El plugin de pruebas',
-            '(`iteradoresJS/`, v1.5plugin.4z) tiene 29 pruebas corriendo,',
-            'incluidas las tres que verifiquen estos fixes.',
-        ],
-        'reemplazar' => [
             '**Estado del proyecto al cierre:** v1.5piloto.74m (framework 1.5i.7f).',
             'Todo funcional. Bug 1 y Bug 2 resueltos. Fixes de v74k',
             'endurecen el alta de micro: rechaza vehículos sin asientos y',
@@ -322,6 +543,25 @@ $cambios = [
             'vuelto el cuello de botella del guardado cuando el grafo',
             'creció. El plugin de pruebas (`iteradoresJS/`,',
             'v1.5plugin.5c) tiene 29 pruebas corriendo.',
+        ],
+        'reemplazar' => [
+            '**Estado del proyecto al cierre:** v1.5piloto.74n (framework 1.5i.7f).',
+            'Todo funcional. Bug 1 y Bug 2 resueltos. Fixes de v74k',
+            'endurecen el alta de micro. Fix de v74m: `guardar_ambos`',
+            'deja de guardar el JSON de respaldo automático. Fix de',
+            'v74n: botón "Limpiar viajes de prueba" para el admin, que',
+            'borra los viajes acumulados por las pruebas del plugin',
+            '(conserva el viaje principal). El plugin de pruebas',
+            '(`iteradoresJS/`, v1.5plugin.5d) tiene 29 pruebas',
+            'corriendo.',
+            '',
+            '**Deuda técnica pendiente:** `formatear_viaje` en `Viaje.php`',
+            'escala como O(V × W): por cada viaje, recorre todas las ventas',
+            'del dueño para calcular `viaje_tiene_ventas` y',
+            '`vendidos_por_micró`. Con muchos viajes y ventas, el costo',
+            'crece. La limpieza de viajes mitiga el problema pero no lo',
+            'elimina. La optimización real (índice de ventas por viaje +',
+            'cacheo de contadores) queda para una tanda dedicada.',
         ],
     ],
 

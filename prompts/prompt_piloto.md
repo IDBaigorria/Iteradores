@@ -431,6 +431,12 @@ se reordenaron los `require_once` en `index.php` para que
   `guardar_opciones_avanzadas_viaje`.
 - `obtener_declaracion_jurada`, `guardar_declaracion_jurada`.
 - `_sustituir_placeholders_dj`.
+- `limpiar_viajes_de_prueba($nombre_dueno)`: elimina los viajes
+  de prueba de un dueño, conservando el viaje principal (por
+  nombre visible) y los que no tengan prefijo de prueba
+  (`viajeprueba`, `viajemicro`, `viajeval`, `viajedup`,
+  `viajecol`, `viajesin`). No elimina viajes con ventas.
+  Pensada para el botón de limpieza del admin.
 - Constantes `TEXTO_DJ_MAYOR_DEFAULT`, `TEXTO_DJ_MENOR_DEFAULT`.
 
 ### 5.8 `ViajeMicros.php`
@@ -499,6 +505,9 @@ se reordenaron los `require_once` en `index.php` para que
 Módulos: `autenticar`, `administrador`, `dueno`, `sesiones`,
 `empresas`, `vehiculos`, `viajes`, `ventas`, `pasajeros`,
 `rendiciones`, `liquidaciones`, `cancelaciones`.
+
+Subacción especial: `viajes/limpiar_prueba` (solo admin).
+Elimina los viajes de prueba del dueño seleccionado.
 
 ### 5.15 `index.php`
 
@@ -737,6 +746,18 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74n**: botón "Limpiar viajes de prueba" en la pestaña
+  Viajes (solo admin). Nueva función
+  `limpiar_viajes_de_prueba($nombre_dueno)` en `Viaje.php` y
+  subacción `viajes/limpiar_prueba` en el enrutador.
+  Conserva el viaje principal "Peregrinación a la Visita
+  del Papa León XIV a Luján" (por nombre visible) y los
+  viajes que no tengan prefijo de prueba. No elimina
+  viajes con ventas. Motivo: las pruebas automáticas del
+  plugin acumulan viajes (20 con el grafo actual) que
+  ralentizan los listados: `formatear_viaje` recorre todas
+  las ventas del dueño por cada viaje, así que el costo de
+  `cargar_viajes` escala con V × W.
 - **v74m**: eliminado el respaldo JSON automático de
   `guardar_ambos`. Motivo: el `json_encode` de todo el
   grafo se volvió el cuello de botella del guardado cuando
@@ -1192,7 +1213,14 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74m
+**Última actualización de este prompt:** v1.5piloto.74n
+(botón "Limpiar viajes de prueba" en la pestaña Viajes para
+el admin. Nueva función `limpiar_viajes_de_prueba` en
+`Viaje.php` y subacción `viajes/limpiar_prueba` en el
+enrutador. Conserva el viaje principal y los que no tengan
+prefijo de prueba. Motivo: las pruebas del plugin acumulan
+viajes que ralentizan `cargar_viajes`).
+Antes: v1.5piloto.74m
 (eliminado el respaldo JSON automático de `guardar_ambos`.
 El `json_encode` de todo el grafo se volvió el cuello de
 botella cuando el grafo creció con terminales, vehículos y
@@ -1373,6 +1401,13 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   helper `_mostrar_alerta_critica()` respeta la bandera
   `window.__iteradores_modo_prueba` que el plugin setea antes
   de los flujos que disparan `alert()`.
+- Cerramos en v74n el botón "Limpiar viajes de prueba" para
+  el admin. El grafo del dueño `carmen1` tenía 21 viajes
+  (20 de ellos de pruebas anteriores), y `formatear_viaje`
+  escala con V × W (viajes × ventas). El botón borra los
+  viajes de prueba conservando el viaje principal
+  "Peregrinación a la Visita del Papa León XIV a Luján" y
+  los que no tengan prefijo de prueba.
 - Cerramos en v74m el fix de performance: `guardar_ambos` ya
   no guarda el JSON de respaldo automático. El `json_encode`
   de todo el grafo se volvió el cuello de botella cuando
@@ -1488,15 +1523,23 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74m (framework 1.5i.7f).
+**Estado del proyecto al cierre:** v1.5piloto.74n (framework 1.5i.7f).
 Todo funcional. Bug 1 y Bug 2 resueltos. Fixes de v74k
-endurecen el alta de micro: rechaza vehículos sin asientos y
-duplicados en el mismo viaje, y evita colisiones de numeración
-al quitar un micro del medio. Fix de v74m: `guardar_ambos`
-deja de guardar el JSON de respaldo automático, que se había
-vuelto el cuello de botella del guardado cuando el grafo
-creció. El plugin de pruebas (`iteradoresJS/`,
-v1.5plugin.5c) tiene 29 pruebas corriendo.
+endurecen el alta de micro. Fix de v74m: `guardar_ambos`
+deja de guardar el JSON de respaldo automático. Fix de
+v74n: botón "Limpiar viajes de prueba" para el admin, que
+borra los viajes acumulados por las pruebas del plugin
+(conserva el viaje principal). El plugin de pruebas
+(`iteradoresJS/`, v1.5plugin.5d) tiene 29 pruebas
+corriendo.
+
+**Deuda técnica pendiente:** `formatear_viaje` en `Viaje.php`
+escala como O(V × W): por cada viaje, recorre todas las ventas
+del dueño para calcular `viaje_tiene_ventas` y
+`vendidos_por_micró`. Con muchos viajes y ventas, el costo
+crece. La limpieza de viajes mitiga el problema pero no lo
+elimina. La optimización real (índice de ventas por viaje +
+cacheo de contadores) queda para una tanda dedicada.
 
 ---
 

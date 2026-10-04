@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.74
+ * @version   1.5piloto.74n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1142,6 +1142,84 @@ function guardar_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, 
 
     guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
+}
+
+/**
+ * Elimina los viajes "de prueba" de un dueño.
+ *
+ * Conserva el viaje principal (por nombre visible:
+ * "Peregrinación a la Visita del Papa León XIV a Luján")
+ * y cualquier viaje que no tenga un prefijo conocido de
+ * prueba en su identificador (viajeprueba, viajemicro,
+ * viajeval, viajedup, viajecol, viajesin).
+ *
+ * No elimina viajes con ventas registradas.
+ *
+ * Pensado para el botón de limpieza del admin. Se usa
+ * cuando las pruebas automáticas acumulan viajes que
+ * ralentizan los listados.
+ *
+ * @param string $nombre_dueno
+ * @return array
+ */
+function limpiar_viajes_de_prueba(string $nombre_dueno): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) {
+        return ['exito' => false, 'error' => 'Dueño no encontrado o sin viajes'];
+    }
+
+    $prefijos = ['viajeprueba', 'viajemicro', 'viajeval', 'viajedup', 'viajecol', 'viajesin'];
+    $nombre_principal = 'Peregrinación a la Visita del Papa León XIV a Luján';
+
+    $adyacentes = (array) $nodo_viajes->adyacentes();
+    $borrados = [];
+    $conservados = [];
+    $con_ventas = [];
+
+    foreach ($adyacentes as $nombre_viaje => $nodo_viaje) {
+        $nombre_viaje = (string)$nombre_viaje;
+
+        // Conservar el viaje principal (por nombre visible).
+        $nombre_visible = $nodo_viaje->adyacente('nombre')
+            ? $nodo_viaje->adyacente('nombre')->dato()
+            : '';
+        if ($nombre_visible === $nombre_principal) {
+            $conservados[] = $nombre_viaje;
+            continue;
+        }
+
+        // Conservar cualquier viaje que no tenga prefijo de prueba.
+        $es_de_prueba = false;
+        foreach ($prefijos as $p) {
+            if (strpos($nombre_viaje, $p) === 0) {
+                $es_de_prueba = true;
+                break;
+            }
+        }
+        if (!$es_de_prueba) {
+            $conservados[] = $nombre_viaje;
+            continue;
+        }
+
+        // No eliminar si tiene ventas registradas.
+        if (viaje_tiene_ventas($nombre_dueno, $nombre_viaje)) {
+            $con_ventas[] = $nombre_viaje;
+            continue;
+        }
+
+        $nodo_viajes->eliminar_adyacente($nombre_viaje);
+        $borrados[] = $nombre_viaje;
+    }
+
+    guardar_ambos(Conf::NOMBRE_APP);
+
+    return [
+        'exito' => true,
+        'borrados' => $borrados,
+        'cantidad_borrados' => count($borrados),
+        'conservados' => $conservados,
+        'con_ventas' => $con_ventas,
+    ];
 }
 
 // Incluir submódulos de viajes

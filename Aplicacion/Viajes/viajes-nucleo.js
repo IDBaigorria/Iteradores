@@ -1,11 +1,70 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.65
+ * @version 1.5piloto.74n
  */
 
 function obtener_nombre_dueno_actual() {
     return es_admin_o_soporte() ? $("#selector_dueno_viajes").value : usuario_actual.nombre_usuario;
 }
+
+/**
+ * Muestra u oculta el botón "Limpiar viajes de prueba".
+ * Solo visible para admin, y solo cuando hay un dueño
+ * seleccionado en el selector.
+ */
+function _actualizar_visibilidad_boton_limpiar_viajes(visible) {
+    if (!usuario_actual || usuario_actual.nivel !== 'admin') return;
+    const btn = document.getElementById('boton_limpiar_viajes_prueba');
+    if (!btn) return;
+    btn.style.display = visible ? 'inline-block' : 'none';
+}
+
+/**
+ * Ejecuta la limpieza de viajes de prueba del dueño
+ * seleccionado. El backend se encarga de preservar el viaje
+ * principal y los que no tengan prefijo de prueba.
+ */
+async function limpiar_viajes_de_prueba_ui() {
+    if (!usuario_actual || usuario_actual.nivel !== 'admin') {
+        mostrar_aviso("Solo el admin puede ejecutar esta acción", 'error');
+        return;
+    }
+    const select = document.getElementById("selector_dueno_viajes");
+    const nombre_dueno = select ? select.value : '';
+    if (!nombre_dueno) {
+        mostrar_aviso("Seleccione un dueño primero", 'error');
+        return;
+    }
+    const ok = confirm(
+        "¿Eliminar todos los viajes de prueba del dueño \"" + nombre_dueno + "\"?\n\n"
+        + "Se conserva el viaje principal y cualquier viaje que no tenga prefijo de prueba. Los viajes con ventas no se eliminan.\n\n"
+        + "Esta acción no se puede deshacer."
+    );
+    if (!ok) return;
+
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/limpiar_prueba",
+            nombre_dueno,
+            nombre_solicitante: usuario_actual.nombre_usuario
+        })
+    });
+    const datos = await resp.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al limpiar viajes", 'error');
+        return;
+    }
+    let msg = "Se eliminaron " + datos.cantidad_borrados + " viaje(s) de prueba.";
+    if (datos.con_ventas && datos.con_ventas.length > 0) {
+        msg += " " + datos.con_ventas.length + " no se pudieron eliminar (tienen ventas).";
+    }
+    mostrar_aviso(msg, 'exito');
+    await listar_viajes(nombre_dueno, 'dueno');
+}
+
+document.getElementById('boton_limpiar_viajes_prueba')?.addEventListener('click', limpiar_viajes_de_prueba_ui);
 
 async function cargar_viajes() {
     const panel_dueno = $("#panel_selector_dueno_viajes");
@@ -50,9 +109,11 @@ async function cargar_duenos_en_select_viajes() {
             if (select.value) {
                 await listar_viajes(select.value, 'dueno');
                 $("#boton_agregar_viaje").style.display = 'inline-block';
+                _actualizar_visibilidad_boton_limpiar_viajes(true);
             } else {
                 $("#lista_viajes").innerHTML = '';
                 $("#boton_agregar_viaje").style.display = 'none';
+                _actualizar_visibilidad_boton_limpiar_viajes(false);
             }
         };
     }

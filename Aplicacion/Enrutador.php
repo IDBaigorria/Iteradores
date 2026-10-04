@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.74
+ * @version   1.5piloto.74n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -426,6 +426,24 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     $viajes = listar_viajes_de_terminal($nombre_terminal);
                     responder_json(['exito' => true, 'viajes' => $viajes]);
+                    break;
+
+                case 'limpiar_prueba':
+                    // Solo admin.
+                    $nombre_sol_lp = $post['nombre_solicitante'] ?? '';
+                    $raiz_sol_lp = Nodo::nodo_por_id('usuarios');
+                    $nodo_sol_lp = ($raiz_sol_lp && $nombre_sol_lp !== '') ? $raiz_sol_lp->adyacente($nombre_sol_lp) : null;
+                    $nodo_nivel_lp = $nodo_sol_lp ? $nodo_sol_lp->adyacente('nivel') : null;
+                    $nivel_sol_lp = $nodo_nivel_lp ? $nodo_nivel_lp->dato() : '';
+                    if ($nivel_sol_lp !== 'admin') {
+                        responder_json(['exito' => false, 'error' => 'Solo el administrador puede ejecutar esta acción']);
+                    }
+                    $nombre_dueno_lp = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno_lp)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado_lp = limpiar_viajes_de_prueba($nombre_dueno_lp);
+                    responder_json($resultado_lp);
                     break;
 
                 case 'guardar':
