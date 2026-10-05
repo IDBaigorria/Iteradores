@@ -812,6 +812,17 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v76**: Fase 2, flujos 15 a 19 arreglados.
+  `eliminar_pasajero` y `limpiar_pasajeros_de_prueba`
+  destruyen el subárbol completo del pasajero (campos
+  personales, fecha_ultima_modificacion, y la
+  declaración jurada adjunta con sus 4 sub-campos).
+  `subir_declaracion_jurada_pasajero` y
+  `eliminar_declaracion_jurada_pasajero` destruyen el
+  nodo DJ con sus sub-hijos. `actualizar_pasajero`
+  destruye las hojas al limpiar un campo. Helpers
+  nuevos: `_destruir_declaracion_jurada_pasajero`,
+  `_destruir_pasajero_completo`.
 - **v75**: Fase 2, flujos 13 y 14 arreglados.
   `eliminar_usuario` ahora destruye los campos del nodo
   usuario (nivel, nombre_real, email, efectivo, banco con
@@ -1272,6 +1283,19 @@ creado durante la selección, y los campos `viaje` y
 `cancelar_venta_limpia_nodos` del plugin, que al crear
 la venta vio un incremento de huérfanos de 5.
 
+**Decimoquinto a decimonoveno flujos arreglados en v76:**
+`eliminar_pasajero` y `limpiar_pasajeros_de_prueba`
+(destruyen el subárbol del pasajero: campos personales,
+fecha de última modificación, y la declaración jurada
+adjunta con sus 4 sub-campos),
+`subir_declaracion_jurada_pasajero` (destruye la DJ
+previa al reemplazarla),
+`eliminar_declaracion_jurada_pasajero` (destruye la DJ),
+y `actualizar_pasajero` (destruye las hojas al limpiar
+un campo). Helpers nuevos:
+`_destruir_declaracion_jurada_pasajero`,
+`_destruir_pasajero_completo`.
+
 **Decimotercer y decimocuarto flujo arreglados en v75:**
 `eliminar_usuario` (destruye los campos del nodo usuario,
 el banco con sus hijos, el nodo credencial con sus campos,
@@ -1653,7 +1677,13 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.75
+**Última actualización de este prompt:** v1.5piloto.76
+(Fase 2, flujos 15 a 19: `eliminar_pasajero`,
+`limpiar_pasajeros_de_prueba`, `subir_declaracion_jurada_pasajero`,
+`eliminar_declaracion_jurada_pasajero`, `actualizar_pasajero`.
+Helpers nuevos: `_destruir_declaracion_jurada_pasajero`,
+`_destruir_pasajero_completo`.).
+Antes: v1.5piloto.75
 (Fase 2, flujos 13 y 14: `eliminar_usuario` y
 `actualizar_usuario`. También `Sesion.php` (destrucción
 de campos del nodo sesión). Nuevo helper
@@ -1924,6 +1954,13 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   nodo. Backend: 3 comandos en el `Controlador`
   (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
   Frontend: `Aplicacion/grafo.js`.
+- Cerramos en v76 los flujos 15 a 19 de Fase 2:
+  `eliminar_pasajero`, `limpiar_pasajeros_de_prueba`,
+  `subir_declaracion_jurada_pasajero`,
+  `eliminar_declaracion_jurada_pasajero`, y
+  `actualizar_pasajero`. Helpers nuevos:
+  `_destruir_declaracion_jurada_pasajero`,
+  `_destruir_pasajero_completo`.
 - Cerramos en v75 los flujos 13 y 14 de Fase 2:
   `eliminar_usuario` (destruye campos del usuario, banco,
   credenciales y sesiones activas) y `actualizar_usuario`
@@ -2149,7 +2186,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.75 (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.76 (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2168,6 +2205,8 @@ y 11 (`actualizar_configuracion_vehiculo`,
 v74z: flujo 12 (`limpiar_viajes_de_prueba`).
 v75: flujos 13 y 14 (`eliminar_usuario`,
 `actualizar_usuario`) y `Sesion.php`.
+v76: flujos 15 a 19 (pasajeros y declaraciones
+juradas adjuntas).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 

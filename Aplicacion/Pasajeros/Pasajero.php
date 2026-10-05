@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.74o
+ * @version   1.5piloto.76
  */
 
 use Iteradores\Nodos\Nodo;
@@ -15,6 +15,7 @@ include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./miscelaneas/Arbol.php");
+include_once("./Aplicacion/FuncionesAuxiliares.php");
 include_once("./Aplicacion/Ventas/Venta.php");
 
 /**
@@ -247,8 +248,14 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
 
             $hubo_cambios = true;
             if ($nodo_campo) {
-                if ($valor === '') $nodo_pasajero->eliminar_adyacente($campo);
-                else $nodo_campo->_dato($valor);
+                if ($valor === '') {
+                    // Fase 2, v76: destruir la hoja al borrar
+                    // el campo. Antes solo se desenlazaba.
+                    $nodo_pasajero->eliminar_adyacente($campo);
+                    Nodo::eliminar($nodo_campo);
+                } else {
+                    $nodo_campo->_dato($valor);
+                }
             } else {
                 if ($valor !== '') $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato($valor), $campo);
             }
@@ -499,7 +506,64 @@ function formatear_venta_para_pasajero(Nodo $nodo_venta, string $dni): ?array {
 }
 
 /**
+ * Destruye la declaración jurada adjunta de un pasajero
+ * (nodo contenedor + sus 4 sub-hijos).
+ *
+ * El nodo DJ tiene: dato (ruta relativa), y los enlaces
+ * `nombre_original`, `tipo`, `tamano`, `fecha_subida`,
+ * todos hojas. Se destruyen con _destruir_campos_simples
+ * y después el nodo DJ.
+ *
+ * @param Nodo $nodo_dj
+ * @return void
+ */
+function _destruir_declaracion_jurada_pasajero(Nodo $nodo_dj): void {
+    _destruir_campos_simples($nodo_dj);
+    Nodo::eliminar($nodo_dj);
+}
+
+/**
+ * Destruye el subárbol completo de un pasajero: la
+ * declaración jurada adjunta (si existe) y todos sus
+ * campos simples.
+ *
+ * No desenlaza el pasajero del contenedor: de eso se
+ * encarga el llamador (eliminar_pasajero o
+ * limpiar_pasajeros_de_prueba).
+ *
+ * @param Nodo $nodo_pasajero
+ * @return void
+ */
+function _destruir_pasajero_completo(Nodo $nodo_pasajero): void {
+    // 1. Declaración jurada adjunta (contenedor con 4 hijos).
+    $nodo_dj = $nodo_pasajero->adyacente('declaracion_jurada');
+    if ($nodo_dj) {
+        $nodo_pasajero->eliminar_adyacente('declaracion_jurada');
+        _destruir_declaracion_jurada_pasajero($nodo_dj);
+    }
+
+    // 2. Campos simples del pasajero (nombres, apellido,
+    //    email, celular, celular_emergencia, fecha_nacimiento,
+    //    localidad, direccion, fecha_ultima_modificacion).
+    _destruir_campos_simples($nodo_pasajero);
+
+    // 3. Destruir el nodo pasajero.
+    Nodo::eliminar($nodo_pasajero);
+}
+
+/**
  * Elimina un pasajero si no tiene pasajes comprados.
+ *
+ * A partir de v1.5piloto.76 (Fase 2 del plan de optimización
+ * del grafo): destruye el subárbol completo del pasajero
+ * (campos personales, fecha de última modificación, y la
+ * declaración jurada adjunta con sus 4 sub-campos) en lugar
+ * de dejarlo huérfano. Antes quedaban ~12-15 nodos por
+ * pasajero.
+ *
+ * @param string $nombre_dueno
+ * @param string $dni
+ * @return array
  */
 function eliminar_pasajero(string $nombre_dueno, string $dni): array {
     $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
@@ -512,8 +576,10 @@ function eliminar_pasajero(string $nombre_dueno, string $dni): array {
         return ['exito' => false, 'error' => 'No se puede eliminar: el pasajero tiene pasajes comprados.'];
     }
 
+    // Fase 2, v76: destruir el subárbol completo antes de
+    // desenlazar del contenedor.
     $contenedor->eliminar_adyacente($dni);
-    Nodo::eliminar($nodo_pasajero);
+    _destruir_pasajero_completo($nodo_pasajero);
 
     guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
@@ -629,11 +695,10 @@ function limpiar_pasajeros_de_prueba(string $nombre_dueno): array {
             continue;
         }
 
-        // Desenlazar y eliminar. Si Nodo::eliminar falla
-        // (referencias residuales que se nos escaparon), el
-        // enlace ya está roto y el nodo queda huérfano.
+        // Fase 2, v76: destruir el subárbol completo del
+        // pasajero antes de desenlazarlo.
         $contenedor->eliminar_adyacente($dni);
-        Nodo::eliminar($nodo_pasajero);
+        _destruir_pasajero_completo($nodo_pasajero);
         $borrados[] = $dni;
     }
 
@@ -1029,7 +1094,10 @@ function subir_declaracion_jurada_pasajero(string $nombre_dueno, string $dni, ar
         if (file_exists($ruta_previa)) {
             @unlink($ruta_previa);
         }
+        // Fase 2, v76: destruir el nodo DJ previo con sus 4
+        // sub-hijos en lugar de solo desenlazarlo.
         $nodo_pasajero->eliminar_adyacente('declaracion_jurada');
+        _destruir_declaracion_jurada_pasajero($nodo_dj_previo);
     }
 
     // Nombre definitivo: {dni}.{ext}.
@@ -1081,7 +1149,10 @@ function eliminar_declaracion_jurada_pasajero(string $nombre_dueno, string $dni)
         @unlink($ruta);
     }
 
+    // Fase 2, v76: destruir el nodo DJ con sus 4 sub-hijos
+    // en lugar de solo desenlazarlo.
     $nodo_pasajero->eliminar_adyacente('declaracion_jurada');
+    _destruir_declaracion_jurada_pasajero($nodo_dj);
 
     guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
