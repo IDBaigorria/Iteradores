@@ -540,6 +540,48 @@
       </div>
     </section>
 
+    <!-- Sección Grafo (solo admin y soporte) -->
+    <section id="grafo" class="tab-content hidden">
+      <div class="panel">
+        <h2>Grafo (superestructura)</h2>
+        <p class="muted">Vista de solo lectura. Muestra la superestructura completa: totales, nodos alcanzables vs huérfanos, y permite inspeccionar los enlaces de cada nodo. Los nodos huérfanos son la causa principal de la acumulación del grafo.</p>
+        <div id="grafo_resumen" class="panel" style="background:#f7f7f7;"></div>
+        <div class="row" style="gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:flex-end;">
+          <div class="field"><label for="grafo_filtro">Filtro</label>
+            <select id="grafo_filtro">
+              <option value="todos">Todos</option>
+              <option value="huerfanos">Solo huérfanos</option>
+              <option value="alcanzables">Solo alcanzables</option>
+            </select>
+          </div>
+          <div class="field"><label for="grafo_filtro_enlace">Enlace</label>
+            <input id="grafo_filtro_enlace" placeholder="Ej: pasajeros">
+          </div>
+          <div class="field"><label for="grafo_filtro_texto">Texto en dato</label>
+            <input id="grafo_filtro_texto" placeholder="Buscar...">
+          </div>
+          <button class="btn primary" id="grafo_boton_filtrar">Filtrar</button>
+          <button class="btn" id="grafo_boton_limpiar">Limpiar</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Tipo</th>
+                <th>Dato</th>
+                <th>Enl. sal.</th>
+                <th>Refs ent.</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="grafo_tabla"></tbody>
+          </table>
+        </div>
+        <div id="grafo_paginacion" class="row" style="margin-top:10px; gap:8px; align-items:center;"></div>
+      </div>
+    </section>
+
     <!-- Sección Pasajeros -->
     <section id="pasajeros" class="tab-content hidden">
       <div class="panel">
@@ -652,7 +694,7 @@
   </div>
 </div>
 <!-- MODO_PRUEBAS_PLACEHOLDER -->
-<script src="aplicacion.js?v=1.5piloto.74f"></script>
+<script src="aplicacion.js?v=1.5piloto.74p"></script>
 <script src="Aplicacion/admin.js?v=1.5piloto.73j"></script>
 <script src="Aplicacion/terminales.js?v=1.5piloto.73j"></script>
 <script src="Aplicacion/micros.js?v=1.5piloto.73d"></script>
@@ -664,5 +706,6 @@
 <script src="Aplicacion/rendiciones.js?v=1.5piloto.73d"></script>
 <script src="Aplicacion/liquidaciones.js?v=1.5piloto.73d"></script>
 <script src="Aplicacion/pasajeros.js?v=1.5piloto.74o"></script>
+<script src="Aplicacion/grafo.js?v=1.5piloto.74p"></script>
 </body>
 </html>

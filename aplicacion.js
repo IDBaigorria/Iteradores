@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.74f
+ * @version 1.5piloto.74p
  */
 
 // Utilidades
@@ -98,8 +98,8 @@ function mostrar_aviso(mensaje, tipo = 'info') {
 // Configuración de pestañas según nivel de usuario
 function configurar_pestanas_segun_nivel(nivel) {
     const pestanas_permitidas = {
-        admin: ['admin', 'micros', 'viajes', 'vendidos', 'pasajeros', 'rendiciones', 'liquidaciones'],
-        soporte: ['admin', 'micros', 'viajes', 'vendidos', 'pasajeros', 'rendiciones', 'liquidaciones'],
+        admin: ['admin', 'micros', 'viajes', 'vendidos', 'pasajeros', 'rendiciones', 'liquidaciones', 'grafo'],
+        soporte: ['admin', 'micros', 'viajes', 'vendidos', 'pasajeros', 'rendiciones', 'liquidaciones', 'grafo'],
         dueno: ['terminales', 'micros', 'viajes', 'vendidos', 'pasajeros', 'rendiciones', 'liquidaciones'],
         terminal: ['viajes', 'vendidos', 'pasajeros']
     };
@@ -114,7 +114,8 @@ function configurar_pestanas_segun_nivel(nivel) {
         pasajeros: 'Pasajeros/Clientes',
         rendiciones: 'Rendiciones',
         liquidaciones: 'Liquidaciones',
-        terminales: 'Puntos de venta'
+        terminales: 'Puntos de venta',
+        grafo: 'Grafo'
     };
     permitidas.forEach(id_pestana => {
         const boton = document.createElement('button');
@@ -164,6 +165,7 @@ function activar_pestana(id_pestana) {
     if (id_pestana === 'pasajeros') return cargar_pasajeros();
     if (id_pestana === 'admin') return cargar_datos_admin();
     if (id_pestana === 'terminales') return cargar_datos_terminales();
+    if (id_pestana === 'grafo') return cargar_grafo();
     return Promise.resolve();
 }
 
@@ -563,6 +565,10 @@ function _limpiar_contenido_dinamico() {
         // Pasajeros
         'selector_dueno_pasajeros',
         'tabla_pasajeros',
+        // Grafo
+        'grafo_resumen',
+        'grafo_tabla',
+        'grafo_paginacion',
     ];
     ids_a_limpiar.forEach(id => {
         const el = document.getElementById(id);

@@ -1445,6 +1445,237 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     }
 
     // ══════════════════════════════════════════════════════
+    // COMANDOS DEL VISUALIZADOR DE GRAFO (v1.5piloto.74p)
+    // ══════════════════════════════════════════════════════
+
+    /**
+     * Registra los comandos del visualizador de grafo.
+     *
+     * Estos comandos exponen operaciones de solo lectura sobre
+     * la superestructura sin revelar el token de seguridad.
+     * El token queda encapsulado en los closures. La seguridad
+     * la aporta el enrutador, que es el único que los invoca
+     * (y ya valida admin/soporte).
+     *
+     * @return void
+     */
+    private static function registrar_comandos_grafo(): void
+    {
+        // ─── grafo:resumen ─────────────────────────────────
+        self::registrar_comando('grafo:resumen', function(string $token, array $args) {
+            $nodos = self::_grafo_cargar_estructura($token);
+            $alcanzables = self::_grafo_bfs_desde_raices($nodos);
+            $total = count($nodos);
+            $huerfanos = $total - count($alcanzables);
+
+            // Top de referencias entrantes.
+            $refs = [];
+            foreach ($nodos as $id => $info) {
+                foreach ($info['ady'] as $enlace => $destino) {
+                    $refs[$destino] = ($refs[$destino] ?? 0) + 1;
+                }
+            }
+            arsort($refs);
+            $top = array_slice($refs, 0, 20, true);
+
+            return [
+                'total' => $total,
+                'alcanzables' => count($alcanzables),
+                'huerfanos' => $huerfanos,
+                'top_referencias' => (object) $top,
+            ];
+        }, null, false);
+
+        // ─── grafo:listar ──────────────────────────────────
+        self::registrar_comando('grafo:listar', function(string $token, array $args) {
+            $opciones = $args[0] ?? [];
+            $filtro = (string)($opciones['filtro'] ?? 'todos');
+            $filtro_enlace = (string)($opciones['enlace'] ?? '');
+            $filtro_texto = (string)($opciones['texto'] ?? '');
+            $offset = max(0, (int)($opciones['offset'] ?? 0));
+            $limite = max(1, min(500, (int)($opciones['limite'] ?? 50)));
+
+            $nodos = self::_grafo_cargar_estructura($token);
+            $alcanzables = ($filtro !== 'todos') ? self::_grafo_bfs_desde_raices($nodos) : [];
+
+            // Cantidad de referencias entrantes por nodo, calculada una sola vez.
+            $refs_count = [];
+            foreach ($nodos as $id => $info) {
+                foreach ($info['ady'] as $destino) {
+                    $refs_count[$destino] = ($refs_count[$destino] ?? 0) + 1;
+                }
+            }
+
+            $resultados = [];
+            foreach ($nodos as $id => $info) {
+                if ($filtro === 'huerfanos' && isset($alcanzables[$id])) continue;
+                if ($filtro === 'alcanzables' && !isset($alcanzables[$id])) continue;
+                if ($filtro_enlace !== '' && !isset($info['ady'][$filtro_enlace])) continue;
+                if ($filtro_texto !== '' && stripos($info['dato'], $filtro_texto) === false) continue;
+
+                $resultados[] = [
+                    'id' => $id,
+                    'dato' => mb_substr($info['dato'], 0, 100),
+                    'es_especial' => !is_numeric($id),
+                    'n_adyacentes' => count($info['ady']),
+                    'n_referencias' => $refs_count[$id] ?? 0,
+                    'tipo' => self::_grafo_inferir_tipo($id, $info['ady']),
+                ];
+            }
+
+            return [
+                'total' => count($resultados),
+                'offset' => $offset,
+                'limite' => $limite,
+                'nodos' => array_slice($resultados, $offset, $limite),
+            ];
+        }, null, false);
+
+        // ─── grafo:nodo ────────────────────────────────────
+        self::registrar_comando('grafo:nodo', function(string $token, array $args) {
+            $id = (string)($args[0] ?? '');
+            if ($id === '') return null;
+
+            $nodo = Nodo::nodo_por_id($id);
+            if (!$nodo) return null;
+
+            $adyacentes = [];
+            foreach ($nodo->adyacentes() as $enlace => $ady) {
+                $adyacentes[] = [
+                    'enlace' => (string)$enlace,
+                    'id_destino' => $ady->id(),
+                    'dato_destino' => mb_substr((string)$ady->dato(), 0, 80),
+                ];
+            }
+
+            // Referencias entrantes: recorrido completo, filtrado.
+            $referencias = [];
+            Nodo::por_cada_nodo_ejecutar($token, function($otro) use ($id, &$referencias) {
+                foreach ($otro->adyacentes() as $enlace => $destino) {
+                    if ($destino->id() === $id) {
+                        $referencias[] = [
+                            'id_origen' => $otro->id(),
+                            'enlace' => (string)$enlace,
+                            'dato_origen' => mb_substr((string)$otro->dato(), 0, 80),
+                        ];
+                    }
+                }
+            }, null);
+
+            return [
+                'id' => $id,
+                'dato' => (string)$nodo->dato(),
+                'es_especial' => !is_numeric($id),
+                'adyacentes' => $adyacentes,
+                'referencias' => $referencias,
+            ];
+        }, null, false);
+    }
+
+    /**
+     * Carga la estructura básica de la superestructura en memoria.
+     *
+     * Devuelve [id => [dato, ady => [enlace => id_destino]]].
+     *
+     * @param string $token
+     * @return array
+     */
+    private static function _grafo_cargar_estructura(string $token): array
+    {
+        $nodos = [];
+        Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$nodos) {
+            $ady = [];
+            foreach ($nodo->adyacentes() as $enlace => $adyacente) {
+                $ady[(string)$enlace] = $adyacente->id();
+            }
+            $nodos[$nodo->id()] = [
+                'dato' => (string)$nodo->dato(),
+                'ady' => $ady,
+            ];
+        }, null);
+        return $nodos;
+    }
+
+    /**
+     * BFS desde los nodos especiales (raíces del grafo).
+     *
+     * Devuelve [id => true] para cada nodo alcanzable.
+     *
+     * @param array $nodos
+     * @return array
+     */
+    private static function _grafo_bfs_desde_raices(array $nodos): array
+    {
+        $alcanzables = [];
+        $cola = [];
+        foreach ($nodos as $id => $info) {
+            if (!is_numeric($id)) {
+                $alcanzables[$id] = true;
+                $cola[] = $id;
+            }
+        }
+        while (!empty($cola)) {
+            $id = array_shift($cola);
+            if (!isset($nodos[$id])) continue;
+            foreach ($nodos[$id]['ady'] as $destino) {
+                if (!isset($alcanzables[$destino])) {
+                    $alcanzables[$destino] = true;
+                    $cola[] = $destino;
+                }
+            }
+        }
+        return $alcanzables;
+    }
+
+    /**
+     * Infiere un tipo legible para un nodo a partir de sus enlaces.
+     * Heurística. Se puede refinar con el tiempo.
+     *
+     * @param string $id
+     * @param array  $ady
+     * @return string
+     */
+    private static function _grafo_inferir_tipo(string $id, array $ady): string
+    {
+        // Especiales (raíces conocidas).
+        if ($id === 'usuarios') return 'Contenedor raíz: usuarios';
+        if ($id === 'sesiones') return 'Contenedor raíz: sesiones';
+        if (!is_numeric($id)) return 'Especial';
+
+        // Usuarios.
+        if (isset($ady['nivel'])) return 'Usuario';
+        // Pasajeros.
+        if (isset($ady['apellido']) && isset($ady['nombres'])) return 'Pasajero';
+        // Viaje.
+        if (isset($ady['origen']) && isset($ady['destino']) && isset($ady['micros'])) return 'Viaje';
+        // Micro.
+        if (isset($ady['vehiculo_copia']) && isset($ady['monto'])) return 'Micro';
+        // Venta.
+        if (isset($ady['total']) && isset($ady['comprador'])) return 'Venta';
+        // Cupón.
+        if (isset($ady['numero']) && isset($ady['estado'])) return 'Cupón';
+        // Rendición.
+        if (isset($ady['detalle_terminales']) && isset($ady['detalle_cupones'])) return 'Rendición';
+        // Liquidación.
+        if (isset($ady['monto_efectivo']) && isset($ady['monto_banco'])) return 'Liquidación';
+        // Cancelación.
+        if (isset($ady['id_venta']) && isset($ady['motivo'])) return 'Cancelación';
+        // Sesión.
+        if (isset($ady['usuario']) && isset($ady['creado_en'])) return 'Sesión';
+        // Copia de vehículo.
+        if (isset($ady['asientos']) && isset($ady['foto'])) return 'Vehículo/Copia';
+        if (isset($ady['asientos'])) return 'Vehículo';
+        // Empresa.
+        if (isset($ady['vehiculos'])) return 'Empresa';
+        // Piso.
+        if (isset($ady['filas']) && isset($ady['columnas'])) return 'Piso';
+        // Asiento.
+        if (isset($ady['fila']) && isset($ady['columna'])) return 'Asiento';
+        // Contenedor genérico (dato vacío y varios enlaces).
+        return '?';
+    }
+
+    // ══════════════════════════════════════════════════════
     // INICIALIZACION
     // ══════════════════════════════════════════════════════
 
@@ -1510,6 +1741,9 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             
             // ─── Comandos genéricos de dominio ──────────────────
             self::registrar_comandos_dominio();
+
+            // ─── Comandos del visualizador de grafo ────────────
+            self::registrar_comandos_grafo();
             static::$inicializo = true;
         }
     }

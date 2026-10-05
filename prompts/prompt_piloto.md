@@ -119,6 +119,7 @@ Cuando llegue el momento, `Conf::NOMBRE_APP` se derivará del subdominio.
 - `Enrutador.php`.
 - `FuncionesAuxiliares.php`.
 - `ventas.js`, `pasajeros.js`, `rendiciones.js`, `liquidaciones.js`.
+- `grafo.js`: pestaña Grafo (visualizador de la superestructura).
 
 **`Configuracion/Configuracion.php`**: clase `Conf`.
 
@@ -157,6 +158,7 @@ depósito de IDs (se ejecuta con `?probar_deposito=1` desde
 - Rendiciones (admin y dueño).
 - Liquidaciones (admin y dueño).
 - Pasajeros/Clientes (todos).
+- Grafo (solo admin y soporte): visualizador de la superestructura.
 
 ### 3.3 Header-wrapper y tabs sticky
 
@@ -164,6 +166,52 @@ Desde v61: header y tabs viven dentro de un
 `<div class="header-wrapper">` sticky. Se pegan juntos al scrollear. Las
 tabs se achican cuando `body.scrolled` está activo (scroll > 40px). En
 pantallas angostas, las tabs van con scroll horizontal.
+
+### 3.4 Pestaña Grafo (visualizador de la superestructura)
+
+Implementada en v1.5piloto.74p (Fase 1 del plan de optimización,
+ver §8.6). Visible solo para **admin y soporte**.
+
+**Es de solo lectura.** No modifica el grafo.
+
+**Qué muestra:**
+
+- **Resumen:** total de nodos, alcanzables desde las raíces
+  (`usuarios`, `sesiones` y demás IDs especiales), huérfanos, y
+  top 20 de nodos por referencias entrantes.
+- **Tabla:** listado paginado con filtros por estado
+  (`todos` / `huerfanos` / `alcanzables`), por nombre de enlace y
+  por texto en el dato. Columnas: ID, tipo inferido, dato,
+  cantidad de enlaces salientes, cantidad de referencias
+  entrantes.
+- **Detalle (modal apilado):** click en una fila → enlaces
+  salientes, referencias entrantes, y navegación por los nodos
+  relacionados.
+
+**Cómo funciona:**
+
+- El frontend (`Aplicacion/grafo.js`) llama a tres subacciones
+  del enrutador: `grafo/resumen`, `grafo/listar`, `grafo/nodo`.
+- El enrutador (módulo `grafo`, chequeo admin/soporte) invoca
+  los comandos `grafo:resumen`, `grafo:listar`, `grafo:nodo`
+  del `Controlador` a través de `Controlador::ejecutar_comando()`.
+- Los comandos están definidos en
+  `Controlador::registrar_comandos_grafo()` (privado). Usan el
+  token interno sin exponerlo. **No usan el motor**: se ejecutan
+  de a uno.
+- Helpers privados en `Controlador`: `_grafo_cargar_estructura`,
+  `_grafo_bfs_desde_raices`, `_grafo_inferir_tipo`.
+
+**Limitaciones conocidas:**
+
+- El comando `grafo:nodo` recorre todo el grafo para encontrar
+  referencias entrantes (O(N) por click).
+- `grafo:listar` carga todo el grafo en memoria y filtra en PHP.
+- `_grafo_inferir_tipo` es heurística; puede devolver `?` para
+  nodos que no cumplen ningún patrón conocido.
+
+Estas limitaciones son aceptables para Fase 1 (diagnóstico). Se
+pueden optimizar en Fase 3.
 
 ---
 
@@ -521,6 +569,10 @@ Subacciones especiales:
 - `entorno/info`: devuelve `{modo, es_pruebas}`. Público, sin
   permisos. Lo consume el frontend para saber si mostrar los
   botones de limpieza.
+- Módulo `grafo` (admin y soporte): `grafo/resumen`,
+  `grafo/listar`, `grafo/nodo`. Invocan comandos del
+  `Controlador` (`grafo:resumen`, `grafo:listar`,
+  `grafo:nodo`). Ver §3.4.
 
 ### 5.15 `index.php`
 
@@ -569,6 +621,7 @@ Mismos cambios que `admin.js` para la pestaña Puntos de venta.
 - `viajes-micros.js`, `viajes-asientos.js`, `viajes-opciones.js`,
   `micros.js`: gestión de viajes y micros.
 - `rendiciones.js`, `liquidaciones.js`.
+- `grafo.js`: pestaña Grafo. Ver §3.4.
 
 ### 6.5 Pantalla de login
 
@@ -759,6 +812,17 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74p**: pestaña "Grafo" (Fase 1 del plan de optimización
+  del grafo). Visible solo para admin y soporte. Vista de solo
+  lectura: totales, alcanzables vs huérfanos, top de
+  referencias, tabla filtrable, y modal de detalle por nodo.
+  Backend: 3 comandos nuevos en el `Controlador`
+  (`grafo:resumen`, `grafo:listar`, `grafo:nodo`) registrados
+  desde `registrar_comandos_grafo()`. Los comandos usan el
+  token interno sin exponerlo; se ejecutan de a uno (sin
+  motor). Módulo `grafo` en el enrutador con chequeo
+  admin/soporte. Frontend: `Aplicacion/grafo.js` nuevo y
+  nueva sección en `aplicacion_GET.html`.
 - **v74o**: botón "Limpiar pasajeros de prueba" en la pestaña
   Pasajeros/Clientes. Nueva función
   `limpiar_pasajeros_de_prueba($nombre_dueno)` en
@@ -973,21 +1037,20 @@ se tildó. No hay botón ni submodal en el modal de pago de
 cupón: la decisión se toma siempre en el momento de editar
 las condiciones de pago.
 
-### 8.4 Pestaña especial: visualizador del grafo (futuro)
+### 8.4 Pestaña Grafo (visualizador de la superestructura)
 
-Pestaña nueva que verán **admin y soporte**. Objetivo: dar una
-interfaz amigable para inspeccionar la estructura de nodos y
-enlaces, sin depender de `imprimir_superestructura` ni de la
-consola. Incluye:
+**Implementada en v74p (Fase 1).** Ver §3.4 para el detalle de
+qué hace y cómo funciona, y §8.6 para el plan completo de las
+tres fases de optimización del grafo.
 
-- Navegación por la superestructura desde la raíz.
-- Vista de nodos con sus datos y enlaces salientes.
-- Listado de iteradores creados con sus cuerpos, alias y posición
-  actual.
+Pendiente para futuras iteraciones del visualizador:
+
+- Listado de iteradores creados con sus cuerpos, alias y
+  posición actual (no implementado en Fase 1).
 - Acciones sobre iteradores (crear, destruir, desocupar, ver
-  caminos registrados).
-
-Se implementa **después** de los bugs y los pendientes menores.
+  caminos registrados) (no implementado en Fase 1).
+- Acciones sobre nodos (eliminar huérfanos, etc.) (no
+  implementado en Fase 1).
 
 ### 8.5 Próximos pasos posibles
 
@@ -1024,6 +1087,109 @@ y liquidaciones.
 - `ver_compra_asiento`: implementado como navegación a la pestaña
   Vendidos con resaltado (vía `ir_a_venta_en_vendidos`). No es
   modal.
+
+### 8.6 Plan de optimización del grafo (tres fases)
+
+**Contexto.** La aplicación se vuelve lenta a medida que el
+grafo crece. Mediciones concretas:
+
+- Grafo de ~10.000 nodos → ~50-70s por prueba del plugin.
+- Grafo de ~2.000 nodos → ~15-18s por prueba.
+
+El problema es la cantidad de nodos, no el código de las
+pruebas ni el guardado. El grafo crece porque el piloto no
+elimina bien los nodos cuando se cancela o elimina una
+entidad: los descuelga del contenedor pero no los destruye.
+Como el framework no permite eliminar un nodo con referencias
+entrantes, esos nodos quedan huérfanos. Con cada operación se
+acumulan.
+
+Hay dos frentes pendientes que interactúan:
+
+**(A) Limitación del framework.** El framework no puede
+cargar/guardar partes reducidas del grafo. Toda operación
+carga los N nodos enteros. Se discute a futuro; requiere
+revisar teoría de grafos y el modelo de persistencia. No se
+toca ahora.
+
+**(B) Falencias del piloto.** No elimina bien los nodos al
+cancelar cosas. En algunos casos NO hay que eliminar
+(datos del cliente que se conservan a propósito). En otros
+SÍ hay que eliminar (viaje, cliente, terminal, micro,
+cancelaciones, cupones).
+
+**Plan en tres fases:**
+
+**Fase 1 — Pestaña Grafo (diagnóstico). Implementada en v74p.**
+
+Vista de solo lectura para ver la fuga con los ojos. Ver §3.4.
+Es la herramienta que habilita las Fases 2 y 3.
+
+**Fase 2 — Auditoría de la fuga de nodos (pendiente, prioridad alta).**
+
+Con la pestaña Grafo como herramienta:
+
+1. Recorrer cada flujo de eliminación del piloto:
+   - Alta/baja de viaje (`eliminar_viaje`).
+   - Alta/baja de cliente (`eliminar_pasajero`).
+   - Alta/baja de terminal (`eliminar_terminal`).
+   - Alta/baja de micro (`eliminar_micro_de_viaje`).
+   - Alta/baja de vehículo (`eliminar_vehiculo`).
+   - Alta/baja de empresa (`eliminar_empresa`).
+   - Cancelación de venta (`cancelar_venta`).
+   - Cupones, rendiciones, liquidaciones, cancelaciones.
+2. Para cada uno, anotar:
+   - Qué nodos se desenlazan.
+   - Qué nodos deberían destruirse también (y hoy no se
+     destruyen).
+   - Qué nodos se conservan a propósito (ej.: datos del
+     cliente).
+3. Implementar los fixes en tandas chicas, midiendo el total
+   de nodos antes y después.
+4. Documentar los criterios en §8.6.1.
+
+**Fase 3 — Optimizaciones (pendiente, prioridad media).**
+
+Solo si después de Fase 2 todavía hace falta velocidad:
+
+- **Iteradores persistentes.** El framework permite iteradores
+  que van perdurando su posición actual en el grafo. Podrían
+  reducir los recorridos repetidos (por ejemplo, en
+  `formatear_viaje`).
+- **Cacheo de contadores.** El `formatear_viaje` actual
+  escala como O(V × W): por cada viaje, recorre todas las
+  ventas del dueño. Con un índice de ventas por viaje +
+  cacheo de contadores, baja a O(V + W).
+- **Eventual carga parcial del grafo.** Requiere cambiar el
+  framework (frente A). No se hace por ahora.
+
+### 8.6.1 Criterios de eliminación
+
+**Stub. A completar en Fase 2.**
+
+Cuando se cancela/elimina una entidad, no siempre hay que
+destruir los nodos asociados. Algunos se conservan a
+propósito (datos del cliente). Otros deben destruirse
+(viaje, micro, terminal). Esta sección documenta el criterio
+por tipo de entidad.
+
+**Criterio general (a validar caso por caso):**
+
+- **Datos del cliente (pasajero, comprador):** se conservan
+  aunque la venta se cancele. El cliente puede volver a
+  comprar.
+- **Entidades operativas (viaje, micro, venta, cupón,
+  terminal):** al eliminarse, sus nodos deberían destruirse.
+  Los nodos que cuelgan de ellas también (asientos de copia,
+  cupones, etc.) salvo que estén referenciados desde otro
+  lado.
+- **Nodos "hijos" (asientos, cupones, etc.):** se destruyen
+  junto con su padre, salvo que tengan referencias
+  entrantes (en cuyo caso primero se desenlazan las
+  referencias).
+
+**Pendiente:** documentar el criterio por entidad concreta
+después de la auditoría.
 
 ---
 
@@ -1238,7 +1404,17 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74o
+**Última actualización de este prompt:** v1.5piloto.74p
+(pestaña "Grafo", Fase 1 del plan de optimización del grafo.
+Visible solo para admin y soporte. Vista de solo lectura.
+Backend: 3 comandos nuevos en el `Controlador`
+(`grafo:resumen`, `grafo:listar`, `grafo:nodo`) registrados
+desde `registrar_comandos_grafo()`, ejecutados vía
+`Controlador::ejecutar_comando()` sin usar el motor. Módulo
+`grafo` en el enrutador. Frontend nuevo: `Aplicacion/grafo.js`.
+Se agregaron §3.4 (pestaña Grafo), §8.6 (plan de las tres
+fases) y §8.6.1 (criterios de eliminación, stub)).
+Antes: v1.5piloto.74o
 (botón "Limpiar pasajeros de prueba" en la pestaña
 Pasajeros/Clientes. Nueva función
 `limpiar_pasajeros_de_prueba` en `Pasajero.php` y subacción
@@ -1435,6 +1611,36 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   helper `_mostrar_alerta_critica()` respeta la bandera
   `window.__iteradores_modo_prueba` que el plugin setea antes
   de los flujos que disparan `alert()`.
+- Cerramos en v74p la Fase 1 del plan de optimización del
+  grafo: pestaña "Grafo" (solo admin y soporte). Vista de
+  solo lectura con totales, alcanzables vs huérfanos, top
+  de referencias, tabla filtrable y modal de detalle por
+  nodo. Backend: 3 comandos en el `Controlador`
+  (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
+  Frontend: `Aplicacion/grafo.js`.
+- **Decisión anotada como pendiente de prioridad alta:**
+  **fuga de nodos**. Cuando se elimina una venta, un
+  pasajero, un viaje o cualquier entidad, el nodo se
+  descuelga del contenedor pero no se destruye. Como el
+  framework no permite eliminar un nodo con referencias
+  entrantes, esos nodos quedan huérfanos y el grafo crece
+  indefinidamente. Medición: grafo de 10.000 nodos → 50-70s
+  por prueba; grafo de 2.000 nodos → 15-18s por prueba.
+  La pestaña Grafo es la herramienta de diagnóstico para la
+  Fase 2 (auditoría de la fuga). Ver §8.6.
+- **Plan de optimización del grafo (3 fases):** ver §8.6.
+  Fase 1 implementada en v74p (pestaña Grafo). Fase 2
+  pendiente (prioridad alta): auditoría de la fuga por
+  flujo de eliminación + implementación de fixes + criterios
+  en §8.6.1. Fase 3 pendiente (prioridad media): iteradores
+  persistentes, cacheo de contadores, eventual carga parcial
+  del grafo (esta última requiere tocar el framework).
+- **Frente de framework (no se toca ahora):** el framework
+  no puede cargar/guardar partes reducidas del grafo. Un
+  nodo puede estar referenciado desde más de un lado, así
+  que no hay un árbol natural de pertenencia. Requiere
+  revisar teoría de grafos. Se retoma en una sesión del
+  framework.
 - Cerramos en v74o el botón "Limpiar pasajeros de prueba"
   para el admin (solo en modo pruebas). Criterio: email
   termina en `@test.local`. Conserva los que tienen
@@ -1443,19 +1649,6 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   `Conf::LOCAL`, e inyecta `window.entorno_es_pruebas` en
   el HTML. Los dos botones de limpieza (viajes y pasajeros)
   aparecen solo si el admin está en modo pruebas.
-- **Decisión anotada como pendiente de prioridad alta:**
-  **fuga de nodos**. Cuando se elimina una venta, un
-  pasajero, un viaje o cualquier entidad, el nodo se
-  descuelga del contenedor pero no se destruye. Como el
-  framework no permite eliminar un nodo con referencias
-  entrantes, esos nodos quedan huérfanos y el grafo crece
-  indefinidamente. Afecta la performance de todo. Los
-  botones de limpieza son paliativos. La solución de fondo
-  requiere auditar cada flujo de eliminación y desenlazar
-  progresivamente antes de llamar a `Nodo::eliminar`.
-  También conviene revisar si el framework podría soportar
-  carga parcial del grafo (traer solo la rama de interés
-  en vez del grafo entero).
 - Cerramos en v74n el botón "Limpiar viajes de prueba" para
   el admin. El grafo del dueño `carmen1` tenía 21 viajes
   (20 de ellos de pruebas anteriores), y `formatear_viaje`
@@ -1578,35 +1771,34 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74o (framework 1.5i.7f).
-Todo funcional. Bug 1 y Bug 2 resueltos. Fixes de v74k
-endurecen el alta de micro. Fix de v74m: `guardar_ambos`
-deja de guardar el JSON de respaldo automático. Fix de
-v74n: botón "Limpiar viajes de prueba". Fix de v74o: botón
-"Limpiar pasajeros de prueba" y control de modo
-(`Entorno::es_pruebas()`). El plugin de pruebas
-(`iteradoresJS/`, v1.5plugin.5d) tiene 29 pruebas
-corriendo.
+**Estado del proyecto al cierre:** v1.5piloto.74p (framework 1.5i.7f).
+Todo funcional. Fixes de v74k a v74o acumulados. Fix de
+v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
+El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5d)
+tiene 29 pruebas corriendo.
 
-**Deuda técnica pendiente (prioridad alta):**
-**fuga de nodos**. Cuando se elimina una venta, un pasajero,
-un viaje o cualquier entidad, el nodo se descuelga del
-contenedor pero no se destruye. Como el framework no
-permite eliminar un nodo con referencias entrantes, esos
-nodos quedan huérfanos y el grafo crece indefinidamente.
-La aplicación se vuelve lenta porque todo itera sobre el
-grafo completo. La limpieza manual (botones de admin) es
-paliativa. La solución requiere auditar cada flujo de
-eliminación y desenlazar progresivamente antes de llamar
-a `Nodo::eliminar`. Requiere también revisar la
-arquitectura del framework para permitir carga parcial
-del grafo (cargar solo la rama de interés).
+**Plan de optimización del grafo (ver §8.6):**
 
-**Deuda técnica pendiente (prioridad media):**
-`formatear_viaje` en `Viaje.php` escala como O(V × W): por
-cada viaje, recorre todas las ventas del dueño. Optimización
-real pendiente: índice de ventas por viaje + cacheo de
-contadores.
+- **Fase 1 — Pestaña Grafo.** Implementada en v74p.
+- **Fase 2 — Auditoría de la fuga de nodos.** Pendiente,
+  prioridad alta. Recorrer cada flujo de eliminación (viaje,
+  cliente, terminal, micro, venta, cancelación, cupón) y
+  anotar qué nodos quedan huérfanos. Implementar los fixes.
+  Documentar criterios en §8.6.1.
+- **Fase 3 — Optimizaciones.** Pendiente, prioridad media.
+  Iteradores persistentes, cacheo de contadores
+  (`formatear_viaje`), eventual carga parcial del grafo.
+
+**Mediciones concretas de la fuga:**
+
+- Grafo de ~10.000 nodos → ~50-70s por prueba del plugin.
+- Grafo de ~2.000 nodos → ~15-18s por prueba.
+
+**Deuda técnica de framework (prioridad alta, no se toca
+ahora):** el framework no puede cargar/guardar partes
+reducidas del grafo. Un nodo puede estar referenciado desde
+más de un lado, así que no hay un árbol natural de
+pertenencia. Se retoma en una sesión del framework.
 
 ---
 

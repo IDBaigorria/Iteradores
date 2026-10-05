@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.74o
+ * @version   1.5piloto.74p
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1122,6 +1122,52 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de usuarios no válida']);
+            }
+            break;
+
+        case 'grafo':
+            // Solo admin y soporte.
+            $nombre_sol_gr = $post['nombre_solicitante'] ?? '';
+            $raiz_sol_gr = Nodo::nodo_por_id('usuarios');
+            $nodo_sol_gr = ($raiz_sol_gr && $nombre_sol_gr !== '') ? $raiz_sol_gr->adyacente($nombre_sol_gr) : null;
+            $nodo_nivel_gr = $nodo_sol_gr ? $nodo_sol_gr->adyacente('nivel') : null;
+            $nivel_sol_gr = $nodo_nivel_gr ? $nodo_nivel_gr->dato() : '';
+            if (!in_array($nivel_sol_gr, ['admin', 'soporte'], true)) {
+                responder_json(['exito' => false, 'error' => 'Permiso denegado']);
+            }
+
+            switch ($subaccion) {
+                case 'resumen':
+                    $resumen_gr = Controlador::ejecutar_comando('grafo:resumen');
+                    responder_json(['exito' => true, 'resumen' => $resumen_gr]);
+                    break;
+
+                case 'listar':
+                    $opciones_gr = [
+                        'filtro' => $post['filtro'] ?? 'todos',
+                        'enlace' => $post['enlace'] ?? '',
+                        'texto' => $post['texto'] ?? '',
+                        'offset' => (int)($post['offset'] ?? 0),
+                        'limite' => (int)($post['limite'] ?? 50),
+                    ];
+                    $lista_gr = Controlador::ejecutar_comando('grafo:listar', $opciones_gr);
+                    responder_json(['exito' => true, 'lista' => $lista_gr]);
+                    break;
+
+                case 'nodo':
+                    $id_gr = $post['id'] ?? '';
+                    if ($id_gr === '') {
+                        responder_json(['exito' => false, 'error' => 'ID no especificado']);
+                    }
+                    $nodo_gr = Controlador::ejecutar_comando('grafo:nodo', $id_gr);
+                    if (!$nodo_gr) {
+                        responder_json(['exito' => false, 'error' => 'Nodo no encontrado']);
+                    }
+                    responder_json(['exito' => true, 'nodo' => $nodo_gr]);
+                    break;
+
+                default:
+                    responder_json(['exito' => false, 'error' => 'Subacción de grafo no válida']);
             }
             break;
 
