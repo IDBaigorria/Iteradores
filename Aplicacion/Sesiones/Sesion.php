@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.70
+ * @version   1.5piloto.75
  */
 
 use Iteradores\Nodos\Nodo;
@@ -13,6 +13,7 @@ use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
+include_once("./Aplicacion/FuncionesAuxiliares.php");
 
 
 /**
@@ -33,6 +34,10 @@ function eliminar_sesiones_de_usuario(string $nombre_usuario): void {
             $nodo_usuario = $nodo_sesion->adyacente('usuario');
             if ($nodo_usuario && $nodo_usuario->dato() === $nombre_usuario) {
                 $raiz->eliminar_adyacente($token);
+                // Fase 2, v75: destruir los campos del nodo
+                // sesión (usuario, creado_en). Antes quedaban
+                // huérfanos (~2 nodos por sesión eliminada).
+                _destruir_campos_simples($nodo_sesion);
                 Nodo::eliminar($nodo_sesion);
             }
         }
@@ -108,6 +113,9 @@ function cerrar_sesion(string $token): bool {
         if (!$nodo_sesion) return false;
 
         $raiz->eliminar_adyacente($token);
+        // Fase 2, v75: destruir los campos del nodo sesión
+        // (usuario, creado_en).
+        _destruir_campos_simples($nodo_sesion);
         Nodo::eliminar($nodo_sesion);
         return true;
     });

@@ -812,6 +812,19 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v75**: Fase 2, flujos 13 y 14 arreglados.
+  `eliminar_usuario` ahora destruye los campos del nodo
+  usuario (nivel, nombre_real, email, efectivo, banco con
+  sus hijos), el nodo credencial con sus campos
+  (codigo_hash, contrasena, intentos_fallidos,
+  bloqueado_hasta, ultimo_acceso, ip_ultimo_acceso), y las
+  sesiones activas del usuario. `actualizar_usuario`
+  destruye los campos al cambiar de nivel (efectivo,
+  banco), al limpiar el banco del dueño (nombre, cuenta),
+  y al resetear el bloqueo (bloqueado_hasta).
+  `eliminar_sesiones_de_usuario` y `cerrar_sesion` de
+  `Sesion.php` ahora destruyen los campos del nodo sesión.
+  Nuevo helper `_destruir_banco_usuario` en `Usuario.php`.
 - **v74z**: Fase 2, duodécimo flujo arreglado:
   `limpiar_viajes_de_prueba`. Antes desenlazaba los
   viajes de prueba del contenedor del dueño sin
@@ -1259,6 +1272,16 @@ creado durante la selección, y los campos `viaje` y
 `cancelar_venta_limpia_nodos` del plugin, que al crear
 la venta vio un incremento de huérfanos de 5.
 
+**Decimotercer y decimocuarto flujo arreglados en v75:**
+`eliminar_usuario` (destruye los campos del nodo usuario,
+el banco con sus hijos, el nodo credencial con sus campos,
+y las sesiones activas) y `actualizar_usuario` (destruye
+efectivo, banco, y las hojas de banco y bloqueo_hasta en
+los flujos de cambio de nivel y limpieza). También se
+arreglan `eliminar_sesiones_de_usuario` y `cerrar_sesion`
+en `Sesion.php` (destruían el nodo sesión sin sus campos).
+Nuevo helper `_destruir_banco_usuario`.
+
 **Duodécimo flujo arreglado en v74z:**
 `limpiar_viajes_de_prueba`. Antes desenlazaba los viajes
 de prueba del contenedor del dueño sin destruirlos:
@@ -1630,7 +1653,12 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74z
+**Última actualización de este prompt:** v1.5piloto.75
+(Fase 2, flujos 13 y 14: `eliminar_usuario` y
+`actualizar_usuario`. También `Sesion.php` (destrucción
+de campos del nodo sesión). Nuevo helper
+`_destruir_banco_usuario` en `Usuario.php`.).
+Antes: v1.5piloto.74z
 (Fase 2, flujo 12: `limpiar_viajes_de_prueba`. Ahora
 destruye el subárbol completo de cada viaje antes de
 desenlazarlo. La herramienta de limpieza era en sí misma
@@ -1896,6 +1924,13 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   nodo. Backend: 3 comandos en el `Controlador`
   (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
   Frontend: `Aplicacion/grafo.js`.
+- Cerramos en v75 los flujos 13 y 14 de Fase 2:
+  `eliminar_usuario` (destruye campos del usuario, banco,
+  credenciales y sesiones activas) y `actualizar_usuario`
+  (destruye efectivo, banco, hojas de banco y
+  bloqueado_hasta). También `eliminar_sesiones_de_usuario`
+  y `cerrar_sesion` en `Sesion.php`. Nuevo helper
+  `_destruir_banco_usuario`.
 - Cerramos en v74z el flujo 12 de Fase 2:
   `limpiar_viajes_de_prueba`. Ahora destruye el subárbol
   completo de cada viaje antes de desenlazarlo.
@@ -2114,7 +2149,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74z (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.75 (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2131,6 +2166,8 @@ y `deseleccionar_asiento_micro`). v74y: flujos 9, 10
 y 11 (`actualizar_configuracion_vehiculo`,
 `eliminar_vehiculo`, `eliminar_empresa`).
 v74z: flujo 12 (`limpiar_viajes_de_prueba`).
+v75: flujos 13 y 14 (`eliminar_usuario`,
+`actualizar_usuario`) y `Sesion.php`.
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 

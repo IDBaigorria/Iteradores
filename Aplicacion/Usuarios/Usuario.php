@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.73j
+ * @version   1.5piloto.75
  */
 
 use Iteradores\Nodos\Nodo;
@@ -13,6 +13,7 @@ use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
+include_once("./Aplicacion/FuncionesAuxiliares.php");
 
 /**
  * Busca un usuario por su código de acceso.
@@ -791,8 +792,20 @@ function actualizar_usuario(array $datos): array {
 
     if ($nivel_actual !== $nivel) {
         if ($nivel === 'admin') {
-            $nodo_usuario->eliminar_adyacente('efectivo');
-            $nodo_usuario->eliminar_adyacente('banco');
+            // Fase 2, v75: destruir efectivo (hoja) y banco
+            // (contenedor con nombre/cuenta) en lugar de solo
+            // desenlazarlos. `dueno` es una referencia externa,
+            // solo se desenlaza.
+            $nodo_ef = $nodo_usuario->adyacente('efectivo');
+            if ($nodo_ef) {
+                $nodo_usuario->eliminar_adyacente('efectivo');
+                Nodo::eliminar($nodo_ef);
+            }
+            $nodo_banco = $nodo_usuario->adyacente('banco');
+            if ($nodo_banco) {
+                $nodo_usuario->eliminar_adyacente('banco');
+                _destruir_banco_usuario($nodo_banco);
+            }
             $nodo_usuario->eliminar_adyacente('dueno');
         }
         if ($nivel === 'dueno') {
@@ -834,7 +847,13 @@ function actualizar_usuario(array $datos): array {
             if ($nodo_banco_nombre) $nodo_banco_nombre->_dato($banco_nombre);
             else $nodo_banco->_adyacente_en(Nodo::crear_con_dato($banco_nombre), 'nombre');
         } else if ($nivel === 'dueno') {
-            $nodo_banco->eliminar_adyacente('nombre');
+            // Fase 2, v75: destruir la hoja `nombre` en lugar
+            // de solo desenlazarla.
+            $nodo_banco_nombre = $nodo_banco->adyacente('nombre');
+            if ($nodo_banco_nombre) {
+                $nodo_banco->eliminar_adyacente('nombre');
+                Nodo::eliminar($nodo_banco_nombre);
+            }
         }
 
         if ($banco_cuenta !== '') {
@@ -842,7 +861,12 @@ function actualizar_usuario(array $datos): array {
             if ($nodo_banco_cuenta) $nodo_banco_cuenta->_dato($banco_cuenta);
             else $nodo_banco->_adyacente_en(Nodo::crear_con_dato($banco_cuenta), 'cuenta');
         } else if ($nivel === 'dueno') {
-            $nodo_banco->eliminar_adyacente('cuenta');
+            // Fase 2, v75: destruir la hoja `cuenta`.
+            $nodo_banco_cuenta = $nodo_banco->adyacente('cuenta');
+            if ($nodo_banco_cuenta) {
+                $nodo_banco->eliminar_adyacente('cuenta');
+                Nodo::eliminar($nodo_banco_cuenta);
+            }
         }
 
         if ($nivel === 'terminal') {
@@ -888,7 +912,13 @@ function actualizar_usuario(array $datos): array {
             $nodo_intentos = $nodo_cred->adyacente('intentos_fallidos');
             if ($nodo_intentos) $nodo_intentos->_dato('0');
             else $nodo_cred->_adyacente_en(Nodo::crear_con_dato('0'), 'intentos_fallidos');
-            $nodo_cred->eliminar_adyacente('bloqueado_hasta');
+            // Fase 2, v75: destruir `bloqueado_hasta` en lugar
+            // de solo desenlazarlo.
+            $nodo_bloqueo = $nodo_cred->adyacente('bloqueado_hasta');
+            if ($nodo_bloqueo) {
+                $nodo_cred->eliminar_adyacente('bloqueado_hasta');
+                Nodo::eliminar($nodo_bloqueo);
+            }
         });
     }
 
@@ -900,7 +930,33 @@ function actualizar_usuario(array $datos): array {
 }
 
 /**
+ * Destruye el nodo banco de un usuario: sus hojas (nombre,
+ * cuenta) y el propio nodo banco.
+ *
+ * El nodo banco es un contenedor cuyo dato es el monto
+ * bancarizado. Sus hijos son `nombre` y `cuenta`, ambos
+ * hojas. `_destruir_campos_simples` recorre los adyacentes
+ * y destruye los que no tienen hijos; después se destruye
+ * el contenedor.
+ *
+ * @param Nodo $nodo_banco
+ * @return void
+ */
+function _destruir_banco_usuario(Nodo $nodo_banco): void {
+    _destruir_campos_simples($nodo_banco);
+    Nodo::eliminar($nodo_banco);
+}
+
+/**
  * Elimina un usuario existente.
+ *
+ * A partir de v1.5piloto.75 (Fase 2 del plan de optimización
+ * del grafo): destruye los campos del nodo usuario (nivel,
+ * nombre_real, email, efectivo, banco con sus hijos), el
+ * nodo credencial con sus campos (codigo_hash, contrasena,
+ * intentos_fallidos, bloqueado_hasta, ultimo_acceso,
+ * ip_ultimo_acceso), y las sesiones activas del usuario.
+ * Antes quedaban ~15-20 nodos huérfanos por usuario.
  *
  * @param string $nombre_usuario Nombre del usuario a eliminar.
  * @return array Resultado de la operación.
@@ -925,6 +981,9 @@ function eliminar_usuario(string $nombre_usuario): array {
         return ['exito' => false, 'error' => 'No se puede eliminar un dueño con terminales asociadas'];
     }
 
+    // === 1. Desenlazar referencias cruzadas entre usuarios ===
+
+    // Terminal: desenlazar del contenedor `terminales` del dueño.
     $nodo_dueno = $nodo_usuario->adyacente('dueno');
     if ($nodo_dueno) {
         $dueno_nombre = $nodo_dueno->dato();
@@ -937,7 +996,7 @@ function eliminar_usuario(string $nombre_usuario): array {
         }
     }
 
-    // Si es soporte, limpiar los enlaces `soporte` en sus dueños.
+    // Soporte: limpiar los enlaces `soporte` en sus dueños.
     $nodo_nivel_actual = $nodo_usuario->adyacente('nivel');
     $nivel_actual_del = $nodo_nivel_actual ? $nodo_nivel_actual->dato() : '';
     if ($nivel_actual_del === 'soporte') {
@@ -949,7 +1008,7 @@ function eliminar_usuario(string $nombre_usuario): array {
         }
     }
 
-    // Si es dueño, limpiar la referencia en su soporte.
+    // Dueño: limpiar la referencia en su soporte.
     if ($nivel_actual_del === 'dueno') {
         $nodo_soporte_del = $nodo_usuario->adyacente('soporte');
         if ($nodo_soporte_del) {
@@ -964,17 +1023,51 @@ function eliminar_usuario(string $nombre_usuario): array {
         }
     }
 
+    // === 2. Destruir el banco (contenedor con nombre/cuenta) ===
+    $nodo_banco = $nodo_usuario->adyacente('banco');
+    if ($nodo_banco) {
+        $nodo_usuario->eliminar_adyacente('banco');
+        _destruir_banco_usuario($nodo_banco);
+    }
+
+    // === 3. Destruir el contenedor `duenos` (si es soporte) ===
+    $nodo_duenos_del = $nodo_usuario->adyacente('duenos');
+    if ($nodo_duenos_del) {
+        // Vaciar el contenedor antes de destruirlo.
+        $adyacentes_duenos = (array) $nodo_duenos_del->adyacentes();
+        foreach ($adyacentes_duenos as $nombre_d => $nodo_d) {
+            $nodo_duenos_del->eliminar_adyacente((string)$nombre_d);
+        }
+        $nodo_usuario->eliminar_adyacente('duenos');
+        _destruir_campos_simples($nodo_duenos_del);
+        Nodo::eliminar($nodo_duenos_del);
+    }
+
+    // === 4. Desenlazar referencias externas ===
+    $nodo_usuario->eliminar_adyacente('dueno');
+    $nodo_usuario->eliminar_adyacente('soporte');
+
+    // === 5. Destruir campos simples del propio usuario ===
+    // (nivel, nombre_real, email, efectivo).
+    _destruir_campos_simples($nodo_usuario);
+
+    // === 6. Desenlazar del contenedor raíz y destruir el usuario ===
     $raiz->eliminar_adyacente($nombre_usuario);
     Nodo::eliminar($nodo_usuario);
     guardar_ambos(Conf::NOMBRE_APP);
 
-    // Eliminar también en credenciales.
+    // === 7. Destruir en credenciales: sesiones + nodo + campos ===
     en_grafo_credenciales(function() use ($nombre_usuario) {
+        // Eliminar sesiones activas del usuario (destruye campos).
+        eliminar_sesiones_de_usuario($nombre_usuario);
+
+        // Destruir el nodo credencial y sus campos.
         $raiz_cred = Nodo::nodo_por_id('usuarios');
         if (!$raiz_cred) return;
         $nodo_cred = $raiz_cred->adyacente($nombre_usuario);
         if ($nodo_cred) {
             $raiz_cred->eliminar_adyacente($nombre_usuario);
+            _destruir_campos_simples($nodo_cred);
             Nodo::eliminar($nodo_cred);
         }
     });
