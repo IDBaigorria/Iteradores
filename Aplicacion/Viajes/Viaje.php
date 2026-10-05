@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.75a
+ * @version   1.5piloto.76a
  */
 
 use Iteradores\Nodos\Nodo;
@@ -200,9 +200,14 @@ function listar_viajes_de_dueno(string $nombre_dueno): array {
     $adyacentes = (array) $nodo_viajes->adyacentes();
     if (!$adyacentes) return [];
 
+    // Fase 3, v76a: precalcular el índice de ventas por viaje
+    // UNA VEZ. Antes, formatear_viaje recorría todo el contenedor
+    // de ventas del dueño por cada viaje (O(V × W)).
+    $indice_ventas = _construir_indice_ventas_por_viaje($nombre_dueno);
+
     $viajes = [];
     foreach ($adyacentes as $nombre_viaje => $nodo_viaje) {
-        $viajes[] = formatear_viaje($nombre_viaje, $nodo_viaje);
+        $viajes[] = formatear_viaje($nombre_viaje, $nodo_viaje, null, $indice_ventas);
     }
     return $viajes;
 }
@@ -224,10 +229,16 @@ function listar_viajes_de_terminal(string $nombre_terminal): array {
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
     if (!$nodo_viajes) return [];
 
+    // Fase 3, v76a: precalcular el índice de ventas por viaje
+    // UNA VEZ, con el terminal como filtro. Antes, formatear_viaje
+    // recorría todo el contenedor de ventas del dueño por cada
+    // viaje (O(V × W)).
+    $indice_ventas = _construir_indice_ventas_por_viaje($nombre_dueno, $nombre_terminal);
+
     $viajes_autorizados = [];
     $adyacentes = (array) $nodo_viajes->adyacentes();
     foreach ($adyacentes as $nombre_viaje => $nodo_viaje) {
-        $viaje = formatear_viaje($nombre_viaje, $nodo_viaje, $nombre_terminal); 
+        $viaje = formatear_viaje($nombre_viaje, $nodo_viaje, $nombre_terminal, $indice_ventas);
         if (in_array($nombre_terminal, $viaje['terminales_autorizadas'])) {
             $viajes_autorizados[] = $viaje;
         }
@@ -244,7 +255,7 @@ function listar_viajes_de_terminal(string $nombre_terminal): array {
  * actualizado (viajes creados antes de la v1.5piloto.27 pueden tener el nodo
  * 'reservados' en "0" o inexistente).
  */
-function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_terminal = null): array {
+function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_terminal = null, ?array $indice_ventas = null): array {
     $datos = [];
     $datos['nombre_viaje'] = $nombre_viaje;
     $datos['dueno'] = $nodo_viaje->adyacente('dueno') ? $nodo_viaje->adyacente('dueno')->dato() : '';
@@ -293,39 +304,26 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
         $datos['activo'] = (strtotime($fecha) >= strtotime($hoy)) ? '1' : '0';
     }
 
-    // Verificar si tiene ventas
-    $datos['tiene_ventas'] = viaje_tiene_ventas($datos['dueno'], $nombre_viaje) ? '1' : '0';
+    // Verificar si tiene ventas.
+    // Fase 3, v76a: si viene el índice precalculado, usarlo.
+    // Si no, computar al vuelo (fallback para llamadores que no
+    // pasan el índice, como los llamados puntuales).
+    if ($indice_ventas !== null) {
+        $tiene_ventas_bool = !empty($indice_ventas['tiene_ventas'][$nombre_viaje]);
+    } else {
+        $tiene_ventas_bool = viaje_tiene_ventas($datos['dueno'], $nombre_viaje);
+    }
+    $datos['tiene_ventas'] = $tiene_ventas_bool ? '1' : '0';
 
-    // Calcular ventas por micro de la terminal actual (si corresponde)
+    // Calcular ventas por micro de la terminal actual (si corresponde).
+    // Fase 3, v76a: si viene el índice precalculado, usarlo.
+    // Si no, computar al vuelo (fallback).
     $vendidos_por_micro = [];
     if ($nombre_terminal !== null) {
-        $contenedor_ventas = obtener_contenedor_ventas_dueno($datos['dueno']);
-        if ($contenedor_ventas) {
-            $venta_iter = hmi($contenedor_ventas);
-            while ($venta_iter) {
-                $nodo_terminal_venta = $venta_iter->adyacente('terminal');
-                $nodo_micro_venta = $venta_iter->adyacente('micro');
-                $nodo_viaje_venta = $venta_iter->adyacente('viaje');
-
-                if ($nodo_terminal_venta && $nodo_terminal_venta->dato() === $nombre_terminal
-                    && $nodo_viaje_venta && $nodo_viaje_venta->dato() === $nombre_viaje
-                    && $nodo_micro_venta) {
-                    $micro_id = $nodo_micro_venta->id();
-                    $cabeza = $venta_iter->adyacente('asientos');
-                    $cantidad = 0;
-                    if ($cabeza) {
-                        $asiento = $cabeza->adyacente('primer');
-                        $seg = 0;
-                        while ($asiento && $seg < 100) {
-                            $cantidad++;
-                            $asiento = $asiento->adyacente('siguiente');
-                            $seg++;
-                        }
-                    }
-                    $vendidos_por_micro[$micro_id] = ($vendidos_por_micro[$micro_id] ?? 0) + $cantidad;
-                }
-                $venta_iter = hd($venta_iter);
-            }
+        if ($indice_ventas !== null) {
+            $vendidos_por_micro = $indice_ventas['vendidos_por_micro'][$nombre_viaje][$nombre_terminal] ?? [];
+        } else {
+            $vendidos_por_micro = _calcular_vendidos_por_micro_de_viaje($datos['dueno'], $nombre_viaje, $nombre_terminal);
         }
     }
 
@@ -461,6 +459,134 @@ function viaje_tiene_ventas(string $nombre_dueno, string $nombre_viaje): bool {
         $actual = hd($actual);
     }
     return false;
+}
+
+/**
+ * Calcula las ventas por micro de una terminal para un viaje.
+ *
+ * Recorre todo el contenedor de ventas del dueño y devuelve un
+ * mapa micro_id => cantidad de asientos vendidos por esa terminal
+ * en ese viaje. Solo cuenta las ventas cuya terminal y viaje
+ * coinciden.
+ *
+ * Es el cómputo original que hacía formatear_viaje inline. Se
+ * extrajo a un helper en v76a (Fase 3) para que el fallback
+ * (cuando formatear_viaje se llama sin índice precalculado)
+ * use el mismo código que la variante con índice.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @param string $nombre_terminal
+ * @return array<int|string, int> micro_id => cantidad
+ */
+function _calcular_vendidos_por_micro_de_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal): array {
+    $vendidos_por_micro = [];
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if (!$contenedor_ventas) return $vendidos_por_micro;
+    $venta_iter = hmi($contenedor_ventas);
+    $seg = 0;
+    while ($venta_iter && $seg < 2000) {
+        $nodo_terminal_venta = $venta_iter->adyacente('terminal');
+        $nodo_micro_venta = $venta_iter->adyacente('micro');
+        $nodo_viaje_venta = $venta_iter->adyacente('viaje');
+
+        if ($nodo_terminal_venta && $nodo_terminal_venta->dato() === $nombre_terminal
+            && $nodo_viaje_venta && $nodo_viaje_venta->dato() === $nombre_viaje
+            && $nodo_micro_venta) {
+            $micro_id = $nodo_micro_venta->id();
+            $cabeza = $venta_iter->adyacente('asientos');
+            $cantidad = 0;
+            if ($cabeza) {
+                $asiento = $cabeza->adyacente('primer');
+                $seg2 = 0;
+                while ($asiento && $seg2 < 100) {
+                    $cantidad++;
+                    $asiento = $asiento->adyacente('siguiente');
+                    $seg2++;
+                }
+            }
+            $vendidos_por_micro[$micro_id] = ($vendidos_por_micro[$micro_id] ?? 0) + $cantidad;
+        }
+        $venta_iter = hd($venta_iter);
+        $seg++;
+    }
+    return $vendidos_por_micro;
+}
+
+/**
+ * Construye el índice de ventas por viaje de un dueño,
+ * recorriendo el contenedor de ventas UNA SOLA VEZ.
+ *
+ * Devuelve un array con dos partes:
+ *
+ *   [
+ *     'tiene_ventas' => [nombre_viaje => bool],
+ *     'vendidos_por_micro' => [
+ *       nombre_viaje => [nombre_terminal => [micro_id => int]]
+ *     ]
+ *   ]
+ *
+ * La parte `vendidos_por_micro` solo se llena si se pasa
+ * $nombre_terminal. Si es null, se omite (los llamadores que
+ * no necesitan ese dato evitan el costo).
+ *
+ * Se usa desde listar_viajes_de_dueno y listar_viajes_de_terminal
+ * para pasar el índice a formatear_viaje, y así evitar
+ * recorrer el contenedor de ventas por cada viaje (O(V × W)).
+ * Fase 3 del plan de optimización del grafo, v76a.
+ *
+ * @param string      $nombre_dueno
+ * @param string|null $nombre_terminal
+ * @return array
+ */
+function _construir_indice_ventas_por_viaje(string $nombre_dueno, ?string $nombre_terminal = null): array {
+    $indice = [
+        'tiene_ventas' => [],
+        'vendidos_por_micro' => [],
+    ];
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if (!$contenedor_ventas) return $indice;
+
+    $venta_iter = hmi($contenedor_ventas);
+    $seg = 0;
+    while ($venta_iter && $seg < 2000) {
+        $nodo_viaje_venta = $venta_iter->adyacente('viaje');
+        if ($nodo_viaje_venta) {
+            $nombre_viaje = $nodo_viaje_venta->dato();
+            $indice['tiene_ventas'][$nombre_viaje] = true;
+
+            if ($nombre_terminal !== null) {
+                $nodo_terminal_venta = $venta_iter->adyacente('terminal');
+                $nodo_micro_venta = $venta_iter->adyacente('micro');
+                if ($nodo_terminal_venta && $nodo_terminal_venta->dato() === $nombre_terminal
+                    && $nodo_micro_venta) {
+                    $micro_id = $nodo_micro_venta->id();
+                    $cabeza = $venta_iter->adyacente('asientos');
+                    $cantidad = 0;
+                    if ($cabeza) {
+                        $asiento = $cabeza->adyacente('primer');
+                        $seg2 = 0;
+                        while ($asiento && $seg2 < 100) {
+                            $cantidad++;
+                            $asiento = $asiento->adyacente('siguiente');
+                            $seg2++;
+                        }
+                    }
+                    if (!isset($indice['vendidos_por_micro'][$nombre_viaje])) {
+                        $indice['vendidos_por_micro'][$nombre_viaje] = [];
+                    }
+                    if (!isset($indice['vendidos_por_micro'][$nombre_viaje][$nombre_terminal])) {
+                        $indice['vendidos_por_micro'][$nombre_viaje][$nombre_terminal] = [];
+                    }
+                    $indice['vendidos_por_micro'][$nombre_viaje][$nombre_terminal][$micro_id] =
+                        ($indice['vendidos_por_micro'][$nombre_viaje][$nombre_terminal][$micro_id] ?? 0) + $cantidad;
+                }
+            }
+        }
+        $venta_iter = hd($venta_iter);
+        $seg++;
+    }
+    return $indice;
 }
 
 /**

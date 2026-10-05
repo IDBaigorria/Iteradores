@@ -823,6 +823,16 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76a**: Fase 3 del plan de optimización del grafo.
+  `formatear_viaje` recibe un 4to parámetro opcional
+  (`$indice_ventas`). `listar_viajes_de_dueno` y
+  `listar_viajes_de_terminal` construyen un índice de
+  ventas por viaje UNA SOLA VEZ antes del bucle de
+  viajes. Helper nuevo
+  `_construir_indice_ventas_por_viaje` y
+  `_calcular_vendidos_por_micro_de_viaje` (extraído del
+  inline anterior). Baja el costo de `listar_viajes_*`
+  de O(V × W) a O(V + W).
 - **v75a**: Fase 2, cierre de los "campos huérfanos" del
   Grupo B. Cinco fixes chicos: hojas que se desenlazaban
   sin destruirlas. `Autenticacion.php`: `bloqueado_hasta`
@@ -1449,18 +1459,26 @@ Con la pestaña Grafo como herramienta:
    de nodos antes y después.
 4. Documentar los criterios en §8.6.1.
 
-**Fase 3 — Optimizaciones (pendiente, prioridad media).**
+**Fase 3 — Optimizaciones (en curso, prioridad media).**
 
-Solo si después de Fase 2 todavía hace falta velocidad:
+**Índice de ventas por viaje implementado en v76a.**
+`formatear_viaje` recibe un 4to parámetro opcional
+(`$indice_ventas`). `listar_viajes_de_dueno` y
+`listar_viajes_de_terminal` construyen el índice UNA SOLA
+VEZ antes del bucle de viajes, con un solo recorrido del
+contenedor de ventas del dueño. Helper nuevo
+`_construir_indice_ventas_por_viaje`. El cómputo inline
+anterior se extrajo a `_calcular_vendidos_por_micro_de_viaje`,
+que se usa como fallback cuando `formatear_viaje` se llama
+sin índice (por ejemplo, desde llamados puntuales como
+`ventas/obtener`). Baja el costo de `listar_viajes_*`
+de O(V × W) a O(V + W).
+
+**Pendientes de Fase 3:**
 
 - **Iteradores persistentes.** El framework permite iteradores
   que van perdurando su posición actual en el grafo. Podrían
-  reducir los recorridos repetidos (por ejemplo, en
-  `formatear_viaje`).
-- **Cacheo de contadores.** El `formatear_viaje` actual
-  escala como O(V × W): por cada viaje, recorre todas las
-  ventas del dueño. Con un índice de ventas por viaje +
-  cacheo de contadores, baja a O(V + W).
+  reducir recorridos repetidos en otros flujos.
 - **Eventual carga parcial del grafo.** Requiere cambiar el
   framework (frente A). No se hace por ahora.
 
@@ -1705,7 +1723,13 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.75a
+**Última actualización de este prompt:** v1.5piloto.76a
+(Fase 3 del plan de optimización del grafo: índice de
+ventas por viaje precalculado. `formatear_viaje` recibe
+un 4to parámetro opcional. `listar_viajes_de_dueno` y
+`listar_viajes_de_terminal` construyen el índice UNA VEZ
+antes del bucle. Baja el costo de O(V × W) a O(V + W).).
+Antes: v1.5piloto.75a
 (cierre de los "campos huérfanos" del Grupo B: cinco
 fixes chicos en `Autenticacion.php`, `Venta.php`,
 `Vehiculo.php` y `Viaje.php`. El `punto_subida_bajada`
@@ -1994,6 +2018,13 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   `actualizar_pasajero`. Helpers nuevos:
   `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- Cerramos en v76a la primera parte de Fase 3:
+  índice de ventas por viaje precalculado. `formatear_viaje`
+  acepta un 4to parámetro opcional. `listar_viajes_de_dueno`
+  y `listar_viajes_de_terminal` construyen el índice UNA
+  VEZ antes del bucle de viajes. Baja el costo de
+  O(V × W) a O(V + W). Pendientes de Fase 3: iteradores
+  persistentes y eventual carga parcial del grafo.
 - Cerramos en v75a el Grupo B de Fase 2 (campos
   huérfanos): `bloqueado_hasta` (Autenticacion.php, 2
   usos), `metodo_pago` del cupón (Venta.php), `foto`
@@ -2225,7 +2256,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.75a (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.76a (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2246,7 +2277,8 @@ v75: flujos 13 y 14 (`eliminar_usuario`,
 `actualizar_usuario`) y `Sesion.php`.
 v75a: cierre del Grupo B (campos huérfanos).
 v76: flujos 15 a 19 (pasajeros y declaraciones
-juradas adjuntas).
+juradas adjuntas). v76a: Fase 3, índice de ventas
+por viaje.
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 
