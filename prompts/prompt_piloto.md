@@ -812,6 +812,16 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74t**: fix del orden de destrucción en los helpers
+  `_destruir_*`. Los helpers no desenlazaban al hijo del
+  padre antes de destruirlo, lo que dejaba 2 nodos
+  huérfanos por micro (las cabezas de las listas
+  circulares de asientos de cada piso). Corregido el
+  orden en `_destruir_lista_circular_asientos`,
+  `_destruir_copia_vehiculo` y `_destruir_micro`:
+  siempre desenlazar antes de destruir. También se
+  desenlaza el `siguiente` de TODOS los asientos, no
+  solo el del último.
 - **v74s**: Fase 2, segundo flujo arreglado.
   `eliminar_micro_de_viaje` ahora destruye el micro
   completo (copia de vehículo, pisos, asientos, campos)
@@ -1492,7 +1502,12 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74s
+**Última actualización de este prompt:** v1.5piloto.74t
+(fix del orden de destrucción en los helpers `_destruir_*`.
+Los helpers no desenlazaban al hijo del padre antes de
+destruirlo, dejando 2 nodos huérfanos por micro: las
+cabezas de las listas circulares de cada piso. Corregido).
+Antes: v1.5piloto.74s
 (Fase 2, segundo flujo arreglado: `eliminar_micro_de_viaje`.
 Ahora destruye el micro completo (copia de vehículo, pisos,
 asientos, campos) en lugar de solo desenlazarlo del contenedor
@@ -1723,6 +1738,14 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   nodo. Backend: 3 comandos en el `Controlador`
   (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
   Frontend: `Aplicacion/grafo.js`.
+- Cerramos en v74t el fix del orden de destrucción en
+  los helpers `_destruir_*` de `Viaje.php`. El bug: los
+  helpers llamaban a `Nodo::eliminar` del hijo ANTES de
+  desenlazarlo del padre, dejando 2 nodos huérfanos por
+  micro (las cabezas de las listas circulares de cada
+  piso). El fix: desenlazar siempre antes de destruir.
+  También se desenlaza el `siguiente` de todos los
+  asientos (no solo el del último).
 - Cerramos en v74s el segundo flujo de Fase 2:
   `eliminar_micro_de_viaje`. Ahora destruye el micro
   completo (copia de vehículo, pisos, asientos, campos)
@@ -1897,12 +1920,14 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74s (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.74t (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
 (Fase 2, primer flujo). v74s: `eliminar_micro_de_viaje`
 destruye el micro completo (Fase 2, segundo flujo).
+v74t: fix del orden de destrucción en los helpers
+`_destruir_*` (desenlazar siempre antes de destruir).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 
