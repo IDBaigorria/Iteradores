@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.74u
+ * @version   1.5piloto.74v
  */
 
 use Iteradores\Nodos\Nodo;
@@ -14,6 +14,7 @@ include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./miscelaneas/Arbol.php");
+include_once("./Aplicacion/FuncionesAuxiliares.php");
 
 /**
  * Texto por defecto de la declaración jurada del pasajero mayor de 18 años
@@ -1275,33 +1276,6 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
 //  - El orden de destrucción va de hojas a raíz, para que
 //    Nodo::eliminar no falle por referencias entrantes.
 // ============================================================
-
-/**
- * Desenlaza y destruye los adyacentes de $padre que sean
- * "campos simples": nodos sin adyacentes propios. No toca a
- * los que sí tienen adyacentes (estructuras).
- *
- * Se llama al final de cada _destruir_*, después de procesar
- * los hijos estructurales. Destruye los campos string (nombre,
- * fecha, hora, monto, etc.) para no dejarlos huérfanos.
- *
- * @param Nodo  $padre
- * @param array $excluir_enlaces Enlaces a NO tocar (referencias
- *                               externas o circulares).
- */
-function _destruir_campos_simples(Nodo $padre, array $excluir_enlaces = []): void {
-    $adyacentes = (array) $padre->adyacentes();
-    foreach ($adyacentes as $enlace => $nodo_hijo) {
-        $enlace = (string)$enlace;
-        if (in_array($enlace, $excluir_enlaces, true)) continue;
-        // Solo destruir si el hijo no tiene adyacentes propios.
-        $hijos_del_hijo = (array) $nodo_hijo->adyacentes();
-        if (!empty($hijos_del_hijo)) continue;
-
-        $padre->eliminar_adyacente($enlace);
-        Nodo::eliminar($nodo_hijo);
-    }
-}
 
 /**
  * Destruye la lista circular de asientos de un piso.

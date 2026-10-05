@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.74a
+ * @version   1.5piloto.74v
  */
 
 
@@ -16,6 +16,7 @@ include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./miscelaneas/Arbol.php");
+include_once("./Aplicacion/FuncionesAuxiliares.php");
 
 /**
  * Obtiene el contenedor de ventas de un dueño (raíz del árbol de ventas), creándolo si no existe.
@@ -1195,10 +1196,19 @@ function cancelar_venta(string $id_venta, string $motivo = ''): array {
         }
     }
 
-    // 2. Liberar asientos reales y eliminar los asientos-en-venta.
+    // 2. Liberar asientos reales y destruir los asientos-en-venta.
+    //    La lista de asientos-en-venta es simple (primer/siguiente),
+    //    no árbol (hmi/hd/p). Antes se intentaba eliminar con
+    //    eliminar_hmi, que opera sobre hmi/hd: el while nunca
+    //    corría y los asientos-en-venta quedaban huérfanos.
+    //    Fase 2, v74v.
     $asientos_liberados = 0;
     $cabeza_asientos = $nodo_venta->adyacente('asientos');
     if ($cabeza_asientos) {
+        // Recolectar todos los asientos-en-venta y liberar los
+        // asientos reales (cambiarles el estado y desenlazar las
+        // referencias a pasajero y venta).
+        $asientos_venta_lista = [];
         $asiento_venta = $cabeza_asientos->adyacente('primer');
         $seg = 0;
         while ($asiento_venta && $seg < 200) {
@@ -1211,13 +1221,32 @@ function cancelar_venta(string $id_venta, string $motivo = ''): array {
                 $nodo_asiento_real->eliminar_adyacente('venta');
                 $asientos_liberados++;
             }
+            $asientos_venta_lista[] = $asiento_venta;
             $asiento_venta = $asiento_venta->adyacente('siguiente');
             $seg++;
         }
-        while ($asiento_a_borrar = eliminar_hmi($cabeza_asientos)) {
-            Nodo::eliminar($asiento_a_borrar);
+
+        // Desenlazar la lista: `siguiente` de cada nodo y el
+        // `primer` de la cabeza. Después desenlazar la cabeza del
+        // propio nodo venta (que la referencia con `asientos`).
+        foreach ($asientos_venta_lista as $av) {
+            $av->eliminar_adyacente('siguiente');
         }
+        $cabeza_asientos->eliminar_adyacente('primer');
         $nodo_venta->eliminar_adyacente('asientos');
+
+        // Destruir cada asiento-en-venta con sus campos. Las
+        // referencias a `asiento` y `pasajero` son a nodos
+        // compartidos: solo se desenlazan, no se destruyen.
+        foreach ($asientos_venta_lista as $av) {
+            _destruir_campos_simples($av, ['asiento', 'pasajero']);
+            $av->eliminar_adyacente('asiento');
+            $av->eliminar_adyacente('pasajero');
+            Nodo::eliminar($av);
+        }
+
+        // Destruir la cabeza.
+        _destruir_campos_simples($cabeza_asientos);
         Nodo::eliminar($cabeza_asientos);
     }
 
@@ -1246,13 +1275,22 @@ function cancelar_venta(string $id_venta, string $motivo = ''): array {
         );
     }
 
-    // 5. Eliminar los cupones y su contenedor.
+    // 5. Destruir los cupones y su contenedor.
+    //    Los cupones son un árbol hmi/hd/p, así que eliminar_hmi
+    //    sirve para desenlazarlos. Pero antes de destruir cada
+    //    cupón hay que desenlazar la referencia externa `rendido`
+    //    (apunta al Nodo Rendición, que sigue vivo) y destruir
+    //    sus campos hoja (numero, monto, estado, fecha_pago,
+    //    metodo_pago). Fase 2, v74v.
     $contenedor_cupones = $nodo_venta->adyacente('cupones');
     if ($contenedor_cupones) {
         while ($cupon_a_borrar = eliminar_hmi($contenedor_cupones)) {
+            $cupon_a_borrar->eliminar_adyacente('rendido');
+            _destruir_campos_simples($cupon_a_borrar);
             Nodo::eliminar($cupon_a_borrar);
         }
         $nodo_venta->eliminar_adyacente('cupones');
+        _destruir_campos_simples($contenedor_cupones);
         Nodo::eliminar($contenedor_cupones);
     }
 
@@ -1296,7 +1334,34 @@ function cancelar_venta(string $id_venta, string $motivo = ''): array {
         }
     }
 
-    // 8. Eliminar el nodo venta entero.
+    // 8. Destruir el nodo venta entero y sus campos hoja.
+    //    Antes de Nodo::eliminar hay que desenlazar las
+    //    referencias externas (comprador, viaje, micro,
+    //    terminal) y las estructurales ya no necesarias
+    //    (hd, hmi, p por si quedaron colgando), y destruir
+    //    el sub-nodo opciones_cobro con sus 4 campos.
+    //    Fase 2, v74v.
+    $nodo_venta->eliminar_adyacente('comprador');
+    $nodo_venta->eliminar_adyacente('viaje');
+    $nodo_venta->eliminar_adyacente('micro');
+    $nodo_venta->eliminar_adyacente('terminal');
+    $nodo_venta->eliminar_adyacente('hmi');
+    $nodo_venta->eliminar_adyacente('hd');
+    $nodo_venta->eliminar_adyacente('p');
+
+    // Destruir el sub-nodo opciones_cobro (si existe).
+    $nodo_opciones_cobro = $nodo_venta->adyacente('opciones_cobro');
+    if ($nodo_opciones_cobro) {
+        _destruir_campos_simples($nodo_opciones_cobro);
+        $nodo_venta->eliminar_adyacente('opciones_cobro');
+        Nodo::eliminar($nodo_opciones_cobro);
+    }
+
+    // Destruir los campos hoja restantes del propio nodo venta
+    // (fecha_hora, fecha_ultimo_pago, metodo_pago, total,
+    // cuotas, pagado, cuotas_restantes).
+    _destruir_campos_simples($nodo_venta);
+
     Nodo::eliminar($nodo_venta);
 
     guardar_ambos(Conf::NOMBRE_APP);

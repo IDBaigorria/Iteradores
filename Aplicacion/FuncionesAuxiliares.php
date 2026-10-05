@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.37
- * @version   1.5piloto.74m
+ * @version   1.5piloto.74v
  */
 
 use Iteradores\Controlador\Controlador;
@@ -171,6 +171,38 @@ function validar_direccion(string $valor): ?string {
         return 'La dirección tiene caracteres no permitidos';
     }
     return null;
+}
+
+// ============================================================
+// Destrucción progresiva (Fase 2 del plan de optimización del grafo)
+// ============================================================
+
+/**
+ * Desenlaza y destruye los adyacentes de $padre que sean
+ * "campos simples": nodos sin adyacentes propios. No toca a
+ * los que sí tienen adyacentes (estructuras).
+ *
+ * Se usa desde los helpers de destrucción del piloto (por
+ * ejemplo _destruir_viaje_completo en Viaje.php y
+ * cancelar_venta en Venta.php). Se movió acá en v74v para
+ * que Venta.php la pueda usar sin depender de Viaje.php.
+ *
+ * @param Nodo  $padre
+ * @param array $excluir_enlaces Enlaces a NO tocar (referencias
+ *                               externas o circulares).
+ */
+function _destruir_campos_simples(Nodo $padre, array $excluir_enlaces = []): void {
+    $adyacentes = (array) $padre->adyacentes();
+    foreach ($adyacentes as $enlace => $nodo_hijo) {
+        $enlace = (string)$enlace;
+        if (in_array($enlace, $excluir_enlaces, true)) continue;
+        // Solo destruir si el hijo no tiene adyacentes propios.
+        $hijos_del_hijo = (array) $nodo_hijo->adyacentes();
+        if (!empty($hijos_del_hijo)) continue;
+
+        $padre->eliminar_adyacente($enlace);
+        Nodo::eliminar($nodo_hijo);
+    }
 }
 
 // ============================================================

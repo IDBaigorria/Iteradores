@@ -812,6 +812,15 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74v**: Fase 2, quinto flujo arreglado:
+  `cancelar_venta`. Antes dejaba huérfanos los asientos-
+  en-venta (el `eliminar_hmi` no aplicaba a la lista
+  simple), los campos de cada cupón, los campos del nodo
+  venta y el sub-nodo `opciones_cobro` completo (~20-36
+  nodos por venta cancelada). Ahora los destruye.
+  `_destruir_campos_simples` se mueve de `Viaje.php` a
+  `FuncionesAuxiliares.php` para que `Venta.php` la use
+  sin depender de `Viaje.php`.
 - **v74u**: Fase 2, tercer y cuarto flujo arreglados.
   `eliminar_terminal_autorizada` ahora destruye el
   TerminalViaje (con sus campos) en lugar de dejarlo
@@ -1187,6 +1196,16 @@ Es la herramienta que habilita las Fases 2 y 3.
 
 **Fase 2 — Auditoría de la fuga de nodos (en curso, prioridad alta).**
 
+**Quinto flujo arreglado en v74v:** `cancelar_venta`.
+Antes dejaba huérfanos los asientos-en-venta (la lista
+cuelga con `primer`/`siguiente`, no con `hmi`/`hd`, así
+que `eliminar_hmi` no los alcanzaba), los campos de cada
+cupón, los campos hoja del nodo venta y el sub-nodo
+`opciones_cobro` con sus 4 hijos. Ahora los destruye
+explícitamente. `_destruir_campos_simples` vive en
+`FuncionesAuxiliares.php` (antes estaba en `Viaje.php`)
+para que `Venta.php` la use sin dependencia circular.
+
 **Tercer y cuarto flujo arreglados en v74u:**
 `eliminar_terminal_autorizada` ahora llama a
 `_destruir_terminal_viaje` después de desenlazar del
@@ -1517,7 +1536,13 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74u
+**Última actualización de este prompt:** v1.5piloto.74v
+(Fase 2, quinto flujo arreglado: `cancelar_venta`. Ahora
+destruye los asientos-en-venta, los cupones con sus
+campos, los campos hoja del nodo venta y el sub-nodo
+`opciones_cobro`. `_destruir_campos_simples` se movió a
+`FuncionesAuxiliares.php`.).
+Antes: v1.5piloto.74u
 (Fase 2, tercer y cuarto flujo arreglados:
 `eliminar_terminal_autorizada` y `_guardar_paradas_intermedias`).
 Antes: v1.5piloto.74t
@@ -1756,6 +1781,12 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   nodo. Backend: 3 comandos en el `Controlador`
   (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
   Frontend: `Aplicacion/grafo.js`.
+- Cerramos en v74v el quinto flujo de Fase 2:
+  `cancelar_venta`. Ahora destruye los asientos-en-venta,
+  los campos de cada cupón, los campos hoja del nodo
+  venta y el sub-nodo `opciones_cobro`. El helper
+  `_destruir_campos_simples` se movió de `Viaje.php` a
+  `FuncionesAuxiliares.php`.
 - Cerramos en v74u los flujos 3 y 4 de la Fase 2:
   `eliminar_terminal_autorizada` ahora destruye el
   TerminalViaje; `_guardar_paradas_intermedias` ahora
@@ -1942,7 +1973,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74u (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.74v (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -1951,7 +1982,8 @@ destruye el micro completo (Fase 2, segundo flujo).
 v74t: fix del orden de destrucción en los helpers
 `_destruir_*` (desenlazar siempre antes de destruir).
 v74u: flujos 3 y 4 de Fase 2 (`eliminar_terminal_autorizada`
-y `_guardar_paradas_intermedias`).
+y `_guardar_paradas_intermedias`). v74v: flujo 5
+(`cancelar_venta`).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 
