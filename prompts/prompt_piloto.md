@@ -823,6 +823,16 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v75a**: Fase 2, cierre de los "campos huérfanos" del
+  Grupo B. Cinco fixes chicos: hojas que se desenlazaban
+  sin destruirlas. `Autenticacion.php`: `bloqueado_hasta`
+  al expirar el bloqueo y al registrar login exitoso.
+  `Venta.php`: `metodo_pago` del cupón al coincidir con el
+  de la venta. `Vehiculo.php`: `foto` al reemplazarla.
+  `Viaje.php`: `hora_estimada` al quitar la hora de una
+  parada. El `punto_subida_bajada` del TerminalViaje
+  (Viaje.php:940) queda descartado: es una referencia
+  externa al nodo parada del viaje, correcto por diseño.
 - **v75**: Fase 2, flujos 13 y 14 arreglados.
   `eliminar_usuario` ahora destruye los campos del nodo
   usuario (nivel, nombre_real, email, efectivo, banco con
@@ -1296,6 +1306,24 @@ un campo). Helpers nuevos:
 `_destruir_declaracion_jurada_pasajero`,
 `_destruir_pasajero_completo`.
 
+**Cierre de campos huérfanos (Grupo B) en v75a:**
+cinco fixes chicos, hojas que se desenlazaban sin
+destruirlas:
+
+- `Autenticacion.php` (`_esta_bloqueado` y
+  `_registrar_login_exitoso`): `bloqueado_hasta`.
+- `Venta.php` (`pagar_cupon_venta`): `metodo_pago` del
+  cupón, cuando coincide con el de la venta.
+- `Vehiculo.php` (`subir_foto_vehiculo`): `foto`, al
+  reemplazar la foto anterior.
+- `Viaje.php` (`_guardar_paradas_intermedias`):
+  `hora_estimada`, al quitar la hora de una parada.
+
+El `punto_subida_bajada` del TerminalViaje
+(`Viaje.php:940`) queda **descartado**: es una referencia
+externa al nodo parada del viaje, que sigue vivo en
+`paradas_intermedias`. Correcto por diseño.
+
 **Decimotercer y decimocuarto flujo arreglados en v75:**
 `eliminar_usuario` (destruye los campos del nodo usuario,
 el banco con sus hijos, el nodo credencial con sus campos,
@@ -1677,7 +1705,12 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76
+**Última actualización de este prompt:** v1.5piloto.75a
+(cierre de los "campos huérfanos" del Grupo B: cinco
+fixes chicos en `Autenticacion.php`, `Venta.php`,
+`Vehiculo.php` y `Viaje.php`. El `punto_subida_bajada`
+del TerminalViaje queda descartado por diseño.).
+Antes: v1.5piloto.76
 (Fase 2, flujos 15 a 19: `eliminar_pasajero`,
 `limpiar_pasajeros_de_prueba`, `subir_declaracion_jurada_pasajero`,
 `eliminar_declaracion_jurada_pasajero`, `actualizar_pasajero`.
@@ -1961,6 +1994,12 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   `actualizar_pasajero`. Helpers nuevos:
   `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- Cerramos en v75a el Grupo B de Fase 2 (campos
+  huérfanos): `bloqueado_hasta` (Autenticacion.php, 2
+  usos), `metodo_pago` del cupón (Venta.php), `foto`
+  del vehículo (Vehiculo.php), `hora_estimada` de la
+  parada (Viaje.php). El `punto_subida_bajada` del
+  TerminalViaje queda descartado (referencia externa).
 - Cerramos en v75 los flujos 13 y 14 de Fase 2:
   `eliminar_usuario` (destruye campos del usuario, banco,
   credenciales y sesiones activas) y `actualizar_usuario`
@@ -2186,7 +2225,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76 (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.75a (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2205,6 +2244,7 @@ y 11 (`actualizar_configuracion_vehiculo`,
 v74z: flujo 12 (`limpiar_viajes_de_prueba`).
 v75: flujos 13 y 14 (`eliminar_usuario`,
 `actualizar_usuario`) y `Sesion.php`.
+v75a: cierre del Grupo B (campos huérfanos).
 v76: flujos 15 a 19 (pasajeros y declaraciones
 juradas adjuntas).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)

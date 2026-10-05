@@ -10,7 +10,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.73m
+ * @version   1.5piloto.75a
  */
 
 use Iteradores\Configuracion\Conf;
@@ -197,7 +197,13 @@ function _esta_bloqueado(Nodo $nodo_usuario): bool {
     }
 
     // El bloqueo expiró: limpiar y resetear intentos.
-    $nodo_usuario->eliminar_adyacente('bloqueado_hasta');
+    // Fase 2, v75a: destruir la hoja `bloqueado_hasta` en
+    // lugar de solo desenlazarla.
+    $nodo_bloqueo = $nodo_usuario->adyacente('bloqueado_hasta');
+    if ($nodo_bloqueo) {
+        $nodo_usuario->eliminar_adyacente('bloqueado_hasta');
+        Nodo::eliminar($nodo_bloqueo);
+    }
     $nodo_intentos = $nodo_usuario->adyacente('intentos_fallidos');
     if ($nodo_intentos) $nodo_intentos->_dato('0');
     return false;
@@ -236,7 +242,13 @@ function _registrar_login_exitoso(Nodo $nodo_usuario, string $ip_cliente, string
     // Resetear intentos y bloqueo.
     $nodo_intentos = $nodo_usuario->adyacente('intentos_fallidos');
     if ($nodo_intentos) $nodo_intentos->_dato('0');
-    $nodo_usuario->eliminar_adyacente('bloqueado_hasta');
+    // Fase 2, v75a: destruir la hoja `bloqueado_hasta` en
+    // lugar de solo desenlazarla.
+    $nodo_bloqueo = $nodo_usuario->adyacente('bloqueado_hasta');
+    if ($nodo_bloqueo) {
+        $nodo_usuario->eliminar_adyacente('bloqueado_hasta');
+        Nodo::eliminar($nodo_bloqueo);
+    }
 
     // Auditoría.
     $ahora = date('d/m/Y H:i');

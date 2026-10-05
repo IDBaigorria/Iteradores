@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.74z
+ * @version   1.5piloto.75a
  */
 
 use Iteradores\Nodos\Nodo;
@@ -556,7 +556,12 @@ function _guardar_paradas_intermedias(Nodo $nodo_viaje, array $paradas): array {
             // Actualizar la hora estimada del nodo reutilizado
             $nodo_hora = $nodo_parada->adyacente('hora_estimada');
             if ($hora === '') {
-                if ($nodo_hora) $nodo_parada->eliminar_adyacente('hora_estimada');
+                // Fase 2, v75a: destruir la hoja `hora_estimada`
+                // en lugar de solo desenlazarla.
+                if ($nodo_hora) {
+                    $nodo_parada->eliminar_adyacente('hora_estimada');
+                    Nodo::eliminar($nodo_hora);
+                }
             } else {
                 if ($nodo_hora) $nodo_hora->_dato($hora);
                 else $nodo_parada->_adyacente_en(Nodo::crear_con_dato($hora), 'hora_estimada');

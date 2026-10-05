@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.74y
+ * @version   1.5piloto.75a
  */
 
 use Iteradores\Nodos\Nodo;
@@ -477,7 +477,10 @@ function subir_foto_vehiculo(string $nombre_empresa, string $nombre_vehiculo, ar
             if (file_exists($ruta_anterior)) {
                 unlink($ruta_anterior);
             }
+            // Fase 2, v75a: destruir la hoja `foto` en lugar
+            // de solo desenlazarla.
             $vehiculo_encontrado->eliminar_adyacente('foto');
+            Nodo::eliminar($foto_anterior);
         }
 
         // Crear enlace foto

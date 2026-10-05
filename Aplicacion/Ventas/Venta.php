@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.74x
+ * @version   1.5piloto.75a
  */
 
 
@@ -1940,7 +1940,15 @@ function pagar_cupon_venta(string $id_venta, string $numero_cupon, string $monto
         if ($nodo_metodo_cupon) $nodo_metodo_cupon->_dato($metodo_pago);
         else $cupon_objetivo->_adyacente_en(Nodo::crear_con_dato($metodo_pago), 'metodo_pago');
     } else {
-        $cupon_objetivo->eliminar_adyacente('metodo_pago');
+        // Fase 2, v75a: destruir la hoja `metodo_pago` del
+        // cupón en lugar de solo desenlazarla. Se ejecuta
+        // cuando el método del pago coincide con el de la
+        // venta y ya no hace falta guardar el override.
+        $nodo_metodo_viejo = $cupon_objetivo->adyacente('metodo_pago');
+        if ($nodo_metodo_viejo) {
+            $cupon_objetivo->eliminar_adyacente('metodo_pago');
+            Nodo::eliminar($nodo_metodo_viejo);
+        }
     }
 
     // Actualizar pagado de la venta.
