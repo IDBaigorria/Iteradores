@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.74p
+ * @version 1.5piloto.76b
  */
 
 // Utilidades
@@ -525,6 +525,47 @@ document.getElementById('modal_apilado')?.addEventListener('click', function(e) 
  * solo los contenedores que se llenan desde el backend.
  */
 function _limpiar_contenido_dinamico() {
+    // Fase 8.5, v76b: cerrar todos los modales antes de limpiar
+    // el contenido. Antes solo se limpiaba el contenido interno
+    // (tablas, listas, selectores), pero los overlays de modal
+    // quedaban visibles al salir. Esto tapaba la pantalla de
+    // login con el modal abierto hasta el próximo clic.
+    //
+    // Se llama desde salir() y desde _aplicar_login_exitoso(),
+    // así que cubre tanto el logout manual como el cambio de
+    // sesión sin recargar la página.
+
+    // 1. Modal apilado (está encima).
+    if (typeof cerrar_modal_apilado === 'function') {
+        cerrar_modal_apilado();
+    }
+
+    // 2. Modal genérico. Cierre directo, sin ejecutar el hook
+    //    window.on_cerrar_modal_generico (que puede disparar
+    //    fetches que ya no tienen sentido al cerrar sesión).
+    window.on_cerrar_modal_generico = null;
+    on_volver_modal = null;
+    const modal_generico_el = document.getElementById('modal_generico');
+    if (modal_generico_el) {
+        modal_generico_el.classList.add('hidden');
+        modal_generico_el.style.display = 'none';
+    }
+    const modal_generico_contenido = document.getElementById('modal_generico_contenido');
+    if (modal_generico_contenido) modal_generico_contenido.innerHTML = '';
+
+    // 3. Modal chico de post-venta (#opciones_impresion).
+    const modal_impresion = document.getElementById('opciones_impresion');
+    if (modal_impresion) {
+        modal_impresion.classList.add('hidden');
+        modal_impresion.style.display = 'none';
+    }
+
+    // 4. Resto de los modales chicos flotantes (.modal-chico).
+    document.querySelectorAll('.modal-chico').forEach(el => {
+        el.classList.add('hidden');
+        el.style.display = 'none';
+    });
+
     const ids_a_limpiar = [
         // Administrador
         'tabla_usuarios_admin',

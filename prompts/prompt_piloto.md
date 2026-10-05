@@ -823,6 +823,13 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76b**: cierre del pendiente "cerrar todos los
+  modales al cerrar sesión". `_limpiar_contenido_dinamico`
+  ahora cierra el modal genérico (sin disparar el hook
+  `window.on_cerrar_modal_generico`, que ya no tiene
+  sentido al salir), el apilado, el `#opciones_impresion`
+  y todos los `.modal-chico` flotantes. Cubre tanto el
+  logout manual como el cambio de sesión sin recargar.
 - **v76a**: Fase 3 del plan de optimización del grafo.
   `formatear_viaje` recibe un 4to parámetro opcional
   (`$indice_ventas`). `listar_viajes_de_dueno` y
@@ -1204,14 +1211,14 @@ y liquidaciones.
   consensuar).
 - Métricas / reportes adicionales: solo ocupación por viaje y
   consolidado de liquidaciones.
-- **Cerrar todos los modales al cerrar sesión** (prioridad
-  media). Actualmente el modal chico de post-venta
-  (`#opciones_impresion`) y a veces otros quedan abiertos al
-  salir. Debería limpiarse todo en `salir()` de `aplicacion.js`.
-  El `_limpiar_contenido_dinamico` actual limpia el contenido
-  de los contenedores pero no oculta los overlays de modal
-  (`#modal_generico`, `#modal_apilado`) ni los modales chicos
-  flotantes (`#modal_chico_*`).
+- ~~**Cerrar todos los modales al cerrar sesión**~~.
+  **Resuelto en v76b.** `_limpiar_contenido_dinamico` cierra
+  el modal genérico (con cierre directo, sin ejecutar el hook
+  `window.on_cerrar_modal_generico`), el apilado, el
+  `#opciones_impresion` y todos los `.modal-chico` flotantes.
+  Cubre el logout manual y el cambio de sesión sin recargar
+  (que también llama a `_limpiar_contenido_dinamico` desde
+  `_aplicar_login_exitoso`).
 - **Convertir en modal la carga de nuevas empresas y micros**
   (prioridad media). Hoy son formularios inline
   (`#formulario_nueva_empresa`, `#formulario_nuevo_vehiculo`).
@@ -1723,7 +1730,13 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76a
+**Última actualización de este prompt:** v1.5piloto.76b
+(cierre del pendiente "cerrar todos los modales al
+cerrar sesión". `_limpiar_contenido_dinamico` ahora
+cierra el modal genérico, el apilado, el
+`#opciones_impresion` y todos los `.modal-chico`.
+Cubre logout manual y cambio de sesión.).
+Antes: v1.5piloto.76a
 (Fase 3 del plan de optimización del grafo: índice de
 ventas por viaje precalculado. `formatear_viaje` recibe
 un 4to parámetro opcional. `listar_viajes_de_dueno` y
@@ -2018,6 +2031,12 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   `actualizar_pasajero`. Helpers nuevos:
   `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- Cerramos en v76b el pendiente de backlog "cerrar
+  todos los modales al cerrar sesión". Ahora
+  `_limpiar_contenido_dinamico` cierra el modal
+  genérico, el apilado, el `#opciones_impresion` y
+  todos los `.modal-chico` flotantes. Cubre el logout
+  manual y el cambio de sesión sin recargar.
 - Cerramos en v76a la primera parte de Fase 3:
   índice de ventas por viaje precalculado. `formatear_viaje`
   acepta un 4to parámetro opcional. `listar_viajes_de_dueno`
@@ -2256,7 +2275,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76a (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.76b (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2278,7 +2297,8 @@ v75: flujos 13 y 14 (`eliminar_usuario`,
 v75a: cierre del Grupo B (campos huérfanos).
 v76: flujos 15 a 19 (pasajeros y declaraciones
 juradas adjuntas). v76a: Fase 3, índice de ventas
-por viaje.
+por viaje. v76b: cerrar todos los modales al
+cerrar sesión.
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 
