@@ -596,6 +596,27 @@ costó un fallo real del runner y una iteración extra.
     de estilo visual interno o refactors sin cambio de
     comportamiento). Aun así, avisar al usuario que no se
     agregan pruebas y por qué.
+15. **Verificar `git diff --stat` antes de commitear.** Un
+    archivo que no debería haber cambiado puede aparecer con
+    cientos de líneas modificadas. Caso real:
+    `Aplicacion/Vehiculos/Vehiculo.php` apareció con 983 líneas
+    cambiadas porque su contenido fue reemplazado con el output
+    del `aplicar_cambios.php` (probablemente un `>` mal
+    escrito o un pegado accidental en VSCode). Costó varias
+    rondas de diagnóstico. Regla: revisar el `diff --stat`
+    después de correr un script y antes de commitear.
+16. **Nunca usar `>` en la terminal con `php` sin estar
+    seguro.** El operador `>` redirige toda la salida del
+    comando al archivo indicado, pisando su contenido. Para
+    guardar el log del script, usar `| Out-File -Append` o
+    copiar a mano.
+17. **Las pruebas que comparten estado acumulan problemas.**
+    Si las pruebas del plugin dependen del estado compartido
+    del piloto (por ejemplo, la cantidad de viajes o de
+    nodos), cuando el estado crece las pruebas se vuelven
+    lentas y frágiles. Paliativo: limpieza periódica +
+    timeouts holgados. Solución real: independencia de estado
+    entre pruebas o setup por prueba.
 
 ---
 
@@ -616,7 +637,13 @@ costó un fallo real del runner y una iteración extra.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.74i. Se
+**Última actualización de este prompt:** v1.5piloto.74q. Se
+agregan tres aprendizajes a la fuerza (15-17): verificar
+`git diff --stat` antes de commitear (caso del `Vehiculo.php`
+pisado con el output del script); nunca usar `>` con `php` en
+la terminal; y las pruebas que comparten estado acumulan
+problemas.
+Antes: v1.5piloto.74i. Se
 incorporan dos reglas nuevas al método de trabajo:
 (13) cada `aplicar_cambios.php` va acompañado de un commit
 sugerido; (14) cada cambio al piloto PHP lleva su espejo de

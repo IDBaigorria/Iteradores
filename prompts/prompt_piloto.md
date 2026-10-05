@@ -812,6 +812,14 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74q**: solo documentación. Se agregaron dos pendientes
+  al backlog (§8.5): cerrar todos los modales al cerrar
+  sesión (prioridad media) y convertir en modal la carga de
+  empresas y micros (prioridad media). El prompt del
+  framework ganó la sección 11 "Limitaciones conocidas"
+  (carga parcial, fuga de nodos, iteradores persistentes
+  subutilizados). El prompt del sistema de scripts ganó
+  tres aprendizajes (15-17).
 - **v74p**: pestaña "Grafo" (Fase 1 del plan de optimización
   del grafo). Visible solo para admin y soporte. Vista de solo
   lectura: totales, alcanzables vs huérfanos, top de
@@ -1072,6 +1080,19 @@ y liquidaciones.
   consensuar).
 - Métricas / reportes adicionales: solo ocupación por viaje y
   consolidado de liquidaciones.
+- **Cerrar todos los modales al cerrar sesión** (prioridad
+  media). Actualmente el modal chico de post-venta
+  (`#opciones_impresion`) y a veces otros quedan abiertos al
+  salir. Debería limpiarse todo en `salir()` de `aplicacion.js`.
+  El `_limpiar_contenido_dinamico` actual limpia el contenido
+  de los contenedores pero no oculta los overlays de modal
+  (`#modal_generico`, `#modal_apilado`) ni los modales chicos
+  flotantes (`#modal_chico_*`).
+- **Convertir en modal la carga de nuevas empresas y micros**
+  (prioridad media). Hoy son formularios inline
+  (`#formulario_nueva_empresa`, `#formulario_nuevo_vehiculo`).
+  Migrar al patrón de modal genérico como se hizo con usuarios
+  y terminales (v73e-v73g).
 
 **Implementados (ya no son pendientes):**
 
@@ -1404,7 +1425,11 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74p
+**Última actualización de este prompt:** v1.5piloto.74q
+(solo documentación. Se agregaron dos pendientes al backlog:
+cerrar todos los modales al cerrar sesión y convertir en modal
+la carga de empresas y micros, ambos de prioridad media).
+Antes: v1.5piloto.74p
 (pestaña "Grafo", Fase 1 del plan de optimización del grafo.
 Visible solo para admin y soporte. Vista de solo lectura.
 Backend: 3 comandos nuevos en el `Controlador`
@@ -1667,6 +1692,12 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   `ventas.js` en `aplicacion_GET.html`, y corrección de contradicciones
   en este prompt (rehash, migraciones, botones, autocompletado,
   `GuardarAmbos.php`, `migrar_pasajeros.php`).
+- Cerramos en v74q la documentación de cierre: se agregaron
+  dos pendientes nuevos al backlog (§8.5): cerrar todos los
+  modales al cerrar sesión (prioridad media) y convertir en
+  modal la carga de empresas y micros (prioridad media).
+  También se documentó la limitación del framework en su
+  propio prompt (sección 11 nueva).
 - No hay tandas de código en curso en este proyecto.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -1771,7 +1802,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74p (framework 1.5i.7f).
+**Estado del proyecto al cierre:** v1.5piloto.74q (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5d)

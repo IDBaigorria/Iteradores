@@ -422,6 +422,80 @@ function migrar_xxx(): array {
 
 ---
 
+## 11. LIMITACIONES CONOCIDAS DEL FRAMEWORK
+
+Esta sección documenta limitaciones estructurales del framework
+que no son bugs, pero que condicionan su uso. Son candidatas a
+mejora en futuras versiones del framework.
+
+### 11.1 Carga y guardado del grafo entero
+
+Toda operación de persistencia (`Controlador::cargar`,
+`Controlador::guardar`) procesa el grafo completo. No existe hoy
+un mecanismo para cargar o guardar **partes reducidas** del grafo
+(por ejemplo, solo la rama de un dueño, solo los nodos de un viaje).
+
+**Consecuencia:** el tiempo de cada operación crece linealmente con
+la cantidad total de nodos. Los listados, las altas y las bajas
+también, porque iteran sobre el grafo completo.
+
+**Caso testigo:** el piloto llegó a un grafo de ~10.000 nodos, con
+tiempos de 50-70s por operación. Con ~2.000 nodos, los mismos
+tiempos bajaron a 15-18s. La performance depende directamente del
+tamaño total del grafo.
+
+**Posibles direcciones (a discutir):**
+
+- Guardar en cada nodo un "ID especial de origen" o similar, para
+  reconstruir sub-grafos.
+  - **Problema:** un nodo puede estar referenciado desde más de un
+    lado. No hay un árbol natural de pertenencia. Requiere revisar
+    teoría de grafos (componentes conexas, sub-grafos inducidos).
+- Persistir por partes usando índices auxiliares.
+- Snapshot por rama con marca de "raíz".
+
+Requiere una sesión del framework, no del piloto.
+
+### 11.2 Fuga de nodos huérfanos
+
+`Nodo::eliminar($nodo)` falla si el nodo tiene referencias
+entrantes. La forma correcta de eliminarlo es desenlazar todas las
+referencias entrantes antes, de a una, empezando por las hojas.
+
+**Consecuencia:** si el código que elimina entidades no hace este
+desenlazado progresivo, los nodos quedan **huérfanos**: ya no se
+alcanzan desde ninguna raíz, pero siguen ocupando memoria y disco.
+No hay recolección automática de basura.
+
+**Caso testigo:** el piloto acumuló miles de nodos huérfanos
+(asientos de ventas canceladas, cupones, nodos de pasajeros
+borrados, etc.). El grafo creció de 2.000 a 10.000 nodos. Afectó la
+performance global.
+
+**Posibles direcciones (a discutir):**
+
+- Extender el framework con un garbage collector que recorra el
+  grafo y libere nodos no alcanzables desde raíces especiales.
+- Documentar patrones de "eliminación progresiva" como el de §7.4.
+- Proveer helpers de "desenlazado en cascada" para el caso común.
+
+### 11.3 Iteradores persistentes subutilizados
+
+El framework tiene Iteradores con posición persistente entre
+operaciones. Son una herramienta para reducir recorridos repetidos
+sobre el grafo (por ejemplo, mantener un puntero a "última venta
+creada" o "último viaje activo").
+
+En la práctica, el piloto rara vez los usa: la mayoría de las
+operaciones abren un nuevo recorrido desde las raíces.
+
+**Posible mejora:** usar iteradores persistentes en los flujos de
+lectura frecuente para reducir el costo O(N) por operación.
+Requiere diseñar qué iteradores conviene mantener y dónde
+persistirlos.
+
+---
+
 ## 10. HISTORIAL DEL FRAMEWORK
 
 - **1.5i.4**: versión base del framework al cierre de v67.
@@ -464,6 +538,15 @@ function migrar_xxx(): array {
   `iterador_interno` dos veces) se cambian por `if ($elemento !==
   null)`. Así los valores falsy (`0`, `''`, `false`) ya no se
   descartan. Mismo fix aplicado al espejo JS (V1.5i.7f).
+- **1.5i.7g**: sin cambios funcionales al framework. Se agrega la
+  sección 11 "Limitaciones conocidas del framework" con tres
+  puntos: (a) toda operación procesa el grafo completo (sin
+  carga parcial); (b) los nodos huérfanos se acumulan porque
+  `Nodo::eliminar` falla con referencias entrantes y no hay
+  recolección automática; (c) los iteradores persistentes están
+  subutilizados. Estas limitaciones se descubrieron trabajando
+  en el piloto: llegó a 10.000 nodos con tiempos de 50-70s por
+  operación; con 2.000 nodos, 15-18s.
 
 El espejo JS también recibió mejoras en paralelo (ver sección 12).
 Su historial es: 1.5i.4 → 1.5i.5 (robustez de persistencia)
@@ -676,6 +759,20 @@ Cada una costó un bug en producción o en pruebas.
     tests imprimen "finalizado" antes de que termine el trabajo.
 20. **`db.close()` en `finally`.** Las conexiones abiertas se
     acumulan hasta que el navegador las recolecte.
+
+**Limitaciones estructurales (documentadas en v1.5i.7g, ver §11):**
+
+21. **Toda operación procesa el grafo completo.** No hay carga
+    parcial. El costo crece con N. Caso testigo: piloto con
+    10.000 nodos → 50-70s por operación; con 2.000 nodos,
+    15-18s.
+22. **Los nodos huérfanos se acumulan.** `Nodo::eliminar` falla
+    con referencias entrantes. Si el llamador no desenlaza
+    progresivamente, los nodos quedan huérfanos sin recolección
+    automática. El framework no incluye garbage collector.
+23. **Los iteradores persistentes están subutilizados.** Pueden
+    reducir recorridos repetidos. En la práctica, la mayoría de
+    las operaciones abren un nuevo recorrido desde las raíces.
 
 **Regla de oro:** cualquier cambio al framework PHP se refleja en
 JS en la misma tanda, con dos scripts y dos commits.
