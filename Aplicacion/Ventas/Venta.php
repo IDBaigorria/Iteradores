@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.74w
+ * @version   1.5piloto.74x
  */
 
 
@@ -1142,6 +1142,37 @@ function obtener_info_cancelacion(string $id_venta): array {
 }
 
 /**
+ * Destruye un nodo asiento-en-venta y sus campos hoja.
+ *
+ * Un nodo asiento-en-venta tiene:
+ *  - `asiento` → referencia externa al asiento real del micro.
+ *  - `punto_subida_bajada`, `hora_subida_bajada` → campos string
+ *    opcionales.
+ *  - `siguiente` → próximo nodo de la lista (debe estar ya
+ *    desenlazado por el llamador).
+ *
+ * La referencia a `asiento` solo se desenlaza (el asiento real
+ * es del micro). Los campos hoja se destruyen con
+ * _destruir_campos_simples.
+ *
+ * Se usa desde tres lugares:
+ *  - _destruir_venta_actual (Venta.php), al destruir el
+ *    subárbol de la venta_actual tras confirmarla.
+ *  - seleccionar_asiento_micro (ViajeAsientos.php), al
+ *    limpiar la lista al cambiar de micro.
+ *  - deseleccionar_asiento_micro (ViajeAsientos.php), al
+ *    filtrar el nodo del asiento deseleccionado.
+ *
+ * @param Nodo $nodo_asiento_venta
+ * @return void
+ */
+function _destruir_asiento_en_venta(Nodo $nodo_asiento_venta): void {
+    _destruir_campos_simples($nodo_asiento_venta, ['asiento']);
+    $nodo_asiento_venta->eliminar_adyacente('asiento');
+    Nodo::eliminar($nodo_asiento_venta);
+}
+
+/**
  * Destruye el subárbol de una venta actual (la que se arma
  * en memoria mientras la terminal selecciona asientos).
  *
@@ -1181,13 +1212,9 @@ function _destruir_venta_actual(Nodo $nodo_venta_actual): void {
         $cabeza->eliminar_adyacente('primer');
         $nodo_venta_actual->eliminar_adyacente('asientos');
 
-        // Destruir cada asiento-en-venta con sus campos. El
-        // `asiento` es una referencia al asiento real del micro:
-        // solo se desenlaza.
+        // Destruir cada asiento-en-venta con sus campos.
         foreach ($asientos_venta as $av) {
-            _destruir_campos_simples($av, ['asiento']);
-            $av->eliminar_adyacente('asiento');
-            Nodo::eliminar($av);
+            _destruir_asiento_en_venta($av);
         }
 
         // Destruir la cabeza.

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.70
+ * @version   1.5piloto.74x
  */
 
 use Iteradores\Nodos\Nodo;
@@ -648,8 +648,24 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
             $actual_venta = $actual_venta->adyacente('siguiente');
         }
     } else {
+        // Cambio de micro a mitad de selección: hay que
+        // destruir los asientos-en-venta viejos. Fase 2, v74x:
+        // antes solo se desenlazaba el `primer` y los nodos
+        // quedaban huérfanos con sus campos.
         if ($cabeza_venta) {
+            $viejos = [];
+            $actual_venta = $cabeza_venta->adyacente('primer');
+            $seg_viejos = 0;
+            while ($actual_venta && $actual_venta->id() !== $cabeza_venta->id() && $seg_viejos < 200) {
+                $viejos[] = $actual_venta;
+                $actual_venta = $actual_venta->adyacente('siguiente');
+                $seg_viejos++;
+            }
             $cabeza_venta->eliminar_adyacente('primer');
+            foreach ($viejos as $av_viejo) {
+                $av_viejo->eliminar_adyacente('siguiente');
+                _destruir_asiento_en_venta($av_viejo);
+            }
         }
     }
 
@@ -761,11 +777,23 @@ function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro,
                 }
 
                 $nodos_filtrados = [];
+                $nodos_descartados = [];
                 foreach ($nodos_venta as $nodo_venta) {
                     $asiento_ref = $nodo_venta->adyacente('asiento');
                     if ($asiento_ref && $asiento_ref->id() !== $nodo_asiento->id()) {
                         $nodos_filtrados[] = $nodo_venta;
+                    } else {
+                        $nodos_descartados[] = $nodo_venta;
                     }
+                }
+
+                // Destruir los asientos-en-venta que se descartan
+                // (el que corresponde al asiento deseleccionado).
+                // Fase 2, v74x: antes se filtraba de la lista sin
+                // destruirlo, dejando el nodo huérfano con sus
+                // campos (punto_subida_bajada, hora_subida_bajada).
+                foreach ($nodos_descartados as $av_desc) {
+                    _destruir_asiento_en_venta($av_desc);
                 }
 
                 if (!empty($nodos_filtrados)) {
