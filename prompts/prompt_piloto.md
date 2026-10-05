@@ -812,6 +812,12 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74s**: Fase 2, segundo flujo arreglado.
+  `eliminar_micro_de_viaje` ahora destruye el micro
+  completo (copia de vehículo, pisos, asientos, campos)
+  en lugar de solo desenlazarlo del contenedor del viaje.
+  Reutiliza `_destruir_micro` de `Viaje.php` (agregada en
+  v74r). Libera ~100 nodos por micro.
 - **v74r**: Fase 2 del plan de optimización del grafo,
   primer flujo arreglado. `eliminar_viaje` ahora destruye
   el subárbol completo del viaje (micros con copias de
@@ -1165,6 +1171,14 @@ Es la herramienta que habilita las Fases 2 y 3.
 
 **Fase 2 — Auditoría de la fuga de nodos (en curso, prioridad alta).**
 
+**Segundo flujo arreglado en v74s:** `eliminar_micro_de_viaje`.
+Antes solo desenlazaba el micro del contenedor `micros` del
+viaje. Ahora llama a `_destruir_micro` (helper de `Viaje.php`
+agregado en v74r), que destruye la copia del vehículo (con
+sus pisos y asientos), los campos del micro, y desenlaza las
+referencias externas (empresa) y circular (viaje). Libera
+~100 nodos por micro.
+
 **Primer flujo arreglado en v74r:** `eliminar_viaje`. Antes
 solo desenlazaba el viaje del contenedor del dueño y dejaba
 huérfanos el nodo viaje, todos sus micros con copias de
@@ -1478,7 +1492,13 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74r
+**Última actualización de este prompt:** v1.5piloto.74s
+(Fase 2, segundo flujo arreglado: `eliminar_micro_de_viaje`.
+Ahora destruye el micro completo (copia de vehículo, pisos,
+asientos, campos) en lugar de solo desenlazarlo del contenedor
+del viaje. Reutiliza `_destruir_micro` de `Viaje.php`. Libera
+~100 nodos por micro).
+Antes: v1.5piloto.74r
 (Fase 2 del plan de optimización del grafo: primer flujo
 arreglado, `eliminar_viaje`. Ahora destruye el subárbol
 completo del viaje en lugar de dejarlo huérfano. Nuevos
@@ -1703,6 +1723,12 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   nodo. Backend: 3 comandos en el `Controlador`
   (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
   Frontend: `Aplicacion/grafo.js`.
+- Cerramos en v74s el segundo flujo de Fase 2:
+  `eliminar_micro_de_viaje`. Ahora destruye el micro
+  completo (copia de vehículo, pisos, asientos, campos)
+  en lugar de solo desenlazarlo del contenedor. Reutiliza
+  `_destruir_micro` de `Viaje.php`. Libera ~100 nodos
+  por micro.
 - Cerramos en v74r el primer flujo de Fase 2: `eliminar_viaje`
   ahora destruye el subárbol completo del viaje, no solo
   desenlaza del contenedor. Nuevos helpers `_destruir_*`
@@ -1871,15 +1897,14 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74r (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.74s (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
-(Fase 2, primer flujo).
-El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5e)
-tiene 29 pruebas corriendo; la prueba espejo de v74r
-se agrega en la próxima tanda, cuando se pasen los
-archivos del plugin.
+(Fase 2, primer flujo). v74s: `eliminar_micro_de_viaje`
+destruye el micro completo (Fase 2, segundo flujo).
+El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
+tiene 31 pruebas corriendo.
 
 **Plan de optimización del grafo (ver §8.6):**
 

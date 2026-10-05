@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.74k
+ * @version   1.5piloto.74s
  */
 
 use Iteradores\Nodos\Nodo;
@@ -210,6 +210,18 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
 
 /**
  * Elimina un micro de un viaje.
+ *
+ * A partir de v1.5piloto.74s (Fase 2 del plan de optimización
+ * del grafo): destruye el micro completo (copia de vehículo,
+ * pisos, asientos, campos) en lugar de solo desenlazarlo del
+ * contenedor. Reutiliza `_destruir_micro` de `Viaje.php`
+ * (agregada en v74r). Antes de esta versión, cada eliminación
+ * de un micro dejaba ~100 nodos huérfanos.
+ *
+ * @param string $nombre_viaje
+ * @param string $nombre_micro
+ * @param string $nombre_dueno
+ * @return array
  */
 function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, string $nombre_dueno): array {
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
@@ -224,7 +236,12 @@ function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, str
     $nodo_micro = $nodo_micros->adyacente($nombre_micro);
     if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
 
+    // Fase 2: destruir el micro completo. Primero desenlazar
+    // del contenedor del viaje, después destruir el subárbol
+    // (copia de vehículo, pisos, asientos, campos).
     $nodo_micros->eliminar_adyacente($nombre_micro);
+    _destruir_micro($nodo_micro);
+
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
     guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
