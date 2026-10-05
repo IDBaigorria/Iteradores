@@ -812,6 +812,14 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74r**: Fase 2 del plan de optimización del grafo,
+  primer flujo arreglado. `eliminar_viaje` ahora destruye
+  el subárbol completo del viaje (micros con copias de
+  vehículo y asientos, TerminalViaje, paradas, DJs,
+  opciones avanzadas) en lugar de dejarlo huérfano.
+  Nuevos helpers `_destruir_*` en `Viaje.php`. Se agrega
+  también el pendiente de los formularios embebidos
+  muertos a §8.5.
 - **v74q**: solo documentación. Se agregaron dos pendientes
   al backlog (§8.5): cerrar todos los modales al cerrar
   sesión (prioridad media) y convertir en modal la carga de
@@ -1093,6 +1101,15 @@ y liquidaciones.
   (`#formulario_nueva_empresa`, `#formulario_nuevo_vehiculo`).
   Migrar al patrón de modal genérico como se hizo con usuarios
   y terminales (v73e-v73g).
+  - **Recordatorio:** al migrar a modal, eliminar los
+    formularios embebidos de `aplicacion_GET.html` que
+    queden muertos: `#formulario_nueva_empresa`,
+    `#formulario_nuevo_vehiculo`, y también los ya muertos
+    desde v73g (`#formulario_nuevo_usuario`,
+    `#formulario_nueva_terminal`). Es código muerto que
+    sigue en el HTML y puede inducir a error al escribir
+    pruebas del plugin (ver aprendizaje 30 en el prompt
+    del plugin).
 
 **Implementados (ya no son pendientes):**
 
@@ -1146,7 +1163,43 @@ cancelaciones, cupones).
 Vista de solo lectura para ver la fuga con los ojos. Ver §3.4.
 Es la herramienta que habilita las Fases 2 y 3.
 
-**Fase 2 — Auditoría de la fuga de nodos (pendiente, prioridad alta).**
+**Fase 2 — Auditoría de la fuga de nodos (en curso, prioridad alta).**
+
+**Primer flujo arreglado en v74r:** `eliminar_viaje`. Antes
+solo desenlazaba el viaje del contenedor del dueño y dejaba
+huérfanos el nodo viaje, todos sus micros con copias de
+vehículo y asientos, los TerminalViaje, las paradas
+intermedias, las DJs y las opciones avanzadas. Ahora llama
+a `_destruir_viaje_completo`, que recorre el subárbol en
+orden (micros → TerminalViaje → paradas → DJs → opciones
+→ campos del viaje) y destruye cada nodo. Los helpers
+`_destruir_*` en `Viaje.php` son reutilizables para los
+próximos flujos.
+
+**Hallazgo del detector de `_adyacente_en(..., true)`:** los
+3 usos en `Venta.php:1279/1286` (en `cancelar_venta`, sección
+7: desenlazar la venta del árbol del dueño, seguido de
+`Nodo::eliminar($nodo_venta)`) y `Viaje.php:900` (en
+`guardar_opciones_terminal_viaje`: reemplazar el enlace
+`punto_subida_bajada` del TerminalViaje, donde la parada
+vieja sigue viva en `paradas_intermedias`) son correctos
+por diseño. No son fugas.
+
+**Otros flujos con fuga pendientes de arreglar** (mismo
+patrón de "desenlazar sin destruir"):
+
+- `eliminar_micro_de_viaje` (en `ViajeMicros.php`):
+  desenlaza el micro del contenedor pero no destruye
+  el micro, su copia de vehículo, ni sus asientos.
+- `eliminar_terminal_autorizada` (en `Viaje.php`):
+  desenlaza el TerminalViaje pero no lo destruye.
+- `_guardar_paradas_intermedias` (en `Viaje.php`): al
+  editar las paradas, las que no se reutilizan quedan
+  huérfanas.
+- `eliminar_pasajero` (en `Pasajero.php`): a auditar.
+- `cancelar_venta` (en `Venta.php`): auditar el uso
+  de `Nodo::eliminar($nodo_venta)` sin chequear el
+  resultado.
 
 Con la pestaña Grafo como herramienta:
 
@@ -1425,7 +1478,14 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74q
+**Última actualización de este prompt:** v1.5piloto.74r
+(Fase 2 del plan de optimización del grafo: primer flujo
+arreglado, `eliminar_viaje`. Ahora destruye el subárbol
+completo del viaje en lugar de dejarlo huérfano. Nuevos
+helpers `_destruir_*` en `Viaje.php`, reutilizables para
+los próximos flujos. Se agrega también el pendiente de
+los formularios embebidos muertos a §8.5).
+Antes: v1.5piloto.74q
 (solo documentación. Se agregaron dos pendientes al backlog:
 cerrar todos los modales al cerrar sesión y convertir en modal
 la carga de empresas y micros, ambos de prioridad media).
@@ -1643,6 +1703,15 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   nodo. Backend: 3 comandos en el `Controlador`
   (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
   Frontend: `Aplicacion/grafo.js`.
+- Cerramos en v74r el primer flujo de Fase 2: `eliminar_viaje`
+  ahora destruye el subárbol completo del viaje, no solo
+  desenlaza del contenedor. Nuevos helpers `_destruir_*`
+  en `Viaje.php`. Con esto, eliminar un viaje con N micros
+  libera ~250 × N nodos. Otros flujos con el mismo patrón
+  pendientes: `eliminar_micro_de_viaje` (en `ViajeMicros.php`),
+  `eliminar_terminal_autorizada` (en `Viaje.php`),
+  `_guardar_paradas_intermedias` (en `Viaje.php`),
+  `eliminar_pasajero` (en `Pasajero.php`, a auditar).
 - **Decisión anotada como pendiente de prioridad alta:**
   **fuga de nodos**. Cuando se elimina una venta, un
   pasajero, un viaje o cualquier entidad, el nodo se
@@ -1802,11 +1871,15 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74q (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.74r (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
-El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5d)
-tiene 29 pruebas corriendo.
+v74r: `eliminar_viaje` destruye el subárbol completo
+(Fase 2, primer flujo).
+El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5e)
+tiene 29 pruebas corriendo; la prueba espejo de v74r
+se agrega en la próxima tanda, cuando se pasen los
+archivos del plugin.
 
 **Plan de optimización del grafo (ver §8.6):**
 

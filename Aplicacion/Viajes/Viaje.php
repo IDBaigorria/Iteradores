@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.74n
+ * @version   1.5piloto.74r
  */
 
 use Iteradores\Nodos\Nodo;
@@ -662,6 +662,19 @@ function editar_viaje(string $nombre_viaje, array $datos): array {
 
 /**
  * Elimina un viaje.
+ *
+ * A partir de v1.5piloto.74r (Fase 2 del plan de optimización
+ * del grafo): destruye el subárbol completo del viaje (micros,
+ * copias de vehículo, asientos, TerminalViaje, paradas, DJs,
+ * opciones avanzadas) en lugar de dejarlo huérfano. Antes de
+ * esta versión solo se desenlazaba el viaje del contenedor
+ * del dueño, dejando huérfanos ~250 nodos por micro.
+ *
+ * No elimina viajes con ventas: eso está chequeado antes.
+ *
+ * @param string $nombre_viaje
+ * @param string $nombre_dueno
+ * @return array
  */
 function eliminar_viaje(string $nombre_viaje, string $nombre_dueno): array {
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
@@ -675,8 +688,13 @@ function eliminar_viaje(string $nombre_viaje, string $nombre_dueno): array {
         return ['exito' => false, 'error' => 'No se pueden eliminar viajes con ventas ya realizadas'];
     }
 
-    // TODO: eliminar nodos huérfanos
+    // Fase 2: destruir el subárbol completo del viaje.
+    // Ver §8.6 del prompt del piloto para el contexto y las
+    // reglas de destrucción.
+    _destruir_viaje_completo($nodo_viaje);
     $nodo_viajes->eliminar_adyacente($nombre_viaje);
+    Nodo::eliminar($nodo_viaje);
+
     guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
 }
@@ -1220,6 +1238,259 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
         'conservados' => $conservados,
         'con_ventas' => $con_ventas,
     ];
+}
+
+// ============================================================
+// Destrucción progresiva del subárbol de un viaje
+//
+// Fase 2 del plan de optimización del grafo (§8.6 del prompt
+// del piloto). El framework no recolecta nodos huérfanos: si
+// se desenlaza un nodo sin destruirlo, queda ocupando memoria
+// y disco. Estos helpers destruyen el subárbol completo de un
+// viaje respetando las referencias externas (empresa, terminal).
+//
+// Reglas:
+//  - Todo nodo "campo" (dato string sin adyacentes propios) se
+//    destruye al destruir su padre.
+//  - Toda referencia a un nodo externo (empresa, terminal) se
+//    desenlaza pero NO se destruye.
+//  - Toda referencia circular interna se desenlaza; los nodos
+//    destino los destruye quien corresponda.
+//  - El orden de destrucción va de hojas a raíz, para que
+//    Nodo::eliminar no falle por referencias entrantes.
+// ============================================================
+
+/**
+ * Desenlaza y destruye los adyacentes de $padre que sean
+ * "campos simples": nodos sin adyacentes propios. No toca a
+ * los que sí tienen adyacentes (estructuras).
+ *
+ * Se llama al final de cada _destruir_*, después de procesar
+ * los hijos estructurales. Destruye los campos string (nombre,
+ * fecha, hora, monto, etc.) para no dejarlos huérfanos.
+ *
+ * @param Nodo  $padre
+ * @param array $excluir_enlaces Enlaces a NO tocar (referencias
+ *                               externas o circulares).
+ */
+function _destruir_campos_simples(Nodo $padre, array $excluir_enlaces = []): void {
+    $adyacentes = (array) $padre->adyacentes();
+    foreach ($adyacentes as $enlace => $nodo_hijo) {
+        $enlace = (string)$enlace;
+        if (in_array($enlace, $excluir_enlaces, true)) continue;
+        // Solo destruir si el hijo no tiene adyacentes propios.
+        $hijos_del_hijo = (array) $nodo_hijo->adyacentes();
+        if (!empty($hijos_del_hijo)) continue;
+
+        $padre->eliminar_adyacente($enlace);
+        Nodo::eliminar($nodo_hijo);
+    }
+}
+
+/**
+ * Destruye la lista circular de asientos de un piso.
+ *
+ * Recolecta los asientos (todos menos la cabeza), rompe el
+ * círculo desenlazando el `siguiente` del último, desenlaza
+ * el `primer` de la cabeza, y destruye cada asiento con sus
+ * campos. Al final destruye la cabeza.
+ *
+ * @param Nodo $nodo_piso
+ */
+function _destruir_lista_circular_asientos(Nodo $nodo_piso): void {
+    $cabeza = $nodo_piso->adyacente('asientos');
+    if (!$cabeza) return;
+
+    // Recolectar todos los asientos menos la cabeza.
+    $asientos = [];
+    $actual = $cabeza->adyacente('primer');
+    $seg = 0;
+    while ($actual && $actual->id() !== $cabeza->id() && $seg < 1000) {
+        $asientos[] = $actual;
+        $actual = $actual->adyacente('siguiente');
+        $seg++;
+    }
+
+    // Romper el círculo: desenlazar el `siguiente` del último.
+    if (!empty($asientos)) {
+        $ultimo = $asientos[count($asientos) - 1];
+        $ultimo->eliminar_adyacente('siguiente');
+    }
+
+    // Desenlazar el `primer` de la cabeza antes de destruir asientos.
+    $cabeza->eliminar_adyacente('primer');
+
+    // Destruir cada asiento con sus campos. Las referencias
+    // externas (pasajero, venta) solo se desenlazan, no se
+    // destruyen. En un viaje sin ventas no deberían existir,
+    // pero se cubre por defensa.
+    foreach ($asientos as $asiento) {
+        _destruir_campos_simples($asiento, ['pasajero', 'venta']);
+        $asiento->eliminar_adyacente('pasajero');
+        $asiento->eliminar_adyacente('venta');
+        Nodo::eliminar($asiento);
+    }
+
+    // Destruir la cabeza.
+    _destruir_campos_simples($cabeza);
+    Nodo::eliminar($cabeza);
+}
+
+/**
+ * Destruye un piso: la lista circular de asientos, el nodo
+ * cabeza, y los campos filas/columnas.
+ *
+ * @param Nodo $nodo_piso
+ */
+function _destruir_piso(Nodo $nodo_piso): void {
+    _destruir_lista_circular_asientos($nodo_piso);
+    _destruir_campos_simples($nodo_piso);
+    Nodo::eliminar($nodo_piso);
+}
+
+/**
+ * Destruye una copia de vehículo: pisos, contenedor de
+ * asientos y campos.
+ *
+ * @param Nodo $nodo_copia
+ */
+function _destruir_copia_vehiculo(Nodo $nodo_copia): void {
+    $nodo_asientos = $nodo_copia->adyacente('asientos');
+    if ($nodo_asientos) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos->adyacente("piso_$i");
+            if ($piso) {
+                _destruir_piso($piso);
+                $nodo_asientos->eliminar_adyacente("piso_$i");
+            }
+        }
+        _destruir_campos_simples($nodo_asientos);
+        Nodo::eliminar($nodo_asientos);
+    }
+    _destruir_campos_simples($nodo_copia);
+    Nodo::eliminar($nodo_copia);
+}
+
+/**
+ * Destruye un micro: copia de vehículo, campos, y desenlaza
+ * las referencias externas (empresa) y circulares (viaje).
+ *
+ * Debe llamarse después de desenlazar el micro del contenedor
+ * `micros` del viaje, para que Nodo::eliminar no falle.
+ *
+ * @param Nodo $nodo_micro
+ */
+function _destruir_micro(Nodo $nodo_micro): void {
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if ($nodo_copia) {
+        _destruir_copia_vehiculo($nodo_copia);
+        $nodo_micro->eliminar_adyacente('vehiculo_copia');
+    }
+    // Desenlazar referencias externas/circulares antes de destruir.
+    $nodo_micro->eliminar_adyacente('empresa');
+    $nodo_micro->eliminar_adyacente('viaje');
+    _destruir_campos_simples($nodo_micro);
+    Nodo::eliminar($nodo_micro);
+}
+
+/**
+ * Destruye un TerminalViaje: desenlaza las referencias a
+ * terminal y a parada, y destruye sus campos override.
+ *
+ * @param Nodo $nodo_tv
+ */
+function _destruir_terminal_viaje(Nodo $nodo_tv): void {
+    $nodo_tv->eliminar_adyacente('terminal');
+    $nodo_tv->eliminar_adyacente('punto_subida_bajada');
+    _destruir_campos_simples($nodo_tv);
+    Nodo::eliminar($nodo_tv);
+}
+
+/**
+ * Destruye una parada intermedia.
+ *
+ * @param Nodo $nodo_parada
+ */
+function _destruir_parada(Nodo $nodo_parada): void {
+    _destruir_campos_simples($nodo_parada);
+    Nodo::eliminar($nodo_parada);
+}
+
+/**
+ * Destruye el subárbol completo de un viaje.
+ *
+ * Orden: micros (uno por uno, después el contenedor),
+ * TerminalViaje (uno por uno, después el contenedor),
+ * paradas (una por una, después el contenedor), DJs,
+ * opciones avanzadas, y al final los campos simples del
+ * propio viaje.
+ *
+ * NO destruye el nodo viaje en sí: de eso se encarga
+ * eliminar_viaje, después de desenlazarlo del contenedor
+ * del dueño.
+ *
+ * @param Nodo $nodo_viaje
+ */
+function _destruir_viaje_completo(Nodo $nodo_viaje): void {
+    // 1. Micros. Primero desenlazar del contenedor, después
+    //    destruir el micro (que ya no tiene entrantes).
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if ($nodo_micros) {
+        $adyacentes_micros = (array) $nodo_micros->adyacentes();
+        foreach ($adyacentes_micros as $nombre_micro => $nodo_micro) {
+            $nodo_micros->eliminar_adyacente((string)$nombre_micro);
+            _destruir_micro($nodo_micro);
+        }
+        _destruir_campos_simples($nodo_micros);
+        $nodo_viaje->eliminar_adyacente('micros');
+        Nodo::eliminar($nodo_micros);
+    }
+
+    // 2. Terminales autorizadas (TerminalViaje).
+    $nodo_terminales = $nodo_viaje->adyacente('terminales_autorizadas');
+    if ($nodo_terminales) {
+        $adyacentes_tv = (array) $nodo_terminales->adyacentes();
+        foreach ($adyacentes_tv as $nombre_terminal => $nodo_tv) {
+            $nodo_terminales->eliminar_adyacente((string)$nombre_terminal);
+            _destruir_terminal_viaje($nodo_tv);
+        }
+        _destruir_campos_simples($nodo_terminales);
+        $nodo_viaje->eliminar_adyacente('terminales_autorizadas');
+        Nodo::eliminar($nodo_terminales);
+    }
+
+    // 3. Paradas intermedias (lista árbol hmi/hd/p).
+    $nodo_paradas = $nodo_viaje->adyacente('paradas_intermedias');
+    if ($nodo_paradas) {
+        while ($parada = eliminar_hmi($nodo_paradas)) {
+            _destruir_parada($parada);
+        }
+        _destruir_campos_simples($nodo_paradas);
+        $nodo_viaje->eliminar_adyacente('paradas_intermedias');
+        Nodo::eliminar($nodo_paradas);
+    }
+
+    // 4. Declaraciones juradas (nodos hoja con dato HTML).
+    foreach (['declaracion_jurada_mayor', 'declaracion_jurada_menor'] as $enlace_dj) {
+        $nodo_dj = $nodo_viaje->adyacente($enlace_dj);
+        if ($nodo_dj) {
+            _destruir_campos_simples($nodo_dj);
+            $nodo_viaje->eliminar_adyacente($enlace_dj);
+            Nodo::eliminar($nodo_dj);
+        }
+    }
+
+    // 5. Opciones avanzadas (contenedor de campos string).
+    $nodo_opciones = $nodo_viaje->adyacente('opciones_avanzadas');
+    if ($nodo_opciones) {
+        _destruir_campos_simples($nodo_opciones);
+        $nodo_viaje->eliminar_adyacente('opciones_avanzadas');
+        Nodo::eliminar($nodo_opciones);
+    }
+
+    // 6. Campos simples del propio viaje (nombre, fecha, hora,
+    //    origen, destino, dueno, contadores).
+    _destruir_campos_simples($nodo_viaje);
 }
 
 // Incluir submódulos de viajes
