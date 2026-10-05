@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.74v
+ * @version   1.5piloto.74y
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1278,105 +1278,6 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
 // ============================================================
 
 /**
- * Destruye la lista circular de asientos de un piso.
- *
- * Recolecta los asientos (todos menos la cabeza), rompe el
- * círculo desenlazando el `siguiente` del último, desenlaza
- * el `primer` de la cabeza, y destruye cada asiento con sus
- * campos. Al final destruye la cabeza.
- *
- * @param Nodo $nodo_piso
- */
-function _destruir_lista_circular_asientos(Nodo $nodo_piso): void {
-    $cabeza = $nodo_piso->adyacente('asientos');
-    if (!$cabeza) return;
-
-    // Recolectar todos los asientos menos la cabeza.
-    $asientos = [];
-    $actual = $cabeza->adyacente('primer');
-    $seg = 0;
-    while ($actual && $actual->id() !== $cabeza->id() && $seg < 1000) {
-        $asientos[] = $actual;
-        $actual = $actual->adyacente('siguiente');
-        $seg++;
-    }
-
-    // Desenlazar el `siguiente` de TODOS los asientos, no
-    // solo el del último. Cada asiento tiene un `siguiente`
-    // apuntando al próximo; si no se desenlaza antes de
-    // destruir, el próximo queda con una referencia entrante
-    // desde el asiento anterior.
-    foreach ($asientos as $a) {
-        $a->eliminar_adyacente('siguiente');
-    }
-
-    // Desenlazar el `primer` de la cabeza.
-    $cabeza->eliminar_adyacente('primer');
-
-    // Desenlazar la cabeza del piso: $nodo_piso->asientos
-    // apunta a la cabeza. Sin esto, la cabeza queda con una
-    // referencia entrante desde el piso y Nodo::eliminar
-    // falla silenciosamente, dejándola huérfana.
-    $nodo_piso->eliminar_adyacente('asientos');
-
-    // Destruir cada asiento con sus campos. Las referencias
-    // externas (pasajero, venta) solo se desenlazan, no se
-    // destruyen.
-    foreach ($asientos as $asiento) {
-        _destruir_campos_simples($asiento, ['pasajero', 'venta']);
-        $asiento->eliminar_adyacente('pasajero');
-        $asiento->eliminar_adyacente('venta');
-        Nodo::eliminar($asiento);
-    }
-
-    // Destruir la cabeza.
-    _destruir_campos_simples($cabeza);
-    Nodo::eliminar($cabeza);
-}
-
-/**
- * Destruye un piso: la lista circular de asientos, el nodo
- * cabeza, y los campos filas/columnas.
- *
- * @param Nodo $nodo_piso
- */
-function _destruir_piso(Nodo $nodo_piso): void {
-    _destruir_lista_circular_asientos($nodo_piso);
-    _destruir_campos_simples($nodo_piso);
-    Nodo::eliminar($nodo_piso);
-}
-
-/**
- * Destruye una copia de vehículo: pisos, contenedor de
- * asientos y campos.
- *
- * @param Nodo $nodo_copia
- */
-function _destruir_copia_vehiculo(Nodo $nodo_copia): void {
-    $nodo_asientos = $nodo_copia->adyacente('asientos');
-    if ($nodo_asientos) {
-        for ($i = 1; $i <= 2; $i++) {
-            $piso = $nodo_asientos->adyacente("piso_$i");
-            if ($piso) {
-                // Desenlazar PRIMERO: el contenedor apunta al
-                // piso con `piso_$i`. Si no se desenlaza antes
-                // de destruir el piso, el piso tiene una
-                // referencia entrante y Nodo::eliminar falla.
-                $nodo_asientos->eliminar_adyacente("piso_$i");
-                _destruir_piso($piso);
-            }
-        }
-        // Desenlazar el contenedor de asientos de la copia
-        // antes de destruirlo.
-        $nodo_copia->eliminar_adyacente('asientos');
-        _destruir_campos_simples($nodo_asientos);
-        Nodo::eliminar($nodo_asientos);
-    }
-    _destruir_campos_simples($nodo_copia);
-    Nodo::eliminar($nodo_copia);
-}
-
-/**
  * Destruye un micro: copia de vehículo, campos, y desenlaza
  * las referencias externas (empresa) y circulares (viaje).
  *
@@ -1392,7 +1293,7 @@ function _destruir_micro(Nodo $nodo_micro): void {
         // se desenlaza antes de destruir la copia, la copia
         // tiene una referencia entrante y Nodo::eliminar falla.
         $nodo_micro->eliminar_adyacente('vehiculo_copia');
-        _destruir_copia_vehiculo($nodo_copia);
+        _destruir_vehiculo_completo($nodo_copia);
     }
     // Desenlazar referencias externas/circulares antes de destruir.
     $nodo_micro->eliminar_adyacente('empresa');

@@ -812,6 +812,18 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74y**: Fase 2, noveno, décimo y undécimo flujo
+  arreglados. `actualizar_configuracion_vehiculo` ahora
+  destruye los pisos viejos antes de reemplazarlos.
+  `eliminar_vehiculo` destruye el vehículo completo.
+  `eliminar_empresa` destruye todos sus vehículos y la
+  empresa. Se mueven `_destruir_lista_circular_asientos`,
+  `_destruir_piso` y `_destruir_copia_vehiculo` (renombrada
+  a `_destruir_vehiculo_completo`) de `Viaje.php` a
+  `FuncionesAuxiliares.php`, para que `Vehiculo.php` y
+  `Empresa.php` las puedan usar sin depender de
+  `Viaje.php`. Detectados por el detector ampliado de
+  fugas (`miscelaneas/detectar_fugas_eliminar.php`).
 - **v74x**: Fase 2, séptimo y octavo flujo arreglados:
   `seleccionar_asiento_micro` (destruye los asientos-en-venta
   viejos al cambiar de micro a mitad de selección, cuando
@@ -1162,6 +1174,18 @@ y liquidaciones.
     pruebas del plugin (ver aprendizaje 30 en el prompt
     del plugin).
 
+**Herramientas de diagnóstico disponibles:**
+
+- `miscelaneas/detectar_adyacente_en_true.php`: encuentra
+  usos de `_adyacente_en(..., true)`. Los 3 del piloto son
+  correctos (ver §8.6).
+- `miscelaneas/detectar_fugas_eliminar.php`: encuentra
+  `eliminar_adyacente` / `eliminar_hmi` / `eliminar_hd`
+  sin destrucción posterior en las 10 líneas siguientes.
+  Reporta candidatos clasificados en "PROBABLE FUGA"
+  (eliminar_hmi/hd sin retorno usado) y "REVISAR".
+  Sirve para priorizar flujos nuevos de Fase 2.
+
 **Implementados (ya no son pendientes):**
 
 - Autocompletado de pasajeros por DNI en el alta desde la pestaña
@@ -1225,6 +1249,19 @@ creado durante la selección, y los campos `viaje` y
 `_destruir_venta_actual`. Bug detectado por la prueba
 `cancelar_venta_limpia_nodos` del plugin, que al crear
 la venta vio un incremento de huérfanos de 5.
+
+**Noveno, décimo y undécimo flujo arreglados en v74y:**
+`actualizar_configuracion_vehiculo` (destruye los pisos
+viejos antes de reemplazarlos), `eliminar_vehiculo`
+(destruye el vehículo completo: asientos, pisos, listas
+circulares de asientos, campos) y `eliminar_empresa`
+(destruye todos sus vehículos y la empresa). Se movieron
+tres helpers de `Viaje.php` a `FuncionesAuxiliares.php`:
+`_destruir_lista_circular_asientos`, `_destruir_piso`, y
+`_destruir_copia_vehiculo` (renombrada a
+`_destruir_vehiculo_completo`). Fueron detectados por el
+detector ampliado de fugas
+(`miscelaneas/detectar_fugas_eliminar.php`).
 
 **Séptimo y octavo flujo arreglados en v74x:**
 `seleccionar_asiento_micro` (bloque `limpiar_lista = true`:
@@ -1575,7 +1612,12 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74x
+**Última actualización de este prompt:** v1.5piloto.74y
+(Fase 2, flujos 9, 10 y 11: `actualizar_configuracion_vehiculo`,
+`eliminar_vehiculo`, `eliminar_empresa`. Se movieron tres
+helpers de `Viaje.php` a `FuncionesAuxiliares.php`.
+Detectados por el detector ampliado de fugas.).
+Antes: v1.5piloto.74x
 (Fase 2, séptimo y octavo flujo arreglados:
 `seleccionar_asiento_micro` (cambio de micro a mitad de
 selección) y `deseleccionar_asiento_micro`. Nuevo helper
@@ -1831,6 +1873,14 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   nodo. Backend: 3 comandos en el `Controlador`
   (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
   Frontend: `Aplicacion/grafo.js`.
+- Cerramos en v74y los flujos 9, 10 y 11 de Fase 2:
+  `actualizar_configuracion_vehiculo`, `eliminar_vehiculo`
+  y `eliminar_empresa`. Se movieron tres helpers de
+  destrucción de `Viaje.php` a `FuncionesAuxiliares.php`
+  (`_destruir_lista_circular_asientos`, `_destruir_piso`,
+  `_destruir_copia_vehiculo` renombrada a
+  `_destruir_vehiculo_completo`). Flujos identificados
+  por el detector ampliado de fugas.
 - Cerramos en v74x los flujos 7 y 8 de Fase 2:
   `seleccionar_asiento_micro` (bloque de cambio de micro)
   y `deseleccionar_asiento_micro`. Nuevo helper
@@ -2037,7 +2087,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74x (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.74y (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2050,7 +2100,9 @@ y `_guardar_paradas_intermedias`). v74v: flujo 5
 (`cancelar_venta`). v74w: flujo 6
 (`confirmar_venta_actual`). v74x: flujos 7 y 8
 (`seleccionar_asiento_micro` con `limpiar_lista`,
-y `deseleccionar_asiento_micro`).
+y `deseleccionar_asiento_micro`). v74y: flujos 9, 10
+y 11 (`actualizar_configuracion_vehiculo`,
+`eliminar_vehiculo`, `eliminar_empresa`).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 

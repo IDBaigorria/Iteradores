@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.70
+ * @version   1.5piloto.74y
  */
 
 use Iteradores\Nodos\Nodo;
@@ -13,6 +13,7 @@ use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
+include_once("./Aplicacion/FuncionesAuxiliares.php");
 
 /**
  * Lista las empresas asociadas a un dueño.
@@ -148,18 +149,27 @@ function eliminar_empresa(string $nombre_dueno, string $nombre_empresa): array {
     $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
     if (!$nodo_empresa) return ['exito' => false, 'error' => 'Empresa no encontrada'];
 
-    // Eliminar vehículos asociados (se eliminan enlaces, nodos quedan huérfanos)
+    // Fase 2, v74y: destruir cada vehículo completo (asientos,
+    // pisos, listas circulares de asientos, campos), después
+    // el contenedor `vehiculos`, y finalmente el nodo empresa
+    // con sus campos. Antes solo se desenlazaban los enlaces,
+    // dejando N × ~100 nodos huérfanos por empresa.
     $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
     if ($nodo_vehiculos) {
-        foreach ($nodo_vehiculos->adyacentes() as $nombre_vehiculo => $nodo_vehiculo) {
-            // TODO: Aquí se deberían eliminar los nodos huérfanos (pisos, asientos, etc.)
-            // Por ahora solo se elimina el enlace, dejando nodos inaccesibles.
-            $nodo_vehiculos->eliminar_adyacente($nombre_vehiculo);
+        $adyacentes_vehiculos = (array) $nodo_vehiculos->adyacentes();
+        foreach ($adyacentes_vehiculos as $nombre_vehiculo => $nodo_vehiculo) {
+            $nodo_vehiculos->eliminar_adyacente((string)$nombre_vehiculo);
+            _destruir_vehiculo_completo($nodo_vehiculo);
         }
+        $nodo_empresa->eliminar_adyacente('vehiculos');
+        _destruir_campos_simples($nodo_vehiculos);
+        Nodo::eliminar($nodo_vehiculos);
     }
 
-    // Eliminar enlace de la empresa
+    // Desenlazar la empresa del contenedor del dueño y destruirla.
     $nodo_empresas->eliminar_adyacente($nombre_empresa);
+    _destruir_campos_simples($nodo_empresa);
+    Nodo::eliminar($nodo_empresa);
 
     guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];

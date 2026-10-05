@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.37
- * @version   1.5piloto.74v
+ * @version   1.5piloto.74y
  */
 
 use Iteradores\Controlador\Controlador;
@@ -203,6 +203,112 @@ function _destruir_campos_simples(Nodo $padre, array $excluir_enlaces = []): voi
         $padre->eliminar_adyacente($enlace);
         Nodo::eliminar($nodo_hijo);
     }
+}
+
+/**
+ * Destruye la lista circular de asientos de un piso.
+ *
+ * Recolecta los asientos (todos menos la cabeza), rompe el
+ * círculo desenlazando el `siguiente` de todos, desenlaza
+ * el `primer` de la cabeza, desenlaza la cabeza del piso,
+ * y destruye cada asiento con sus campos. Al final destruye
+ * la cabeza.
+ *
+ * Se usa desde _destruir_piso, que a su vez se usa desde
+ * _destruir_vehiculo_completo. Movido de Viaje.php a
+ * FuncionesAuxiliares.php en v74y para que Vehiculo.php
+ * y Empresa.php lo puedan usar sin depender de Viaje.php.
+ *
+ * @param Nodo $nodo_piso
+ */
+function _destruir_lista_circular_asientos(Nodo $nodo_piso): void {
+    $cabeza = $nodo_piso->adyacente('asientos');
+    if (!$cabeza) return;
+
+    // Recolectar todos los asientos menos la cabeza.
+    $asientos = [];
+    $actual = $cabeza->adyacente('primer');
+    $seg = 0;
+    while ($actual && $actual->id() !== $cabeza->id() && $seg < 1000) {
+        $asientos[] = $actual;
+        $actual = $actual->adyacente('siguiente');
+        $seg++;
+    }
+
+    // Desenlazar el `siguiente` de TODOS los asientos.
+    foreach ($asientos as $a) {
+        $a->eliminar_adyacente('siguiente');
+    }
+
+    // Desenlazar el `primer` de la cabeza.
+    $cabeza->eliminar_adyacente('primer');
+
+    // Desenlazar la cabeza del piso.
+    $nodo_piso->eliminar_adyacente('asientos');
+
+    // Destruir cada asiento con sus campos. Las referencias
+    // externas (pasajero, venta) solo se desenlazan.
+    foreach ($asientos as $asiento) {
+        _destruir_campos_simples($asiento, ['pasajero', 'venta']);
+        $asiento->eliminar_adyacente('pasajero');
+        $asiento->eliminar_adyacente('venta');
+        Nodo::eliminar($asiento);
+    }
+
+    // Destruir la cabeza.
+    _destruir_campos_simples($cabeza);
+    Nodo::eliminar($cabeza);
+}
+
+/**
+ * Destruye un piso: la lista circular de asientos, el nodo
+ * cabeza, y los campos filas/columnas.
+ *
+ * @param Nodo $nodo_piso
+ */
+function _destruir_piso(Nodo $nodo_piso): void {
+    _destruir_lista_circular_asientos($nodo_piso);
+    _destruir_campos_simples($nodo_piso);
+    Nodo::eliminar($nodo_piso);
+}
+
+/**
+ * Destruye un vehículo completo: sus pisos, el contenedor de
+ * asientos, y el nodo vehículo con sus campos (nombre, foto).
+ *
+ * Se usa tanto para el vehículo original (empresa) como para
+ * la copia que se clona en un micro. La estructura es la
+ * misma en los dos casos.
+ *
+ * Antes de llamar a esta función, el llamador debe desenlazar
+ * el vehículo del contenedor que lo referencia.
+ *
+ * Movido de Viaje.php a FuncionesAuxiliares.php en v74y, y
+ * renombrado de _destruir_copia_vehiculo a
+ * _destruir_vehiculo_completo.
+ *
+ * @param Nodo $nodo_vehiculo
+ */
+function _destruir_vehiculo_completo(Nodo $nodo_vehiculo): void {
+    $nodo_asientos = $nodo_vehiculo->adyacente('asientos');
+    if ($nodo_asientos) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos->adyacente("piso_$i");
+            if ($piso) {
+                // Desenlazar PRIMERO: el contenedor apunta al
+                // piso con `piso_$i`. Si no se desenlaza antes
+                // de destruir el piso, el piso tiene una
+                // referencia entrante y Nodo::eliminar falla.
+                $nodo_asientos->eliminar_adyacente("piso_$i");
+                _destruir_piso($piso);
+            }
+        }
+        $nodo_vehiculo->eliminar_adyacente('asientos');
+        _destruir_campos_simples($nodo_asientos);
+        Nodo::eliminar($nodo_asientos);
+    }
+    _destruir_campos_simples($nodo_vehiculo);
+    Nodo::eliminar($nodo_vehiculo);
 }
 
 // ============================================================

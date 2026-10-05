@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.70
+ * @version   1.5piloto.74y
  */
 
 use Iteradores\Nodos\Nodo;
@@ -13,6 +13,7 @@ use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
+include_once("./Aplicacion/FuncionesAuxiliares.php");
 
 /**
  * Lista los vehículos asociados a una empresa.
@@ -279,9 +280,17 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
             $nodo_vehiculo->_adyacente_en($nodo_asientos, 'asientos');
         }
 
-        // Eliminar pisos anteriores
-        $nodo_asientos->eliminar_adyacente('piso_1');
-        $nodo_asientos->eliminar_adyacente('piso_2');
+        // Destruir los pisos anteriores antes de reemplazarlos.
+        // Fase 2, v74y: antes solo se desenlazaban, dejando los
+        // pisos completos (con sus listas circulares de
+        // asientos) huérfanos. ~100 nodos por reconfiguración.
+        for ($i = 1; $i <= 2; $i++) {
+            $piso_viejo = $nodo_asientos->adyacente("piso_$i");
+            if ($piso_viejo) {
+                $nodo_asientos->eliminar_adyacente("piso_$i");
+                _destruir_piso($piso_viejo);
+            }
+        }
 
         $total_asientos = 0;
         $indice_piso = 1;
@@ -370,9 +379,12 @@ function eliminar_vehiculo(string $nombre_empresa, string $nombre_vehiculo): arr
         $nodo_vehiculo = $nodo_vehiculos->adyacente($nombre_vehiculo);
         if (!$nodo_vehiculo) return ['exito' => false, 'error' => 'Vehículo no encontrado'];
 
-        // TODO: Aquí falta eliminar nodos huérfanos (pisos, asientos, foto, etc.).
-        // Por ahora solo se elimina el enlace.
+        // Fase 2, v74y: destruir el vehículo completo (asientos,
+        // pisos, listas circulares de asientos, campos nombre y
+        // foto). Antes solo se desenlazaba del contenedor,
+        // dejando ~100 nodos huérfanos por vehículo.
         $nodo_vehiculos->eliminar_adyacente($nombre_vehiculo);
+        _destruir_vehiculo_completo($nodo_vehiculo);
 
         guardar_ambos(Conf::NOMBRE_APP);
         return ['exito' => true];
