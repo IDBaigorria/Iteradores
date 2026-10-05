@@ -812,6 +812,12 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74u**: Fase 2, tercer y cuarto flujo arreglados.
+  `eliminar_terminal_autorizada` ahora destruye el
+  TerminalViaje (con sus campos) en lugar de dejarlo
+  huérfano. `_guardar_paradas_intermedias` ahora destruye
+  las paradas viejas que no se reutilizan al editar el
+  viaje. Ambos reutilizan helpers `_destruir_*` de v74r.
 - **v74t**: fix del orden de destrucción en los helpers
   `_destruir_*`. Los helpers no desenlazaban al hijo del
   padre antes de destruirlo, lo que dejaba 2 nodos
@@ -1181,6 +1187,15 @@ Es la herramienta que habilita las Fases 2 y 3.
 
 **Fase 2 — Auditoría de la fuga de nodos (en curso, prioridad alta).**
 
+**Tercer y cuarto flujo arreglados en v74u:**
+`eliminar_terminal_autorizada` ahora llama a
+`_destruir_terminal_viaje` después de desenlazar del
+contenedor. `_guardar_paradas_intermedias` ahora destruye
+las paradas viejas que no se reutilizan al editar el viaje
+(las que sí se reutilizan conservan su identidad, para no
+romper las referencias de los TerminalViaje que apuntan a
+ellas).
+
 **Segundo flujo arreglado en v74s:** `eliminar_micro_de_viaje`.
 Antes solo desenlazaba el micro del contenedor `micros` del
 viaje. Ahora llama a `_destruir_micro` (helper de `Viaje.php`
@@ -1502,7 +1517,10 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74t
+**Última actualización de este prompt:** v1.5piloto.74u
+(Fase 2, tercer y cuarto flujo arreglados:
+`eliminar_terminal_autorizada` y `_guardar_paradas_intermedias`).
+Antes: v1.5piloto.74t
 (fix del orden de destrucción en los helpers `_destruir_*`.
 Los helpers no desenlazaban al hijo del padre antes de
 destruirlo, dejando 2 nodos huérfanos por micro: las
@@ -1738,6 +1756,10 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   nodo. Backend: 3 comandos en el `Controlador`
   (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
   Frontend: `Aplicacion/grafo.js`.
+- Cerramos en v74u los flujos 3 y 4 de la Fase 2:
+  `eliminar_terminal_autorizada` ahora destruye el
+  TerminalViaje; `_guardar_paradas_intermedias` ahora
+  destruye las paradas viejas no reutilizadas.
 - Cerramos en v74t el fix del orden de destrucción en
   los helpers `_destruir_*` de `Viaje.php`. El bug: los
   helpers llamaban a `Nodo::eliminar` del hijo ANTES de
@@ -1920,7 +1942,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74t (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.74u (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -1928,6 +1950,8 @@ v74r: `eliminar_viaje` destruye el subárbol completo
 destruye el micro completo (Fase 2, segundo flujo).
 v74t: fix del orden de destrucción en los helpers
 `_destruir_*` (desenlazar siempre antes de destruir).
+v74u: flujos 3 y 4 de Fase 2 (`eliminar_terminal_autorizada`
+y `_guardar_paradas_intermedias`).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 

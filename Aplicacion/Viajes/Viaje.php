@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.74t
+ * @version   1.5piloto.74u
  */
 
 use Iteradores\Nodos\Nodo;
@@ -569,6 +569,18 @@ function _guardar_paradas_intermedias(Nodo $nodo_viaje, array $paradas): array {
         _hmi($nodo_paradas, $nodo_parada);
     }
 
+    // 5. Destruir las paradas viejas que NO se reutilizaron.
+    //    Las que se reutilizaron conservan su identidad (id()),
+    //    que es lo que importa para que los TerminalViaje que
+    //    apuntan a ellas sigan funcionando. Las que no se
+    //    reutilizaron quedaron fuera de la lista nueva y, si
+    //    no se destruyen, quedan huérfanas. Fase 2, v74u.
+    foreach ($nodos_existentes as $nombre_viejo => $nodo_viejo) {
+        if (!isset($paradas_normalizadas[$nombre_viejo])) {
+            _destruir_parada($nodo_viejo);
+        }
+    }
+
     return ['exito' => true];
 }
 
@@ -753,9 +765,11 @@ function agregar_terminal_autorizada(string $nombre_viaje, string $nombre_termin
 /**
  * Quita una terminal autorizada de un viaje.
  *
- * Desenlaza el Nodo TerminalViaje del contenedor y limpia sus enlaces internos.
- * El nodo intermedio queda huérfano (no se destruye), siguiendo el mismo
- * criterio que eliminar_micro_de_viaje.
+ * A partir de v1.5piloto.74u (Fase 2 del plan de optimización
+ * del grafo): destruye el TerminalViaje completo (con sus
+ * campos: terminal, cambiar_punto_predeterminado, overrides
+ * de pago) en lugar de dejarlo huérfano. Reutiliza
+ * `_destruir_terminal_viaje` de Viaje.php (v74r).
  *
  * @param string $nombre_viaje     Identificador del viaje.
  * @param string $nombre_terminal  Nombre de usuario de la terminal.
@@ -777,10 +791,12 @@ function eliminar_terminal_autorizada(string $nombre_viaje, string $nombre_termi
         return ['exito' => false, 'error' => 'La terminal no está autorizada'];
     }
 
-    // Limpiar enlaces internos antes de desenlazar (evita dejar referencias colgando)
-    $nodo_terminal_viaje->eliminar_adyacente('punto_subida_bajada');
-
+    // Fase 2: desenlazar del contenedor y destruir el TerminalViaje
+    // completo. _destruir_terminal_viaje se encarga de desenlazar
+    // `terminal` (referencia externa) y `punto_subida_bajada`
+    // (referencia a un nodo parada del viaje, que sigue vivo).
     $nodo_terminales->eliminar_adyacente($nombre_terminal);
+    _destruir_terminal_viaje($nodo_terminal_viaje);
 
     guardar_ambos(Conf::NOMBRE_APP);
     return ['exito' => true];
