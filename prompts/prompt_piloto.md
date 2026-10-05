@@ -812,6 +812,16 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74w**: Fase 2, sexto flujo arreglado:
+  `confirmar_venta_actual`. Antes desenlazaba la venta
+  actual de la terminal pero no destruía su subárbol,
+  dejando ~5 nodos huérfanos por venta confirmada (nodo
+  venta_actual, cabeza de asientos-en-venta, cada
+  asiento-en-venta, y los campos viaje y micro). Nuevo
+  helper `_destruir_venta_actual` en `Venta.php`. Bug
+  detectado por la prueba espejo
+  `cancelar_venta_limpia_nodos` del plugin: crear la
+  venta incrementaba el contador de huérfanos en 5.
 - **v74v**: Fase 2, quinto flujo arreglado:
   `cancelar_venta`. Antes dejaba huérfanos los asientos-
   en-venta (el `eliminar_hmi` no aplicaba a la lista
@@ -1196,6 +1206,29 @@ Es la herramienta que habilita las Fases 2 y 3.
 
 **Fase 2 — Auditoría de la fuga de nodos (en curso, prioridad alta).**
 
+**Sexto flujo arreglado en v74w:** `confirmar_venta_actual`.
+Antes desenlazaba la venta_actual de la terminal pero no
+la destruía: quedaban huérfanos el propio nodo, la cabeza
+de la lista de asientos-en-venta, cada asiento-en-venta
+creado durante la selección, y los campos `viaje` y
+`micro` (~5 nodos por venta). Nuevo helper
+`_destruir_venta_actual`. Bug detectado por la prueba
+`cancelar_venta_limpia_nodos` del plugin, que al crear
+la venta vio un incremento de huérfanos de 5.
+
+**Otras dos fugas detectadas en la misma auditoría**
+(pendientes de tanda):
+
+- `deseleccionar_asiento_micro` (en `ViajeAsientos.php`):
+  al filtrar la lista de asientos-en-venta de la venta
+  actual, el nodo asiento-en-venta deseleccionado queda
+  huérfano. Fuga: 1 nodo por deselección.
+- `seleccionar_asiento_micro` (en `ViajeAsientos.php`):
+  cuando `limpiar_lista` es true (cambio de micro a
+  mitad de selección), los asientos-en-venta viejos
+  quedan huérfanos. Fuga: N nodos por cambio de micro
+  a mitad de selección.
+
 **Quinto flujo arreglado en v74v:** `cancelar_venta`.
 Antes dejaba huérfanos los asientos-en-venta (la lista
 cuelga con `primer`/`siguiente`, no con `hmi`/`hd`, así
@@ -1536,7 +1569,13 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74v
+**Última actualización de este prompt:** v1.5piloto.74w
+(Fase 2, sexto flujo arreglado: `confirmar_venta_actual`.
+Antes desenlazaba la venta_actual sin destruir su subárbol,
+dejando ~5 nodos huérfanos por venta. Nuevo helper
+`_destruir_venta_actual`. Bug detectado por la prueba
+`cancelar_venta_limpia_nodos` del plugin.).
+Antes: v1.5piloto.74v
 (Fase 2, quinto flujo arreglado: `cancelar_venta`. Ahora
 destruye los asientos-en-venta, los cupones con sus
 campos, los campos hoja del nodo venta y el sub-nodo
@@ -1781,6 +1820,14 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   nodo. Backend: 3 comandos en el `Controlador`
   (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
   Frontend: `Aplicacion/grafo.js`.
+- Cerramos en v74w el sexto flujo de Fase 2:
+  `confirmar_venta_actual`. Ahora destruye el subárbol
+  de la venta_actual después de desenlazarla de la
+  terminal. Bug detectado por la prueba espejo
+  `cancelar_venta_limpia_nodos` (crear la venta
+  incrementaba el contador de huérfanos en 5).
+  Pendientes dos fugas menores en `deseleccionar_
+  asiento_micro` y `seleccionar_asiento_micro`.
 - Cerramos en v74v el quinto flujo de Fase 2:
   `cancelar_venta`. Ahora destruye los asientos-en-venta,
   los campos de cada cupón, los campos hoja del nodo
@@ -1973,7 +2020,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74v (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.74w (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -1983,7 +2030,8 @@ v74t: fix del orden de destrucción en los helpers
 `_destruir_*` (desenlazar siempre antes de destruir).
 v74u: flujos 3 y 4 de Fase 2 (`eliminar_terminal_autorizada`
 y `_guardar_paradas_intermedias`). v74v: flujo 5
-(`cancelar_venta`).
+(`cancelar_venta`). v74w: flujo 6
+(`confirmar_venta_actual`).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 

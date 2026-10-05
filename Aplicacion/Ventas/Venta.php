@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.74v
+ * @version   1.5piloto.74w
  */
 
 
@@ -578,8 +578,14 @@ function confirmar_venta_actual(
     }
     _hmi($contenedor_ventas, $nodo_venta);
 
-    // Eliminar venta actual de la terminal
+    // Desenlazar la venta actual de la terminal y destruir
+    // su subárbol completo. Fase 2, v74w: antes solo se
+    // desenlazaba, dejando huérfanos el nodo venta_actual,
+    // la cabeza de la lista de asientos-en-venta, cada
+    // asiento-en-venta creado durante la selección, y los
+    // campos `viaje` y `micro` (~5 nodos por venta).
     $nodo_terminal->eliminar_adyacente('venta_actual');
+    _destruir_venta_actual($venta_actual);
 
     guardar_ambos(Conf::NOMBRE_APP);
 
@@ -1133,6 +1139,81 @@ function obtener_info_cancelacion(string $id_venta): array {
             'no_cubierto_banco' => number_format($cubierto_info['no_cubierto_ba'], 2, '.', ''),
         ],
     ];
+}
+
+/**
+ * Destruye el subárbol de una venta actual (la que se arma
+ * en memoria mientras la terminal selecciona asientos).
+ *
+ * Estructura del nodo venta_actual:
+ *  - `terminal` → referencia externa al Nodo Usuario terminal.
+ *  - `viaje`, `micro` → campos string.
+ *  - `asientos` → cabeza de lista con `primer` → asiento-en-venta.
+ *  - (fallback) `primer` directo, si algún flujo antiguo lo usó.
+ *
+ * Cada asiento-en-venta tiene `asiento` (referencia al asiento
+ * real del micro) y `siguiente` (para el próximo nodo de la lista).
+ * El asiento real no se destruye: es del micro.
+ *
+ * Aplica Fase 2 del plan de optimización del grafo. Se llama
+ * desde confirmar_venta_actual después de desenlazar la
+ * venta_actual de la terminal.
+ *
+ * @param Nodo $nodo_venta_actual
+ * @return void
+ */
+function _destruir_venta_actual(Nodo $nodo_venta_actual): void {
+    // 1. Asientos-en-venta colgando de `asientos` (cabeza).
+    $cabeza = $nodo_venta_actual->adyacente('asientos');
+    if ($cabeza) {
+        $asientos_venta = [];
+        $actual = $cabeza->adyacente('primer');
+        $seg = 0;
+        while ($actual && $seg < 200) {
+            $asientos_venta[] = $actual;
+            $actual = $actual->adyacente('siguiente');
+            $seg++;
+        }
+        // Desenlazar la lista.
+        foreach ($asientos_venta as $av) {
+            $av->eliminar_adyacente('siguiente');
+        }
+        $cabeza->eliminar_adyacente('primer');
+        $nodo_venta_actual->eliminar_adyacente('asientos');
+
+        // Destruir cada asiento-en-venta con sus campos. El
+        // `asiento` es una referencia al asiento real del micro:
+        // solo se desenlaza.
+        foreach ($asientos_venta as $av) {
+            _destruir_campos_simples($av, ['asiento']);
+            $av->eliminar_adyacente('asiento');
+            Nodo::eliminar($av);
+        }
+
+        // Destruir la cabeza.
+        _destruir_campos_simples($cabeza);
+        Nodo::eliminar($cabeza);
+    }
+
+    // 2. Fallback: `primer` directo en el venta_actual (por si
+    //    algún flujo viejo lo creó así).
+    $primer_directo = $nodo_venta_actual->adyacente('primer');
+    if ($primer_directo) {
+        $nodo_venta_actual->eliminar_adyacente('primer');
+        _destruir_campos_simples($primer_directo, ['asiento']);
+        $primer_directo->eliminar_adyacente('asiento');
+        Nodo::eliminar($primer_directo);
+    }
+
+    // 3. Desenlazar referencias externas.
+    $nodo_venta_actual->eliminar_adyacente('terminal');
+
+    // 4. Destruir los campos simples del propio venta_actual
+    //    (viaje, micro).
+    _destruir_campos_simples($nodo_venta_actual);
+
+    // 5. Destruir el nodo venta_actual.
+    Nodo::eliminar($nodo_venta_actual);
 }
 
 /**
