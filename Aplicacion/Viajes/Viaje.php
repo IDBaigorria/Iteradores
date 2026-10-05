@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.74y
+ * @version   1.5piloto.74z
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1242,7 +1242,13 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
             continue;
         }
 
+        // Fase 2, v74z: destruir el subárbol completo del viaje
+        // antes de desenlazarlo. Antes solo se desenlazaba,
+        // dejando el mismo subárbol huérfano que eliminar_viaje
+        // antes de v74r (~250 nodos por micro arrastrado).
+        _destruir_viaje_completo($nodo_viaje);
         $nodo_viajes->eliminar_adyacente($nombre_viaje);
+        Nodo::eliminar($nodo_viaje);
         $borrados[] = $nombre_viaje;
     }
 

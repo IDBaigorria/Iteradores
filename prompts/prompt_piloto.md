@@ -812,6 +812,15 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   modifican. Las ventas viejas sin `opciones_cobro` se migran
   al guardar opciones: con la config vieja si no se tildó el
   check, con la nueva si se tildó. Backend y frontend.
+- **v74z**: Fase 2, duodécimo flujo arreglado:
+  `limpiar_viajes_de_prueba`. Antes desenlazaba los
+  viajes de prueba del contenedor del dueño sin
+  destruirlos, dejando el mismo subárbol huérfano que
+  `eliminar_viaje` antes de v74r (~250 nodos por
+  micro). Ahora llama a `_destruir_viaje_completo`
+  antes de desenlazarlos. Cierra la deuda de que la
+  herramienta de limpieza era en sí misma una fuente
+  de fuga. Detectado por el detector ampliado de fugas.
 - **v74y**: Fase 2, noveno, décimo y undécimo flujo
   arreglados. `actualizar_configuracion_vehiculo` ahora
   destruye los pisos viejos antes de reemplazarlos.
@@ -1250,6 +1259,15 @@ creado durante la selección, y los campos `viaje` y
 `cancelar_venta_limpia_nodos` del plugin, que al crear
 la venta vio un incremento de huérfanos de 5.
 
+**Duodécimo flujo arreglado en v74z:**
+`limpiar_viajes_de_prueba`. Antes desenlazaba los viajes
+de prueba del contenedor del dueño sin destruirlos:
+quedaba el mismo subárbol huérfano que `eliminar_viaje`
+antes de v74r (~250 nodos por micro arrastrado). Ahora
+llama a `_destruir_viaje_completo` antes de desenlazar
+cada viaje. La herramienta de limpieza era en sí misma
+una fuente de fuga.
+
 **Noveno, décimo y undécimo flujo arreglados en v74y:**
 `actualizar_configuracion_vehiculo` (destruye los pisos
 viejos antes de reemplazarlos), `eliminar_vehiculo`
@@ -1612,7 +1630,12 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.74y
+**Última actualización de este prompt:** v1.5piloto.74z
+(Fase 2, flujo 12: `limpiar_viajes_de_prueba`. Ahora
+destruye el subárbol completo de cada viaje antes de
+desenlazarlo. La herramienta de limpieza era en sí misma
+una fuente de fuga.).
+Antes: v1.5piloto.74y
 (Fase 2, flujos 9, 10 y 11: `actualizar_configuracion_vehiculo`,
 `eliminar_vehiculo`, `eliminar_empresa`. Se movieron tres
 helpers de `Viaje.php` a `FuncionesAuxiliares.php`.
@@ -1873,6 +1896,10 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   nodo. Backend: 3 comandos en el `Controlador`
   (`grafo:resumen`, `grafo:listar`, `grafo:nodo`).
   Frontend: `Aplicacion/grafo.js`.
+- Cerramos en v74z el flujo 12 de Fase 2:
+  `limpiar_viajes_de_prueba`. Ahora destruye el subárbol
+  completo de cada viaje antes de desenlazarlo.
+  Reutiliza `_destruir_viaje_completo` de v74r.
 - Cerramos en v74y los flujos 9, 10 y 11 de Fase 2:
   `actualizar_configuracion_vehiculo`, `eliminar_vehiculo`
   y `eliminar_empresa`. Se movieron tres helpers de
@@ -2087,7 +2114,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.74y (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.74z (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2103,6 +2130,7 @@ y `_guardar_paradas_intermedias`). v74v: flujo 5
 y `deseleccionar_asiento_micro`). v74y: flujos 9, 10
 y 11 (`actualizar_configuracion_vehiculo`,
 `eliminar_vehiculo`, `eliminar_empresa`).
+v74z: flujo 12 (`limpiar_viajes_de_prueba`).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 
