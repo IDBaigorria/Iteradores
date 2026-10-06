@@ -275,7 +275,7 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
         }
     }
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     $activos = pasajero_tiene_pasajes_activos($nombre_dueno, $dni);
     return [
@@ -341,7 +341,7 @@ function crear_pasajero(string $nombre_dueno, array $datos): array {
 
     $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato(date('Y-m-d')), 'fecha_ultima_modificacion');
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     return [
         'exito' => true,
@@ -581,7 +581,7 @@ function eliminar_pasajero(string $nombre_dueno, string $dni): array {
     $contenedor->eliminar_adyacente($dni);
     _destruir_pasajero_completo($nodo_pasajero);
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -702,7 +702,7 @@ function limpiar_pasajeros_de_prueba(string $nombre_dueno): array {
         $borrados[] = $dni;
     }
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     return [
         'exito' => true,
@@ -1116,7 +1116,7 @@ function subir_declaracion_jurada_pasajero(string $nombre_dueno, string $dni, ar
     $nodo_dj->_adyacente_en(Nodo::crear_con_dato(date('d/m/Y H:i')), 'fecha_subida');
     $nodo_pasajero->_adyacente_en($nodo_dj, 'declaracion_jurada');
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     return [
         'exito' => true,
@@ -1154,6 +1154,6 @@ function eliminar_declaracion_jurada_pasajero(string $nombre_dueno, string $dni)
     $nodo_pasajero->eliminar_adyacente('declaracion_jurada');
     _destruir_declaracion_jurada_pasajero($nodo_dj);
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
 }

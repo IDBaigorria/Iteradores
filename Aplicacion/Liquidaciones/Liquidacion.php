@@ -142,7 +142,7 @@ function confirmar_liquidacion(string $nombre_dueno, string $monto_efectivo_str,
     if ($nodo_ba) $nodo_ba->_dato((string)$banco_restante);
 
     _hmi($contenedor, $nodo_liq);
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     return [
         'exito' => true,

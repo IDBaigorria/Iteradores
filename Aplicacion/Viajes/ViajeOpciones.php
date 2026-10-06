@@ -131,7 +131,7 @@ function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
         _aplicar_retroactivo_a_ventas_del_viaje($nombre_dueno, $nombre_viaje, $snapshot_ventas, $aplicar_retroactivo);
     }
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
 }
 

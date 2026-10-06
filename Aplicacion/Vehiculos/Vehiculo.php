@@ -157,7 +157,7 @@ function agregar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, strin
 
         $nodo_vehiculos->_adyacente_en($nodo_vehiculo, $nombre_vehiculo);
 
-        guardar_ambos(Conf::NOMBRE_APP);
+        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
         return ['exito' => true];
     }
@@ -228,7 +228,7 @@ function actualizar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, ar
             }
         }
 
-        guardar_ambos(Conf::NOMBRE_APP);
+        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
         return ['exito' => true];
     }
@@ -343,7 +343,7 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
 
         $nodo_asientos->_dato((string)$total_asientos);
 
-        guardar_ambos(Conf::NOMBRE_APP);
+        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
         return ['exito' => true];
     }
@@ -386,7 +386,7 @@ function eliminar_vehiculo(string $nombre_empresa, string $nombre_vehiculo): arr
         $nodo_vehiculos->eliminar_adyacente($nombre_vehiculo);
         _destruir_vehiculo_completo($nodo_vehiculo);
 
-        guardar_ambos(Conf::NOMBRE_APP);
+        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
         return ['exito' => true];
     }
 
@@ -487,7 +487,7 @@ function subir_foto_vehiculo(string $nombre_empresa, string $nombre_vehiculo, ar
         $vehiculo_encontrado->_adyacente_en(Nodo::crear_con_dato($ruta_relativa), 'foto');
 
         // Guardar persistencia
-        guardar_ambos(Conf::NOMBRE_APP);
+        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
         return ['exito' => true, 'foto' => $ruta_relativa];
     }

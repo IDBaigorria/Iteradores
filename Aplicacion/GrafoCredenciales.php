@@ -47,22 +47,22 @@ function en_grafo_credenciales(callable $fn) {
     try {
         // Guardar la app actual si tiene nodos.
         if (Nodo::hay_nodos_en_superestructura()) {
-            guardar_ambos(Conf::NOMBRE_APP);
+            guardar_ambos(ConfiguracionApli::NOMBRE_APP);
         }
 
         // Crear credenciales si no existe.
-        if (!Controlador::existe(Conf::NOMBRE_APP_CREDENCIALES)) {
-            Controlador::cargar(Conf::NOMBRE_APP_CREDENCIALES);
+        if (!Controlador::existe(ConfiguracionApli::NOMBRE_APP_CREDENCIALES)) {
+            Controlador::cargar(ConfiguracionApli::NOMBRE_APP_CREDENCIALES);
             if (!Nodo::nodo_por_id('usuarios')) {
                 Nodo::crear_con_id('usuarios');
             }
             if (!Nodo::nodo_por_id('sesiones')) {
                 Nodo::crear_con_id('sesiones');
             }
-            guardar_ambos(Conf::NOMBRE_APP_CREDENCIALES);
+            guardar_ambos(ConfiguracionApli::NOMBRE_APP_CREDENCIALES);
         } else {
             // Solo cargar si ya existe (el caso "no existe" ya la cargó arriba).
-            Controlador::cargar(Conf::NOMBRE_APP_CREDENCIALES);
+            Controlador::cargar(ConfiguracionApli::NOMBRE_APP_CREDENCIALES);
         }
 
         // Ejecutar callback y guardar credenciales en el finally interno,
@@ -74,7 +74,7 @@ function en_grafo_credenciales(callable $fn) {
         } catch (\Throwable $e) {
             $excepcion = $e;
         } finally {
-            guardar_ambos(Conf::NOMBRE_APP_CREDENCIALES);
+            guardar_ambos(ConfiguracionApli::NOMBRE_APP_CREDENCIALES);
         }
         if ($excepcion !== null) {
             throw $excepcion;
@@ -84,10 +84,10 @@ function en_grafo_credenciales(callable $fn) {
     } finally {
         // Recargar la app. Si falla, es un error fatal: la superestructura
         // quedaría vacía y el próximo guardado podría pisar el grafo.
-        $ok_carga = Controlador::cargar(Conf::NOMBRE_APP);
+        $ok_carga = Controlador::cargar(ConfiguracionApli::NOMBRE_APP);
         $GLOBALS['__en_grafo_credenciales'] = false;
         if (!$ok_carga) {
-            Controlador::_error("en_grafo_credenciales: no se pudo recargar la app \"" . Conf::NOMBRE_APP . "\".");
+            Controlador::_error("en_grafo_credenciales: no se pudo recargar la app \"" . ConfiguracionApli::NOMBRE_APP . "\".");
             throw new \RuntimeException("No se pudo recargar el grafo de la aplicacion tras operar en credenciales.");
         }
     }

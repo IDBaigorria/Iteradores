@@ -19,7 +19,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.73k
+ * @version   1.5piloto.76e
  */
 
 // --- Utilidades base ----------------------------------
@@ -65,7 +65,10 @@ include_once("Comunicadores/index.php");
 include_once("Controlador/Controlador.php");
 
 // Incluir módulos de la aplicación.
-// Primero `FuncionesAuxiliares.php`, que define `guardar_ambos`.
+// Primero `ConfiguracionApli.php`, que define las constantes
+// propias del piloto (hereda del `Conf` del framework).
+require_once __DIR__ . '/Aplicacion/ConfiguracionApli.php';
+// `FuncionesAuxiliares.php` define `guardar_ambos`.
 require_once __DIR__ . '/Aplicacion/FuncionesAuxiliares.php';
 require_once __DIR__ . '/Aplicacion/GrafoCredenciales.php';
 require_once __DIR__ . '/Aplicacion/Usuarios/Usuario.php';
@@ -86,12 +89,15 @@ require_once __DIR__ . '/Aplicacion/Enrutador.php';
 // producción, modo producción (los botones quedan
 // ocultos porque el HTML no incluye la bandera JS).
 Entorno::establecer_modo(Conf::LOCAL ? Entorno::MODO_PRUEBAS : Entorno::MODO_PRODUCCION);
+// Alinear el prefijo de sesión del framework con el del piloto
+// (el framework no conoce el nombre de la app).
+Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);
 
 // Inicialización de la persistencia.
 // Va después de los require_once para que `guardar_ambos` esté
 // definida (vive en FuncionesAuxiliares.php).
 Controlador::establecer_metodo('SQL');
-$nombre_app = Conf::NOMBRE_APP;
+$nombre_app = ConfiguracionApli::NOMBRE_APP;
 if (Controlador::existe($nombre_app)) {
     if (!Controlador::cargar($nombre_app)) {
         // Existe en SQL pero no se pudo cargar. No caemos al else:
@@ -164,16 +170,16 @@ if (isset($_GET['probar_arbol'])) {
 
 // Crear usuario administrador si no existe (en ambos grafos).
 $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-$nodo_admin_existente = $raiz_usuarios ? $raiz_usuarios->adyacente(Conf::NOMBRE_ADMIN) : null;
+$nodo_admin_existente = $raiz_usuarios ? $raiz_usuarios->adyacente(ConfiguracionApli::NOMBRE_ADMIN) : null;
 if (!$nodo_admin_existente) {
     if (!$raiz_usuarios) {
         Nodo::crear_con_id('usuarios');
         $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     }
-    $nodo_admin = Nodo::crear_con_dato(Conf::NOMBRE_ADMIN);
-    $nodo_admin->_adyacente_en(Nodo::crear_con_dato(Conf::NOMBRE_ADMIN), 'nombre_real');
+    $nodo_admin = Nodo::crear_con_dato(ConfiguracionApli::NOMBRE_ADMIN);
+    $nodo_admin->_adyacente_en(Nodo::crear_con_dato(ConfiguracionApli::NOMBRE_ADMIN), 'nombre_real');
     $nodo_admin->_adyacente_en(Nodo::crear_con_dato('admin'), 'nivel');
-    $raiz_usuarios->_adyacente_en($nodo_admin, Conf::NOMBRE_ADMIN);
+    $raiz_usuarios->_adyacente_en($nodo_admin, ConfiguracionApli::NOMBRE_ADMIN);
     guardar_ambos($nombre_app);
 }
 
@@ -184,10 +190,10 @@ en_grafo_credenciales(function() {
         Nodo::crear_con_id('usuarios');
         $raiz_cred = Nodo::nodo_por_id('usuarios');
     }
-    if (!$raiz_cred->adyacente(Conf::NOMBRE_ADMIN)) {
-        $nodo_admin_cred = Nodo::crear_con_dato(Conf::NOMBRE_ADMIN);
+    if (!$raiz_cred->adyacente(ConfiguracionApli::NOMBRE_ADMIN)) {
+        $nodo_admin_cred = Nodo::crear_con_dato(ConfiguracionApli::NOMBRE_ADMIN);
         $nodo_admin_cred->_adyacente_en(Nodo::crear_con_dato(password_hash(Conf::CODIGO_ADMIN, PASSWORD_DEFAULT)), 'codigo_hash');
-        $raiz_cred->_adyacente_en($nodo_admin_cred, Conf::NOMBRE_ADMIN);
+        $raiz_cred->_adyacente_en($nodo_admin_cred, ConfiguracionApli::NOMBRE_ADMIN);
     }
 });
 

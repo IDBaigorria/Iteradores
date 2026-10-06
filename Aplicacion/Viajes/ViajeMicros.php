@@ -204,7 +204,7 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true, 'nombre_micro' => $nombre_micro];
 }
 
@@ -243,7 +243,7 @@ function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, str
     _destruir_micro($nodo_micro);
 
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
 }
 
@@ -270,7 +270,7 @@ function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, stri
         $nodo_micro->_adyacente_en(Nodo::crear_con_dato($monto), 'monto');
     }
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
 }
 

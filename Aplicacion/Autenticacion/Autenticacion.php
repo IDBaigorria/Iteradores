@@ -10,7 +10,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.75a
+ * @version   1.5piloto.76e
  */
 
 use Iteradores\Configuracion\Conf;
@@ -178,7 +178,7 @@ function _ip_cliente(): string {
  * @return void
  */
 function _verificacion_dummy(string $valor): void {
-    password_verify($valor, Conf::HASH_DUMMY_AUTENTICACION);
+    password_verify($valor, ConfiguracionApli::HASH_DUMMY_AUTENTICACION);
 }
 
 /**
@@ -223,8 +223,8 @@ function _registrar_intento_fallido(Nodo $nodo_usuario): void {
     if ($nodo_intentos) $nodo_intentos->_dato((string)$intentos);
     else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$intentos), 'intentos_fallidos');
 
-    if ($intentos >= Conf::INTENTOS_MAXIMOS_AUTENTICACION) {
-        $hasta = time() + Conf::BLOQUEO_AUTENTICACION_SEGUNDOS;
+    if ($intentos >= ConfiguracionApli::intentos_maximos_autenticacion()) {
+        $hasta = time() + ConfiguracionApli::bloqueo_autenticacion_segundos();
         $nodo_bloqueo = $nodo_usuario->adyacente('bloqueado_hasta');
         if ($nodo_bloqueo) $nodo_bloqueo->_dato((string)$hasta);
         else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$hasta), 'bloqueado_hasta');

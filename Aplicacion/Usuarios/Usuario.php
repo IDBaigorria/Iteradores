@@ -149,7 +149,7 @@ function listar_duenos(string $nombre_solicitante = ''): array {
     }
 
     // Si el solicitante es soporte, filtrar a sus dueños asignados.
-    if ($nombre_solicitante !== '' && $nombre_solicitante !== Conf::NOMBRE_ADMIN) {
+    if ($nombre_solicitante !== '' && $nombre_solicitante !== ConfiguracionApli::NOMBRE_ADMIN) {
         $raiz = Nodo::nodo_por_id('usuarios');
         if ($raiz) {
             $nodo_sol = $raiz->adyacente($nombre_solicitante);
@@ -415,7 +415,7 @@ function _formatear_usuario_para_admin(string $nombre_usuario, Nodo $nodo_usuari
 function _verificar_permiso_dueno(string $nombre_solicitante, string $nombre_dueno): bool {
     if ($nombre_solicitante === '') return true;
     if ($nombre_solicitante === $nombre_dueno) return true;
-    if ($nombre_solicitante === Conf::NOMBRE_ADMIN) return true;
+    if ($nombre_solicitante === ConfiguracionApli::NOMBRE_ADMIN) return true;
 
     $raiz = Nodo::nodo_por_id('usuarios');
     if (!$raiz) return false;
@@ -454,7 +454,7 @@ function _verificar_permiso_dueno(string $nombre_solicitante, string $nombre_due
  */
 function _puede_cerrar_sesion(string $nombre_solicitante, string $token): bool {
     if ($nombre_solicitante === '') return false;
-    if ($nombre_solicitante === Conf::NOMBRE_ADMIN) return true;
+    if ($nombre_solicitante === ConfiguracionApli::NOMBRE_ADMIN) return true;
 
     // Leer el usuario de la sesión desde credenciales.
     $usuario_de_sesion = en_grafo_credenciales(function() use ($token) {
@@ -698,7 +698,7 @@ function agregar_usuario(array $datos): array {
         _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);
     }
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     // Escribir credenciales en su grafo aparte.
     en_grafo_credenciales(function() use ($nombre_usuario, $codigo_acceso, $contrasena) {
@@ -882,7 +882,7 @@ function actualizar_usuario(array $datos): array {
         }
     }
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     if ($codigo_acceso !== '' || $contrasena !== '') {
         en_grafo_credenciales(function() use ($nombre_usuario, $codigo_acceso, $contrasena) {
@@ -966,7 +966,7 @@ function eliminar_usuario(string $nombre_usuario): array {
         return ['exito' => false, 'error' => 'Nombre de usuario no proporcionado'];
     }
 
-    if ($nombre_usuario === Conf::NOMBRE_ADMIN) {
+    if ($nombre_usuario === ConfiguracionApli::NOMBRE_ADMIN) {
         return ['exito' => false, 'error' => 'No se puede eliminar al administrador principal'];
     }
 
@@ -1054,7 +1054,7 @@ function eliminar_usuario(string $nombre_usuario): array {
     // === 6. Desenlazar del contenedor raíz y destruir el usuario ===
     $raiz->eliminar_adyacente($nombre_usuario);
     Nodo::eliminar($nodo_usuario);
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     // === 7. Destruir en credenciales: sesiones + nodo + campos ===
     en_grafo_credenciales(function() use ($nombre_usuario) {

@@ -587,7 +587,7 @@ function confirmar_venta_actual(
     $nodo_terminal->eliminar_adyacente('venta_actual');
     _destruir_venta_actual($venta_actual);
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     return [
         'exito' => true,
@@ -1472,7 +1472,7 @@ function cancelar_venta(string $id_venta, string $motivo = ''): array {
 
     Nodo::eliminar($nodo_venta);
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     $dev_ef_total = $desglose['en_terminal_efectivo'] + $desglose['rendido_efectivo'];
     $dev_ba_total = $desglose['en_terminal_banco'] + $desglose['rendido_banco'];
@@ -2022,7 +2022,7 @@ function pagar_cupon_venta(string $id_venta, string $numero_cupon, string $monto
         }
     }
 
-    guardar_ambos(Conf::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     return [
         'exito' => true,

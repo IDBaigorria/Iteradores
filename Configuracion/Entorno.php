@@ -23,7 +23,7 @@ use Iteradores\Nucleo\Objeto;
  * que necesiten adaptar su comportamiento al entorno actual.
  *
  * @author Ignacio David Baigorria
- * @version 1.3.6
+ * @version 1.3.7
  * @since 1.2.6
  * @package Iteradores\Configuracion
  */
@@ -284,6 +284,47 @@ class Entorno extends Objeto
         return self::$persistencia === self::PERSISTENCIA_XML;
     }
 
+    // ══════════════════════════════════════════════
+    // PREFIJO DE SESIÓN (v1.5i.7h)
+    // ══════════════════════════════════════════════
+
+    /**
+     * Prefijo usado para las claves de sesión que el framework
+     * guarda (por ejemplo, las coordenadas geográficas).
+     *
+     * El framework no conoce el nombre de la aplicación. El
+     * piloto llama a `establecer_prefijo_sesion()` al arrancar
+     * (con `ConfiguracionApli::PREFIJO_SESSION`) para alinear
+     * las claves de sesión con su propio nombre.
+     *
+     * @var string
+     * @since 1.5i.7h
+     */
+    private static string $prefijo_sesion = 'iteradores_';
+
+    /**
+     * Define el prefijo de sesión que el framework usará.
+     *
+     * @param string $prefijo
+     * @return void
+     * @since 1.5i.7h
+     */
+    public static function establecer_prefijo_sesion(string $prefijo): void
+    {
+        self::$prefijo_sesion = $prefijo;
+    }
+
+    /**
+     * Devuelve el prefijo de sesión actual.
+     *
+     * @return string
+     * @since 1.5i.7h
+     */
+    public static function prefijo_sesion(): string
+    {
+        return self::$prefijo_sesion;
+    }
+
     // ═══════════════════════════════════════════════════════════
     // UBICACIÓN GEOGRÁFICA (v1.3.6)
     // ═══════════════════════════════════════════════════════════
@@ -319,7 +360,7 @@ class Entorno extends Objeto
             return self::$_coordenadas_cacheadas;
         }
 
-        $clave_sesion = Conf::PREFIJO_SESSION . 'coordenadas';
+        $clave_sesion = self::$prefijo_sesion . 'coordenadas';
 
         // Intento 1: Recuperar de sesión (si existe)
         if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION[$clave_sesion])) {
