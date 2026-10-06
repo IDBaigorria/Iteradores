@@ -11,6 +11,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.70
+ * @version   1.5piloto.76f
  */
 
 use Iteradores\Nodos\Nodo;
@@ -89,6 +90,66 @@ function en_grafo_credenciales(callable $fn) {
         if (!$ok_carga) {
             Controlador::_error("en_grafo_credenciales: no se pudo recargar la app \"" . ConfiguracionApli::NOMBRE_APP . "\".");
             throw new \RuntimeException("No se pudo recargar el grafo de la aplicacion tras operar en credenciales.");
+        }
+    }
+}
+
+/**
+ * Ejecuta un callback dentro del grafo de credenciales, en modo
+ * solo lectura.
+ *
+ * Diferencia con en_grafo_credenciales:
+ * - No guarda la app antes de cargar credenciales.
+ * - No guarda credenciales al terminar.
+ * - Recarga la app al final para dejar el estado como estaba.
+ *
+ * Pensado para operaciones de diagnóstico (por ejemplo, contar
+ * huérfanos) que no modifican el grafo. Es más rápido que el
+ * helper completo porque evita la transacción de guardado.
+ *
+ * Si el callback lanza una excepción, se loguea como error y
+ * se devuelve null (no se relanza: es solo lectura).
+ *
+ * @param callable $fn Callback a ejecutar en el contexto de credenciales.
+ * @return mixed El valor devuelto por el callback, o null si hubo error.
+ * @since 1.5piloto.76f
+ */
+function en_grafo_credenciales_solo_lectura(callable $fn) {
+    if (!empty($GLOBALS['__en_grafo_credenciales'])) {
+        return $fn();
+    }
+    $GLOBALS['__en_grafo_credenciales'] = true;
+    try {
+        // Crear credenciales si no existe (raro pero posible).
+        if (!Controlador::existe(ConfiguracionApli::NOMBRE_APP_CREDENCIALES)) {
+            Controlador::cargar(ConfiguracionApli::NOMBRE_APP_CREDENCIALES);
+            if (!Nodo::nodo_por_id('usuarios')) {
+                Nodo::crear_con_id('usuarios');
+            }
+            if (!Nodo::nodo_por_id('sesiones')) {
+                Nodo::crear_con_id('sesiones');
+            }
+            // No guardamos: solo lectura.
+        } else {
+            Controlador::cargar(ConfiguracionApli::NOMBRE_APP_CREDENCIALES);
+        }
+
+        $resultado = null;
+        try {
+            $resultado = $fn();
+        } catch (\Throwable $e) {
+            Controlador::_error("en_grafo_credenciales_solo_lectura: " . $e->getMessage());
+        }
+        return $resultado;
+    } finally {
+        // Recargar la app. Si falla, es un error fatal: la
+        // superestructura quedaría vacía y el próximo guardado
+        // podría pisar el grafo.
+        $ok_carga = Controlador::cargar(ConfiguracionApli::NOMBRE_APP);
+        $GLOBALS['__en_grafo_credenciales'] = false;
+        if (!$ok_carga) {
+            Controlador::_error("en_grafo_credenciales_solo_lectura: no se pudo recargar la app \"" . ConfiguracionApli::NOMBRE_APP . "\".");
+            throw new \RuntimeException("No se pudo recargar el grafo de la aplicacion tras leer credenciales.");
         }
     }
 }

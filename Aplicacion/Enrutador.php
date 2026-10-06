@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.74p
+ * @version   1.5piloto.76f
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1140,6 +1140,24 @@ function enrutar_peticion_post(string $accion, array $post): void {
                 case 'resumen':
                     $resumen_gr = Controlador::ejecutar_comando('grafo:resumen');
                     responder_json(['exito' => true, 'resumen' => $resumen_gr]);
+                    break;
+
+                case 'resumen_credenciales':
+                    // Solo en modo pruebas. El chequeo es del lado
+                    // del servidor: en producción el endpoint no
+                    // ejecuta nada, sin importar quién lo llame.
+                    // Además hereda el chequeo de nivel del módulo
+                    // `grafo` (admin o soporte).
+                    if (!\Iteradores\Configuracion\Entorno::es_pruebas()) {
+                        responder_json(['exito' => false, 'error' => 'Disponible solo en modo pruebas']);
+                    }
+                    $resumen_cred = en_grafo_credenciales_solo_lectura(function() {
+                        return Controlador::ejecutar_comando('grafo:resumen');
+                    });
+                    if ($resumen_cred === null) {
+                        responder_json(['exito' => false, 'error' => 'No se pudo cargar el grafo de credenciales']);
+                    }
+                    responder_json(['exito' => true, 'resumen' => $resumen_cred]);
                     break;
 
                 case 'listar':

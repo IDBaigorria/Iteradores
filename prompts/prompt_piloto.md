@@ -569,6 +569,11 @@ Subacciones especiales:
 - `entorno/info`: devuelve `{modo, es_pruebas}`. Público, sin
   permisos. Lo consume el frontend para saber si mostrar los
   botones de limpieza.
+- `grafo/resumen_credenciales`: **solo en modo pruebas**, admin o
+  soporte. Devuelve el mismo resumen que `grafo/resumen` pero
+  sobre el grafo de credenciales. Usa
+  `en_grafo_credenciales_solo_lectura` (no guarda). Lo consume
+  el plugin en la prueba de rate limiting.
 - Módulo `grafo` (admin y soporte): `grafo/resumen`,
   `grafo/listar`, `grafo/nodo`. Invocan comandos del
   `Controlador` (`grafo:resumen`, `grafo:listar`,
@@ -823,6 +828,11 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76f**: nuevo helper `en_grafo_credenciales_solo_lectura`
+  (lee el grafo de credenciales sin guardarlo) y nueva
+  subacción `grafo/resumen_credenciales` en el enrutador
+  (solo en modo pruebas, admin o soporte). Permite al plugin
+  medir huérfanos del grafo de credenciales.
 - **v76d**: solo documentación. Se escribe completa la
   sección §8.6.1 "Criterios de eliminación" con el
   criterio concreto por entidad, extraído de los 19
@@ -1922,7 +1932,12 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76d
+**Última actualización de este prompt:** v1.5piloto.76f
+(nuevo helper `en_grafo_credenciales_solo_lectura` +
+subacción `grafo/resumen_credenciales` en el enrutador,
+solo en modo pruebas. Permite al plugin medir huérfanos
+del grafo de credenciales.).
+Antes: v1.5piloto.76d
 (solo documentación. Se escribe completa la sección
 §8.6.1 "Criterios de eliminación" con el criterio por
 entidad extraído de toda la Fase 2.).
@@ -2485,7 +2500,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76d (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.76f (framework 1.5i.7h).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2511,6 +2526,8 @@ por viaje. v76b: cerrar todos los modales al
 cerrar sesión. v76c: alta de empresa y vehículo a
 modal + eliminación de código muerto del HTML.
 v76d: §8.6.1 completado (documentación).
+v76f: helper de solo lectura para credenciales + endpoint
+`grafo/resumen_credenciales` (solo en modo pruebas).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 
