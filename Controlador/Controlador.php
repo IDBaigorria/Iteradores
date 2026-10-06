@@ -1445,7 +1445,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     }
 
     // ══════════════════════════════════════════════════════
-    // COMANDOS DEL VISUALIZADOR DE GRAFO (v1.5piloto.74p)
+    // COMANDOS DEL VISUALIZADOR DE GRAFO (v1.5i.7i)
     // ══════════════════════════════════════════════════════
 
     /**
@@ -1568,6 +1568,68 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
                 'es_especial' => !is_numeric($id),
                 'adyacentes' => $adyacentes,
                 'referencias' => $referencias,
+            ];
+        }, null, false);
+
+        // ─── grafo:eliminar_huerfanos ─────────────────────
+        //
+        // Elimina todos los nodos no alcanzables desde las
+        // raíces (IDs especiales) del grafo. Solo los llama
+        // el enrutador del piloto (admin o soporte).
+        //
+        // No lleva chequeo de es_pruebas: se usa en producción
+        // para limpiar la acumulación de nodos basura. El
+        // enrutador es quien decide cuándo exponerlo.
+        //
+        // Algoritmo:
+        //   1. Cargar estructura y hacer BFS desde las raíces.
+        //   2. Huérfanos = todos los que no son alcanzables.
+        //   3. Desenlazar las salientes de cada huérfano que
+        //      apunten a otro huérfano (para que no queden
+        //      referencias entrantes entre ellos).
+        //   4. Nodo::eliminar cada huérfano.
+        //   5. El enrutador guarda el grafo después.
+        //
+        // Devuelve { eliminados, total_huerfanos }.
+        self::registrar_comando('grafo:eliminar_huerfanos', function(string $token, array $args) {
+            $nodos = self::_grafo_cargar_estructura($token);
+            $alcanzables = self::_grafo_bfs_desde_raices($nodos);
+
+            $huerfanos = [];
+            foreach ($nodos as $id => $info) {
+                if (!isset($alcanzables[$id])) {
+                    $huerfanos[$id] = true;
+                }
+            }
+
+            $total_huerfanos = count($huerfanos);
+            if ($total_huerfanos === 0) {
+                return ['eliminados' => 0, 'total_huerfanos' => 0];
+            }
+
+            foreach ($huerfanos as $id => $_) {
+                $nodo = Nodo::nodo_por_id($id);
+                if (!$nodo) continue;
+                $adyacentes = $nodo->adyacentes();
+                if (!$adyacentes) continue;
+                foreach ($adyacentes as $enlace => $destino) {
+                    if (isset($huerfanos[$destino->id()])) {
+                        $nodo->eliminar_adyacente((string)$enlace);
+                    }
+                }
+            }
+
+            $eliminados = 0;
+            foreach ($huerfanos as $id => $_) {
+                $nodo = Nodo::nodo_por_id($id);
+                if ($nodo && Nodo::eliminar($nodo)) {
+                    $eliminados++;
+                }
+            }
+
+            return [
+                'eliminados' => $eliminados,
+                'total_huerfanos' => $total_huerfanos,
             ];
         }, null, false);
     }
