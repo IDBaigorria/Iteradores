@@ -7,7 +7,7 @@
  * Es la base para la auditoría de la fuga de nodos (Fase 2).
  * Ver prompts/prompt_piloto.md §8.6.
  *
- * @version 1.5piloto.74p
+ * @version 1.5piloto.76g
  */
 
 let grafo_offset_actual = 0;
@@ -210,6 +210,124 @@ function _grafo_escape(s) {
         .replace(/"/g, '&quot;');
 }
 
+// ============================================================
+// ELIMINAR NODOS HUÉRFANOS (v1.5piloto.76g)
+// ============================================================
+
+/**
+ * Abre el modal de confirmación para eliminar los nodos
+ * huérfanos del grafo. Muestra la cantidad total y una
+ * vista previa de los primeros 20.
+ *
+ * No hay chequeo de modo pruebas en este flujo: la limpieza
+ * es útil en producción. El backend valida admin/soporte.
+ */
+async function eliminar_huerfanos_grafo() {
+    const resp_res = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "grafo/resumen",
+            nombre_solicitante: usuario_actual.nombre_usuario
+        })
+    });
+    const datos_res = await resp_res.json();
+    if (!datos_res.exito) {
+        mostrar_aviso(datos_res.error || "Error al cargar el resumen", 'error');
+        return;
+    }
+
+    const total_huerfanos = datos_res.resumen.huerfanos;
+    if (total_huerfanos === 0) {
+        mostrar_aviso("No hay nodos basura para eliminar.", 'info');
+        return;
+    }
+
+    // Vista previa: los primeros 20.
+    const resp_lista = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "grafo/listar",
+            nombre_solicitante: usuario_actual.nombre_usuario,
+            filtro: "huerfanos",
+            enlace: "",
+            texto: "",
+            offset: "0",
+            limite: "20"
+        })
+    });
+    const datos_lista = await resp_lista.json();
+    if (!datos_lista.exito) {
+        mostrar_aviso(datos_lista.error || "Error al listar huérfanos", 'error');
+        return;
+    }
+
+    let filas = '';
+    datos_lista.lista.nodos.forEach(n => {
+        filas += `<tr>`
+            + `<td><code>${_grafo_escape(n.id)}</code></td>`
+            + `<td>${_grafo_escape(n.tipo || '?')}</td>`
+            + `<td style="word-break:break-all;">${_grafo_escape(n.dato || '')}</td>`
+            + `</tr>`;
+    });
+
+    const aviso_extra = total_huerfanos > 20
+        ? `<p class="muted small">Se muestran los primeros 20 de ${total_huerfanos}.</p>`
+        : '';
+
+    const html = `
+        <p>Se eliminarán <strong>${total_huerfanos}</strong> nodos no alcanzables desde las raíces del grafo.</p>
+        <p class="muted small">Son nodos que ya no referencia nadie vivo. Igual, si no tenés backup reciente, conviene cancelar y hacer uno antes.</p>
+        <div style="max-height:300px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; margin:10px 0;">
+            <table class="data-table" style="margin:0;">
+                <thead><tr><th>ID</th><th>Tipo</th><th>Dato</th></tr></thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </div>
+        ${aviso_extra}
+        <div class="field" style="margin-top:10px;">
+            <label><input type="checkbox" id="grafo_eliminar_confirmo"> Confirmo que quiero eliminar estos nodos.</label>
+        </div>
+        <div class="actions" style="margin-top:15px;">
+            <button class="btn danger" id="grafo_eliminar_ejecutar" disabled>Eliminar ${total_huerfanos} nodos</button>
+            <button class="btn" id="grafo_eliminar_cancelar">Cancelar</button>
+        </div>
+    `;
+
+    abrir_modal_generico('Eliminar nodos basura', html);
+
+    const cont = document.getElementById('modal_generico_contenido');
+    if (!cont) return;
+    const chk = cont.querySelector('#grafo_eliminar_confirmo');
+    const btn = cont.querySelector('#grafo_eliminar_ejecutar');
+    chk.addEventListener('change', () => { btn.disabled = !chk.checked; });
+    cont.querySelector('#grafo_eliminar_cancelar').addEventListener('click', cerrar_modal_generico);
+    btn.addEventListener('click', () => _grafo_ejecutar_eliminacion());
+}
+
+/**
+ * Ejecuta la eliminación y refresca el panel.
+ */
+async function _grafo_ejecutar_eliminacion() {
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "grafo/eliminar_huerfanos",
+            nombre_solicitante: usuario_actual.nombre_usuario
+        })
+    });
+    const datos = await resp.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al eliminar", 'error');
+        return;
+    }
+    mostrar_aviso(`Eliminados ${datos.eliminados} nodos basura.`, 'exito');
+    cerrar_modal_generico();
+    await cargar_grafo();
+}
+
 // Inicialización de listeners del panel Grafo.
 (function() {
     const btn_filtrar = document.getElementById('grafo_boton_filtrar');
@@ -221,4 +339,6 @@ function _grafo_escape(s) {
         document.getElementById('grafo_filtro_texto').value = '';
         _grafo_cargar_tabla(0);
     });
+    const btn_eliminar_huerfanos = document.getElementById('grafo_boton_eliminar_huerfanos');
+    if (btn_eliminar_huerfanos) btn_eliminar_huerfanos.addEventListener('click', eliminar_huerfanos_grafo);
 })();

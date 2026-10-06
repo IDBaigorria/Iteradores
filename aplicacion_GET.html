@@ -471,6 +471,10 @@
         <h2>Grafo (superestructura)</h2>
         <p class="muted">Vista de solo lectura. Muestra la superestructura completa: totales, nodos alcanzables vs huérfanos, y permite inspeccionar los enlaces de cada nodo. Los nodos huérfanos son la causa principal de la acumulación del grafo.</p>
         <div id="grafo_resumen" class="panel" style="background:#f7f7f7;"></div>
+        <div class="row" style="gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+          <button class="btn danger" id="grafo_boton_eliminar_huerfanos">Eliminar nodos basura</button>
+          <span class="muted small" style="align-self:center;">Borra los nodos no alcanzables desde las raíces. Confirmación previa con vista de los primeros 20.</span>
+        </div>
         <div class="row" style="gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:flex-end;">
           <div class="field"><label for="grafo_filtro">Filtro</label>
             <select id="grafo_filtro">
@@ -631,6 +635,6 @@
 <script src="Aplicacion/rendiciones.js?v=1.5piloto.73d"></script>
 <script src="Aplicacion/liquidaciones.js?v=1.5piloto.73d"></script>
 <script src="Aplicacion/pasajeros.js?v=1.5piloto.74o"></script>
-<script src="Aplicacion/grafo.js?v=1.5piloto.74p"></script>
+<script src="Aplicacion/grafo.js?v=1.5piloto.76g"></script>
 </body>
 </html>

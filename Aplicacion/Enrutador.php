@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.76f
+ * @version   1.5piloto.76g
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1158,6 +1158,22 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'No se pudo cargar el grafo de credenciales']);
                     }
                     responder_json(['exito' => true, 'resumen' => $resumen_cred]);
+                    break;
+
+                case 'eliminar_huerfanos':
+                    // Solo admin/soporte (chequeo heredado del módulo).
+                    // Sin chequeo de es_pruebas: se usa en producción
+                    // para limpiar la acumulación de nodos basura.
+                    $resultado_huerfanos = Controlador::ejecutar_comando('grafo:eliminar_huerfanos');
+                    if ($resultado_huerfanos === null) {
+                        responder_json(['exito' => false, 'error' => 'No se pudo ejecutar la eliminación']);
+                    }
+                    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                    responder_json([
+                        'exito' => true,
+                        'eliminados' => $resultado_huerfanos['eliminados'],
+                        'total_huerfanos' => $resultado_huerfanos['total_huerfanos'],
+                    ]);
                     break;
 
                 case 'listar':
