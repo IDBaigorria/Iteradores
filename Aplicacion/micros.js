@@ -1,6 +1,6 @@
 /***
  * Funciones de empresas, vehículos y editor de asientos.
- * @version 1.5piloto.28
+ * @version 1.5piloto.76c
  */
 
 // Variable global para el editor de asientos
@@ -223,30 +223,52 @@ function mostrar_croquis_vehiculo(vehiculo) {
 }
 
 // Eventos de empresa y vehículo
+//
+// Fase 8.5, v76c: el alta de empresa y de vehículo pasa a
+// modal genérico. Los formularios embebidos se eliminaron
+// del HTML.
 $("#boton_agregar_empresa_micros").addEventListener("click", () => {
-    $("#formulario_nueva_empresa").classList.remove("hidden");
+    const html = `
+        <div class="form-grid">
+            <div class="field">
+                <label>Nombre de empresa (identificador) *</label>
+                <input type="text" id="modal_nueva_empresa_nombre">
+            </div>
+            <div class="field">
+                <label>Nombre visible</label>
+                <input type="text" id="modal_nueva_empresa_nombre_real">
+            </div>
+        </div>
+        <div class="actions" style="margin-top:15px">
+            <button class="btn primary" id="modal_btn_guardar_empresa">Guardar</button>
+            <button class="btn" id="modal_btn_cancelar_empresa">Cancelar</button>
+        </div>
+    `;
+    abrir_modal_generico('Nueva empresa', html);
+
+    const contenedor = document.getElementById('modal_generico_contenido');
+    contenedor.querySelector('#modal_btn_cancelar_empresa').addEventListener('click', cerrar_modal_generico);
+    contenedor.querySelector('#modal_btn_guardar_empresa').addEventListener('click', _guardar_empresa_desde_modal);
 });
 
-$("#boton_cancelar_empresa").addEventListener("click", () => {
-    $("#formulario_nueva_empresa").classList.add("hidden");
-});
-
-$("#boton_guardar_empresa").addEventListener("click", async () => {
+async function _guardar_empresa_desde_modal() {
     const nombre_dueno = es_admin_o_soporte() ? $("#selector_dueno_micros").value : usuario_actual.nombre_usuario;
     if (!nombre_dueno) {
         mostrar_aviso("Seleccione un dueño", 'error');
         return;
     }
-    const datos = {
-        accion: "empresas/agregar",
-        nombre_dueno,
-        nombre_empresa: $("#nueva_empresa_nombre").value.trim(),
-        nombre_real: $("#nueva_empresa_nombre_real").value.trim()
-    };
-    if (!datos.nombre_empresa) {
+    const nombre_empresa = (document.getElementById('modal_nueva_empresa_nombre')?.value || '').trim();
+    const nombre_real = (document.getElementById('modal_nueva_empresa_nombre_real')?.value || '').trim();
+    if (!nombre_empresa) {
         mostrar_aviso("Nombre de empresa obligatorio", 'error');
         return;
     }
+    const datos = {
+        accion: "empresas/agregar",
+        nombre_dueno,
+        nombre_empresa,
+        nombre_real
+    };
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -255,38 +277,60 @@ $("#boton_guardar_empresa").addEventListener("click", async () => {
     const resultado = await respuesta.json();
     if (resultado.exito) {
         mostrar_aviso("Empresa agregada", 'exito');
-        $("#formulario_nueva_empresa").classList.add("hidden");
+        cerrar_modal_generico();
         await cargar_empresas_de_dueno(nombre_dueno);
     } else {
         mostrar_aviso(resultado.error || "Error al agregar empresa", 'error');
     }
-});
+}
 
 // Eventos de vehículo
+//
+// Fase 8.5, v76c: el alta de vehículo pasa a modal genérico.
+// Se conserva el flujo post-alta (seleccionar el vehículo y
+// abrir el editor de asientos automáticamente).
 $("#boton_agregar_vehiculo_micros").addEventListener("click", () => {
-    $("#formulario_nuevo_vehiculo").classList.remove("hidden");
+    const html = `
+        <div class="form-grid">
+            <div class="field">
+                <label>Patente (identificador) *</label>
+                <input type="text" id="modal_nuevo_vehiculo_nombre">
+            </div>
+            <div class="field">
+                <label>Nombre visible</label>
+                <input type="text" id="modal_nuevo_vehiculo_nombre_real">
+            </div>
+        </div>
+        <div class="actions" style="margin-top:15px">
+            <button class="btn primary" id="modal_btn_guardar_vehiculo">Guardar</button>
+            <button class="btn" id="modal_btn_cancelar_vehiculo">Cancelar</button>
+        </div>
+    `;
+    abrir_modal_generico('Nuevo vehículo', html);
+
+    const contenedor = document.getElementById('modal_generico_contenido');
+    contenedor.querySelector('#modal_btn_cancelar_vehiculo').addEventListener('click', cerrar_modal_generico);
+    contenedor.querySelector('#modal_btn_guardar_vehiculo').addEventListener('click', _guardar_vehiculo_desde_modal);
 });
 
-$("#boton_cancelar_vehiculo").addEventListener("click", () => {
-    $("#formulario_nuevo_vehiculo").classList.add("hidden");
-});
-
-$("#boton_guardar_vehiculo").addEventListener("click", async () => {
+async function _guardar_vehiculo_desde_modal() {
     const nombre_empresa = $("#selector_empresa_micros").value;
     if (!nombre_empresa) {
         mostrar_aviso("Seleccione una empresa", 'error');
         return;
     }
-    const datos = {
-        accion: "vehiculos/agregar",
-        nombre_empresa,
-        nombre_vehiculo: $("#nuevo_vehiculo_nombre").value.trim(),
-        nombre_real: $("#nuevo_vehiculo_nombre_real").value.trim()
-    };
-    if (!datos.nombre_vehiculo) {
+    const nombre_vehiculo = (document.getElementById('modal_nuevo_vehiculo_nombre')?.value || '').trim();
+    const nombre_real = (document.getElementById('modal_nuevo_vehiculo_nombre_real')?.value || '').trim();
+    if (!nombre_vehiculo) {
         mostrar_aviso("Patente obligatoria", 'error');
         return;
     }
+    const datos = {
+        accion: "vehiculos/agregar",
+        nombre_empresa,
+        nombre_vehiculo,
+        nombre_real
+    };
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -295,7 +339,7 @@ $("#boton_guardar_vehiculo").addEventListener("click", async () => {
     const resultado = await respuesta.json();
     if (resultado.exito) {
         mostrar_aviso("Vehículo agregado. Configure los asientos.", 'exito');
-        $("#formulario_nuevo_vehiculo").classList.add("hidden");
+        cerrar_modal_generico();
         await cargar_vehiculos_de_empresa(nombre_empresa);
         const select = $("#selector_vehiculo_micros");
         select.value = datos.nombre_vehiculo;
@@ -308,7 +352,7 @@ $("#boton_guardar_vehiculo").addEventListener("click", async () => {
     } else {
         mostrar_aviso(resultado.error || "Error al agregar vehículo", 'error');
     }
-});
+}
 
 // Editor de asientos
 function iniciar_editor_vehiculo() {

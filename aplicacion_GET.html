@@ -71,42 +71,8 @@
             <select id="selector_dueno_admin"></select>
           </div>
         </div>
-        <div id="formulario_nuevo_usuario" class="panel hidden">
-          <h3>Nuevo usuario</h3>
-          <div class="form-grid">
-            <div class="field"><label>Nombre de usuario *</label><input id="nuevo_nombre_usuario"></div>
-            <div class="field"><label>Contraseña (opcional)</label><input type="password" id="nuevo_contrasena"></div>
-            <div class="field"><label>Nombre real</label><input id="nuevo_nombre_real"></div>
-            <div class="field"><label>Email (opcional)</label><input id="nuevo_email"></div>
-            <div class="field"><label>Código de acceso *</label><input id="nuevo_codigo_acceso"></div>
-            <div class="field"><label>Nivel</label>
-              <select id="nuevo_nivel">
-                <option value="terminal">Terminal</option>
-                <option value="dueno" selected>Dueño</option>
-                <option value="admin">Administrador</option>
-                <option value="soporte">Soporte</option>
-              </select>
-            </div>
-            <div class="field" id="campo_dueno" style="display:none">
-              <label>Dueño (para terminales) *</label>
-              <select id="nuevo_dueno_select">
-                <!-- Se llena dinámicamente -->
-              </select>
-            </div>
-            <div class="field" id="campo_banco_nombre" style="display:none"><label>Banco (nombre) *</label><input id="nuevo_banco_nombre"></div>
-            <div class="field" id="campo_banco_cuenta" style="display:none"><label>Cuenta bancaria *</label><input id="nuevo_banco_cuenta"></div>
-            <div class="field" id="campo_duenos_soporte" style="display:none">
-              <label>Dueños asignados</label>
-              <div id="nuevo_soporte_duenos_lista" style="max-height:200px; overflow-y:auto; border:1px solid #ccc; padding:6px; border-radius:4px; min-width:260px;">
-                <!-- Se llena dinámicamente -->
-              </div>
-            </div>
-          </div>
-          <div class="actions" style="margin-top:12px">
-            <button class="btn primary" id="boton_guardar_usuario">Guardar</button>
-            <button class="btn" id="boton_cancelar_nuevo_usuario">Cancelar</button>
-          </div>
-        </div>
+        <!-- Fase 8.5, v76c: formulario embebido eliminado
+             (el alta de usuario ya usaba modal desde v73g). -->
         <div class="panel">
           <h3>Usuarios registrados</h3>
           <div class="table-wrap">
@@ -150,22 +116,8 @@
         <button class="btn primary" id="boton_agregar_terminal">Agregar punto de venta</button>
       </div>
 
-      <div id="formulario_nueva_terminal" class="panel hidden">
-        <h3>Nuevo punto de venta</h3>
-        <div class="form-grid">
-          <div class="field"><label>Nombre de usuario *</label><input id="nuevo_terminal_nombre_usuario"></div>
-          <div class="field"><label>Contraseña (opcional)</label><input type="password" id="nuevo_terminal_contrasena"></div>
-          <div class="field"><label>Nombre real</label><input id="nuevo_terminal_nombre_real"></div>
-          <div class="field"><label>Email (opcional)</label><input id="nuevo_terminal_email"></div>
-          <div class="field"><label>Código de acceso *</label><input id="nuevo_terminal_codigo_acceso"></div>
-          <div class="field"><label>Banco (nombre) *</label><input id="nuevo_terminal_banco_nombre"></div>
-          <div class="field"><label>Cuenta bancaria *</label><input id="nuevo_terminal_banco_cuenta"></div>
-        </div>
-        <div class="actions" style="margin-top:12px">
-          <button class="btn primary" id="boton_guardar_terminal">Guardar</button>
-          <button class="btn" id="boton_cancelar_terminal">Cancelar</button>
-        </div>
-      </div>
+      <!-- Fase 8.5, v76c: formulario embebido eliminado
+           (el alta de terminal ya usaba modal desde v73g). -->
 
       <div class="panel">
         <h3>Terminales</h3>
@@ -223,28 +175,10 @@
           <label for="selector_empresa_micros">Empresa:</label>
           <select id="selector_empresa_micros"></select>
           <button class="btn" id="boton_agregar_empresa_micros">Agregar empresa</button>
-          <button class="btn" id="boton_editar_empresa_micros">Editar</button>
-          <button class="btn danger" id="boton_eliminar_empresa_micros">Eliminar</button>
+          <!-- Fase 8.5, v76c: botones eliminados porque no tenían listener (código muerto). -->
         </div>
-        <div id="formulario_nueva_empresa" class="panel hidden" style="margin-top:10px;">
-            <div class="form-grid">
-                <div class="field"><label>Nombre de empresa (identificador) *</label><input id="nueva_empresa_nombre"></div>
-                <div class="field"><label>Nombre visible</label><input id="nueva_empresa_nombre_real"></div>
-            </div>
-            <div class="actions" style="margin-top:8px">
-                <button class="btn primary" id="boton_guardar_empresa">Guardar</button>
-                <button class="btn" id="boton_cancelar_empresa">Cancelar</button>
-            </div>
-        </div>
-        <div id="formulario_editar_empresa" class="panel hidden" style="margin-top:10px;">
-          <div class="form-grid">
-            <div class="field"><label>Nombre visible</label><input id="editar_empresa_nombre"></div>
-          </div>
-          <div class="actions" style="margin-top:8px">
-            <button class="btn primary" id="boton_guardar_edicion_empresa">Guardar</button>
-            <button class="btn" id="boton_cancelar_edicion_empresa">Cancelar</button>
-          </div>
-        </div>
+        <!-- Fase 8.5, v76c: formulario migrado a modal genérico. -->
+        <!-- Fase 8.5, v76c: formulario sin uso eliminado (código muerto). -->
       </div>
 
       <div class="panel" id="panel_vehiculos_micros" style="display:none;">
@@ -253,18 +187,9 @@
           <select id="selector_vehiculo_micros"></select>
           <button class="btn" id="boton_agregar_vehiculo_micros">Agregar vehículo</button>
           <button class="btn primary" id="boton_modificar_vehiculo_micros">Modificar vehículo</button>
-          <button class="btn danger" id="boton_eliminar_vehiculo_micros">Eliminar</button>
+          <!-- Fase 8.5, v76c: botón eliminado porque no tenía listener (código muerto). -->
         </div>
-        <div id="formulario_nuevo_vehiculo" class="panel hidden" style="margin-top:10px;">
-          <div class="form-grid">
-            <div class="field"><label>Patente (identificador) *</label><input id="nuevo_vehiculo_nombre"></div>
-            <div class="field"><label>Nombre visible</label><input id="nuevo_vehiculo_nombre_real"></div>
-          </div>
-          <div class="actions" style="margin-top:8px">
-            <button class="btn primary" id="boton_guardar_vehiculo">Guardar</button>
-            <button class="btn" id="boton_cancelar_vehiculo">Cancelar</button>
-          </div>
-        </div>
+        <!-- Fase 8.5, v76c: formulario migrado a modal genérico. -->
         <div id="panel_datos_vehiculo" class="panel-datos-vehiculo hidden">
             <div class="foto-miniatura">
                 <img id="foto_vehiculo_miniatura" src="" alt="Foto" style="display:none;">
@@ -697,7 +622,7 @@
 <script src="aplicacion.js?v=1.5piloto.76b"></script>
 <script src="Aplicacion/admin.js?v=1.5piloto.73j"></script>
 <script src="Aplicacion/terminales.js?v=1.5piloto.73j"></script>
-<script src="Aplicacion/micros.js?v=1.5piloto.73d"></script>
+<script src="Aplicacion/micros.js?v=1.5piloto.76c"></script>
 <script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.74o"></script>
 <script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.74k"></script>
 <script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.74e"></script>

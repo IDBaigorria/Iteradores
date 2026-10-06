@@ -823,6 +823,25 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76d**: solo documentación. Se escribe completa la
+  sección §8.6.1 "Criterios de eliminación" con el
+  criterio concreto por entidad, extraído de los 19
+  flujos arreglados en Fase 2 (v74r-v75a) + el cierre
+  del Grupo B (v75a). Incluye reglas generales,
+  anti-patrones, criterio por entidad y referencia a
+  los helpers `_destruir_*` correspondientes.
+- **v76c**: cierre del pendiente "convertir en modal la
+  carga de empresas y micros" + eliminación de código
+  muerto. `micros.js`: el alta de empresa y de vehículo
+  pasan a modal genérico. `aplicacion_GET.html`: se
+  eliminan los formularios embebidos
+  (`#formulario_nuevo_usuario`, `#formulario_nueva_terminal`,
+  `#formulario_nueva_empresa`, `#formulario_editar_empresa`,
+  `#formulario_nuevo_vehiculo`) y 3 botones huérfanos sin
+  listener (`#boton_editar_empresa_micros`,
+  `#boton_eliminar_empresa_micros`,
+  `#boton_eliminar_vehiculo_micros`). Se elimina también
+  `__index.html`, backup viejo de la interfaz.
 - **v76b**: cierre del pendiente "cerrar todos los
   modales al cerrar sesión". `_limpiar_contenido_dinamico`
   ahora cierra el modal genérico (sin disparar el hook
@@ -1219,20 +1238,19 @@ y liquidaciones.
   Cubre el logout manual y el cambio de sesión sin recargar
   (que también llama a `_limpiar_contenido_dinamico` desde
   `_aplicar_login_exitoso`).
-- **Convertir en modal la carga de nuevas empresas y micros**
-  (prioridad media). Hoy son formularios inline
-  (`#formulario_nueva_empresa`, `#formulario_nuevo_vehiculo`).
-  Migrar al patrón de modal genérico como se hizo con usuarios
-  y terminales (v73e-v73g).
-  - **Recordatorio:** al migrar a modal, eliminar los
-    formularios embebidos de `aplicacion_GET.html` que
-    queden muertos: `#formulario_nueva_empresa`,
-    `#formulario_nuevo_vehiculo`, y también los ya muertos
-    desde v73g (`#formulario_nuevo_usuario`,
-    `#formulario_nueva_terminal`). Es código muerto que
-    sigue en el HTML y puede inducir a error al escribir
-    pruebas del plugin (ver aprendizaje 30 en el prompt
-    del plugin).
+- ~~**Convertir en modal la carga de nuevas empresas y micros**~~.
+  **Resuelto en v76c.** El alta de empresa y de vehículo
+  pasan a modal genérico. Se eliminaron los formularios
+  embebidos de `aplicacion_GET.html`:
+  `#formulario_nueva_empresa`, `#formulario_nuevo_vehiculo`,
+  y también los ya muertos desde v73g
+  (`#formulario_nuevo_usuario`, `#formulario_nueva_terminal`),
+  más `#formulario_editar_empresa` (muerto en JS).
+  Se eliminaron también 3 botones huérfanos sin listener
+  (`#boton_editar_empresa_micros`,
+  `#boton_eliminar_empresa_micros`,
+  `#boton_eliminar_vehiculo_micros`) y `__index.html`
+  (backup viejo de la interfaz).
 
 **Herramientas de diagnóstico disponibles:**
 
@@ -1245,6 +1263,13 @@ y liquidaciones.
   Reporta candidatos clasificados en "PROBABLE FUGA"
   (eliminar_hmi/hd sin retorno usado) y "REVISAR".
   Sirve para priorizar flujos nuevos de Fase 2.
+- `miscelaneas/detectar_botones_sin_listener.php`:
+  encuentra IDs de elementos en HTML sin referencia
+  literal en ningún JS (getElementById, querySelector
+  #id, $("#id"), [id="id"]). Útil para detectar código
+  muerto del frontend. Limitaciones: no detecta IDs
+  construidos dinámicamente ni referencias vía dataset
+  o getAttribute. Excluye los que tienen onclick inline.
 
 **Implementados (ya no son pendientes):**
 
@@ -1464,7 +1489,8 @@ Con la pestaña Grafo como herramienta:
      cliente).
 3. Implementar los fixes en tandas chicas, midiendo el total
    de nodos antes y después.
-4. Documentar los criterios en §8.6.1.
+4. Documentar los criterios en §8.6.1. **Hecho en v76d**
+   (ver §8.6.1).
 
 **Fase 3 — Optimizaciones (en curso, prioridad media).**
 
@@ -1491,31 +1517,197 @@ de O(V × W) a O(V + W).
 
 ### 8.6.1 Criterios de eliminación
 
-**Stub. A completar en Fase 2.**
+Documentado al cerrar Fase 2 (v76d). El criterio se extrajo
+de los 19 flujos arreglados en v74r-v75a + el Grupo B.
 
-Cuando se cancela/elimina una entidad, no siempre hay que
-destruir los nodos asociados. Algunos se conservan a
-propósito (datos del cliente). Otros deben destruirse
-(viaje, micro, terminal). Esta sección documenta el criterio
-por tipo de entidad.
+**Reglas generales (aplican siempre):**
 
-**Criterio general (a validar caso por caso):**
+1. **Sub-árbol interno vs referencia externa.** Al destruir
+   una entidad, hay que distinguir qué nodos viven solo
+   como parte de ella (sub-árbol interno) y qué nodos
+   tienen vida propia o son compartidos (referencias
+   externas).
+   - **Sub-árbol interno:** se destruye recursivamente.
+     Ejemplos: campos string, contenedores, cupones de una
+     venta, asientos de una copia de vehículo, TerminalViaje,
+     opciones avanzadas, opciones_cobro.
+   - **Referencia externa:** solo se desenlaza, no se
+     destruye. Ejemplos: pasajero/comprador (reutilizable),
+     empresa (pertenece al dueño), terminal (usuario),
+     asiento real del micro (vive en el micro, no en la
+     venta), parada (vive en el viaje), rendición (vive en
+     el dueño), sesión (vive en credenciales).
 
-- **Datos del cliente (pasajero, comprador):** se conservan
-  aunque la venta se cancele. El cliente puede volver a
-  comprar.
-- **Entidades operativas (viaje, micro, venta, cupón,
-  terminal):** al eliminarse, sus nodos deberían destruirse.
-  Los nodos que cuelgan de ellas también (asientos de copia,
-  cupones, etc.) salvo que estén referenciados desde otro
-  lado.
-- **Nodos "hijos" (asientos, cupones, etc.):** se destruyen
-  junto con su padre, salvo que tengan referencias
-  entrantes (en cuyo caso primero se desenlazan las
-  referencias).
+2. **Orden: hojas a raíz.** Antes de `Nodo::eliminar($n)`,
+   hay que haber desenlazado todas sus referencias
+   entrantes. El patrón recursivo es: primero desenlazar
+   al hijo del padre, después destruir el hijo. Si no,
+   `Nodo::eliminar` falla silenciosamente y el nodo queda
+   huérfano.
 
-**Pendiente:** documentar el criterio por entidad concreta
-después de la auditoría.
+3. **El contenedor padre se vacía antes de destruirse.**
+   Si la entidad tiene un contenedor propio (ej. `micros`
+   de un viaje), hay que vaciarlo (destruyendo cada hijo)
+   antes de destruir el contenedor.
+
+4. **Desenlazar del contenedor de arriba.** Después de
+   destruir el sub-árbol, desenlazar el nodo principal
+   del contenedor que lo contenía (el contenedor del
+   dueño, por ejemplo).
+
+5. **Los campos hoja se destruyen con su padre.** Un nodo
+   con dato string y sin adyacentes propios es un "campo
+   hoja". Se destruye junto con el nodo que lo contiene.
+   El helper `_destruir_campos_simples($padre, $excluir)`
+   hace esto automáticamente, dejando intactos los
+   enlaces que apuntan a sub-árboles o a referencias
+   externas.
+
+**Anti-patrones (lo que causaba las fugas pre-Fase 2):**
+
+- **Desenlazar sin destruir.** `$padre->eliminar_adyacente($enlace)`
+  solo desconecta el nodo. Si el nodo no tiene otra
+  referencia entrante, queda huérfano. Fue la causa
+  principal de las ~10.000 fugas del piloto.
+- **Destruir sin desenlazar.** `Nodo::eliminar($n)` con
+  referencias entrantes falla silenciosamente. El nodo
+  sigue vivo con sus referencias rotas. Fue el bug del
+  orden de destrucción (v74t).
+- **Usar `eliminar_hmi` sobre listas simples.** Las listas
+  con `primer`/`siguiente` no son árboles `hmi`/`hd`. El
+  `eliminar_hmi` no las ve. Bug de `cancelar_venta`
+  (v74v).
+
+**Criterio por entidad concreta:**
+
+**Usuario (`eliminar_usuario`, `actualizar_usuario`):**
+- Destruir: campos del nodo usuario (`nivel`, `nombre_real`,
+  `email`, `efectivo`), banco (contenedor con `nombre`,
+  `cuenta`), contenedor `duenos` si es soporte, nodo
+  credencial en credenciales (con `codigo_hash`,
+  `contrasena`, `intentos_fallidos`, `bloqueado_hasta`,
+  `ultimo_acceso`, `ip_ultimo_acceso`), y las sesiones
+  activas del usuario.
+- Desenlazar: referencias cruzadas entre usuarios (`soporte`
+  en dueños, `dueno` en terminales, terminales del dueño).
+- No destruir: pasajeros asociados, terminales (impiden la
+  eliminación si las tiene), ventas.
+- Helper: `_destruir_banco_usuario`.
+
+**Pasajero (`eliminar_pasajero`, `limpiar_pasajeros_de_prueba`):**
+- Destruir: campos personales (`nombres`, `apellido`,
+  `email`, `celular`, `celular_emergencia`,
+  `fecha_nacimiento`, `localidad`, `direccion`,
+  `fecha_ultima_modificacion`), declaración jurada adjunta
+  con sus 4 sub-campos (`nombre_original`, `tipo`, `tamano`,
+  `fecha_subida`).
+- No eliminar si tiene pasajes comprados (regla del negocio:
+  no se puede borrar un cliente que viajó).
+- Helpers: `_destruir_declaracion_jurada_pasajero`,
+  `_destruir_pasajero_completo`.
+
+**Declaración jurada del pasajero (subir / reemplazar /
+eliminar):**
+- Destruir: el nodo DJ con sus 4 sub-campos.
+- Helper: `_destruir_declaracion_jurada_pasajero`.
+
+**Empresa (`eliminar_empresa`):**
+- Destruir: cada vehículo completo (con asientos, pisos,
+  listas circulares, campos), el contenedor `vehiculos`, y
+  la propia empresa (con sus campos).
+- No destruir: los micros de viajes que apunten a esta
+  empresa. La referencia es solo por identificador de
+  empresa, no rompe al destruir la empresa.
+- Helper: `_destruir_vehiculo_completo`.
+
+**Vehículo (`eliminar_vehiculo`, `actualizar_configuracion_vehiculo`):**
+- Destruir: asientos, pisos, listas circulares de asientos,
+  campos (`nombre`, `foto`).
+- No destruir: copias del vehículo en micros. Son nodos
+  independientes.
+- Helper: `_destruir_vehiculo_completo`, `_destruir_piso`,
+  `_destruir_lista_circular_asientos`.
+
+**Viaje (`eliminar_viaje`, `limpiar_viajes_de_prueba`):**
+- Destruir, en orden: micros (cada uno con su copia de
+  vehículo y asientos), contenedor `micros`, TerminalViaje
+  de cada terminal autorizada, contenedor
+  `terminales_autorizadas`, paradas intermedias, DJs
+  mayor y menor, opciones avanzadas, campos del viaje.
+- Desenlazar: `dueno` (referencia externa al usuario).
+- Helper: `_destruir_viaje_completo` (que usa
+  `_destruir_micro`, `_destruir_terminal_viaje`,
+  `_destruir_parada`).
+
+**Micro de viaje (`eliminar_micro_de_viaje`):**
+- Destruir: copia de vehículo (con pisos y asientos),
+  campos del micro (`monto`, contadores).
+- Desenlazar: `empresa` (externa), `viaje` (circular).
+- Helper: `_destruir_micro`.
+
+**Terminal autorizada de un viaje
+(`eliminar_terminal_autorizada`):**
+- Destruir: el TerminalViaje con sus campos override.
+- Desenlazar: `terminal` (usuario externo),
+  `punto_subida_bajada` (parada del viaje, sigue vivo).
+- Helper: `_destruir_terminal_viaje`.
+
+**Paradas intermedias (`_guardar_paradas_intermedias`):**
+- Reutilizadas: se conservan (su identidad importa para
+  los TerminalViaje que las referencian por
+  `punto_subida_bajada`).
+- No reutilizadas: se destruyen.
+- Helper: `_destruir_parada`.
+
+**Venta persistente (`cancelar_venta`):**
+- Destruir: asientos-en-venta (con sus campos
+  `punto_subida_bajada`, `hora_subida_bajada`), cupones
+  (con campos), contenedor de cupones, sub-nodo
+  `opciones_cobro`, campos del nodo venta.
+- Desenlazar: `comprador` (pasajero reutilizable),
+  `asiento` real (vuelve a libre en el micro),
+  `viaje`/`micro`/`terminal` (referencias externas),
+  `rendido` del cupón (nodo Rendición que sigue vivo).
+- Helper: `_destruir_asiento_en_venta` (usado por
+  `cancelar_venta`, `_destruir_venta_actual` y
+  `ViajeAsientos.php`).
+
+**Venta actual (`confirmar_venta_actual`):**
+- Destruir: venta_actual, lista de asientos-en-venta
+  temporales.
+- Desenlazar: `terminal` (usuario externo), `asiento` real.
+- Helper: `_destruir_venta_actual`.
+
+**Asiento-en-venta (`seleccionar_asiento_micro`,
+`deseleccionar_asiento_micro`):**
+- Al cambiar de micro a mitad de selección, o al
+  deseleccionar un asiento, el nodo asiento-en-venta se
+  destruye.
+- Helper: `_destruir_asiento_en_venta`.
+
+**Cupón (`pagar_cupon_venta`):**
+- Al eliminar cupones sobrantes tras pagar el saldo, se
+  destruyen con sus campos.
+- Helper: `_eliminar_cupon_del_contenedor` (implícito).
+
+**Sesión (`cerrar_sesion`, `eliminar_sesiones_de_usuario`):**
+- Destruir: el nodo sesión con sus campos (`usuario`,
+  `creado_en`).
+
+**Campos hoja específicos:**
+- `bloqueado_hasta` en credenciales: al expirar el bloqueo
+  y al registrar login exitoso (`Autenticacion.php`).
+- `metodo_pago` del cupón: al coincidir con el método de la
+  venta (`Venta.php`).
+- `foto` del vehículo: al reemplazarla (`Vehiculo.php`).
+- `hora_estimada` de una parada: al quitarle la hora
+  (`Viaje.php`).
+- Campos al limpiar un valor en `actualizar_pasajero` y
+  `actualizar_usuario`.
+
+**Regla de oro:** si un nodo se desenlaza sin destruirse,
+primero preguntar "¿tiene otra referencia entrante?". Si la
+respuesta es no, hay que destruirlo.
 
 ---
 
@@ -1730,7 +1922,16 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76b
+**Última actualización de este prompt:** v1.5piloto.76d
+(solo documentación. Se escribe completa la sección
+§8.6.1 "Criterios de eliminación" con el criterio por
+entidad extraído de toda la Fase 2.).
+Antes: v1.5piloto.76c
+(cierre del pendiente "convertir en modal la carga de
+empresas y micros" + eliminación de código muerto del
+HTML: 5 formularios embebidos, 3 botones huérfanos y
+`__index.html`.).
+Antes: v1.5piloto.76b
 (cierre del pendiente "cerrar todos los modales al
 cerrar sesión". `_limpiar_contenido_dinamico` ahora
 cierra el modal genérico, el apilado, el
@@ -2031,6 +2232,15 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   `actualizar_pasajero`. Helpers nuevos:
   `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- Cerramos en v76d la sección §8.6.1 "Criterios de
+  eliminación": reemplazado el stub por el criterio
+  completo. Reglas generales, anti-patrones, criterio
+  por entidad, referencia a los helpers `_destruir_*`.
+- Cerramos en v76c el pendiente "convertir en modal la
+  carga de empresas y micros" + eliminación de código
+  muerto del HTML. Se eliminaron los 5 formularios
+  embebidos, 3 botones huérfanos sin listener y
+  `__index.html`.
 - Cerramos en v76b el pendiente de backlog "cerrar
   todos los modales al cerrar sesión". Ahora
   `_limpiar_contenido_dinamico` cierra el modal
@@ -2275,7 +2485,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76b (framework 1.5i.7g).
+**Estado del proyecto al cierre:** v1.5piloto.76d (framework 1.5i.7g).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2298,7 +2508,9 @@ v75a: cierre del Grupo B (campos huérfanos).
 v76: flujos 15 a 19 (pasajeros y declaraciones
 juradas adjuntas). v76a: Fase 3, índice de ventas
 por viaje. v76b: cerrar todos los modales al
-cerrar sesión.
+cerrar sesión. v76c: alta de empresa y vehículo a
+modal + eliminación de código muerto del HTML.
+v76d: §8.6.1 completado (documentación).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
 tiene 31 pruebas corriendo.
 
