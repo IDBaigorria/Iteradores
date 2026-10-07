@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.67c
+ * @version   1.5piloto.76h
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -1887,11 +1887,16 @@ function imprimir_croquis_micro(string $nombre_dueno, string $nombre_viaje, stri
  *   6. TEL. FAMILIAR
  *   7. DOMICILIO
  *
+ * Si `$vacia` es true, se imprimen los mismos encabezados,
+ * los mismos números de asiento y las mismas columnas, pero
+ * sin los datos de cada pasajero (útil para completar a mano).
+ *
  * @param string $nombre_dueno
  * @param string $nombre_viaje
  * @param string $nombre_micro
+ * @param bool   $vacia  Si true, no llena las filas con los datos del pasajero.
  */
-function imprimir_planilla_pasajeros_micro(string $nombre_dueno, string $nombre_viaje, string $nombre_micro): void {
+function imprimir_planilla_pasajeros_micro(string $nombre_dueno, string $nombre_viaje, string $nombre_micro, bool $vacia = false): void {
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
     if (!$nodo_viajes) { echo "Dueño no encontrado"; return; }
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -1979,10 +1984,19 @@ function imprimir_planilla_pasajeros_micro(string $nombre_dueno, string $nombre_
         echo '</tr></thead><tbody>';
 
         foreach ($asientos as $a) {
-            $pa = $a['pasajero'];
-            $tiene_pas = ($pa !== null && ($pa['nombre_completo'] !== '' || $pa['dni_visible'] !== ''));
             echo '<tr>';
             echo '<td class="num">' . htmlspecialchars($a['numero']) . '</td>';
+
+            // Modo planilla vacía: solo el número de asiento, sin
+            // datos del pasajero. Se corta antes de leerlos.
+            if ($vacia) {
+                echo '<td></td><td></td><td></td><td></td><td></td><td></td>';
+                echo '</tr>';
+                continue;
+            }
+
+            $pa = $a['pasajero'];
+            $tiene_pas = ($pa !== null && ($pa['nombre_completo'] !== '' || $pa['dni_visible'] !== ''));
             if ($tiene_pas) {
                 $dir_completa = trim(($pa['direccion'] ?? '') . (($pa['localidad'] ?? '') !== '' ? ', ' . $pa['localidad'] : ''));
                 echo '<td>' . htmlspecialchars($pa['nombre_completo']) . '</td>';

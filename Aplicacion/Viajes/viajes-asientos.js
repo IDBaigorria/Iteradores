@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.74e
+ * @version 1.5piloto.76h
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -1170,6 +1170,7 @@ function renderizar_pasaje_micro(micro) {
             <div class="acciones-impresion-micro" style="margin-top:12px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
                 <button class="btn" id="btn_imprimir_croquis_micro">Imprimir Croquis</button>
                 <button class="btn primary" id="btn_imprimir_planilla_micro">Imprimir Planilla</button>
+                <button class="btn" id="btn_imprimir_planilla_vacia_micro">Imprimir Planilla Vacía</button>
             </div>
         `;
         contenedorCroquis.insertAdjacentHTML('beforeend', botonesHTML);
@@ -1192,6 +1193,18 @@ function renderizar_pasaje_micro(micro) {
                     + `&dueno=${encodeURIComponent(nombre_dueno_imp)}`
                     + `&viaje=${encodeURIComponent(nombre_viaje_imp)}`
                     + `&micro=${encodeURIComponent(nombre_micro_imp)}`;
+                window.open(url, '_blank');
+            });
+        }
+
+        const btn_planilla_vacia = document.getElementById('btn_imprimir_planilla_vacia_micro');
+        if (btn_planilla_vacia) {
+            btn_planilla_vacia.addEventListener('click', () => {
+                const url = `index.php?imprimir=1&tipo=planilla_pasajeros_micro`
+                    + `&dueno=${encodeURIComponent(nombre_dueno_imp)}`
+                    + `&viaje=${encodeURIComponent(nombre_viaje_imp)}`
+                    + `&micro=${encodeURIComponent(nombre_micro_imp)}`
+                    + `&vacia=1`;
                 window.open(url, '_blank');
             });
         }
