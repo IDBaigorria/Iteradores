@@ -172,7 +172,18 @@ pantallas angostas, las tabs van con scroll horizontal.
 Implementada en v1.5piloto.74p (Fase 1 del plan de optimización,
 ver §8.6). Visible solo para **admin y soporte**.
 
-**Es de solo lectura.** No modifica el grafo.
+**Originalmente de solo lectura; desde v76g incluye una
+acción de escritura.** El botón "Eliminar nodos basura"
+borra todos los nodos no alcanzables desde las raíces
+(IDs especiales) del grafo de la aplicación. **No está
+restringido a modo pruebas**: se usa en producción, donde
+más se acumulan los huérfanos. El chequeo es admin/soporte,
+heredado del módulo `grafo` del enrutador. Antes de
+eliminar, muestra un modal de confirmación con la cuenta
+total y una vista previa de los primeros 20 nodos
+huérfanos. El backend usa el comando
+`grafo:eliminar_huerfanos`, que desenlaza las salientes
+entre huérfanos y después los elimina uno a uno.
 
 **Qué muestra:**
 
@@ -551,6 +562,9 @@ se reordenaron los `require_once` en `index.php` para que
 - `imprimir_informe_ventas`.
 - `imprimir_informe_cancelacion`, `imprimir_informe_liquidacion`.
 - `imprimir_croquis_micro`, `imprimir_planilla_pasajeros_micro`.
+  La planilla acepta un 4to parámetro `$vacia` (desde v76h);
+  si es true, imprime la estructura sin los datos del
+  pasajero (útil para completar a mano).
 - `imprimir_informe_rendicion`.
 - `imprimir_declaracion_jurada`.
 
@@ -575,9 +589,15 @@ Subacciones especiales:
   `en_grafo_credenciales_solo_lectura` (no guarda). Lo consume
   el plugin en la prueba de rate limiting.
 - Módulo `grafo` (admin y soporte): `grafo/resumen`,
-  `grafo/listar`, `grafo/nodo`. Invocan comandos del
-  `Controlador` (`grafo:resumen`, `grafo:listar`,
-  `grafo:nodo`). Ver §3.4.
+  `grafo/listar`, `grafo/nodo`, `grafo/eliminar_huerfanos`.
+  Los primeros tres invocan comandos del `Controlador`
+  (`grafo:resumen`, `grafo:listar`, `grafo:nodo`). El
+  cuarto (agregado en v76g) invoca el comando
+  `grafo:eliminar_huerfanos` y guarda el grafo con
+  `guardar_ambos`. **No lleva chequeo de `es_pruebas`:
+  se usa en producción**, por decisión consciente (la
+  limpieza es mantenimiento, no prueba). El control es
+  admin/soporte. Ver §3.4.
 
 ### 5.15 `index.php`
 
@@ -643,6 +663,8 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 - `index.php?imprimir=1&tipo=informe_cancelacion&id_cancelacion=X`.
 - `index.php?imprimir=1&tipo=croquis_micro&dueno=X&viaje=Y&micro=Z`.
 - `index.php?imprimir=1&tipo=planilla_pasajeros_micro&dueno=X&viaje=Y&micro=Z`.
+  Con `&vacia=1`, la planilla sale sin los datos del
+  pasajero (solo números de asiento y columnas en blanco).
 - `index.php?imprimir=1&tipo=declaracion_jurada&dueno=X&viaje=Y&tipo_dj=mayor|menor`.
 
 ---
@@ -828,6 +850,26 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76h**: nuevo botón "Imprimir Planilla Vacía" en el
+  croquis del micro. `imprimir_planilla_pasajeros_micro`
+  recibe un 4to parámetro `$vacia = false`; cuando es
+  true, imprime los mismos encabezados, los números de
+  asiento y las columnas, pero sin los datos del
+  pasajero (útil para completar a mano). `index.php`
+  lee `$_GET['vacia']` y lo pasa. Solo PHP.
+- **v76g**: eliminación de nodos huérfanos desde la pestaña
+  Grafo. Nuevo comando `grafo:eliminar_huerfanos` en el
+  framework PHP (1.5i.7i) y JS (espejado en la misma
+  tanda), nueva subacción `grafo/eliminar_huerfanos` en el
+  enrutador (admin/soporte, **sin chequeo de
+  `es_pruebas`**: se usa en producción, donde más se
+  acumulan los huérfanos — decisión consciente). Nuevo
+  botón "Eliminar nodos basura" con modal de
+  confirmación (cuenta total + vista previa de los
+  primeros 20). Nuevo helper
+  `en_grafo_credenciales_solo_lectura` (v76f) reutilizado
+  en la prueba del plugin. Nueva prueba 56
+  (`eliminar_huerfanos_limpia_grafo`) en el plugin.
 - **v76f**: nuevo helper `en_grafo_credenciales_solo_lectura`
   (lee el grafo de credenciales sin guardarlo) y nueva
   subacción `grafo/resumen_credenciales` en el enrutador
@@ -1221,6 +1263,18 @@ Pendiente para futuras iteraciones del visualizador:
   implementado en Fase 1).
 
 ### 8.5 Próximos pasos posibles
+
+**Bug de UX pendiente (prioridad media):**
+
+- **DJ del viaje en el modal de edición.** Reportado durante
+  v76h. Con el rol dueño: se abre el modal de edición de la
+  DJ del viaje, se edita, se cancela. Al volver a tocar el
+  botón de editar, el modal abre pero queda bloqueado: no
+  deja editar. Se sospecha que algún estado interno
+  (contenteditable, listener, flag global) queda
+  inconsistente después del primer ciclo. Requiere revisar
+  `Aplicacion/Viajes/viajes-nucleo.js` y el HTML del modal
+  de DJ. No está cubierto por pruebas del plugin.
 
 **Diversificación por tipo de aplicación** (próximo gran frente):
 
@@ -1932,7 +1986,22 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76f
+**Última actualización de este prompt:** v1.5piloto.76h
+(planilla de pasajeros "vacía": nuevo botón "Imprimir
+Planilla Vacía" en el croquis del micro.
+`imprimir_planilla_pasajeros_micro` recibe un 4to
+parámetro `$vacia`; `index.php` lee `$_GET['vacia']`.
+Solo PHP.).
+Antes: v1.5piloto.76g
+(eliminación de nodos huérfanos desde la pestaña Grafo.
+Nuevo comando `grafo:eliminar_huerfanos` (framework PHP
+1.5i.7i + espejo JS), subacción `grafo/eliminar_huerfanos`
+en el enrutador — admin/soporte, sin chequeo de
+`es_pruebas` por decisión consciente — y botón
+"Eliminar nodos basura" en `Aplicacion/grafo.js` con modal
+de confirmación y vista previa. Nueva prueba 56 del plugin
+(`eliminar_huerfanos_limpia_grafo`).).
+Antes: v1.5piloto.76f
 (nuevo helper `en_grafo_credenciales_solo_lectura` +
 subacción `grafo/resumen_credenciales` en el enrutador,
 solo en modo pruebas. Permite al plugin medir huérfanos
@@ -2500,7 +2569,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76f (framework 1.5i.7h).
+**Estado del proyecto al cierre:** v1.5piloto.76h (framework 1.5i.7i).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2528,8 +2597,16 @@ modal + eliminación de código muerto del HTML.
 v76d: §8.6.1 completado (documentación).
 v76f: helper de solo lectura para credenciales + endpoint
 `grafo/resumen_credenciales` (solo en modo pruebas).
-El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5g)
-tiene 31 pruebas corriendo.
+v76g: eliminación de nodos huérfanos desde la pestaña
+Grafo (comando `grafo:eliminar_huerfanos` en PHP y JS,
+subacción `grafo/eliminar_huerfanos` en el enrutador,
+botón en el frontend). Decisión consciente: no está
+restringido a modo pruebas.
+v76h: planilla de pasajeros "vacía" (parámetro `$vacia`
+en `imprimir_planilla_pasajeros_micro` + botón en el
+croquis del micro).
+El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5w)
+tiene 56 pruebas corriendo.
 
 **Plan de optimización del grafo (ver §8.6):**
 

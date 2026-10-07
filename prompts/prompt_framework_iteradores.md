@@ -453,6 +453,38 @@ tamaño total del grafo.
     teoría de grafos (componentes conexas, sub-grafos inducidos).
 - Persistir por partes usando índices auxiliares.
 - Snapshot por rama con marca de "raíz".
+- **Índice de contexto por producto de primos (idea
+  anotada, sin implementar).** Asignar a cada raíz
+  especial (nodo con ID no numérico) un número primo
+  distinto. Guardar en cada nodo un campo — columna en
+  la tabla `nodos` — con el producto de los primos de
+  todas las raíces desde las que el nodo es alcanzable.
+  Como la factorización en primos es única (teorema
+  fundamental de la aritmética), el producto identifica
+  exactamente el conjunto de contextos a los que
+  pertenece el nodo. Para cargar solo el contexto de una
+  raíz R, filtrar `WHERE contexto % primo_R = 0`. Un
+  nodo alcanzable desde varias raíces queda con el
+  producto de sus primos.
+  - **Ventaja:** un único índice numérico reemplaza a
+    una tabla de pertenencias. Filtrado con una sola
+    condición aritmética.
+  - **Límite:** el producto crece rápido. Con N raíces,
+    si un nodo es alcanzable desde muchas, el producto
+    puede overflow. En la práctica el piloto tiene 2
+    raíces (`usuarios`, `sesiones`); con 5-10 raíces el
+    producto de los primeros primos entra en un
+    `BIGINT` sin problema.
+  - **Mantenimiento:** cada vez que se agrega un enlace,
+    hay que propagar el producto por el grafo (un nodo
+    nuevo hereda el producto de su padre; si el nodo ya
+    existía y suma un contexto, se multiplica el primo).
+    Requiere diseñar la propagación incremental.
+  - **Interacción con el framework:** habría que
+    modificar `PerdurarSuperestructuraStringSQL` para
+    agregar la columna, calcular el producto al guardar
+    y usarlo al cargar con un filtro. Es un cambio de
+    la implementación de persistencia, no de la API.
 
 Requiere una sesión del framework, no del piloto.
 
@@ -547,6 +579,31 @@ persistirlos.
   subutilizados. Estas limitaciones se descubrieron trabajando
   en el piloto: llegó a 10.000 nodos con tiempos de 50-70s por
   operación; con 2.000 nodos, 15-18s.
+- **1.5i.7h**: separación de la configuración del framework
+  de la del piloto. `Configuracion.php` (framework) se
+  queda solo con las constantes propias del framework;
+  las constantes del piloto (`NOMBRE_APP`,
+  `NOMBRE_APP_CREDENCIALES`, `VERSION_APP`, `AUTOR_APP`,
+  `PREFIJO_SESSION`, `INTENTOS_MAXIMOS_AUTENTICACION`,
+  `BLOQUEO_AUTENTICACION_SEGUNDOS`, `HASH_DUMMY_AUTENTICACION`,
+  `NOMBRE_ADMIN`) se mueven al nuevo
+  `Aplicacion/ConfiguracionApli.php` (extends `Conf`).
+  `Entorno.php` recibe `establecer_prefijo_sesion()` y
+  `prefijo_sesion()` para desacoplarse del `PREFIJO_SESSION`
+  del piloto. Refactor masivo en 12 archivos del piloto:
+  `Conf::X` → `ConfiguracionApli::X`. Espejado en JS:
+  `Aplicacion/ConfiguracionApli.js` reemplaza a
+  `ConfPlugin.js` y aplica los valores al `Conf` del
+  framework vía `configurar_conf(Conf)`.
+- **1.5i.7i**: comando `grafo:eliminar_huerfanos` en el
+  `Controlador`. Elimina todos los nodos no alcanzables
+  desde las raíces. Desenlaza las salientes entre
+  huérfanos antes de destruirlos. Sin chequeo de
+  `es_pruebas`: el enrutador del piloto decide cuándo
+  exponerlo (admin/soporte). Se espeja el módulo grafo
+  completo al `Controlador` JS (los comandos `grafo:*`
+  existían solo en PHP desde 1.5i.7g-pre; ahora los
+  cuatro + helpers privados están en ambos espejos).
 
 El espejo JS también recibió mejoras en paralelo (ver sección 12).
 Su historial es: 1.5i.4 → 1.5i.5 (robustez de persistencia)
@@ -687,6 +744,24 @@ Versiones recientes del espejo JS:
 - **1.5i.7f**: fix del bug latente `if (elemento)` en
   `_crear_interno`, `_cargar_interno` y `_iterador_interno`
   (dos veces). Espejo del fix PHP 1.5i.7f.
+- **1.5i.7h**: separación `ConfiguracionApli` (ver
+  1.5i.7h del historial). `Configuracion.js` del
+  framework se queda solo con las constantes del
+  framework; `ConfiguracionApli.js` (antes
+  `ConfPlugin.js`) define las del plugin y aplica los
+  valores al `Conf` del framework vía
+  `configurar_conf(Conf)`. `Entorno.js` recibe
+  `_prefijo_sesion`, `establecer_prefijo_sesion()` y
+  `prefijo_sesion()`.
+- **1.5i.7i**: espejado del módulo grafo completo
+  (`grafo:resumen`, `grafo:listar`, `grafo:nodo`,
+  `grafo:eliminar_huerfanos` + helpers privados
+  `_grafo_cargar_estructura`, `_grafo_bfs_desde_raices`,
+  `_grafo_inferir_tipo`). En JS,
+  `Nodo.por_cada_nodo_ejecutar` devuelve un objeto
+  plano `{id: resultado}`, no un `Map`; los helpers
+  del Controlador lo normalizan a un objeto
+  `{id: {dato, ady}}` para el resto del módulo.
 
 Cualquier cambio al framework PHP que toque la API compartida debe
 reflejarse también en el espejo JS.

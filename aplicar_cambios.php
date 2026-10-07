@@ -1,15 +1,11 @@
 <?php
 /**
- * Aplicador de cambios — Piloto PHP.
+ * Aplicador de cambios — Prompt del framework.
  *
- * Tanda V1.5piloto.76h:
- *   - Nueva variante de impresión: planilla de pasajeros "vacía".
- *     Mismos encabezados, mismos números de asiento, pero sin
- *     datos del pasajero en cada fila.
- *   - Parámetro `$vacia = false` en `imprimir_planilla_pasajeros_micro`.
- *   - `index.php` lee `$_GET['vacia']` y lo pasa.
- *   - `viajes-asientos.js`: nuevo botón + listener.
- *   - `aplicacion_GET.html`: bump del ?v= del JS.
+ * Tanda de documentación: 1.5i.7h (separación ConfiguracionApli)
+ * y 1.5i.7i (comando grafo:eliminar_huerfanos + espejo JS del
+ * módulo grafo). Además, idea del índice de contexto por
+ * producto de primos para la sección 11.1.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -20,234 +16,144 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ------------------------------------------------------------
-    // Aplicacion/Impresion/Impresion.php
+    // Historial: agregar 1.5i.7h y 1.5i.7i después de 1.5i.7g
     // ------------------------------------------------------------
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Impresion/Impresion.php',
-        'descripcion' => 'Impresion.php: bump @version a 1.5piloto.76h',
-        'buscar' => [' * @version   1.5piloto.67c'],
-        'reemplazar' => [' * @version   1.5piloto.76h'],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Impresion/Impresion.php',
-        'descripcion' => 'Impresion.php: firma con $vacia + doc',
+        'archivo' => 'prompts/prompt_framework_iteradores.md',
+        'descripcion' => 'Historial: agregar 1.5i.7h y 1.5i.7i',
         'buscar' => [
-            ' * Imprime la planilla de pasajeros del micro, en A4 horizontal.',
-            ' *',
-            ' * Header: logo a la izquierda, dirección y teléfono al lado, y a',
-            ' * la derecha DESTINO, FECHA y HORA del viaje.',
-            ' * Cuerpo: tabla con 7 columnas.',
-            ' *   1. 😊 (header) — en cada fila va el número de asiento. Columna',
-            ' *      fina, sin título de texto.',
-            ' *   2. APELLIDO Y NOMBRES',
-            ' *   3. NACIMIENTO',
-            ' *   4. DNI',
-            ' *   5. TELEFONO',
-            ' *   6. TEL. FAMILIAR',
-            ' *   7. DOMICILIO',
-            ' *',
-            ' * @param string $nombre_dueno',
-            ' * @param string $nombre_viaje',
-            ' * @param string $nombre_micro',
-            ' */',
-            'function imprimir_planilla_pasajeros_micro(string $nombre_dueno, string $nombre_viaje, string $nombre_micro): void {',
-        ],
-        'reemplazar' => [
-            ' * Imprime la planilla de pasajeros del micro, en A4 horizontal.',
-            ' *',
-            ' * Header: logo a la izquierda, dirección y teléfono al lado, y a',
-            ' * la derecha DESTINO, FECHA y HORA del viaje.',
-            ' * Cuerpo: tabla con 7 columnas.',
-            ' *   1. 😊 (header) — en cada fila va el número de asiento. Columna',
-            ' *      fina, sin título de texto.',
-            ' *   2. APELLIDO Y NOMBRES',
-            ' *   3. NACIMIENTO',
-            ' *   4. DNI',
-            ' *   5. TELEFONO',
-            ' *   6. TEL. FAMILIAR',
-            ' *   7. DOMICILIO',
-            ' *',
-            ' * Si `$vacia` es true, se imprimen los mismos encabezados,',
-            ' * los mismos números de asiento y las mismas columnas, pero',
-            ' * sin los datos de cada pasajero (útil para completar a mano).',
-            ' *',
-            ' * @param string $nombre_dueno',
-            ' * @param string $nombre_viaje',
-            ' * @param string $nombre_micro',
-            ' * @param bool   $vacia  Si true, no llena las filas con los datos del pasajero.',
-            ' */',
-            'function imprimir_planilla_pasajeros_micro(string $nombre_dueno, string $nombre_viaje, string $nombre_micro, bool $vacia = false): void {',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Impresion/Impresion.php',
-        'descripcion' => 'Impresion.php: filas vacías cuando $vacia',
-        'buscar' => [
-            '        foreach ($asientos as $a) {',
-            '            $pa = $a[\'pasajero\'];',
-            '            $tiene_pas = ($pa !== null && ($pa[\'nombre_completo\'] !== \'\' || $pa[\'dni_visible\'] !== \'\'));',
-            '            echo \'<tr>\';',
-            '            echo \'<td class="num">\' . htmlspecialchars($a[\'numero\']) . \'</td>\';',
-            '            if ($tiene_pas) {',
-        ],
-        'reemplazar' => [
-            '        foreach ($asientos as $a) {',
-            '            echo \'<tr>\';',
-            '            echo \'<td class="num">\' . htmlspecialchars($a[\'numero\']) . \'</td>\';',
+            '  operación; con 2.000 nodos, 15-18s.',
             '',
-            '            // Modo planilla vacía: solo el número de asiento, sin',
-            '            // datos del pasajero. Se corta antes de leerlos.',
-            '            if ($vacia) {',
-            '                echo \'<td></td><td></td><td></td><td></td><td></td><td></td>\';',
-            '                echo \'</tr>\';',
-            '                continue;',
-            '            }',
+            'El espejo JS también recibió mejoras en paralelo (ver sección 12).',
+        ],
+        'reemplazar' => [
+            '  operación; con 2.000 nodos, 15-18s.',
+            '- **1.5i.7h**: separación de la configuración del framework',
+            '  de la del piloto. `Configuracion.php` (framework) se',
+            '  queda solo con las constantes propias del framework;',
+            '  las constantes del piloto (`NOMBRE_APP`,',
+            '  `NOMBRE_APP_CREDENCIALES`, `VERSION_APP`, `AUTOR_APP`,',
+            '  `PREFIJO_SESSION`, `INTENTOS_MAXIMOS_AUTENTICACION`,',
+            '  `BLOQUEO_AUTENTICACION_SEGUNDOS`, `HASH_DUMMY_AUTENTICACION`,',
+            '  `NOMBRE_ADMIN`) se mueven al nuevo',
+            '  `Aplicacion/ConfiguracionApli.php` (extends `Conf`).',
+            '  `Entorno.php` recibe `establecer_prefijo_sesion()` y',
+            '  `prefijo_sesion()` para desacoplarse del `PREFIJO_SESSION`',
+            '  del piloto. Refactor masivo en 12 archivos del piloto:',
+            '  `Conf::X` → `ConfiguracionApli::X`. Espejado en JS:',
+            '  `Aplicacion/ConfiguracionApli.js` reemplaza a',
+            '  `ConfPlugin.js` y aplica los valores al `Conf` del',
+            '  framework vía `configurar_conf(Conf)`.',
+            '- **1.5i.7i**: comando `grafo:eliminar_huerfanos` en el',
+            '  `Controlador`. Elimina todos los nodos no alcanzables',
+            '  desde las raíces. Desenlaza las salientes entre',
+            '  huérfanos antes de destruirlos. Sin chequeo de',
+            '  `es_pruebas`: el enrutador del piloto decide cuándo',
+            '  exponerlo (admin/soporte). Se espeja el módulo grafo',
+            '  completo al `Controlador` JS (los comandos `grafo:*`',
+            '  existían solo en PHP desde 1.5i.7g-pre; ahora los',
+            '  cuatro + helpers privados están en ambos espejos).',
             '',
-            '            $pa = $a[\'pasajero\'];',
-            '            $tiene_pas = ($pa !== null && ($pa[\'nombre_completo\'] !== \'\' || $pa[\'dni_visible\'] !== \'\'));',
-            '            if ($tiene_pas) {',
+            'El espejo JS también recibió mejoras en paralelo (ver sección 12).',
         ],
     ],
 
     // ------------------------------------------------------------
-    // index.php
+    // §11.1: agregar idea del índice de contexto por primos
     // ------------------------------------------------------------
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'index.php',
-        'descripcion' => 'index.php: bump @version a 1.5piloto.76h',
-        'buscar' => [' * @version   1.5piloto.76e'],
-        'reemplazar' => [' * @version   1.5piloto.76h'],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'index.php',
-        'descripcion' => 'index.php: pasar $vacia a la planilla',
+        'archivo' => 'prompts/prompt_framework_iteradores.md',
+        'descripcion' => '§11.1: agregar idea del índice por primos',
         'buscar' => [
-            '    // Caso especial: planilla de pasajeros del micro.',
-            '    if ($tipo === \'planilla_pasajeros_micro\') {',
-            '        imprimir_planilla_pasajeros_micro(',
-            '            $_GET[\'dueno\'] ?? \'\',',
-            '            $_GET[\'viaje\'] ?? \'\',',
-            '            $_GET[\'micro\'] ?? \'\'',
-            '        );',
-            '        exit;',
-            '    }',
-        ],
-        'reemplazar' => [
-            '    // Caso especial: planilla de pasajeros del micro.',
-            '    // Si viene &vacia=1, se imprimen los encabezados y los',
-            '    // números de asiento, pero sin los datos del pasajero.',
-            '    if ($tipo === \'planilla_pasajeros_micro\') {',
-            '        $vacia = (($_GET[\'vacia\'] ?? \'0\') === \'1\');',
-            '        imprimir_planilla_pasajeros_micro(',
-            '            $_GET[\'dueno\'] ?? \'\',',
-            '            $_GET[\'viaje\'] ?? \'\',',
-            '            $_GET[\'micro\'] ?? \'\',',
-            '            $vacia',
-            '        );',
-            '        exit;',
-            '    }',
-        ],
-    ],
-
-    // ------------------------------------------------------------
-    // Aplicacion/Viajes/viajes-asientos.js
-    // ------------------------------------------------------------
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-        'descripcion' => 'viajes-asientos.js: bump @version a 1.5piloto.76h',
-        'buscar' => [' * @version 1.5piloto.74e'],
-        'reemplazar' => [' * @version 1.5piloto.76h'],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-        'descripcion' => 'viajes-asientos.js: agregar botón planilla vacía',
-        'buscar' => [
-            '        const botonesHTML = `',
-            '            <div class="acciones-impresion-micro" style="margin-top:12px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">',
-            '                <button class="btn" id="btn_imprimir_croquis_micro">Imprimir Croquis</button>',
-            '                <button class="btn primary" id="btn_imprimir_planilla_micro">Imprimir Planilla</button>',
-            '            </div>',
-            '        `;',
-        ],
-        'reemplazar' => [
-            '        const botonesHTML = `',
-            '            <div class="acciones-impresion-micro" style="margin-top:12px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">',
-            '                <button class="btn" id="btn_imprimir_croquis_micro">Imprimir Croquis</button>',
-            '                <button class="btn primary" id="btn_imprimir_planilla_micro">Imprimir Planilla</button>',
-            '                <button class="btn" id="btn_imprimir_planilla_vacia_micro">Imprimir Planilla Vacía</button>',
-            '            </div>',
-            '        `;',
-        ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-        'descripcion' => 'viajes-asientos.js: listener del botón planilla vacía',
-        'buscar' => [
-            '        const btn_planilla = document.getElementById(\'btn_imprimir_planilla_micro\');',
-            '        if (btn_planilla) {',
-            '            btn_planilla.addEventListener(\'click\', () => {',
-            '                const url = `index.php?imprimir=1&tipo=planilla_pasajeros_micro`',
-            '                    + `&dueno=${encodeURIComponent(nombre_dueno_imp)}`',
-            '                    + `&viaje=${encodeURIComponent(nombre_viaje_imp)}`',
-            '                    + `&micro=${encodeURIComponent(nombre_micro_imp)}`;',
-            '                window.open(url, \'_blank\');',
-            '            });',
-            '        }',
-            '    }',
-        ],
-        'reemplazar' => [
-            '        const btn_planilla = document.getElementById(\'btn_imprimir_planilla_micro\');',
-            '        if (btn_planilla) {',
-            '            btn_planilla.addEventListener(\'click\', () => {',
-            '                const url = `index.php?imprimir=1&tipo=planilla_pasajeros_micro`',
-            '                    + `&dueno=${encodeURIComponent(nombre_dueno_imp)}`',
-            '                    + `&viaje=${encodeURIComponent(nombre_viaje_imp)}`',
-            '                    + `&micro=${encodeURIComponent(nombre_micro_imp)}`;',
-            '                window.open(url, \'_blank\');',
-            '            });',
-            '        }',
+            '- Persistir por partes usando índices auxiliares.',
+            '- Snapshot por rama con marca de "raíz".',
             '',
-            '        const btn_planilla_vacia = document.getElementById(\'btn_imprimir_planilla_vacia_micro\');',
-            '        if (btn_planilla_vacia) {',
-            '            btn_planilla_vacia.addEventListener(\'click\', () => {',
-            '                const url = `index.php?imprimir=1&tipo=planilla_pasajeros_micro`',
-            '                    + `&dueno=${encodeURIComponent(nombre_dueno_imp)}`',
-            '                    + `&viaje=${encodeURIComponent(nombre_viaje_imp)}`',
-            '                    + `&micro=${encodeURIComponent(nombre_micro_imp)}`',
-            '                    + `&vacia=1`;',
-            '                window.open(url, \'_blank\');',
-            '            });',
-            '        }',
-            '    }',
+            'Requiere una sesión del framework, no del piloto.',
+        ],
+        'reemplazar' => [
+            '- Persistir por partes usando índices auxiliares.',
+            '- Snapshot por rama con marca de "raíz".',
+            '- **Índice de contexto por producto de primos (idea',
+            '  anotada, sin implementar).** Asignar a cada raíz',
+            '  especial (nodo con ID no numérico) un número primo',
+            '  distinto. Guardar en cada nodo un campo — columna en',
+            '  la tabla `nodos` — con el producto de los primos de',
+            '  todas las raíces desde las que el nodo es alcanzable.',
+            '  Como la factorización en primos es única (teorema',
+            '  fundamental de la aritmética), el producto identifica',
+            '  exactamente el conjunto de contextos a los que',
+            '  pertenece el nodo. Para cargar solo el contexto de una',
+            '  raíz R, filtrar `WHERE contexto % primo_R = 0`. Un',
+            '  nodo alcanzable desde varias raíces queda con el',
+            '  producto de sus primos.',
+            '  - **Ventaja:** un único índice numérico reemplaza a',
+            '    una tabla de pertenencias. Filtrado con una sola',
+            '    condición aritmética.',
+            '  - **Límite:** el producto crece rápido. Con N raíces,',
+            '    si un nodo es alcanzable desde muchas, el producto',
+            '    puede overflow. En la práctica el piloto tiene 2',
+            '    raíces (`usuarios`, `sesiones`); con 5-10 raíces el',
+            '    producto de los primeros primos entra en un',
+            '    `BIGINT` sin problema.',
+            '  - **Mantenimiento:** cada vez que se agrega un enlace,',
+            '    hay que propagar el producto por el grafo (un nodo',
+            '    nuevo hereda el producto de su padre; si el nodo ya',
+            '    existía y suma un contexto, se multiplica el primo).',
+            '    Requiere diseñar la propagación incremental.',
+            '  - **Interacción con el framework:** habría que',
+            '    modificar `PerdurarSuperestructuraStringSQL` para',
+            '    agregar la columna, calcular el producto al guardar',
+            '    y usarlo al cargar con un filtro. Es un cambio de',
+            '    la implementación de persistencia, no de la API.',
+            '',
+            'Requiere una sesión del framework, no del piloto.',
         ],
     ],
 
     // ------------------------------------------------------------
-    // aplicacion_GET.html
+    // §12.5: agregar 1.5i.7i a la lista del espejo JS
     // ------------------------------------------------------------
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'HTML: bump ?v= de viajes-asientos.js a 1.5piloto.76h',
-        'buscar' => ['<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.74e"></script>'],
-        'reemplazar' => ['<script src="Aplicacion/Viajes/viajes-asientos.js?v=1.5piloto.76h"></script>'],
+        'archivo' => 'prompts/prompt_framework_iteradores.md',
+        'descripcion' => '§12.5: agregar 1.5i.7i al estado del espejo',
+        'buscar' => [
+            '- **1.5i.7f**: fix del bug latente `if (elemento)` en',
+            '  `_crear_interno`, `_cargar_interno` y `_iterador_interno`',
+            '  (dos veces). Espejo del fix PHP 1.5i.7f.',
+            '',
+            'Cualquier cambio al framework PHP que toque la API compartida debe',
+        ],
+        'reemplazar' => [
+            '- **1.5i.7f**: fix del bug latente `if (elemento)` en',
+            '  `_crear_interno`, `_cargar_interno` y `_iterador_interno`',
+            '  (dos veces). Espejo del fix PHP 1.5i.7f.',
+            '- **1.5i.7h**: separación `ConfiguracionApli` (ver',
+            '  1.5i.7h del historial). `Configuracion.js` del',
+            '  framework se queda solo con las constantes del',
+            '  framework; `ConfiguracionApli.js` (antes',
+            '  `ConfPlugin.js`) define las del plugin y aplica los',
+            '  valores al `Conf` del framework vía',
+            '  `configurar_conf(Conf)`. `Entorno.js` recibe',
+            '  `_prefijo_sesion`, `establecer_prefijo_sesion()` y',
+            '  `prefijo_sesion()`.',
+            '- **1.5i.7i**: espejado del módulo grafo completo',
+            '  (`grafo:resumen`, `grafo:listar`, `grafo:nodo`,',
+            '  `grafo:eliminar_huerfanos` + helpers privados',
+            '  `_grafo_cargar_estructura`, `_grafo_bfs_desde_raices`,',
+            '  `_grafo_inferir_tipo`). En JS,',
+            '  `Nodo.por_cada_nodo_ejecutar` devuelve un objeto',
+            '  plano `{id: resultado}`, no un `Map`; los helpers',
+            '  del Controlador lo normalizan a un objeto',
+            '  `{id: {dato, ady}}` para el resto del módulo.',
+            '',
+            'Cualquier cambio al framework PHP que toque la API compartida debe',
+        ],
     ],
 
 ];
@@ -270,7 +176,7 @@ foreach ($cambios as $cambio) {
 }
 $total_reemplazos = 0;
 foreach ($reemplazos_por_archivo as $lista) { $total_reemplazos += count($lista); }
-echo "[INFO] $total_reemplazos reemplazo(s) en " . count($reemplazos_por_archivo) . " archivo(s).\n\n";
+echo "[INFO] $total_reemplazos reemplazo(s).\n\n";
 $archivos_a_escribir = []; $bloques_ok = 0; $bloques_fallidos = [];
 foreach ($reemplazos_por_archivo as $archivo_rel => $lista_cambios) {
     $ruta_abs = $raiz_proyecto . '/' . $archivo_rel;
@@ -294,7 +200,7 @@ foreach ($reemplazos_por_archivo as $archivo_rel => $lista_cambios) {
 }
 if ($modo_estricto && !empty($bloques_fallidos)) { echo "=== ABORTADO ===\n"; foreach ($bloques_fallidos as $f) echo "  [FALLO] $f\n"; exit(1); }
 foreach ($archivos_a_escribir as $ruta_abs => $contenido_final) {
-    if (file_put_contents($ruta_abs, $contenido_final) === false) { echo "[FALLO] Escribir: " . substr($ruta_abs, strlen($raiz_proyecto)+1) . "\n"; continue; }
+    if (file_put_contents($ruta_abs, $contenido_final) === false) { echo "[FALLO] Escribir.\n"; continue; }
     echo "[OK] " . substr($ruta_abs, strlen($raiz_proyecto)+1) . "\n";
 }
 echo "\n=== Resumen ===\nBloques aplicados: $bloques_ok\n";
