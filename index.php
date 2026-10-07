@@ -19,7 +19,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.76e
+ * @version   1.5piloto.76h
  */
 
 // --- Utilidades base ----------------------------------
@@ -265,11 +265,15 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
     }
 
     // Caso especial: planilla de pasajeros del micro.
+    // Si viene &vacia=1, se imprimen los encabezados y los
+    // números de asiento, pero sin los datos del pasajero.
     if ($tipo === 'planilla_pasajeros_micro') {
+        $vacia = (($_GET['vacia'] ?? '0') === '1');
         imprimir_planilla_pasajeros_micro(
             $_GET['dueno'] ?? '',
             $_GET['viaje'] ?? '',
-            $_GET['micro'] ?? ''
+            $_GET['micro'] ?? '',
+            $vacia
         );
         exit;
     }
