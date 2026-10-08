@@ -850,6 +850,20 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76k**: Fase A de contextos del piloto. Todos los
+  usuarios pasan a ser IDs especiales `us_<nombre>`. Los
+  enlaces desde `usuarios` siguen llamándose `<nombre>`
+  (nombre visible), así los accesos por `adyacente()` no
+  cambian. `agregar_usuario`, `actualizar_usuario` (rama
+  de credenciales) y la creación del admin en `index.php`
+  (ambos grafos) ahora usan `crear_con_dato_e_id`. Nuevo
+  comando genérico `grafo:reemplazar_referencias` en el
+  `Controlador` (recibe un mapa `{viejo → nuevo}` y
+  redirige todas las aristas del grafo que apunten a un
+  viejo). Nuevo script `miscelaneas/migrar_usuarios_especiales.php`
+  (idempotente) y bloque `?migrar_usuarios_especiales=1`
+  en `index.php`. Sin cambios en los accesos, sin carga
+  parcial todavía.
 - **v76j**: cierre de la fase 2 del framework
   (contextos). El framework PHP llegó a 1.5i.7k con
   `PerdurarSuperestructuraStringSQL64` (3 tablas
@@ -1808,12 +1822,17 @@ grafo completo (ver §8.6, "frente A"). Aislar el
 subgrafo de un dueño permite cargar solo lo que se
 necesita y baja el costo de cada operación.
 
-**Dueños como IDs especiales.** El primer paso es
-convertir a los dueños en IDs especiales del grafo.
-Hoy los dueños son nodos comunes colgando del ID
-especial `usuarios`. En el plan pasan a ser roots
-propios, con un prefijo que los identifique (por
-ejemplo `us_dueno1`, `us_dueno2`).
+**Usuarios como IDs especiales (Fase A, completada en v76k).**
+Todos los usuarios (no solo los dueños) son ahora nodos
+con ID especial `us_<nombre>`. Los enlaces desde
+`usuarios` siguen llamándose `<nombre>` (nombre visible),
+así todos los accesos por `adyacente()` funcionan sin
+cambios. Los nodos viejos se migraron con
+`miscelaneas/migrar_usuarios_especiales.php`, que usa el
+nuevo comando `grafo:reemplazar_referencias` para redirigir
+las aristas cruzadas. Próximo paso: aprovechar la carga
+parcial (Fase C) una vez cerrada la Fase B (tipos como
+IDs especiales).
 
 Lo que cambia:
 
@@ -2113,7 +2132,18 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76j
+**Última actualización de este prompt:** v1.5piloto.76k
+(Fase A de contextos del piloto. Todos los usuarios pasan a
+tener ID especial `us_<nombre>`. Los enlaces desde `usuarios`
+siguen llamándose `<nombre>` (nombre visible), por lo que
+todos los accesos por `adyacente()` siguen funcionando sin
+cambios. Script de migración idempotente en
+`miscelaneas/migrar_usuarios_especiales.php`, ejecutable con
+`?migrar_usuarios_especiales=1` desde `index.php`. Nuevo
+comando `grafo:reemplazar_referencias` en el `Controlador`
+para redirigir referencias cruzadas. Sin carga parcial
+todavía.).
+Antes: v1.5piloto.76j
 (cierre de la fase 2 del framework. El framework
 quedó en 1.5i.7k: SQL64 en PHP e IndexedDB64 en JS,
 ambos cerrados y verificados. §8.7 se actualiza con
@@ -2604,6 +2634,20 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   modal la carga de empresas y micros (prioridad media).
   También se documentó la limitación del framework en su
   propio prompt (sección 11 nueva).
+- Cerramos en v76k la Fase A de contextos del piloto:
+  todos los usuarios pasan a ser IDs especiales
+  `us_<nombre>`. Los enlaces desde `usuarios` siguen
+  llamándose `<nombre>`, así todos los accesos por
+  `adyacente()` funcionan sin cambios. Solo se tocaron
+  los 3 lugares donde se CREAN usuarios (`agregar_usuario`,
+  `actualizar_usuario` rama credenciales, y la creación
+  del admin en `index.php`). Nuevo comando genérico
+  `grafo:reemplazar_referencias` en el `Controlador`,
+  que redirige todas las aristas del grafo desde un
+  mapa `{viejo → nuevo}`. Script de migración
+  idempotente en `miscelaneas/migrar_usuarios_especiales.php`,
+  ejecutable con `?migrar_usuarios_especiales=1`. Sin
+  cambios en los accesos, sin carga parcial todavía.
 - Cerramos en v76j el cierre de la fase 2 del framework
   (contextos). El framework PHP llegó a 1.5i.7k con
   `PerdurarSuperestructuraStringSQL64` completo (3 tablas
@@ -2742,7 +2786,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76j (framework 1.5i.7k).
+**Estado del proyecto al cierre:** v1.5piloto.76k (framework 1.5i.7k).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2784,6 +2828,11 @@ IndexedDB64 (JS) completos. Deuda de diseño anotada:
 dejar el Nodo limpio antes de agregar más métodos
 de indexación de contextos (ver §11.4 del prompt del
 framework).
+v76k: Fase A de contextos del piloto. Todos los usuarios
+son IDs especiales `us_<nombre>`. Nuevo comando
+`grafo:reemplazar_referencias`. Script de migración
+idempotente en `miscelaneas/migrar_usuarios_especiales.php`.
+Sin cambios en los accesos, sin carga parcial todavía.
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5w)
 tiene 56 pruebas corriendo.
 

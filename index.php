@@ -19,7 +19,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.76j
+ * @version   1.5piloto.76k
  */
 
 // --- Utilidades base ----------------------------------
@@ -155,6 +155,35 @@ if (isset($_GET['probar_contextos'])) {
     require_once __DIR__ . '/Pruebas/prueba_contextos.php';
     exit;
 }
+
+// ==== Migración de usuarios a IDs especiales (v76k) ====
+// Convierte cada nodo usuario a ID especial us_<nombre>.
+// Idempotente: si ya están migrados, no hace nada.
+if (isset($_GET['migrar_usuarios_especiales'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    require_once __DIR__ . '/miscelaneas/migrar_usuarios_especiales.php';
+    $res = migrar_usuarios_a_especiales($nombre_app);
+    echo "Migración de usuarios a IDs especiales\n";
+    echo "==========================================\n\n";
+    foreach ($res as $grafo => $detalle) {
+        echo "-- $grafo --\n";
+        if (is_array($detalle)) {
+            foreach ($detalle as $k => $v) {
+                if (is_array($v)) {
+                    echo "  $k:\n";
+                    foreach ($v as $linea) echo "    $linea\n";
+                } else {
+                    echo "  $k => " . var_export($v, true) . "\n";
+                }
+            }
+        } else {
+            echo "  " . var_export($detalle, true) . "\n";
+        }
+        echo "\n";
+    }
+    echo "Listo.\n";
+    exit;
+}
 // (bloque ?migrar_micros eliminado en v73r)
 // (bloque ?migrar_micros_patente eliminado en v73r)
 // (bloque ?migrar_terminales_autorizadas eliminado en v73r)
@@ -182,10 +211,13 @@ if (!$nodo_admin_existente) {
         Nodo::crear_con_id('usuarios');
         $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     }
-    $nodo_admin = Nodo::crear_con_dato(ConfiguracionApli::NOMBRE_ADMIN);
-    $nodo_admin->_adyacente_en(Nodo::crear_con_dato(ConfiguracionApli::NOMBRE_ADMIN), 'nombre_real');
-    $nodo_admin->_adyacente_en(Nodo::crear_con_dato('admin'), 'nivel');
-    $raiz_usuarios->_adyacente_en($nodo_admin, ConfiguracionApli::NOMBRE_ADMIN);
+    $id_especial_admin = 'us_' . ConfiguracionApli::NOMBRE_ADMIN;
+    $nodo_admin = Nodo::crear_con_dato_e_id(ConfiguracionApli::NOMBRE_ADMIN, $id_especial_admin);
+    if ($nodo_admin) {
+        $nodo_admin->_adyacente_en(Nodo::crear_con_dato(ConfiguracionApli::NOMBRE_ADMIN), 'nombre_real');
+        $nodo_admin->_adyacente_en(Nodo::crear_con_dato('admin'), 'nivel');
+        $raiz_usuarios->_adyacente_en($nodo_admin, ConfiguracionApli::NOMBRE_ADMIN);
+    }
     guardar_ambos($nombre_app);
 }
 
@@ -197,9 +229,12 @@ en_grafo_credenciales(function() {
         $raiz_cred = Nodo::nodo_por_id('usuarios');
     }
     if (!$raiz_cred->adyacente(ConfiguracionApli::NOMBRE_ADMIN)) {
-        $nodo_admin_cred = Nodo::crear_con_dato(ConfiguracionApli::NOMBRE_ADMIN);
-        $nodo_admin_cred->_adyacente_en(Nodo::crear_con_dato(password_hash(Conf::CODIGO_ADMIN, PASSWORD_DEFAULT)), 'codigo_hash');
-        $raiz_cred->_adyacente_en($nodo_admin_cred, ConfiguracionApli::NOMBRE_ADMIN);
+        $id_especial_admin_cred = 'us_' . ConfiguracionApli::NOMBRE_ADMIN;
+        $nodo_admin_cred = Nodo::crear_con_dato_e_id(ConfiguracionApli::NOMBRE_ADMIN, $id_especial_admin_cred);
+        if ($nodo_admin_cred) {
+            $nodo_admin_cred->_adyacente_en(Nodo::crear_con_dato(password_hash(Conf::CODIGO_ADMIN, PASSWORD_DEFAULT)), 'codigo_hash');
+            $raiz_cred->_adyacente_en($nodo_admin_cred, ConfiguracionApli::NOMBRE_ADMIN);
+        }
     }
 });
 

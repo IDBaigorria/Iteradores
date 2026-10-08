@@ -1720,6 +1720,49 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
                 'total_huerfanos' => $total_huerfanos,
             ];
         }, null, false);
+
+        // ─── grafo:reemplazar_referencias ──────────────────
+        //
+        // Recibe un mapa {id_viejo: id_nuevo}. Recorre todos
+        // los nodos del grafo actual y reemplaza cualquier
+        // enlace que apunte a id_viejo por un enlace al nodo
+        // id_nuevo. Necesario para migraciones estructurales
+        // (por ejemplo, convertir usuarios a IDs especiales).
+        //
+        // No modifica los nodos viejos. Solo redirige las
+        // referencias entrantes que apuntan a ellos.
+        //
+        // Devuelve { reemplazos: int }.
+        self::registrar_comando('grafo:reemplazar_referencias', function(string $token, array $args) {
+            $mapa = $args[0] ?? [];
+            if (!is_array($mapa) || empty($mapa)) {
+                return ['reemplazos' => 0];
+            }
+
+            // Recolectar los cambios primero, para no modificar
+            // el grafo mientras lo recorremos.
+            $cambios = [];
+            Nodo::por_cada_nodo_ejecutar($token, function($nodo) use ($mapa, &$cambios) {
+                $adyacentes = $nodo->adyacentes();
+                if (!$adyacentes) return;
+                foreach ($adyacentes as $enlace => $destino) {
+                    $id_dest = (string)$destino->id();
+                    if (isset($mapa[$id_dest])) {
+                        $cambios[] = [$nodo, (string)$enlace, $mapa[$id_dest]];
+                    }
+                }
+            }, null);
+
+            $reemplazos = 0;
+            foreach ($cambios as [$origen, $enlace, $id_nuevo_destino]) {
+                $destino = Nodo::nodo_por_id($id_nuevo_destino);
+                if ($origen && $destino) {
+                    $origen->_adyacente_en($destino, $enlace, true);
+                    $reemplazos++;
+                }
+            }
+            return ['reemplazos' => $reemplazos];
+        }, null, false);
     }
 
     /**

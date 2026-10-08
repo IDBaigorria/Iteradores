@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.75
+ * @version   1.5piloto.76k
  */
 
 use Iteradores\Nodos\Nodo;
@@ -645,7 +645,18 @@ function agregar_usuario(array $datos): array {
         return ['exito' => false, 'error' => 'El nombre de usuario ya existe'];
     }
 
-    $nodo_usuario = Nodo::crear_con_dato($nombre_usuario);
+    // Fase A (v76k): el nodo usuario se crea con ID especial
+    // us_<nombre>. El enlace desde `usuarios` sigue llamándose
+    // <nombre> (nombre visible), así todos los accesos por
+    // adyacente() siguen funcionando sin cambios.
+    $id_especial = 'us_' . $nombre_usuario;
+    if (Nodo::existe($id_especial)) {
+        return ['exito' => false, 'error' => 'El ID especial del usuario ya existe'];
+    }
+    $nodo_usuario = Nodo::crear_con_dato_e_id($nombre_usuario, $id_especial);
+    if (!$nodo_usuario) {
+        return ['exito' => false, 'error' => 'No se pudo crear el nodo del usuario'];
+    }
 
     $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($nivel), 'nivel');
     if ($nombre_real !== '') $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($nombre_real), 'nombre_real');
@@ -707,7 +718,12 @@ function agregar_usuario(array $datos): array {
             Nodo::crear_con_id('usuarios');
             $raiz_cred = Nodo::nodo_por_id('usuarios');
         }
-        $nodo_cred = Nodo::crear_con_dato($nombre_usuario);
+        // Fase A (v76k): el nodo credencial también con ID
+        // especial us_<nombre>. El enlace desde `usuarios`
+        // (en credenciales) sigue llamándose <nombre>.
+        $id_especial_cred = 'us_' . $nombre_usuario;
+        $nodo_cred = Nodo::crear_con_dato_e_id($nombre_usuario, $id_especial_cred);
+        if (!$nodo_cred) return;
         if ($codigo_acceso !== '') {
             $nodo_cred->_adyacente_en(Nodo::crear_con_dato(password_hash($codigo_acceso, PASSWORD_DEFAULT)), 'codigo_hash');
         }
@@ -893,8 +909,11 @@ function actualizar_usuario(array $datos): array {
             }
             $nodo_cred = $raiz_cred->adyacente($nombre_usuario);
             if (!$nodo_cred) {
-                $nodo_cred = Nodo::crear_con_dato($nombre_usuario);
-                $raiz_cred->_adyacente_en($nodo_cred, $nombre_usuario);
+                $id_especial_cred = 'us_' . $nombre_usuario;
+                $nodo_cred = Nodo::crear_con_dato_e_id($nombre_usuario, $id_especial_cred);
+                if ($nodo_cred) {
+                    $raiz_cred->_adyacente_en($nodo_cred, $nombre_usuario);
+                }
             }
             if ($codigo_acceso !== '') {
                 $hash_nuevo = password_hash($codigo_acceso, PASSWORD_DEFAULT);
