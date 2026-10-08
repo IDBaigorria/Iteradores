@@ -1791,6 +1791,13 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             if (!$raiz) {
                 return ['migrados' => 0, 'saltados' => 0, 'errores' => ['No existe el nodo usuarios.']];
             }
+            if ($objetivo !== 'todos' && !$raiz->adyacente($objetivo)) {
+                return [
+                    'migrados' => 0,
+                    'saltados' => 0,
+                    'errores' => ["No existe un usuario con el nombre '$objetivo'."],
+                ];
+            }
             $adyacentes = $raiz->adyacentes();
             if (!$adyacentes) {
                 return ['migrados' => 0, 'saltados' => 0, 'errores' => []];

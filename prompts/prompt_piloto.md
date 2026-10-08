@@ -863,7 +863,9 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   (idempotente). Script `miscelaneas/migrar_niveles_usuario.php`
   y bloque `?migrar_niveles_usuario=1` en `index.php`
   (opcional `&usuario=carmen1`). Solo grafo de la app: el
-  de credenciales queda plano por ahora.
+  de credenciales queda plano por ahora. Fix posterior:
+  si el `&usuario=X` no existe, el comando devuelve error
+  y no migra nada (antes devolvía `migrados: 0` sin avisar).
 - **v76l**: diseño del modelo topológico por niveles de
   exposición. Cada usuario va a tener contenedores
   `publico`, `privado` y `compartido_con_X` colgando de
