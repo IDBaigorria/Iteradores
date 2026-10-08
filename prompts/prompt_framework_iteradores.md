@@ -780,6 +780,38 @@ actual el campo en el nodo funciona; no bloquea nada.
   `Nodo.nodo_por_id`, para replicar el comportamiento de PHP.
   Ver §12.3 y §11.4.
 
+- **1.5i.7l**: comando `grafo:raices` agregado al framework
+  PHP (tanda 76n) y espejado en JS. Lista los nodos raíz
+  del grafo (IDs especiales) con sus adyacentes directos.
+  Pendientes anotados para resolver en una tanda futura
+  (no bloquean el trabajo actual):
+
+  - **Espejar `grafo:reemplazar_referencias` en JS.**
+    Se agregó al PHP en la tanda 76k (recibe un mapa
+    `{viejo → nuevo}` y redirige las aristas cruzadas).
+    Es genérico, no específico del piloto, así que
+    corresponde espejarlo al `Controlador.js`.
+  - **Mover `grafo:crear_niveles_usuario` fuera del
+    framework.** Es un comando específico del piloto
+    (crea contenedores `publico` y `privado` en cada
+    nodo usuario). Debe levantarse al vuelo desde la
+    app (con `Controlador::registrar_comando(...)`
+    invocado desde `Aplicacion/Migraciones/Comandos.php`
+    o similar), no vivir en el `Controlador` del
+    framework. Hoy está en el framework como deuda
+    técnica.
+  - **No se pudo verificar `grafo:raices` desde la consola
+    del service worker del plugin.** MV3 prohíbe
+    `import()` dinámico en `ServiceWorkerGlobalScope`
+    (error: *"import() is disallowed on
+    ServiceWorkerGlobalScope by the HTML specification"*).
+    La verificación se hizo desde el piloto PHP, donde la
+    pestaña Grafo invoca el comando vía el enrutador. Si
+    se quiere verificar desde el plugin, hay que exponer
+    `globalThis.Controlador = Controlador` en el bootstrap
+    del service worker (práctica habitual para debug
+    desde la consola del SW en MV3).
+
 El espejo JS también recibió mejoras en paralelo (ver sección 12).
 Su historial es: 1.5i.4 → 1.5i.5 (robustez de persistencia)
 → 1.5i.6 (fix del depósito de IDs) → 1.5i.7 (alineación con PHP).

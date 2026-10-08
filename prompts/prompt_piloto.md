@@ -850,6 +850,19 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76o**: solo documentación. Se dejan asentados tres
+  pendientes sobre el framework, sin tocar código:
+  (1) espejar `grafo:reemplazar_referencias` en el
+  `Controlador.js`;
+  (2) mover `grafo:crear_niveles_usuario` fuera del
+  `Controlador` del framework (es específico del piloto,
+  debe levantarse al vuelo desde la app);
+  (3) `grafo:raices` no se pudo verificar desde la consola
+  del SW del plugin por limitación de MV3 (`import()`
+  dinámico prohibido). La verificación se hizo desde el
+  piloto PHP. Si se quiere verificar desde el plugin,
+  exponer `globalThis.Controlador = Controlador` en el
+  bootstrap del SW.
 - **v76n**: pestaña Grafo ampliada con dos secciones nuevas
   y sistema de migraciones.
   - Comando `grafo:raices` en el framework: lista los IDs
@@ -2781,6 +2794,20 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   idempotente en `miscelaneas/migrar_usuarios_especiales.php`,
   ejecutable con `?migrar_usuarios_especiales=1`. Sin
   cambios en los accesos, sin carga parcial todavía.
+- Cerramos en v76o con documentación. Se dejan asentados
+  tres pendientes sobre el framework, sin tocar código:
+  (1) espejar `grafo:reemplazar_referencias` en el
+  `Controlador.js` (se agregó al PHP en 76k, es genérico);
+  (2) mover `grafo:crear_niveles_usuario` fuera del
+  `Controlador` del framework: es específico del piloto
+  y debe levantarse al vuelo desde la app;
+  (3) no se pudo verificar `grafo:raices` desde la consola
+  del service worker del plugin, porque MV3 prohíbe
+  `import()` dinámico en `ServiceWorkerGlobalScope`. La
+  verificación se hizo desde el piloto PHP vía la pestaña
+  Grafo. Si se quiere verificar desde el plugin, hay que
+  exponer `globalThis.Controlador = Controlador` en el
+  bootstrap del SW. Pendiente anotado, sin urgencia.
 - Cerramos en v76n la pestaña Grafo ampliada y el sistema
   de migraciones. Sección "Nodos raíz" (lista los IDs
   especiales con sus adyacentes; botón "Ver" reusa el
@@ -2954,7 +2981,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76n (framework 1.5i.7k).
+**Estado del proyecto al cierre:** v1.5piloto.76o (framework 1.5i.7l).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
