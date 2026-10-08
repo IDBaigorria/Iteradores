@@ -526,6 +526,121 @@ lectura frecuente para reducir el costo O(N) por operación.
 Requiere diseñar qué iteradores conviene mantener y dónde
 persistirlos.
 
+### 11.4 Contextos y carga parcial (plan, en desarrollo)
+
+Esta sección documenta el **plan** para resolver §11.1
+(carga parcial del grafo) usando **contextos**. Todavía
+no está implementado. Se avanza por fases y se
+actualiza este bloque a medida que cada fase se cierra.
+
+**Definición de contexto.** Un **contexto** es un ID
+especial del grafo (nodo con ID no numérico) que actúa
+como raíz. Cualquier nodo alcanzable desde ese ID
+especial pertenece a ese contexto. El framework no
+distingue la semántica de un contexto (usuarios,
+sesiones, tipos, dueños, etc.): todos son contextos por
+igual. Esta abstracción es la clave del diseño: el
+framework solo entiende "contextos".
+
+**Representación.** Cada nodo lleva un `contexto_mask`:
+un entero donde cada bit representa un contexto.
+Bit 0 = contexto #1, bit 1 = contexto #2, etc. Un nodo
+puede pertenecer a varios contextos a la vez (bits
+múltiples en 1).
+
+**Cálculo.** Al guardar, BFS multi-fuente desde todos los
+IDs especiales. Cada nodo acumula el conjunto de
+contextos alcanzantes; el conjunto se convierte a
+bitmask. Al cargar, el bitmask se asigna al nodo en
+memoria.
+
+**Método `SQL64` (fase 1, a implementar).** Misma base
+de datos que `SQL`, pero usa **tres tablas nuevas**
+(las tablas `nodo` y `adyacente` de SQL quedan
+intactas, así los dos métodos coexisten sin pisarse):
+
+```sql
+CREATE TABLE nodo_contexto (
+  idsuperestructura VARCHAR(50) NOT NULL,
+  idnodo            VARCHAR(50) NOT NULL,
+  dato              BLOB,
+  contexto_mask     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (idsuperestructura, idnodo),
+  INDEX idx_nodo_contexto_super_ctx (idsuperestructura, contexto_mask)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE adyacente_contexto (
+  idsuperestructura VARCHAR(50) NOT NULL,
+  idnodo            VARCHAR(50) NOT NULL,
+  enlace            VARCHAR(100) NOT NULL,
+  idadyacente       VARCHAR(50) NOT NULL,
+  PRIMARY KEY (idsuperestructura, idnodo, enlace, idadyacente)
+) DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE contexto (
+  idsuperestructura VARCHAR(50) NOT NULL,
+  bit               TINYINT UNSIGNED NOT NULL,
+  nombre            VARCHAR(100) NOT NULL,
+  PRIMARY KEY (idsuperestructura, bit),
+  UNIQUE KEY uq_ctx_nombre (idsuperestructura, nombre)
+) DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+```
+
+La tabla `contexto` mapea bit ↔ nombre del ID especial.
+Los bits se asignan por orden alfabético de los IDs
+especiales en el primer `guardar`; los contextos nuevos
+van al próximo bit libre. Los contextos que desaparecen
+no liberan su bit (histórico).
+
+**Interfaz.** Se crea
+`PerdurarSuperestructuraConContexto extends PerdurarSuperestructura`
+con tres métodos nuevos:
+
+- `cargar_parcial($nombre, array $contextos)`
+- `guardar_parcial($nombre, array $contextos)`
+- `listar_contextos($nombre)`
+
+La interfaz recibe **nombres de contextos** (IDs
+especiales), no bitmasks. El bitmask es un detalle de
+implementación. La retrocompatibilidad está garantizada:
+los métodos que no implementan la nueva interfaz siguen
+funcionando.
+
+**Fases.**
+
+- **Fase 1**: `PerdurarSuperestructuraStringSQL64` (PHP).
+  Comportamiento: `guardar` calcula y persiste el
+  bitmask; `cargar` lee todo; `cargar_parcial` filtra
+  con `WHERE contexto_mask & $mask != 0`. Los enlaces a
+  nodos fuera del filtro se descartan (silencioso).
+  `guardar_parcial` queda como stub que devuelve error.
+  El `Controlador` marca la superestructura como parcial
+  y `guardar` falla si se intenta guardar un grafo
+  parcial sin usar `guardar_parcial`.
+- **Fase 2**: `PerdurarSuperestructuraStringIndexedDB64.js`
+  (JS). Espejo de fase 1.
+- **Fase 3**: `PerdurarSuperestructuraStringJSON64.php` y
+  `PerdurarSuperestructuraStringXML64.php`. Estos
+  formatos agregan `guardar_parcial` escribiendo a un
+  archivo separado. Regla: solo se puede cargar un
+  subconjunto que fue guardado previamente.
+- **Fase 4** (opcional): implementar `guardar_parcial`
+  real en SQL64 e IndexedDB64. Requiere merge del
+  subgrafo en memoria con el persistido sin pisar
+  contextos fuera de la operación.
+- **Fase 5** (si hace falta): extender a 256 contextos
+  (bitmask de `BINARY(32)`) o al producto de primos
+  (ver discusión en §11.1).
+
+**Límite fase 1-4.** 64 contextos por superestructura.
+Alcanza para el piloto hoy y para varios años.
+
+**Extrapolación a los métodos de persistencia.**
+Solo SQL e IndexedDB ganan con el bitmask. JSON y XML
+se adaptan por consistencia (el bitmask permite decidir
+qué escribir en el archivo parcial, pero la carga sigue
+siendo total o de un archivo ya guardado).
+
 ---
 
 ## 10. HISTORIAL DEL FRAMEWORK
@@ -604,6 +719,12 @@ persistirlos.
   completo al `Controlador` JS (los comandos `grafo:*`
   existían solo en PHP desde 1.5i.7g-pre; ahora los
   cuatro + helpers privados están en ambos espejos).
+
+- **1.5i.7j**: solo documentación. Se agrega la sección
+  §11.4 con el plan de contextos y carga parcial. No hay
+  cambios funcionales todavía; el plan se implementará por
+  fases (SQL64, luego IndexedDB64, luego JSON64/XML64, y
+  eventualmente 256 bits y producto de primos). Ver §11.4.
 
 El espejo JS también recibió mejoras en paralelo (ver sección 12).
 Su historial es: 1.5i.4 → 1.5i.5 (robustez de persistencia)

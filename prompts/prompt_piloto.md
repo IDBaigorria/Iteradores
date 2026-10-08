@@ -850,6 +850,10 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76i**: solo documentación. Se agrega la sección
+  §8.7 con el plan de contextos del piloto (dueños
+  y tipos como IDs especiales, integración con el
+  plan del framework §11.4). No hay cambios de código.
 - **v76h**: nuevo botón "Imprimir Planilla Vacía" en el
   croquis del micro. `imprimir_planilla_pasajeros_micro`
   recibe un 4to parámetro `$vacia = false`; cuando es
@@ -1773,6 +1777,102 @@ eliminar):**
 primero preguntar "¿tiene otra referencia entrante?". Si la
 respuesta es no, hay que destruirlo.
 
+### 8.7 Plan de contextos y carga parcial (en desarrollo)
+
+Este apartado es el plan del piloto para aprovechar los
+contextos que se están implementando en el framework
+(ver §11.4 del prompt del framework). Todavía no está
+implementado. Se actualiza a medida que avanza cada fase.
+
+**Motivación.** El piloto crece en cantidad de dueños,
+viajes, ventas y pasajeros. Cada operación carga el
+grafo completo (ver §8.6, "frente A"). Aislar el
+subgrafo de un dueño permite cargar solo lo que se
+necesita y baja el costo de cada operación.
+
+**Dueños como IDs especiales.** El primer paso es
+convertir a los dueños en IDs especiales del grafo.
+Hoy los dueños son nodos comunes colgando del ID
+especial `usuarios`. En el plan pasan a ser roots
+propios, con un prefijo que los identifique (por
+ejemplo `us_dueno1`, `us_dueno2`).
+
+Lo que cambia:
+
+- Cada dueño es una raíz del grafo. Al cargar, se
+  puede hacer BFS desde ese root y traer solo su
+  subárbol.
+- Los terminales de un dueño quedan dentro del
+  contexto del dueño. Siguen siendo usuarios, pero
+  se alcanzan a través del dueño.
+- El nodo `usuarios` sigue existiendo como raíz
+  global (contiene a todos los usuarios, incluidos
+  los dueños), así que las operaciones globales
+  (login, admin) no se rompen.
+
+**Tipos como IDs especiales.** Segundo eje de
+contexto. Hoy los tipos son implícitos: "empresa" es
+un nodo bajo `dueno1 -> empresas -> <empresa>`. En el
+plan se agregan roots explícitos como `tipo_empresas`,
+`tipo_viajes`, `tipo_asientos`, `tipo_clientes`,
+`tipo_ventas`, `tipo_micros`. Cada root apunta a los
+nodos de su tipo, sin importar el dueño.
+
+Lo que cambia:
+
+- Consultas cross-cutting: "todas las empresas del
+  sistema" se hacen con BFS desde `tipo_empresas`
+  en vez de recorrer todos los dueños.
+- Un nodo puede pertenecer a dos contextos a la vez
+  (un dueño + un tipo). El bitmask soporta esa
+  situación.
+- La pertenencia múltiple tiene un costo: los nodos
+  tienen dos padres (uno por cada eje). El framework
+  lo soporta, pero hay que revisar los flujos de
+  destrucción para que desenlacen de ambos lados.
+
+**Multi-dueño real.** El plan contempla un mismo
+nodo perteneciente a varios dueños (por ejemplo, un
+catálogo de productos compartido entre clientes). El
+bitmask lo soporta sin cambios estructurales: la
+columna `contexto_mask` guarda varios bits en 1.
+
+**Cuándo se implementa.** El orden es:
+
+1. **Fase 1 del framework**: `SQL64` (bitmask + 3
+   tablas nuevas). Sin tocar el piloto.
+2. **Fase 2 del framework**: `IndexedDB64` (espejo).
+3. **Fase 3 del framework**: `JSON64` / `XML64`.
+4. **Cambio del piloto**: convertir dueños a IDs
+   especiales. Requiere migración de datos y de
+   código. Es una tanda grande.
+5. **Segundo cambio del piloto**: agregar los
+   `tipo_*` como IDs especiales.
+6. **Tercer cambio del piloto**: aprovechar la carga
+   parcial en las operaciones más frecuentes
+   (listar viajes, listar ventas, etc.).
+
+Los pasos 1-3 son del framework. Los pasos 4-6 son
+del piloto. Cada paso en su propia tanda, con sus
+dos scripts donde corresponda.
+
+**Preguntas abiertas (a consensuar cuando llegue el
+momento):**
+
+- Nombre exacto del prefijo para los dueños
+  (`us_dueno1` vs `u_dueno1` vs otro).
+- Qué hacer con los nodos que hoy cuelgan directo
+  de `usuarios` y no pertenecen a ningún dueño
+  (por ejemplo el admin). Siguen en el contexto
+  global del nodo `usuarios`.
+- Cómo migrar los grafos existentes sin perder
+  datos. Se puede hacer una migración ad-hoc que
+  recorra el grafo, cree los nuevos roots y
+  reescriba los enlaces.
+- Qué operaciones del piloto pasan a usar carga
+  parcial primero. Candidatas: listar viajes,
+  listar ventas, ver detalle de un viaje.
+
 ---
 
 ## 9. PATRONES DE CÓDIGO DEL PILOTO
@@ -1986,7 +2086,12 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76h
+**Última actualización de este prompt:** v1.5piloto.76i
+(solo documentación. Se agrega §8.7 con el plan de
+contextos del piloto: dueños y tipos como IDs
+especiales, integración con el plan del framework
+§11.4, fases y preguntas abiertas.).
+Antes: v1.5piloto.76h
 (planilla de pasajeros "vacía": nuevo botón "Imprimir
 Planilla Vacía" en el croquis del micro.
 `imprimir_planilla_pasajeros_micro` recibe un 4to
@@ -2569,7 +2674,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76h (framework 1.5i.7i).
+**Estado del proyecto al cierre:** v1.5piloto.76i (framework 1.5i.7j).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
