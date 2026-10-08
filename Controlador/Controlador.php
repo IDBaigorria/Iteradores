@@ -1763,6 +1763,87 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             }
             return ['reemplazos' => $reemplazos];
         }, null, false);
+
+        // ─── grafo:crear_niveles_usuario ──────────────────
+        //
+        // Crea los contenedores `publico` y `privado` como
+        // hijos de cada nodo usuario del grafo actualmente
+        // cargado, y enlaza desde ahí a los nodos hijos que
+        // ya existían. NO toca los enlaces viejos, así el
+        // código existente sigue funcionando (los contenedores
+        // son alias a los mismos nodos físicos).
+        //
+        // `publico` tiene como dato el nombre de usuario.
+        // Los enlaces que van a `publico`: nivel, nombre_real,
+        // email. Los que van a `privado`: el resto de los
+        // datos del usuario. Los enlaces "de permiso"
+        // (`dueno`, `soporte`, `duenos`) quedan en la raíz.
+        //
+        // Idempotente: si `publico` ya existe en un usuario,
+        // se saltea.
+        //
+        // Args: ['usuario' => nombre | 'todos']
+        // Devuelve: { migrados: int, saltados: int, errores: [] }.
+        self::registrar_comando('grafo:crear_niveles_usuario', function(string $token, array $args) {
+            $objetivo = (string)($args[0]['usuario'] ?? 'todos');
+
+            $raiz = Nodo::nodo_por_id('usuarios');
+            if (!$raiz) {
+                return ['migrados' => 0, 'saltados' => 0, 'errores' => ['No existe el nodo usuarios.']];
+            }
+            $adyacentes = $raiz->adyacentes();
+            if (!$adyacentes) {
+                return ['migrados' => 0, 'saltados' => 0, 'errores' => []];
+            }
+
+            // Enlaces que van a `publico`. El resto (salvo los
+            // de permiso) va a `privado`.
+            $enlaces_publicos = ['nivel', 'nombre_real', 'email'];
+            $enlaces_de_permiso = ['dueno', 'soporte', 'duenos'];
+
+            $migrados = 0;
+            $saltados = 0;
+            $errores = [];
+
+            foreach ($adyacentes as $nombre_enlace => $nodo_usuario) {
+                $nombre_enlace = (string)$nombre_enlace;
+                if ($objetivo !== 'todos' && $nombre_enlace !== $objetivo) continue;
+
+                // Idempotencia: si ya tiene `publico`, se saltea.
+                if ($nodo_usuario->adyacente('publico')) {
+                    $saltados++;
+                    continue;
+                }
+
+                // Datos previos: los adyacentes del nodo usuario.
+                $hijos = $nodo_usuario->adyacentes();
+
+                // Crear los dos contenedores.
+                $contenedor_publico = Nodo::crear_con_dato($nombre_enlace);
+                $contenedor_privado = Nodo::crear_con_dato('');
+
+                $nodo_usuario->_adyacente_en($contenedor_publico, 'publico');
+                $nodo_usuario->_adyacente_en($contenedor_privado, 'privado');
+
+                if ($hijos) {
+                    foreach ($hijos as $enlace_hijo => $nodo_hijo) {
+                        $enlace_hijo = (string)$enlace_hijo;
+                        if ($enlace_hijo === 'publico' || $enlace_hijo === 'privado') continue;
+                        if (in_array($enlace_hijo, $enlaces_de_permiso, true)) continue;
+
+                        if (in_array($enlace_hijo, $enlaces_publicos, true)) {
+                            $contenedor_publico->_adyacente_en($nodo_hijo, $enlace_hijo);
+                        } else {
+                            $contenedor_privado->_adyacente_en($nodo_hijo, $enlace_hijo);
+                        }
+                    }
+                }
+
+                $migrados++;
+            }
+
+            return ['migrados' => $migrados, 'saltados' => $saltados, 'errores' => $errores];
+        }, null, false);
     }
 
     /**

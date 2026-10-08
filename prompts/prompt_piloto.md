@@ -850,6 +850,20 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76m**: Fase B1 del modelo topológico. Crea los
+  contenedores `publico` y `privado` como hijos de cada
+  nodo usuario, enlazándolos con los nodos que ya existían
+  (alias). `publico` tiene como dato el nombre de usuario
+  y enlaza a `nivel`, `nombre_real` y `email`. `privado`
+  enlaza al resto de los datos del usuario. Los enlaces
+  "de permiso" (`dueno`, `soporte`, `duenos`) quedan en
+  la raíz. **Los enlaces viejos NO se eliminan**, así el
+  código actual sigue funcionando sin cambios. Nuevo
+  comando `grafo:crear_niveles_usuario` en el `Controlador`
+  (idempotente). Script `miscelaneas/migrar_niveles_usuario.php`
+  y bloque `?migrar_niveles_usuario=1` en `index.php`
+  (opcional `&usuario=carmen1`). Solo grafo de la app: el
+  de credenciales queda plano por ahora.
 - **v76l**: diseño del modelo topológico por niveles de
   exposición. Cada usuario va a tener contenedores
   `publico`, `privado` y `compartido_con_X` colgando de
@@ -2195,7 +2209,18 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76l
+**Última actualización de este prompt:** v1.5piloto.76m
+(Fase B1 del modelo topológico. Crea los contenedores
+`publico` y `privado` como alias de los nodos ya existentes.
+Los enlaces viejos NO se tocan: los contenedores apuntan a
+los mismos nodos físicos, así el código actual sigue
+funcionando sin cambios. La migración es idempotente y se
+corre con `?migrar_niveles_usuario=1` desde `index.php`
+(opcionalmente con `&usuario=carmen1` para un solo usuario).
+Nuevo comando `grafo:crear_niveles_usuario` en el
+`Controlador`, que opera sobre el grafo cargado usando el
+token encapsulado.).
+Antes: v1.5piloto.76l
 (diseño del modelo topológico por niveles de exposición.
 Cada usuario va a tener contenedores `publico`, `privado` y
 `compartido_con_X` colgando de su nodo raíz. La seguridad
@@ -2719,6 +2744,17 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   idempotente en `miscelaneas/migrar_usuarios_especiales.php`,
   ejecutable con `?migrar_usuarios_especiales=1`. Sin
   cambios en los accesos, sin carga parcial todavía.
+- Cerramos en v76m la Fase B1 del modelo topológico:
+  los contenedores `publico` y `privado` se crean como
+  **alias** de los nodos ya existentes. Los enlaces viejos
+  NO se tocan: los contenedores apuntan a los mismos nodos
+  físicos, así el código actual sigue funcionando. Nuevo
+  comando genérico `grafo:crear_niveles_usuario` en el
+  `Controlador` (idempotente), script de migración en
+  `miscelaneas/migrar_niveles_usuario.php` y bloque
+  `?migrar_niveles_usuario=1` en `index.php` (opcional
+  `&usuario=carmen1`). Solo grafo de la app; el de
+  credenciales queda plano por ahora.
 - Cerramos en v76l el diseño del modelo topológico por
   niveles de exposición. Cada usuario va a tener
   contenedores `publico`, `privado` y `compartido_con_X`
@@ -2868,7 +2904,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76l (framework 1.5i.7k).
+**Estado del proyecto al cierre:** v1.5piloto.76m (framework 1.5i.7k).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2920,6 +2956,11 @@ exposición (`publico`, `privado`, `compartido_con_X`).
 Documentado en el PHPDoc de `aplicacion_POST.php`
 (sección "Diseño propuesto") y en §8.7. Sin cambios
 de código todavía.
+v76m: Fase B1. Contenedores `publico` y `privado` creados
+como alias de los nodos existentes. Enlaces viejos
+intactos. Nuevo comando `grafo:crear_niveles_usuario` y
+script `miscelaneas/migrar_niveles_usuario.php` (idempotente).
+Bloque `?migrar_niveles_usuario=1` en `index.php`.
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5w)
 tiene 56 pruebas corriendo.
 

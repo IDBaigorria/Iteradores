@@ -19,7 +19,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.76k
+ * @version   1.5piloto.76m
  */
 
 // --- Utilidades base ----------------------------------
@@ -153,6 +153,29 @@ if (isset($_GET['probar_arbol'])) {
 // ==== Bloque temporal para prueba de contextos (v1.5i.7k) ====
 if (isset($_GET['probar_contextos'])) {
     require_once __DIR__ . '/Pruebas/prueba_contextos.php';
+    exit;
+}
+
+// ==== Migración de niveles de usuario (v76m) ====
+// Crea los contenedores `publico` y `privado` en cada
+// usuario. NO elimina los enlaces viejos: los contenedores
+// son alias a los mismos nodos físicos. Idempotente.
+// Parámetro opcional `usuario` (default `todos`).
+if (isset($_GET['migrar_niveles_usuario'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    require_once __DIR__ . '/miscelaneas/migrar_niveles_usuario.php';
+    $usuario_obj = $_GET['usuario'] ?? 'todos';
+    $res = migrar_niveles_usuario($nombre_app, $usuario_obj);
+    echo "Migración de niveles de usuario\n";
+    echo "================================\n\n";
+    echo "Usuario objetivo: $usuario_obj\n\n";
+    echo "Migrados: " . $res['migrados'] . "\n";
+    echo "Saltados: " . $res['saltados'] . "\n";
+    if (!empty($res['errores'])) {
+        echo "Errores:\n";
+        foreach ($res['errores'] as $e) echo "  - $e\n";
+    }
+    echo "\nListo.\n";
     exit;
 }
 
