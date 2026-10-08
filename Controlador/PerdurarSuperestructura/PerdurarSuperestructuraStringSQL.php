@@ -12,7 +12,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php"
 /**
  * Clase PerdurarSuperestructuraStringSQL
  * 
- * @version 1.5i.7d
+ * @version 1.5i.7k
  *
  * @author Ignacio David Baigorria
  *
@@ -74,7 +74,7 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
      * Si es remota, asume que ya existe.
      * Fuerza la codificación a utf8mb4 para compatibilidad total.
      */
-	static private function crear_conexion_sql()
+	static protected function crear_conexion_sql()
 	{
 		//echo "</br>host: ".Conf::SUPERESTRUCTURA_HOST_SQL;
         //echo "</br>usuario: ".Conf::SUPERESTRUCTURA_USUARIO_SQL;
@@ -82,9 +82,9 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
         //echo "</br>nombreBD: ". Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL;
 		if (Conf::LOCAL) {
 			if ($sql = new \mysqli(Conf::SUPERESTRUCTURA_HOST_SQL, Conf::SUPERESTRUCTURA_USUARIO_SQL, Conf::SUPERESTRUCTURA_CONTRASENA_SQL)) {
-				self::crear_base_de_datos_sql($sql);
+				static::crear_base_de_datos_sql($sql);
 				$sql->select_db(Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL);
-				self::crear_tablas_sql($sql);
+				static::crear_tablas_sql($sql);
 				//return $sql;
 			} else {
 				self::_error("no se pudo conectar a la base de datos");
@@ -94,7 +94,7 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
 			if ($sql = new \mysqli(Conf::SUPERESTRUCTURA_HOST_SQL, Conf::SUPERESTRUCTURA_USUARIO_SQL, Conf::SUPERESTRUCTURA_CONTRASENA_SQL, Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL)) {
 				//self::crear_base_de_datos_sql($sql)
 				//$sql->select_db(Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL);
-				self::crear_tablas_sql($sql);
+				static::crear_tablas_sql($sql);
 				//return $sql;
 			} else {
 				self::_error("no se pudo conectar a la base de datos");
@@ -122,7 +122,7 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
      * 
      * @postconditions La base de datos queda disponible para seleccionar y utilizar.
      */
-	static private function crear_base_de_datos_sql($sql)
+	static protected function crear_base_de_datos_sql($sql)
 	{
 		//echo "KKKKKKKKKKKKKKKKKKLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLKKKgKKKKKKKKKKKLLLLLLLLLLLLL";
 		if ($sql->query("CREATE DATABASE IF NOT EXISTS " . Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL)) {
@@ -146,7 +146,7 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
      * 
      * @postconditions Asegura la existencia de las tablas requeridas para almacenar nodos y enlaces.
      */
-	static private function crear_tablas_sql($sql)
+	static protected function crear_tablas_sql($sql)
 	{
 		/*if (!mysql_select_db("superestructura")){
 			PerdurarSuperestructuraString::_error("no se pudo seleccuinar la base de datos en crearTablas");

@@ -542,6 +542,15 @@ sesiones, tipos, dueños, etc.): todos son contextos por
 igual. Esta abstracción es la clave del diseño: el
 framework solo entiende "contextos".
 
+**Todo ID especial es contexto.** No hay exclusiones.
+Si un nodo tiene ID especial, es contexto por
+definición. Los nodos que cuelgan de él, si tienen ID
+normal (generado), **no son contextos**: solo heredan
+los bits de los contextos que los alcanzan. Si más
+adelante hace falta un ID especial que NO sea contexto,
+se agrega una lista de exclusión en `ConfiguracionApli`
+(pendiente, sin caso de uso actual).
+
 **Representación.** Cada nodo lleva un `contexto_mask`:
 un entero donde cada bit representa un contexto.
 Bit 0 = contexto #1, bit 1 = contexto #2, etc. Un nodo

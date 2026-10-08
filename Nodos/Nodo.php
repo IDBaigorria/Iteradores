@@ -189,7 +189,7 @@ include_once("./Nodos/Interfaces/AccesoAEspeciales.php");
  * @author Ignacio David Baigorria
  * @package Iteradores\Nodos
  * @since 1.0
- * @version 1.5i.4
+ * @version 1.5i.7k
  * @implements Interfaces\FabricaDeNodos
  * @implements Interfaces\Datos
  * @implements Interfaces\Adyacentes
@@ -213,6 +213,16 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
 	 * @var array | array<array> Matriz de enlaces a nodos adyacentes
 	 * */
     protected $adyacentes;
+
+    /**
+     * Máscara de contextos: entero donde cada bit representa
+     * un contexto (ID especial) al que pertenece el nodo.
+     * Solo la asigna la capa de persistencia SQL64/IndexedDB64.
+     *
+     * @var int
+     * @since 1.5i.7k
+     */
+    protected $contexto_mascara = 0;
 
     ////////////////////////////////////////////////////
     // VARIABLES DE CLASE
@@ -1447,6 +1457,30 @@ class Nodo extends Objeto implements FabricaDeNodos, Datos, Adyacentes, Incident
             return null;
         }
 	}
+
+    /**
+     * Devuelve la máscara de contextos del nodo.
+     * 0 si el nodo todavía no fue persistido con un método
+     * que soporte contextos.
+     *
+     * @return int
+     * @since 1.5i.7k
+     */
+    public function contexto_mascara(): int {
+        return $this->contexto_mascara;
+    }
+
+    /**
+     * Asigna la máscara de contextos del nodo. Uso interno
+     * de la capa de persistencia (SQL64, IndexedDB64, etc.).
+     *
+     * @param int $mascara
+     * @return void
+     * @since 1.5i.7k
+     */
+    public function establecer_contexto_mascara(int $mascara): void {
+        $this->contexto_mascara = $mascara;
+    }
 
 
 /*************************************************************************************************************/

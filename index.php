@@ -149,6 +149,12 @@ if (isset($_GET['probar_arbol'])) {
     require_once __DIR__ . '/miscelaneas/pruebas_arbol.php';
     exit;
 }
+
+// ==== Bloque temporal para prueba de contextos (v1.5i.7k) ====
+if (isset($_GET['probar_contextos'])) {
+    require_once __DIR__ . '/Pruebas/prueba_contextos.php';
+    exit;
+}
 // (bloque ?migrar_micros eliminado en v73r)
 // (bloque ?migrar_micros_patente eliminado en v73r)
 // (bloque ?migrar_terminales_autorizadas eliminado en v73r)

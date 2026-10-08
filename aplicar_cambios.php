@@ -1,9 +1,10 @@
 <?php
 /**
- * Aplicador de cambios — Prompt del piloto.
+ * Aplicador de cambios — Fix del test de contextos.
  *
- * Tanda de documentación: v76i. Anota el plan de contextos
- * en el piloto (dueños y tipos como IDs especiales).
+ * Tanda V1.5i.7k (corrección): reescribir prueba_contextos.php
+ * para que los hijos tengan IDs normales y solo los roots
+ * sean contextos. Documentar la convención en el prompt.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -13,196 +14,139 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
 
-    // ------------------------------------------------------------
-    // Historial: agregar v76i
-    // ------------------------------------------------------------
-
     [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'Historial: agregar v76i (plan de contextos)',
-        'buscar' => [
-            '- **v76h**: nuevo botón "Imprimir Planilla Vacía" en el',
-        ],
-        'reemplazar' => [
-            '- **v76i**: solo documentación. Se agrega la sección',
-            '  §8.7 con el plan de contextos del piloto (dueños',
-            '  y tipos como IDs especiales, integración con el',
-            '  plan del framework §11.4). No hay cambios de código.',
-            '- **v76h**: nuevo botón "Imprimir Planilla Vacía" en el',
+        'tipo' => 'crear',
+        'archivo' => 'Pruebas/prueba_contextos.php',
+        'descripcion' => 'Reescribir test de contextos',
+        'contenido' => [
+            '<?php',
+            '/**',
+            ' * Prueba funcional de la fase 1 de contextos (SQL64).',
+            ' *',
+            ' * Se ejecuta con ?probar_contextos=1 desde index.php.',
+            ' *',
+            ' * Convención: todo ID especial es un contexto. Por eso',
+            ' * acá los roots (ctx_a, ctx_b) son especiales, y los',
+            ' * nodos hijos tienen IDs normales (no especiales).',
+            ' *',
+            ' * @since 1.5i.7k',
+            ' */',
+            '',
+            'use Iteradores\\Nodos\\Nodo;',
+            'use Iteradores\\Controlador\\Controlador;',
+            '',
+            'header(\'Content-Type: text/plain; charset=utf-8\');',
+            'echo "=== Prueba de contextos (SQL64) ===\\n\\n";',
+            '',
+            '$nombre_test = \'TestContextos_\' . date(\'YmdHis\');',
+            '$res = [];',
+            '',
+            'Controlador::establecer_metodo(\'SQL64\');',
+            '',
+            '// --- 1. Crear grafo ---',
+            '// ctx_a y ctx_b son IDs especiales → contextos.',
+            '// n1, n2, n3 son IDs normales → no son contextos.',
+            'Controlador::ejecutar_prueba(function($token) use (&$res) {',
+            '    Nodo::vaciar_superestructura($token);',
+            '    $raiz_a = Nodo::crear_con_id(\'ctx_a\');',
+            '    $raiz_b = Nodo::crear_con_id(\'ctx_b\');',
+            '    $n1 = Nodo::crear_con_dato(\'nodo1\');',
+            '    $n2 = Nodo::crear_con_dato(\'nodo2\');',
+            '    $n3 = Nodo::crear_con_dato(\'nodo3\');',
+            '    $raiz_a->_adyacente_en($n1, \'hijo\');',
+            '    $raiz_b->_adyacente_en($n2, \'hijo\');',
+            '    $n1->_adyacente_en($n3, \'compartido\');',
+            '    $n2->_adyacente_en($n3, \'compartido\');',
+            '});',
+            '',
+            '// --- 2. Guardar y cargar completo ---',
+            '$res[\'guardar\'] = Controlador::guardar($nombre_test);',
+            '$res[\'cargar\'] = Controlador::cargar($nombre_test);',
+            '',
+            '// --- 3. Verificar máscaras ---',
+            '// n3 es alcanzable desde ctx_a Y desde ctx_b, entonces',
+            '// su máscara debe ser 3 (bits 0 y 1).',
+            'Controlador::ejecutar_prueba(function($token) use (&$res) {',
+            '    $raiz_a = Nodo::nodo_por_id(\'ctx_a\');',
+            '    $raiz_b = Nodo::nodo_por_id(\'ctx_b\');',
+            '    $n1 = $raiz_a ? $raiz_a->adyacente(\'hijo\') : null;',
+            '    $n2 = $raiz_b ? $raiz_b->adyacente(\'hijo\') : null;',
+            '    $n3 = $n1 ? $n1->adyacente(\'compartido\') : null;',
+            '    $res[\'mascara_ctx_a\'] = $raiz_a ? $raiz_a->contexto_mascara() : \'NO\';',
+            '    $res[\'mascara_ctx_b\'] = $raiz_b ? $raiz_b->contexto_mascara() : \'NO\';',
+            '    $res[\'mascara_n1\'] = $n1 ? $n1->contexto_mascara() : \'NO\';',
+            '    $res[\'mascara_n2\'] = $n2 ? $n2->contexto_mascara() : \'NO\';',
+            '    $res[\'mascara_n3\'] = $n3 ? $n3->contexto_mascara() : \'NO\';',
+            '});',
+            '',
+            '// --- 4. Listar contextos ---',
+            '$res[\'contextos\'] = Controlador::listar_contextos($nombre_test);',
+            '',
+            '// --- 5. Cargar parcial por ctx_a ---',
+            '$res[\'cargar_parcial\'] = Controlador::cargar_parcial($nombre_test, [\'ctx_a\']);',
+            '$res[\'es_parcial\'] = Controlador::es_grafo_parcial();',
+            '',
+            'Controlador::ejecutar_prueba(function($token) use (&$res) {',
+            '    $raiz_a = Nodo::nodo_por_id(\'ctx_a\');',
+            '    $n1 = $raiz_a ? $raiz_a->adyacente(\'hijo\') : null;',
+            '    $n3 = $n1 ? $n1->adyacente(\'compartido\') : null;',
+            '    $res[\'tiene_ctx_a_tras_parcial\'] = Nodo::existe(\'ctx_a\');',
+            '    $res[\'tiene_ctx_b_tras_parcial\'] = Nodo::existe(\'ctx_b\');',
+            '    $res[\'tiene_n1_tras_parcial\'] = ($n1 !== null);',
+            '    $res[\'tiene_n3_tras_parcial\'] = ($n3 !== null);',
+            '});',
+            '',
+            '// --- 6. Guardar completo sobre parcial (debe fallar) ---',
+            '$res[\'guardar_sobre_parcial\'] = Controlador::guardar($nombre_test);',
+            '',
+            '// --- 7. Limpieza ---',
+            '$res[\'eliminar\'] = Controlador::eliminar($nombre_test);',
+            '',
+            'echo "--- Resultados ---\\n";',
+            'foreach ($res as $k => $v) {',
+            '    echo $k . " => " . var_export($v, true) . "\\n";',
+            '}',
+            'echo "\\n--- Fin ---\\n";',
+            '?>',
         ],
     ],
 
-    // ------------------------------------------------------------
-    // Nueva sección §8.7
-    // ------------------------------------------------------------
+    // ============================================================
+    // Prompt del framework: agregar nota sobre la convención
+    // ============================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => '§8.7: agregar plan de contextos del piloto',
+        'archivo' => 'prompts/prompt_framework_iteradores.md',
+        'descripcion' => '§11.4: aclarar "todo ID especial es contexto"',
         'buscar' => [
-            '**Regla de oro:** si un nodo se desenlaza sin destruirse,',
-            'primero preguntar "¿tiene otra referencia entrante?". Si la',
-            'respuesta es no, hay que destruirlo.',
-            '',
-            '---',
-            '',
-            '## 9. PATRONES DE CÓDIGO DEL PILOTO',
+            '**Definición de contexto.** Un **contexto** es un ID',
+            'especial del grafo (nodo con ID no numérico) que actúa',
+            'como raíz. Cualquier nodo alcanzable desde ese ID',
+            'especial pertenece a ese contexto. El framework no',
+            'distingue la semántica de un contexto (usuarios,',
+            'sesiones, tipos, dueños, etc.): todos son contextos por',
+            'igual. Esta abstracción es la clave del diseño: el',
+            'framework solo entiende "contextos".',
         ],
         'reemplazar' => [
-            '**Regla de oro:** si un nodo se desenlaza sin destruirse,',
-            'primero preguntar "¿tiene otra referencia entrante?". Si la',
-            'respuesta es no, hay que destruirlo.',
+            '**Definición de contexto.** Un **contexto** es un ID',
+            'especial del grafo (nodo con ID no numérico) que actúa',
+            'como raíz. Cualquier nodo alcanzable desde ese ID',
+            'especial pertenece a ese contexto. El framework no',
+            'distingue la semántica de un contexto (usuarios,',
+            'sesiones, tipos, dueños, etc.): todos son contextos por',
+            'igual. Esta abstracción es la clave del diseño: el',
+            'framework solo entiende "contextos".',
             '',
-            '### 8.7 Plan de contextos y carga parcial (en desarrollo)',
-            '',
-            'Este apartado es el plan del piloto para aprovechar los',
-            'contextos que se están implementando en el framework',
-            '(ver §11.4 del prompt del framework). Todavía no está',
-            'implementado. Se actualiza a medida que avanza cada fase.',
-            '',
-            '**Motivación.** El piloto crece en cantidad de dueños,',
-            'viajes, ventas y pasajeros. Cada operación carga el',
-            'grafo completo (ver §8.6, "frente A"). Aislar el',
-            'subgrafo de un dueño permite cargar solo lo que se',
-            'necesita y baja el costo de cada operación.',
-            '',
-            '**Dueños como IDs especiales.** El primer paso es',
-            'convertir a los dueños en IDs especiales del grafo.',
-            'Hoy los dueños son nodos comunes colgando del ID',
-            'especial `usuarios`. En el plan pasan a ser roots',
-            'propios, con un prefijo que los identifique (por',
-            'ejemplo `us_dueno1`, `us_dueno2`).',
-            '',
-            'Lo que cambia:',
-            '',
-            '- Cada dueño es una raíz del grafo. Al cargar, se',
-            '  puede hacer BFS desde ese root y traer solo su',
-            '  subárbol.',
-            '- Los terminales de un dueño quedan dentro del',
-            '  contexto del dueño. Siguen siendo usuarios, pero',
-            '  se alcanzan a través del dueño.',
-            '- El nodo `usuarios` sigue existiendo como raíz',
-            '  global (contiene a todos los usuarios, incluidos',
-            '  los dueños), así que las operaciones globales',
-            '  (login, admin) no se rompen.',
-            '',
-            '**Tipos como IDs especiales.** Segundo eje de',
-            'contexto. Hoy los tipos son implícitos: "empresa" es',
-            'un nodo bajo `dueno1 -> empresas -> <empresa>`. En el',
-            'plan se agregan roots explícitos como `tipo_empresas`,',
-            '`tipo_viajes`, `tipo_asientos`, `tipo_clientes`,',
-            '`tipo_ventas`, `tipo_micros`. Cada root apunta a los',
-            'nodos de su tipo, sin importar el dueño.',
-            '',
-            'Lo que cambia:',
-            '',
-            '- Consultas cross-cutting: "todas las empresas del',
-            '  sistema" se hacen con BFS desde `tipo_empresas`',
-            '  en vez de recorrer todos los dueños.',
-            '- Un nodo puede pertenecer a dos contextos a la vez',
-            '  (un dueño + un tipo). El bitmask soporta esa',
-            '  situación.',
-            '- La pertenencia múltiple tiene un costo: los nodos',
-            '  tienen dos padres (uno por cada eje). El framework',
-            '  lo soporta, pero hay que revisar los flujos de',
-            '  destrucción para que desenlacen de ambos lados.',
-            '',
-            '**Multi-dueño real.** El plan contempla un mismo',
-            'nodo perteneciente a varios dueños (por ejemplo, un',
-            'catálogo de productos compartido entre clientes). El',
-            'bitmask lo soporta sin cambios estructurales: la',
-            'columna `contexto_mask` guarda varios bits en 1.',
-            '',
-            '**Cuándo se implementa.** El orden es:',
-            '',
-            '1. **Fase 1 del framework**: `SQL64` (bitmask + 3',
-            '   tablas nuevas). Sin tocar el piloto.',
-            '2. **Fase 2 del framework**: `IndexedDB64` (espejo).',
-            '3. **Fase 3 del framework**: `JSON64` / `XML64`.',
-            '4. **Cambio del piloto**: convertir dueños a IDs',
-            '   especiales. Requiere migración de datos y de',
-            '   código. Es una tanda grande.',
-            '5. **Segundo cambio del piloto**: agregar los',
-            '   `tipo_*` como IDs especiales.',
-            '6. **Tercer cambio del piloto**: aprovechar la carga',
-            '   parcial en las operaciones más frecuentes',
-            '   (listar viajes, listar ventas, etc.).',
-            '',
-            'Los pasos 1-3 son del framework. Los pasos 4-6 son',
-            'del piloto. Cada paso en su propia tanda, con sus',
-            'dos scripts donde corresponda.',
-            '',
-            '**Preguntas abiertas (a consensuar cuando llegue el',
-            'momento):**',
-            '',
-            '- Nombre exacto del prefijo para los dueños',
-            '  (`us_dueno1` vs `u_dueno1` vs otro).',
-            '- Qué hacer con los nodos que hoy cuelgan directo',
-            '  de `usuarios` y no pertenecen a ningún dueño',
-            '  (por ejemplo el admin). Siguen en el contexto',
-            '  global del nodo `usuarios`.',
-            '- Cómo migrar los grafos existentes sin perder',
-            '  datos. Se puede hacer una migración ad-hoc que',
-            '  recorra el grafo, cree los nuevos roots y',
-            '  reescriba los enlaces.',
-            '- Qué operaciones del piloto pasan a usar carga',
-            '  parcial primero. Candidatas: listar viajes,',
-            '  listar ventas, ver detalle de un viaje.',
-            '',
-            '---',
-            '',
-            '## 9. PATRONES DE CÓDIGO DEL PILOTO',
-        ],
-    ],
-
-    // ------------------------------------------------------------
-    // §12: nueva "Última actualización"
-    // ------------------------------------------------------------
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => '§12: nueva Última actualización a v76i',
-        'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.76h',
-            '(planilla de pasajeros "vacía": nuevo botón "Imprimir',
-            'Planilla Vacía" en el croquis del micro.',
-            '`imprimir_planilla_pasajeros_micro` recibe un 4to',
-            'parámetro `$vacia`; `index.php` lee `$_GET[\'vacia\']`.',
-            'Solo PHP.).',
-            'Antes: v1.5piloto.76g',
-        ],
-        'reemplazar' => [
-            '**Última actualización de este prompt:** v1.5piloto.76i',
-            '(solo documentación. Se agrega §8.7 con el plan de',
-            'contextos del piloto: dueños y tipos como IDs',
-            'especiales, integración con el plan del framework',
-            '§11.4, fases y preguntas abiertas.).',
-            'Antes: v1.5piloto.76h',
-            '(planilla de pasajeros "vacía": nuevo botón "Imprimir',
-            'Planilla Vacía" en el croquis del micro.',
-            '`imprimir_planilla_pasajeros_micro` recibe un 4to',
-            'parámetro `$vacia`; `index.php` lee `$_GET[\'vacia\']`.',
-            'Solo PHP.).',
-            'Antes: v1.5piloto.76g',
-        ],
-    ],
-
-    // ------------------------------------------------------------
-    // §13: bump de versión del estado
-    // ------------------------------------------------------------
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => '§13: bump de versión del estado a v76i',
-        'buscar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.76h (framework 1.5i.7i).',
-        ],
-        'reemplazar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.76i (framework 1.5i.7j).',
+            '**Todo ID especial es contexto.** No hay exclusiones.',
+            'Si un nodo tiene ID especial, es contexto por',
+            'definición. Los nodos que cuelgan de él, si tienen ID',
+            'normal (generado), **no son contextos**: solo heredan',
+            'los bits de los contextos que los alcanzan. Si más',
+            'adelante hace falta un ID especial que NO sea contexto,',
+            'se agrega una lista de exclusión en `ConfiguracionApli`',
+            '(pendiente, sin caso de uso actual).',
         ],
     ],
 
@@ -226,7 +170,7 @@ foreach ($cambios as $cambio) {
 }
 $total_reemplazos = 0;
 foreach ($reemplazos_por_archivo as $lista) { $total_reemplazos += count($lista); }
-echo "[INFO] $total_reemplazos reemplazo(s) en " . count($reemplazos_por_archivo) . " archivo(s).\n\n";
+echo "[INFO] $total_reemplazos reemplazo(s) en " . count($reemplazos_por_archivo) . " archivo(s), " . count($creaciones) . " a crear.\n\n";
 $archivos_a_escribir = []; $bloques_ok = 0; $bloques_fallidos = [];
 foreach ($reemplazos_por_archivo as $archivo_rel => $lista_cambios) {
     $ruta_abs = $raiz_proyecto . '/' . $archivo_rel;
@@ -250,9 +194,10 @@ foreach ($reemplazos_por_archivo as $archivo_rel => $lista_cambios) {
 }
 if ($modo_estricto && !empty($bloques_fallidos)) { echo "=== ABORTADO ===\n"; foreach ($bloques_fallidos as $f) echo "  [FALLO] $f\n"; exit(1); }
 foreach ($archivos_a_escribir as $ruta_abs => $contenido_final) {
-    if (file_put_contents($ruta_abs, $contenido_final) === false) { echo "[FALLO] Escribir.\n"; continue; }
+    if (file_put_contents($ruta_abs, $contenido_final) === false) { echo "[FALLO] Escribir: " . substr($ruta_abs, strlen($raiz_proyecto)+1) . "\n"; continue; }
     echo "[OK] " . substr($ruta_abs, strlen($raiz_proyecto)+1) . "\n";
 }
-echo "\n=== Resumen ===\nBloques aplicados: $bloques_ok\n";
+foreach ($creaciones as $c) { $r = $raiz_proyecto.'/'.$c['archivo']; if (!is_dir(dirname($r))) mkdir(dirname($r), 0777, true); if (file_put_contents($r, implode("\n", $c['contenido']))===false){echo "[FALLO] Crear: {$c['archivo']}\n";continue;} echo "[OK] {$c['archivo']} (creado)\n"; }
+echo "\n=== Resumen ===\nBloques aplicados: $bloques_ok\nArchivos nuevos:   " . count($creaciones) . "\n";
 if (!empty($bloques_fallidos)) { echo "Fallos: " . count($bloques_fallidos) . "\n"; foreach ($bloques_fallidos as $f) echo "  - $f\n"; }
 echo "\nListo.\n";

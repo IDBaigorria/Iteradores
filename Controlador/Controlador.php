@@ -10,6 +10,8 @@ use Iteradores\Nucleo\Objeto;
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructura;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL;
+use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraConContexto;
+use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL64;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringJSON;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringXML;
 use Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL;
@@ -26,6 +28,8 @@ use Iteradores\Controlador\Talamo;
 
 require_once("PerdurarSuperestructura/PerdurarSuperestructura.php");
 require_once("PerdurarSuperestructura/PerdurarSuperestructuraStringSQL.php");
+require_once("PerdurarSuperestructura/PerdurarSuperestructuraConContexto.php");
+require_once("PerdurarSuperestructura/PerdurarSuperestructuraStringSQL64.php");
 require_once("PerdurarSuperestructura/PerdurarSuperestructuraElectricosStringSQL.php");
 require_once("PerdurarSuperestructura/PerdurarSuperestructuraStringJSON.php");
 require_once("PerdurarSuperestructura/PerdurarSuperestructuraStringXML.php");
@@ -189,6 +193,10 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      * @version 1.5i.4
     */
     public static function guardar($nombre): bool {
+        if (static::$grafo_parcial) {
+            static::_error("No se puede guardar un grafo parcial con guardar(). Usar guardar_parcial() o cargar() completo primero.");
+            return false;
+        }
         if (!static::verificar_superestructura_desocupada()) {
             return false;
         }
@@ -208,6 +216,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      */
     public static function cargar($nombre): bool|null {
         Nodo::vaciar_superestructura(static::$token);
+        static::$grafo_parcial = false;
         return static::delegar('cargar', $nombre);
     }
 
@@ -219,6 +228,85 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     /** @return bool */
     public static function existe($nombre): bool {
         return (bool) static::delegar('existe', $nombre);
+    }
+
+    // ══════════════════════════════════════════════════════
+    // CONTEXTOS Y CARGA PARCIAL (v1.5i.7k)
+    // ══════════════════════════════════════════════════════
+
+    /**
+     * @var bool Indica si la superestructura cargada es parcial.
+     */
+    protected static bool $grafo_parcial = false;
+
+    /**
+     * Devuelve true si la superestructura en memoria fue
+     * cargada de forma parcial.
+     *
+     * @return bool
+     * @since 1.5i.7k
+     */
+    public static function es_grafo_parcial(): bool {
+        return static::$grafo_parcial;
+    }
+
+    /**
+     * Carga solo los nodos que pertenecen a alguno de los
+     * contextos pedidos. Marca la superestructura como
+     * parcial.
+     *
+     * @param string   $nombre
+     * @param string[] $contextos
+     * @return bool|null
+     * @since 1.5i.7k
+     */
+    public static function cargar_parcial($nombre, array $contextos): bool|null {
+        Nodo::vaciar_superestructura(static::$token);
+        static::$grafo_parcial = false;
+        $clase = static::$claseActual;
+        if (!$clase || !method_exists($clase, 'cargar_parcial')) {
+            static::_error("El método de persistencia activo no soporta cargar_parcial.");
+            return null;
+        }
+        $res = $clase::cargar_parcial($nombre, $contextos);
+        if ($res === true) {
+            static::$grafo_parcial = true;
+        }
+        return $res;
+    }
+
+    /**
+     * Guarda solo el subgrafo en memoria filtrando por
+     * contextos.
+     *
+     * @param string   $nombre
+     * @param string[] $contextos
+     * @return bool
+     * @since 1.5i.7k
+     */
+    public static function guardar_parcial($nombre, array $contextos): bool {
+        $clase = static::$claseActual;
+        if (!$clase || !method_exists($clase, 'guardar_parcial')) {
+            static::_error("El método de persistencia activo no soporta guardar_parcial.");
+            return false;
+        }
+        return (bool) $clase::guardar_parcial($nombre, $contextos);
+    }
+
+    /**
+     * Lista los contextos registrados bajo un nombre.
+     *
+     * @param string $nombre
+     * @return string[]|null
+     * @since 1.5i.7k
+     */
+    public static function listar_contextos($nombre): ?array {
+        $clase = static::$claseActual;
+        if (!$clase || !method_exists($clase, 'listar_contextos')) {
+            static::_error("El método de persistencia activo no soporta listar_contextos.");
+            return null;
+        }
+        return $clase::listar_contextos($nombre);
     }
 
     /**
@@ -1762,6 +1850,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
 
             // ─── Implementaciones de persistencia ──────────────
             Controlador::registrar_implementacion("SQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL");
+            Controlador::registrar_implementacion("SQL64", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringSQL64");
             Controlador::registrar_implementacion("JSON", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringJSON");
             Controlador::registrar_implementacion("XML", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraStringXML");
             Controlador::registrar_implementacion("ESQL", "Iteradores\Controlador\PerdurarSuperestructura\PerdurarSuperestructuraElectricosStringSQL");
