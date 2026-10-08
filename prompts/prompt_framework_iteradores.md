@@ -186,6 +186,78 @@ El sistema de errores y alertas está en la clase `Objeto`, que es la raíz
 de la jerarquía. Guarda cada mensaje con la pila de llamadas. Tiene un
 límite de profundidad configurable en `Conf`.
 
+### 4.4 Sistema de comandos
+
+El framework tiene un sistema de comandos que permite
+registrar operaciones por nombre y ejecutarlas de forma
+uniforme. Cada comando es una función (o clase) que recibe
+el token de seguridad y los argumentos, y devuelve un
+resultado.
+
+**Registro.** Hay dos formas:
+
+- `Controlador::registrar_comando($nombre, $manejador, $reversa = null, $solo_desarrollo = false)`.
+  Registra un comando dinámico con un closure.
+- `Controlador::registrar_comando_desde_clase($clase)`.
+  Registra un comando que implementa la interfaz `Comando`.
+  La clase declara nombre, descripción, parámetros, ejemplos
+  y una función de reversa opcional.
+
+**Ejecución.** `Controlador::ejecutar_comando($nombre, ...$args)`.
+Devuelve lo que devuelva el manejador, o `null` si el
+comando no existe, no hay permiso, o los argumentos no
+validan.
+
+**Argumentos.** Si el comando tiene clase con método
+`parametros()`, los args se parsean y validan antes de
+invocar el manejador. La estructura que llega al manejador
+es `['posicionales' => [...], 'banderas' => [...],
+'opciones' => [...]]`. Si el comando no tiene definición
+de parámetros, los args llegan crudos como array numérico.
+
+**Reversa.** Cada comando puede declarar una función de
+reversa que se apila en `Controlador::$historial`. Se
+deshace con `Controlador::deshacer_ultimo()`.
+
+**Cuándo se registran.** El Controlador se autoinicializa
+al final de `Controlador.php` (llamada a
+`Controlador::inicializar()`). En `index.php`, los
+`require_once` de la app van DESPUÉS del de `Controlador.php`.
+Por lo tanto, cuando se cargan los archivos de la app, el
+Controlador YA está inicializado y se puede registrar
+comandos con `registrar_comando` directo.
+
+**`RegistroGlobal` para autoencolación.** Existe la clase
+`RegistroGlobal` con `$comandos_pendientes` y
+`$comunicadores_pendientes`, que el Controlador procesa
+durante `inicializar()`. Sirve para archivos que se cargan
+ANTES del Controlador (por ejemplo, los comandos que vienen
+en `Comandos/index.php`, que `index.php` incluye antes de
+`Controlador.php`). Los archivos de la app que se cargan
+DESPUÉS no deben usar `RegistroGlobal` (no tiene sentido:
+el Controlador ya procesó esa cola).
+
+**Regla práctica:**
+
+- Comandos del framework → van en `Controlador.php`, en
+  una sección `_registrar_comandos_*` invocada desde
+  `inicializar()`.
+- Comandos de la app → van en archivos de la app,
+  registrados con `registrar_comando` directo desde
+  `index.php` (después de los `require_once` de la app).
+  NO van en el `Controlador` del framework.
+- Comandos que se autoencolan → solo si se cargan antes
+  del Controlador, vía `RegistroGlobal::encolar_comando()`.
+
+**Espejo JS.** El `Controlador.js` del plugin tiene la
+misma API (`registrar_comando`, `ejecutar_comando`,
+`registrar_comando_desde_clase`, `registrar_comando_desde_instancia`).
+Se inicializa igual: auto-init al final del módulo. En MV3,
+desde la consola del service worker NO se pueden hacer
+`import()` dinámicos (prohibido por spec). Para debug
+desde el SW, exponer `globalThis.Controlador = Controlador`
+en el bootstrap.
+
 ---
 
 ## 5. HELPERS DE ÁRBOL (`miscelaneas/Arbol.php`)
@@ -1067,6 +1139,33 @@ Cada una costó un bug en producción o en pruebas.
 23. **Los iteradores persistentes están subutilizados.** Pueden
     reducir recorridos repetidos. En la práctica, la mayoría de
     las operaciones abren un nuevo recorrido desde las raíces.
+
+**Comandos (lecciones sobre el registro):**
+
+24. **El Controlador se autoinicializa al final de
+    `Controlador.php`.** En `index.php`, los `require_once`
+    de la app van después. Consecuencia: los archivos de la
+    app pueden registrar comandos con `registrar_comando`
+    directo (el Controlador ya está listo). No deben usar
+    `RegistroGlobal::encolar_comando` (esa cola ya se
+    procesó).
+25. **Comandos del framework vs comandos de la app.** Los
+    del framework van en el `Controlador`. Los de la app
+    van en archivos de la app, registrados al vuelo desde
+    `index.php`. Un comando específico del piloto NO debe
+    vivir en el `Controlador` del framework: es deuda
+    técnica.
+26. **`RegistroGlobal` sirve solo para archivos que se
+    cargan antes del Controlador.** Por ejemplo, los
+    comandos de `Comandos/index.php`. Para archivos
+    posteriores, `registrar_comando` directo.
+27. **En MV3, `import()` dinámico está prohibido en el
+    `ServiceWorkerGlobalScope`.** Error: *"import() is
+    disallowed on ServiceWorkerGlobalScope by the HTML
+    specification"*. Para debug desde la consola del SW,
+    exponer `globalThis.Controlador = Controlador` en el
+    bootstrap. Los imports estáticos del bootstrap sí
+    funcionan.
 
 **Regla de oro:** cualquier cambio al framework PHP se refleja en
 JS en la misma tanda, con dos scripts y dos commits.

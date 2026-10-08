@@ -606,8 +606,35 @@ Subacciones especiales:
 - Requiere `Aplicacion/FuncionesAuxiliares.php` (que define
   `guardar_ambos`) antes que todo lo demás.
 - Crea admin en ambos grafos si no existe.
+- Crea el nodo especial `aplicacion` con su contenedor
+  `migraciones` si no existe (v76n).
+- Registra los comandos de la app con
+  `registrar_comandos_migraciones()` (v76n). El Controlador
+  ya está inicializado cuando se cargan los `require_once`
+  de la app, así que el registro es directo con
+  `Controlador::registrar_comando(...)`.
 - Bloques temporales de migración.
 - Enrutado POST con `enrutar_peticion_post`.
+
+### 5.16 Comandos de la app
+
+Los comandos de la app viven en `Aplicacion/Migraciones/`
+(v76n) y se registran al vuelo desde `index.php` con
+`Controlador::registrar_comando(...)`, no desde el
+`Controlador` del framework.
+
+**Regla de convivencia:**
+
+- Comandos del framework (`grafo:*`, `comunicacion:*`,
+  `dominio:*`, etc.) → van en `Controlador.php`.
+- Comandos de la app (`app:migracion_*`, y en el futuro
+  los que correspondan a módulos de negocio) → van en
+  archivos bajo `Aplicacion/`, registrados desde
+  `index.php` después de los `require_once`.
+- Los comandos específicos del piloto que hoy están en el
+  `Controlador` del framework (por ejemplo
+  `grafo:crear_niveles_usuario`) son deuda técnica: hay
+  que moverlos a la app cuando se pueda.
 
 ---
 
@@ -850,6 +877,18 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76p**: solo documentación. Se documenta todo el
+  aprendizaje sobre el sistema de comandos del framework:
+  nueva sección §4.4 en el prompt del framework (registro,
+  ejecución, argumentos, reversa, cuándo se registran,
+  `RegistroGlobal` para autoencolación, espejo JS). Cuatro
+  lecciones nuevas en §13 (autoinicialización del
+  Controlador, comandos del framework vs de la app,
+  `RegistroGlobal` solo para archivos previos al
+  Controlador, y la limitación de MV3 con `import()`
+  dinámico). Nueva §5.16 en el prompt del piloto con la
+  regla de convivencia entre comandos del framework y de
+  la app.
 - **v76o**: solo documentación. Se dejan asentados tres
   pendientes sobre el framework, sin tocar código:
   (1) espejar `grafo:reemplazar_referencias` en el
@@ -2981,7 +3020,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76o (framework 1.5i.7l).
+**Estado del proyecto al cierre:** v1.5piloto.76p (framework 1.5i.7l).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
