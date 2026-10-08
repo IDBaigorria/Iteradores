@@ -735,6 +735,19 @@ siendo total o de un archivo ya guardado).
   fases (SQL64, luego IndexedDB64, luego JSON64/XML64, y
   eventualmente 256 bits y producto de primos). Ver §11.4.
 
+- **1.5i.7k**: fase 1 (PHP) y fase 2 (JS) de contextos.
+  PHP: interfaz `PerdurarSuperestructuraConContexto`, clase
+  `PerdurarSuperestructuraStringSQL64` con 3 tablas nuevas,
+  `Nodo::contexto_mascara`, métodos `cargar_parcial`,
+  `guardar_parcial` (stub) y `listar_contextos` en el
+  `Controlador`, flag `$grafo_parcial`. JS: espejo en
+  `PerdurarSuperestructuraStringIndexedDB64` con base de datos
+  separada (`HyS_ctx`). Fix posterior en JS: normalizar a
+  `String(id)` las claves del `Map` de `_superestructura` y
+  `_nodos_especiales`, y normalizar en `Nodo.existe` y
+  `Nodo.nodo_por_id`, para replicar el comportamiento de PHP.
+  Ver §12.3 y §11.4.
+
 El espejo JS también recibió mejoras en paralelo (ver sección 12).
 Su historial es: 1.5i.4 → 1.5i.5 (robustez de persistencia)
 → 1.5i.6 (fix del depósito de IDs) → 1.5i.7 (alineación con PHP).
@@ -844,6 +857,18 @@ real. El fix es:
 - JS: `if (elemento !== null && elemento !== undefined)`
 
 **Resuelto** en v73r (PHP) y V1.5i.7f (JS).
+
+**IDs y claves de Map en JS.** En PHP, `isset($arr["1"])`
+funciona aunque la clave original sea el int `1`, porque PHP
+coerciona strings numéricos a int en claves de array. En JS,
+`Map.has("1")` y `Map.has(1)` son distintos. Regla: normalizar
+a `String(id)` todas las claves del `Map` de
+`_superestructura` y `_nodos_especiales`, y normalizar también
+en `Nodo.existe` y `Nodo.nodo_por_id`. Es el equivalente JS del
+comportamiento de PHP. Bug detectado en la fase 2 de contextos
+(IndexedDB64, V1.5i.7k): el BFS del bitmask llamaba a
+`Nodo.nodo_por_id(String(id))` sobre un nodo común cuyo ID
+original era número, y el lookup fallaba silenciosamente.
 
 ### 12.4 API del Controlador JS
 

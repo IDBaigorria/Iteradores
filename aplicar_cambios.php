@@ -1,10 +1,9 @@
 <?php
 /**
- * Aplicador de cambios — Fix del test de contextos.
+ * Aplicador de cambios — Proyecto iteradores (PHP).
  *
- * Tanda V1.5i.7k (corrección): reescribir prueba_contextos.php
- * para que los hijos tengan IDs normales y solo los roots
- * sean contextos. Documentar la convención en el prompt.
+ * Tanda V1.5i.7k (solo prompt). Documenta la trampa de tipos
+ * de ID en el Map de superestructura del espejo JS.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -15,138 +14,55 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     [
-        'tipo' => 'crear',
-        'archivo' => 'Pruebas/prueba_contextos.php',
-        'descripcion' => 'Reescribir test de contextos',
-        'contenido' => [
-            '<?php',
-            '/**',
-            ' * Prueba funcional de la fase 1 de contextos (SQL64).',
-            ' *',
-            ' * Se ejecuta con ?probar_contextos=1 desde index.php.',
-            ' *',
-            ' * Convención: todo ID especial es un contexto. Por eso',
-            ' * acá los roots (ctx_a, ctx_b) son especiales, y los',
-            ' * nodos hijos tienen IDs normales (no especiales).',
-            ' *',
-            ' * @since 1.5i.7k',
-            ' */',
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_framework_iteradores.md',
+        'descripcion' => '§12.3: agregar trampa de IDs y claves de Map',
+        'buscar' => [
+            '**Resuelto** en v73r (PHP) y V1.5i.7f (JS).',
+        ],
+        'reemplazar' => [
+            '**Resuelto** en v73r (PHP) y V1.5i.7f (JS).',
             '',
-            'use Iteradores\\Nodos\\Nodo;',
-            'use Iteradores\\Controlador\\Controlador;',
-            '',
-            'header(\'Content-Type: text/plain; charset=utf-8\');',
-            'echo "=== Prueba de contextos (SQL64) ===\\n\\n";',
-            '',
-            '$nombre_test = \'TestContextos_\' . date(\'YmdHis\');',
-            '$res = [];',
-            '',
-            'Controlador::establecer_metodo(\'SQL64\');',
-            '',
-            '// --- 1. Crear grafo ---',
-            '// ctx_a y ctx_b son IDs especiales → contextos.',
-            '// n1, n2, n3 son IDs normales → no son contextos.',
-            'Controlador::ejecutar_prueba(function($token) use (&$res) {',
-            '    Nodo::vaciar_superestructura($token);',
-            '    $raiz_a = Nodo::crear_con_id(\'ctx_a\');',
-            '    $raiz_b = Nodo::crear_con_id(\'ctx_b\');',
-            '    $n1 = Nodo::crear_con_dato(\'nodo1\');',
-            '    $n2 = Nodo::crear_con_dato(\'nodo2\');',
-            '    $n3 = Nodo::crear_con_dato(\'nodo3\');',
-            '    $raiz_a->_adyacente_en($n1, \'hijo\');',
-            '    $raiz_b->_adyacente_en($n2, \'hijo\');',
-            '    $n1->_adyacente_en($n3, \'compartido\');',
-            '    $n2->_adyacente_en($n3, \'compartido\');',
-            '});',
-            '',
-            '// --- 2. Guardar y cargar completo ---',
-            '$res[\'guardar\'] = Controlador::guardar($nombre_test);',
-            '$res[\'cargar\'] = Controlador::cargar($nombre_test);',
-            '',
-            '// --- 3. Verificar máscaras ---',
-            '// n3 es alcanzable desde ctx_a Y desde ctx_b, entonces',
-            '// su máscara debe ser 3 (bits 0 y 1).',
-            'Controlador::ejecutar_prueba(function($token) use (&$res) {',
-            '    $raiz_a = Nodo::nodo_por_id(\'ctx_a\');',
-            '    $raiz_b = Nodo::nodo_por_id(\'ctx_b\');',
-            '    $n1 = $raiz_a ? $raiz_a->adyacente(\'hijo\') : null;',
-            '    $n2 = $raiz_b ? $raiz_b->adyacente(\'hijo\') : null;',
-            '    $n3 = $n1 ? $n1->adyacente(\'compartido\') : null;',
-            '    $res[\'mascara_ctx_a\'] = $raiz_a ? $raiz_a->contexto_mascara() : \'NO\';',
-            '    $res[\'mascara_ctx_b\'] = $raiz_b ? $raiz_b->contexto_mascara() : \'NO\';',
-            '    $res[\'mascara_n1\'] = $n1 ? $n1->contexto_mascara() : \'NO\';',
-            '    $res[\'mascara_n2\'] = $n2 ? $n2->contexto_mascara() : \'NO\';',
-            '    $res[\'mascara_n3\'] = $n3 ? $n3->contexto_mascara() : \'NO\';',
-            '});',
-            '',
-            '// --- 4. Listar contextos ---',
-            '$res[\'contextos\'] = Controlador::listar_contextos($nombre_test);',
-            '',
-            '// --- 5. Cargar parcial por ctx_a ---',
-            '$res[\'cargar_parcial\'] = Controlador::cargar_parcial($nombre_test, [\'ctx_a\']);',
-            '$res[\'es_parcial\'] = Controlador::es_grafo_parcial();',
-            '',
-            'Controlador::ejecutar_prueba(function($token) use (&$res) {',
-            '    $raiz_a = Nodo::nodo_por_id(\'ctx_a\');',
-            '    $n1 = $raiz_a ? $raiz_a->adyacente(\'hijo\') : null;',
-            '    $n3 = $n1 ? $n1->adyacente(\'compartido\') : null;',
-            '    $res[\'tiene_ctx_a_tras_parcial\'] = Nodo::existe(\'ctx_a\');',
-            '    $res[\'tiene_ctx_b_tras_parcial\'] = Nodo::existe(\'ctx_b\');',
-            '    $res[\'tiene_n1_tras_parcial\'] = ($n1 !== null);',
-            '    $res[\'tiene_n3_tras_parcial\'] = ($n3 !== null);',
-            '});',
-            '',
-            '// --- 6. Guardar completo sobre parcial (debe fallar) ---',
-            '$res[\'guardar_sobre_parcial\'] = Controlador::guardar($nombre_test);',
-            '',
-            '// --- 7. Limpieza ---',
-            '$res[\'eliminar\'] = Controlador::eliminar($nombre_test);',
-            '',
-            'echo "--- Resultados ---\\n";',
-            'foreach ($res as $k => $v) {',
-            '    echo $k . " => " . var_export($v, true) . "\\n";',
-            '}',
-            'echo "\\n--- Fin ---\\n";',
-            '?>',
+            '**IDs y claves de Map en JS.** En PHP, `isset($arr["1"])`',
+            'funciona aunque la clave original sea el int `1`, porque PHP',
+            'coerciona strings numéricos a int en claves de array. En JS,',
+            '`Map.has("1")` y `Map.has(1)` son distintos. Regla: normalizar',
+            'a `String(id)` todas las claves del `Map` de',
+            '`_superestructura` y `_nodos_especiales`, y normalizar también',
+            'en `Nodo.existe` y `Nodo.nodo_por_id`. Es el equivalente JS del',
+            'comportamiento de PHP. Bug detectado en la fase 2 de contextos',
+            '(IndexedDB64, V1.5i.7k): el BFS del bitmask llamaba a',
+            '`Nodo.nodo_por_id(String(id))` sobre un nodo común cuyo ID',
+            'original era número, y el lookup fallaba silenciosamente.',
         ],
     ],
-
-    // ============================================================
-    // Prompt del framework: agregar nota sobre la convención
-    // ============================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_framework_iteradores.md',
-        'descripcion' => '§11.4: aclarar "todo ID especial es contexto"',
+        'descripcion' => 'Historial: entrada 1.5i.7k',
         'buscar' => [
-            '**Definición de contexto.** Un **contexto** es un ID',
-            'especial del grafo (nodo con ID no numérico) que actúa',
-            'como raíz. Cualquier nodo alcanzable desde ese ID',
-            'especial pertenece a ese contexto. El framework no',
-            'distingue la semántica de un contexto (usuarios,',
-            'sesiones, tipos, dueños, etc.): todos son contextos por',
-            'igual. Esta abstracción es la clave del diseño: el',
-            'framework solo entiende "contextos".',
+            '  eventualmente 256 bits y producto de primos). Ver §11.4.',
+            '',
+            'El espejo JS también recibió mejoras en paralelo (ver sección 12).',
         ],
         'reemplazar' => [
-            '**Definición de contexto.** Un **contexto** es un ID',
-            'especial del grafo (nodo con ID no numérico) que actúa',
-            'como raíz. Cualquier nodo alcanzable desde ese ID',
-            'especial pertenece a ese contexto. El framework no',
-            'distingue la semántica de un contexto (usuarios,',
-            'sesiones, tipos, dueños, etc.): todos son contextos por',
-            'igual. Esta abstracción es la clave del diseño: el',
-            'framework solo entiende "contextos".',
+            '  eventualmente 256 bits y producto de primos). Ver §11.4.',
             '',
-            '**Todo ID especial es contexto.** No hay exclusiones.',
-            'Si un nodo tiene ID especial, es contexto por',
-            'definición. Los nodos que cuelgan de él, si tienen ID',
-            'normal (generado), **no son contextos**: solo heredan',
-            'los bits de los contextos que los alcanzan. Si más',
-            'adelante hace falta un ID especial que NO sea contexto,',
-            'se agrega una lista de exclusión en `ConfiguracionApli`',
-            '(pendiente, sin caso de uso actual).',
+            '- **1.5i.7k**: fase 1 (PHP) y fase 2 (JS) de contextos.',
+            '  PHP: interfaz `PerdurarSuperestructuraConContexto`, clase',
+            '  `PerdurarSuperestructuraStringSQL64` con 3 tablas nuevas,',
+            '  `Nodo::contexto_mascara`, métodos `cargar_parcial`,',
+            '  `guardar_parcial` (stub) y `listar_contextos` en el',
+            '  `Controlador`, flag `$grafo_parcial`. JS: espejo en',
+            '  `PerdurarSuperestructuraStringIndexedDB64` con base de datos',
+            '  separada (`HyS_ctx`). Fix posterior en JS: normalizar a',
+            '  `String(id)` las claves del `Map` de `_superestructura` y',
+            '  `_nodos_especiales`, y normalizar en `Nodo.existe` y',
+            '  `Nodo.nodo_por_id`, para replicar el comportamiento de PHP.',
+            '  Ver §12.3 y §11.4.',
+            '',
+            'El espejo JS también recibió mejoras en paralelo (ver sección 12).',
         ],
     ],
 
@@ -183,10 +99,9 @@ foreach ($reemplazos_por_archivo as $archivo_rel => $lista_cambios) {
     foreach ($lista_cambios as $cambio) {
         $buscar_str = implode("\n", $cambio['buscar']);
         $reemplazar_str = implode("\n", $cambio['reemplazar']);
-        $es_todos = !empty($cambio['todos']);
         $ocurrencias = contar_ocurrencias($contenido, $buscar_str);
         if ($ocurrencias === 0) { $bloques_fallidos[] = "$archivo_rel: NO ENCONTRADO - {$cambio['descripcion']}"; $hubo_error = true; continue; }
-        if (!$es_todos && $ocurrencias > 1) { $bloques_fallidos[] = "$archivo_rel: AMBIGUO ($ocurrencias) - {$cambio['descripcion']}"; $hubo_error = true; continue; }
+        if ($ocurrencias > 1) { $bloques_fallidos[] = "$archivo_rel: AMBIGUO ($ocurrencias) - {$cambio['descripcion']}"; $hubo_error = true; continue; }
         $contenido = str_replace($buscar_str, $reemplazar_str, $contenido);
         $bloques_ok++;
     }
