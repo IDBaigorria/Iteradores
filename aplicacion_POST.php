@@ -690,6 +690,142 @@
  * - Panel de administración usa `listar_usuarios()`, `listar_sesiones()` y
  *   `listar_duenos()` para mostrar y gestionar datos.
  *
+ * ## Diseño propuesto: contenedores por nivel de exposición (v1.5piloto.76l)
+ * 
+ * **Estado:** diseño consensuado, todavía no implementado.
+ * La migración se hace por fases (ver §8.7 del prompt
+ * del piloto). Una vez implementado, esta sección
+ * reemplazará a la descripción "actual" de más arriba.
+ * 
+ * ### Idea general
+ * 
+ * Cada usuario (`us_<nombre>`) deja de tener sus datos
+ * colgando directamente de la raíz. En su lugar, cuelgan
+ * varios contenedores, uno por cada nivel de exposición.
+ * 
+ * Ejemplo del dueño:
+ * 
+ * ```
+ * us_dueno1
+ * ├── publico                       (dato = "dueno1")
+ * │   ├── nivel → "dueno"
+ * │   ├── nombre_real → "..."
+ * │   └── email → "..."
+ * ├── privado
+ * │   ├── efectivo, banco
+ * │   ├── terminales, empresas, viajes, pasajeros
+ * │   ├── ventas, rendiciones, liquidaciones, cancelaciones
+ * │   └── ...
+ * ├── compartido_con_us_term1       (uno por cada terminal autorizado)
+ * │   ├── viajes         (solo los autorizados a term1)
+ * │   ├── empresas       (solo las que usa term1)
+ * │   ├── terminales     (solo term1 a sí mismo)
+ * │   └── ventas         (solo las ventas de term1)
+ * └── compartido_con_us_term2
+ *     └── ...
+ * ```
+ * 
+ * Y desde el lado del terminal:
+ * 
+ * ```
+ * us_term1
+ * ├── publico                       (dato = "term1")
+ * │   ├── nivel → "terminal"
+ * │   ├── nombre_real → "..."
+ * │   └── email → "..."
+ * ├── privado
+ * │   ├── efectivo, banco
+ * │   ├── ventas         (solo las propias)
+ * │   └── venta_actual   (la venta en curso)
+ * └── compartido_con_dueno
+ *     ├── dueno → us_dueno1/compartido_con_us_term1
+ *     └── empresas → { empresa1 → ... }
+ * ```
+ * 
+ * Los enlaces "de permiso" (como `dueno` en el terminal
+ * o `soporte` en el dueño) van directamente en la raíz
+ * del usuario, no en un contenedor.
+ * 
+ * ### Principio de seguridad
+ * 
+ * La seguridad emerge de la topología. Un usuario no
+ * puede acceder a un nodo si no hay un camino desde su
+ * raíz hasta ese nodo. Si el terminal no tiene un enlace
+ * al `privado` del dueño, no lo puede alcanzar, aunque
+ * el grafo se cargue completo.
+ * 
+ * ### Qué va en cada contenedor
+ * 
+ * **Dueño (`us_duenoX`):**
+ * 
+ * | Contenedor | Contenido |
+ * |---|---|
+ * | `publico` | `nivel`, `nombre_real`, `email`. Dato = nombre de usuario. |
+ * | `privado` | `efectivo`, `banco`, `terminales`, `empresas`, `viajes`, `pasajeros`, `ventas`, `rendiciones`, `liquidaciones`, `cancelaciones`. |
+ * | `compartido_con_us_term1` | `viajes` (autorizados), `empresas` (usadas), `terminales` (solo term1), `ventas` (de term1). |
+ * | ... | uno por cada terminal autorizado. |
+ * | `soporte` | enlace directo en la raíz, si tiene soporte asignado. |
+ * 
+ * **Terminal (`us_termX`):**
+ * 
+ * | Contenedor | Contenido |
+ * |---|---|
+ * | `publico` | `nivel`, `nombre_real`, `email`. Dato = nombre de usuario. |
+ * | `privado` | `efectivo`, `banco`, `ventas` (propias), `venta_actual`. |
+ * | `compartido_con_dueno` | `dueno` (→ `us_duenoY/compartido_con_us_termX`), `empresas` (las que necesita para vender). |
+ * 
+ * **Soporte (`us_soporteX`):**
+ * 
+ * Sin cambios estructurales por ahora. Los soportes
+ * acceden por código (con `_verificar_permiso_dueno`),
+ * no por topología.
+ * 
+ * **Admin (`us_admin`):**
+ * 
+ * Sin cambios. Acceso total por código.
+ * 
+ * ### Notas de diseño
+ * 
+ * - **Los contenedores son directos**, no cuelgan de un
+ *   contenedor intermedio `niveles`. Los niveles son la
+ *   estructura principal del usuario.
+ * - **Un contenedor por terminal**: como el dueño autoriza
+ *   terminales por viaje, no alcanza un único
+ *   `compartido_con_terminales`. Cada terminal tiene su
+ *   propio contenedor de compartición.
+ * - **Ventas y cupones**: la venta vive en
+ *   `us_dueno1/privado/ventas`. También hay una referencia
+ *   desde `us_term1/privado/ventas` (solo las ventas
+ *   propias). La venta tiene dos referencias entrantes;
+ *   la destrucción debe desenlazar de ambas.
+ * - **`usuarios` apunta al `publico`**: el nodo `usuarios`
+ *   es un índice. Cada enlace `usuarios → <nombre>` apunta
+ *   al contenedor `publico` del usuario. Así
+ *   `listar_usuarios` puede leer el dato y los datos
+ *   públicos sin cargar el subárbol privado.
+ * - **`terminales_autorizadas` de un viaje no cambia
+ *   internamente.** Sigue siendo un contenedor con un
+ *   TerminalViaje por terminal. Lo que cambia es cómo se
+ *   llega al viaje: desde el dueño por `privado/viajes`,
+ *   desde el terminal por `compartido_con_dueno/dueno/viajes`.
+ * 
+ * ### Plan de migración
+ * 
+ * Por fases, con la aplicación funcionando entre cada una:
+ * 
+ * 1. **Fase B1**: crear `publico` y `privado` en cada
+ *    usuario. Mover los datos existentes. `usuarios`
+ *    apunta al `publico`. Los `compartido_con_X` todavía
+ *    no existen. Los terminales siguen accediendo como hoy.
+ * 2. **Fase B2**: crear los `compartido_con_X` de cada
+ *    dueño (uno por terminal autorizado) y reescribir los
+ *    enlaces desde los terminales.
+ * 3. **Fase B3**: eliminar los accesos viejos.
+ * 
+ * Cada fase es una tanda, con migración idempotente y
+ * verificación en local antes de producción. Ver §8.7
+ * del prompt del piloto.
+ * 
  * ## Sistema de "Volver" en el modal genérico
  *
  * A partir de v1.5piloto.32, `abrir_modal_generico()` acepta un tercer parámetro
@@ -712,7 +848,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.73
+ * @version   1.5piloto.76l
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

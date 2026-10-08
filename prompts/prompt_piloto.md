@@ -850,6 +850,20 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76l**: diseño del modelo topológico por niveles de
+  exposición. Cada usuario va a tener contenedores
+  `publico`, `privado` y `compartido_con_X` colgando de
+  su nodo raíz, con los datos distribuidos según quién
+  debe verlos. La seguridad emerge de la topología: si
+  un usuario no tiene un enlace al `privado` de otro,
+  no puede alcanzarlo. Los enlaces "de permiso"
+  (`dueno`, `soporte`) van en la raíz. Admin y soporte
+  no usan este modelo: siguen accediendo por código
+  (con `_verificar_permiso_dueno`). Diseño completo en
+  el PHPDoc de `aplicacion_POST.php` (sección "Diseño
+  propuesto: contenedores por nivel de exposición").
+  Plan por fases (B1/B2/B3) en §8.7. Solo documentación:
+  no hay cambios de código todavía.
 - **v76k**: Fase A de contextos del piloto. Todos los
   usuarios pasan a ser IDs especiales `us_<nombre>`. Los
   enlaces desde `usuarios` siguen llamándose `<nombre>`
@@ -1822,17 +1836,66 @@ grafo completo (ver §8.6, "frente A"). Aislar el
 subgrafo de un dueño permite cargar solo lo que se
 necesita y baja el costo de cada operación.
 
-**Usuarios como IDs especiales (Fase A, completada en v76k).**
+**Fase A — Usuarios como IDs especiales (completada en v76k).**
 Todos los usuarios (no solo los dueños) son ahora nodos
 con ID especial `us_<nombre>`. Los enlaces desde
 `usuarios` siguen llamándose `<nombre>` (nombre visible),
 así todos los accesos por `adyacente()` funcionan sin
 cambios. Los nodos viejos se migraron con
 `miscelaneas/migrar_usuarios_especiales.php`, que usa el
-nuevo comando `grafo:reemplazar_referencias` para redirigir
-las aristas cruzadas. Próximo paso: aprovechar la carga
-parcial (Fase C) una vez cerrada la Fase B (tipos como
-IDs especiales).
+comando `grafo:reemplazar_referencias` para redirigir
+las aristas cruzadas.
+
+**Fase B — Contenedores por nivel de exposición (en diseño).**
+Cada usuario pasa a tener contenedores por nivel colgando
+directamente de su nodo raíz:
+
+```
+us_X
+├── publico                    (dato = nombre_usuario)
+│   ├── nivel
+│   ├── nombre_real
+│   └── email
+├── privado                    (los datos internos del rol)
+├── compartido_con_us_Y        (uno por cada usuario con quien comparte)
+└── ...
+```
+
+Los enlaces "de permiso" (`dueno` en el terminal, `soporte`
+en el dueño) van directamente en la raíz del usuario, no
+en un contenedor.
+
+La seguridad emerge de la topología: si un usuario no
+tiene un enlace al `privado` de otro, no puede alcanzarlo.
+Los datos privados no están en el grafo alcanzable desde
+otros usuarios.
+
+Los contenedores concretos por rol están en el PHPDoc de
+`aplicacion_POST.php`, sección "Diseño propuesto:
+contenedores por nivel de exposición".
+
+Admin y soporte NO usan este modelo: siguen accediendo a
+todo por código (con `_verificar_permiso_dueno`). El admin
+es todopoderoso; el soporte lo es solo sobre sus dueños
+asignados.
+
+**Fases de implementación.** El orden revisado es:
+
+1. Fase A (completada): usuarios como IDs especiales.
+2. Fase B1: crear `publico` y `privado` en cada usuario.
+   Mover los datos existentes. `usuarios` apunta al
+   `publico`. Los `compartido_con_X` todavía no existen.
+   Los terminales siguen accediendo como hoy.
+3. Fase B2: crear los `compartido_con_X` de cada dueño
+   (uno por terminal autorizado) y reescribir los enlaces
+   desde los terminales.
+4. Fase B3: eliminar los accesos viejos.
+5. Fase C: (opcional) tipos como IDs especiales,
+   ortogonal.
+6. Fase D: aprovechar la carga parcial como optimización.
+
+Cada fase es una tanda, con migración idempotente y
+verificación en local antes de producción.
 
 Lo que cambia:
 
@@ -1889,14 +1952,19 @@ columna `contexto_mask` guarda varios bits en 1.
    hay que mover la máscara fuera del Nodo. Ver
    §11.4 del prompt del framework. Pendiente,
    bloqueante de la Fase 5.
-5. **Cambio del piloto**: convertir dueños a IDs
-   especiales. Requiere migración de datos y de
-   código. Es una tanda grande.
-6. **Segundo cambio del piloto**: agregar los
-   `tipo_*` como IDs especiales.
-7. **Tercer cambio del piloto**: aprovechar la carga
-   parcial en las operaciones más frecuentes
-   (listar viajes, listar ventas, etc.).
+5. **Fase A del piloto**: usuarios como IDs especiales.
+   **Completada** en v76k.
+6. **Fase B1 del piloto**: crear `publico` y `privado`
+   en cada usuario. Mover los datos. `usuarios` apunta
+   al `publico`. Pendiente.
+7. **Fase B2 del piloto**: crear los `compartido_con_X`
+   y reescribir los enlaces desde los terminales.
+   Pendiente.
+8. **Fase B3 del piloto**: eliminar los accesos viejos.
+   Pendiente.
+9. **Fase C (opcional)**: tipos como IDs especiales.
+10. **Fase D**: aprovechar la carga parcial como
+    optimización.
 
 Los pasos 1-4 son del framework. Los pasos 5-7 son
 del piloto. Cada paso en su propia tanda, con sus
@@ -1905,19 +1973,14 @@ dos scripts donde corresponda.
 **Preguntas abiertas (a consensuar cuando llegue el
 momento):**
 
-- Nombre exacto del prefijo para los dueños
-  (`us_dueno1` vs `u_dueno1` vs otro).
-- Qué hacer con los nodos que hoy cuelgan directo
-  de `usuarios` y no pertenecen a ningún dueño
-  (por ejemplo el admin). Siguen en el contexto
-  global del nodo `usuarios`.
-- Cómo migrar los grafos existentes sin perder
-  datos. Se puede hacer una migración ad-hoc que
-  recorra el grafo, cree los nuevos roots y
-  reescriba los enlaces.
-- Qué operaciones del piloto pasan a usar carga
-  parcial primero. Candidatas: listar viajes,
-  listar ventas, ver detalle de un viaje.
+- Qué operaciones del piloto van a aprovechar el modelo
+  topológico, y cuáles van a seguir requiriendo un
+  acceso de admin/soporte.
+- Cómo se comporta `listar_usuarios` desde la Fase B1 en
+  adelante: recorre `usuarios → cada hijo`, lee el dato
+  del contenedor `publico`, sin cargar subárboles.
+- Cómo migrar los grafos existentes sin perder datos.
+  La migración es idempotente y se corre por fases.
 
 ---
 
@@ -2132,7 +2195,15 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76k
+**Última actualización de este prompt:** v1.5piloto.76l
+(diseño del modelo topológico por niveles de exposición.
+Cada usuario va a tener contenedores `publico`, `privado` y
+`compartido_con_X` colgando de su nodo raíz. La seguridad
+emerge de la topología. Admin y soporte siguen accediendo
+por código, no por topología. Diseño completo en el PHPDoc
+de `aplicacion_POST.php`; plan por fases en §8.7. Solo
+documentación, no hay cambios de código todavía.).
+Antes: v1.5piloto.76k
 (Fase A de contextos del piloto. Todos los usuarios pasan a
 tener ID especial `us_<nombre>`. Los enlaces desde `usuarios`
 siguen llamándose `<nombre>` (nombre visible), por lo que
@@ -2648,6 +2719,17 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   idempotente en `miscelaneas/migrar_usuarios_especiales.php`,
   ejecutable con `?migrar_usuarios_especiales=1`. Sin
   cambios en los accesos, sin carga parcial todavía.
+- Cerramos en v76l el diseño del modelo topológico por
+  niveles de exposición. Cada usuario va a tener
+  contenedores `publico`, `privado` y `compartido_con_X`
+  colgando de su nodo raíz. La seguridad emerge de la
+  topología: si un usuario no tiene un enlace al
+  `privado` de otro, no puede alcanzarlo. Los enlaces
+  "de permiso" (`dueno`, `soporte`) van en la raíz.
+  Admin y soporte no usan la topología: siguen
+  accediendo por código. El diseño completo está en el
+  PHPDoc de `aplicacion_POST.php`; el plan por fases
+  está en §8.7. No hay cambios de código todavía.
 - Cerramos en v76j el cierre de la fase 2 del framework
   (contextos). El framework PHP llegó a 1.5i.7k con
   `PerdurarSuperestructuraStringSQL64` completo (3 tablas
@@ -2786,7 +2868,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76k (framework 1.5i.7k).
+**Estado del proyecto al cierre:** v1.5piloto.76l (framework 1.5i.7k).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2833,6 +2915,11 @@ son IDs especiales `us_<nombre>`. Nuevo comando
 `grafo:reemplazar_referencias`. Script de migración
 idempotente en `miscelaneas/migrar_usuarios_especiales.php`.
 Sin cambios en los accesos, sin carga parcial todavía.
+v76l: diseño del modelo topológico por niveles de
+exposición (`publico`, `privado`, `compartido_con_X`).
+Documentado en el PHPDoc de `aplicacion_POST.php`
+(sección "Diseño propuesto") y en §8.7. Sin cambios
+de código todavía.
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5w)
 tiene 56 pruebas corriendo.
 
