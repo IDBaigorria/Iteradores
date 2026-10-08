@@ -850,6 +850,24 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76j**: cierre de la fase 2 del framework
+  (contextos). El framework PHP llegó a 1.5i.7k con
+  `PerdurarSuperestructuraStringSQL64` (3 tablas
+  nuevas, BFS multi-fuente, `cargar_parcial`); el
+  espejo JS llegó a la misma versión con
+  `PerdurarSuperestructuraStringIndexedDB64` (base
+  de datos separada `HyS_ctx`). Se agregó la
+  interfaz `PerdurarSuperestructuraConContexto` y
+  los métodos `cargar_parcial`, `guardar_parcial`
+  (stub), `listar_contextos` y `es_grafo_parcial`
+  en ambos `Controlador`. Fix del bug de tipos de
+  ID en el `Map` de `_superestructura` (JS):
+  normalización a `String(id)` de las claves y de
+  `Nodo.existe` / `Nodo.nodo_por_id`. Deuda de
+  diseño anotada: dejar el Nodo limpio antes de
+  agregar más métodos de indexación de contextos.
+  Ver §11.4 del prompt del framework. Solo
+  documentación del piloto + bump de `index.php`.
 - **v76i**: solo documentación. Se agrega la sección
   §8.7 con el plan de contextos del piloto (dueños
   y tipos como IDs especiales, integración con el
@@ -1841,18 +1859,27 @@ columna `contexto_mask` guarda varios bits en 1.
 
 1. **Fase 1 del framework**: `SQL64` (bitmask + 3
    tablas nuevas). Sin tocar el piloto.
+   **Completado** (framework 1.5i.7k).
 2. **Fase 2 del framework**: `IndexedDB64` (espejo).
+   **Completado** (framework 1.5i.7k).
 3. **Fase 3 del framework**: `JSON64` / `XML64`.
-4. **Cambio del piloto**: convertir dueños a IDs
+   Pendiente.
+4. **Refactor del framework: dejar el Nodo limpio.**
+   Antes de agregar más métodos de indexación de
+   contextos (256 bits, producto de primos, etc.),
+   hay que mover la máscara fuera del Nodo. Ver
+   §11.4 del prompt del framework. Pendiente,
+   bloqueante de la Fase 5.
+5. **Cambio del piloto**: convertir dueños a IDs
    especiales. Requiere migración de datos y de
    código. Es una tanda grande.
-5. **Segundo cambio del piloto**: agregar los
+6. **Segundo cambio del piloto**: agregar los
    `tipo_*` como IDs especiales.
-6. **Tercer cambio del piloto**: aprovechar la carga
+7. **Tercer cambio del piloto**: aprovechar la carga
    parcial en las operaciones más frecuentes
    (listar viajes, listar ventas, etc.).
 
-Los pasos 1-3 son del framework. Los pasos 4-6 son
+Los pasos 1-4 son del framework. Los pasos 5-7 son
 del piloto. Cada paso en su propia tanda, con sus
 dos scripts donde corresponda.
 
@@ -2086,7 +2113,14 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76i
+**Última actualización de este prompt:** v1.5piloto.76j
+(cierre de la fase 2 del framework. El framework
+quedó en 1.5i.7k: SQL64 en PHP e IndexedDB64 en JS,
+ambos cerrados y verificados. §8.7 se actualiza con
+el estado del framework (pasos 1-2 completados, más
+la deuda del Nodo limpio). §12 y §13 reflejan el
+cierre. Bump de `index.php` a `1.5piloto.76j`.).
+Antes: v1.5piloto.76i
 (solo documentación. Se agrega §8.7 con el plan de
 contextos del piloto: dueños y tipos como IDs
 especiales, integración con el plan del framework
@@ -2570,6 +2604,40 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   modal la carga de empresas y micros (prioridad media).
   También se documentó la limitación del framework en su
   propio prompt (sección 11 nueva).
+- Cerramos en v76j el cierre de la fase 2 del framework
+  (contextos). El framework PHP llegó a 1.5i.7k con
+  `PerdurarSuperestructuraStringSQL64` completo (3 tablas
+  nuevas, BFS multi-fuente desde los IDs especiales,
+  `cargar_parcial` con filtro por bitmask). El espejo
+  JS llegó a la misma versión con
+  `PerdurarSuperestructuraStringIndexedDB64` (base de
+  datos separada `HyS_ctx`, mismos almacenes y misma
+  API). Se agregó la interfaz
+  `PerdurarSuperestructuraConContexto` en ambos lenguajes.
+  El `Controlador` (PHP y JS) ganó 4 métodos nuevos:
+  `cargar_parcial`, `guardar_parcial` (stub en fase 1-2),
+  `listar_contextos` y `es_grafo_parcial`. Nuevo flag
+  `$grafo_parcial` (PHP) / `_grafo_parcial` (JS) que
+  bloquea `guardar()` sobre grafo parcial.
+- Bug de tipos de ID en el `Map` de `_superestructura`
+  (JS) detectado y corregido: en JS, `Map.has("1")` y
+  `Map.has(1)` son distintos, a diferencia de PHP que
+  coerciona strings numéricos a int en claves de array.
+  Fix: normalizar a `String(id)` las claves de
+  `_superestructura` y `_nodos_especiales`, y normalizar
+  los lookups en `Nodo.existe` y `Nodo.nodo_por_id`.
+  Documentado en §12.3 del prompt del framework.
+- Deuda de diseño anotada en §11.4 del prompt del
+  framework: **dejar el Nodo limpio** antes de agregar
+  más métodos de indexación de contextos (256 bits,
+  producto de primos, etc.). Hoy el campo
+  `contexto_mascara` / `_contexto_mascara` vive en el
+  Nodo; el objetivo es moverlo a una estructura auxiliar
+  de la capa de persistencia. Bloqueante de la Fase 5
+  del framework.
+- Cerramos en v76j el cierre formal del piloto: bump de
+  `index.php` a `1.5piloto.76j` y actualización de este
+  prompt. Sin cambios de código de aplicación.
 - No hay tandas de código en curso en este proyecto.
 
 **Decisiones de diseño tomadas y en vigor:**
@@ -2674,7 +2742,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76i (framework 1.5i.7j).
+**Estado del proyecto al cierre:** v1.5piloto.76j (framework 1.5i.7k).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2710,6 +2778,12 @@ restringido a modo pruebas.
 v76h: planilla de pasajeros "vacía" (parámetro `$vacia`
 en `imprimir_planilla_pasajeros_micro` + botón en el
 croquis del micro).
+v76j: cierre de la fase 2 del framework (contextos).
+El framework quedó en 1.5i.7k, con SQL64 (PHP) y
+IndexedDB64 (JS) completos. Deuda de diseño anotada:
+dejar el Nodo limpio antes de agregar más métodos
+de indexación de contextos (ver §11.4 del prompt del
+framework).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5w)
 tiene 56 pruebas corriendo.
 

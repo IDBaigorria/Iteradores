@@ -650,6 +650,38 @@ se adaptan por consistencia (el bitmask permite decidir
 qué escribir en el archivo parcial, pero la carga sigue
 siendo total o de un archivo ya guardado).
 
+**Deuda de diseño: dejar el Nodo limpio.**
+
+Hoy el campo `contexto_mascara` (PHP) / `_contexto_mascara`
+(JS) vive en el Nodo. Es aceptable para la fase 1-2, pero
+**antes de agregar más métodos de indexación de contextos**
+(256 bits, producto de primos, o cualquier otro esquema)
+hay que refactorizar para que el Nodo no cargue con
+metadata de la capa de persistencia.
+
+Diseño objetivo: las máscaras viven en una estructura
+auxiliar del `Controlador` (o de la implementación de
+persistencia), no en el nodo. El nodo sigue siendo dato
++ adyacentes, y nada más. La capa de persistencia consulta
+el mapa auxiliar por id al guardar, y lo rellena al cargar.
+
+Razones:
+
+- El nodo es una unidad del grafo conceptual. La máscara
+  de contextos es metadata de indexación, no del grafo.
+- Si cambia el esquema (256 bits, primos, etc.), no hay
+  que tocar `Nodo.php` ni `Nodo.js`.
+- Evita que la clase Nodo cargue con lógica de persistencia
+  que no le corresponde.
+
+Costo: la firma de la capa de persistencia cambia (o la
+implementación mantiene el mapa internamente y el nodo
+nunca lo ve). Es una tanda aparte, con espejo PHP + JS.
+
+**Momento:** antes de la fase 5 (256 contextos) o antes
+de cualquier otro método de indexación. En la fase 1-2
+actual el campo en el nodo funciona; no bloquea nada.
+
 ---
 
 ## 10. HISTORIAL DEL FRAMEWORK
