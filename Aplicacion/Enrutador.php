@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.76g
+ * @version   1.5piloto.76n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1198,6 +1198,48 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'Nodo no encontrado']);
                     }
                     responder_json(['exito' => true, 'nodo' => $nodo_gr]);
+                    break;
+
+                case 'raices':
+                    // Lista los nodos raíz (IDs especiales) con sus
+                    // adyacentes directos.
+                    $raices = Controlador::ejecutar_comando('grafo:raices');
+                    responder_json(['exito' => true, 'raices' => $raices ?: []]);
+                    break;
+
+                case 'migraciones_listar':
+                    // Lista el registro de migraciones con su estado.
+                    if (!function_exists('registrar_comandos_migraciones')) {
+                        responder_json(['exito' => false, 'error' => 'Módulo de migraciones no cargado.']);
+                    }
+                    $lista = Controlador::ejecutar_comando('app:migracion_listar');
+                    if (!is_array($lista) || empty($lista['exito'])) {
+                        $err = is_array($lista) && isset($lista['error']) ? $lista['error'] : 'Error al listar migraciones.';
+                        responder_json(['exito' => false, 'error' => $err]);
+                    }
+                    // Si hubo auto-marcado, guardar.
+                    if (!empty($lista['auto_marcadas'])) {
+                        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                    }
+                    responder_json(['exito' => true, 'migraciones' => $lista['migraciones']]);
+                    break;
+
+                case 'migraciones_aplicar':
+                    // Aplica una migración y guarda.
+                    if (!function_exists('registrar_comandos_migraciones')) {
+                        responder_json(['exito' => false, 'error' => 'Módulo de migraciones no cargado.']);
+                    }
+                    $id_mig = $post['id'] ?? '';
+                    if ($id_mig === '') {
+                        responder_json(['exito' => false, 'error' => 'Falta el id de la migración.']);
+                    }
+                    $res_mig = Controlador::ejecutar_comando('app:migracion_aplicar', ['id' => $id_mig]);
+                    if (!is_array($res_mig) || empty($res_mig['exito'])) {
+                        $err = is_array($res_mig) && isset($res_mig['error']) ? $res_mig['error'] : 'Error al aplicar.';
+                        responder_json(['exito' => false, 'error' => $err]);
+                    }
+                    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                    responder_json(['exito' => true, 'detalles' => $res_mig['detalles'] ?? []]);
                     break;
 
                 default:

@@ -850,6 +850,31 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76n**: pestaña Grafo ampliada con dos secciones nuevas
+  y sistema de migraciones.
+  - Comando `grafo:raices` en el framework: lista los IDs
+    especiales del grafo con sus adyacentes directos.
+  - Nodo especial `aplicacion` con contenedor `migraciones`.
+    Cada migración aplicada deja un enlace testigo
+    autoreferente (`migraciones/<id>` → `migraciones`).
+    Idempotente y auto-detectable.
+  - Módulo `Aplicacion/Migraciones/` con tres archivos:
+    `Registro.php` (array de migraciones),
+    `Funciones.php` (detección y aplicación),
+    `Comandos.php` (registro de `app:migracion_*`).
+  - Comandos `app:migracion_listar`, `app:migracion_aplicar`
+    y `app:migracion_marcar` registrados directo (no
+    encolados) porque el Controlador ya está inicializado
+    cuando se cargan los `require_once` de la app.
+  - Subacciones `grafo/raices`, `grafo/migraciones_listar`
+    y `grafo/migraciones_aplicar` en el Enrutador.
+  - Sección "Nodos raíz" y "Migraciones" en la pestaña
+    Grafo. La segunda permite aplicar migraciones desde
+    la UI, con confirmación previa.
+  - **Excepción a la regla del plugin de pruebas** (lección
+    14 del prompt del sistema de scripts): este cambio NO
+    lleva pruebas del plugin. Es herramienta de admin, no
+    flujo de negocio, y se usa a mano todo el tiempo.
 - **v76m**: Fase B1 del modelo topológico. Crea los
   contenedores `publico` y `privado` como hijos de cada
   nodo usuario, enlazándolos con los nodos que ya existían
@@ -2211,7 +2236,17 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76m
+**Última actualización de este prompt:** v1.5piloto.76n
+(pestaña Grafo: sección "Nodos raíz" y sistema de
+migraciones. Nuevo comando `grafo:raices` en el framework
+(lista los IDs especiales con sus adyacentes). Nuevo nodo
+especial `aplicacion` con contenedor `migraciones`; cada
+migración aplicada deja un enlace testigo autoreferente.
+Nuevo módulo `Aplicacion/Migraciones/` con el registro de
+migraciones, sus funciones de detección y aplicación, y los
+comandos `app:migracion_*`. La pestaña Grafo permite
+aplicar migraciones desde la UI.).
+Antes: v1.5piloto.76m
 (Fase B1 del modelo topológico. Crea los contenedores
 `publico` y `privado` como alias de los nodos ya existentes.
 Los enlaces viejos NO se tocan: los contenedores apuntan a
@@ -2746,6 +2781,19 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   idempotente en `miscelaneas/migrar_usuarios_especiales.php`,
   ejecutable con `?migrar_usuarios_especiales=1`. Sin
   cambios en los accesos, sin carga parcial todavía.
+- Cerramos en v76n la pestaña Grafo ampliada y el sistema
+  de migraciones. Sección "Nodos raíz" (lista los IDs
+  especiales con sus adyacentes; botón "Ver" reusa el
+  modal existente) y sección "Migraciones" (lista con
+  estado y botón "Aplicar"). Nuevo nodo especial
+  `aplicacion` con contenedor `migraciones`; cada
+  migración aplicada deja un enlace testigo autoreferente.
+  Nuevo módulo `Aplicacion/Migraciones/` (Registro,
+  Funciones, Comandos). Los comandos `app:migracion_*` se
+  registran directo con `Controlador::registrar_comando`,
+  porque el Controlador ya está inicializado cuando
+  corre el `require_once` de la app. Excepción documentada
+  a la regla del plugin: no lleva pruebas del plugin.
 - Cerramos en v76m la Fase B1 del modelo topológico:
   los contenedores `publico` y `privado` se crean como
   **alias** de los nodos ya existentes. Los enlaces viejos
@@ -2906,7 +2954,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76m (framework 1.5i.7k).
+**Estado del proyecto al cierre:** v1.5piloto.76n (framework 1.5i.7k).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -2963,6 +3011,14 @@ como alias de los nodos existentes. Enlaces viejos
 intactos. Nuevo comando `grafo:crear_niveles_usuario` y
 script `miscelaneas/migrar_niveles_usuario.php` (idempotente).
 Bloque `?migrar_niveles_usuario=1` en `index.php`.
+v76n: pestaña Grafo con sección "Nodos raíz" y "Migraciones".
+Nuevo nodo especial `aplicacion` con contenedor `migraciones`.
+Módulo `Aplicacion/Migraciones/` con Registro, Funciones y
+Comandos. Comandos `grafo:raices` (framework) y
+`app:migracion_*` (app, registrados directo). Subacciones
+`grafo/raices`, `grafo/migraciones_listar` y
+`grafo/migraciones_aplicar` en el Enrutador. Excepción
+documentada a la regla del plugin (no lleva pruebas).
 El plugin de pruebas (`iteradoresJS/`, v1.5plugin.5w)
 tiene 56 pruebas corriendo.
 

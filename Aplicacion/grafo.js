@@ -7,7 +7,7 @@
  * Es la base para la auditoría de la fuga de nodos (Fase 2).
  * Ver prompts/prompt_piloto.md §8.6.
  *
- * @version 1.5piloto.76g
+ * @version 1.5piloto.76n
  */
 
 let grafo_offset_actual = 0;
@@ -31,6 +31,8 @@ async function cargar_grafo() {
     }
     _grafo_renderizar_resumen(datos_res.resumen);
     await _grafo_cargar_tabla(0);
+    await cargar_grafo_raices();
+    await cargar_grafo_migraciones();
 }
 
 function _grafo_renderizar_resumen(resumen) {
@@ -325,6 +327,121 @@ async function _grafo_ejecutar_eliminacion() {
     }
     mostrar_aviso(`Eliminados ${datos.eliminados} nodos basura.`, 'exito');
     cerrar_modal_generico();
+    await cargar_grafo();
+}
+
+// ============================================================
+// NODOS RAÍZ (v1.5piloto.76n)
+// ============================================================
+
+async function cargar_grafo_raices() {
+    const cont = document.getElementById('grafo_raices');
+    if (!cont) return;
+    cont.innerHTML = '<p class="muted">Cargando...</p>';
+
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "grafo/raices",
+            nombre_solicitante: usuario_actual.nombre_usuario
+        })
+    });
+    const datos = await resp.json();
+    if (!datos.exito) {
+        cont.innerHTML = '<p class="muted">Error: ' + _grafo_escape(datos.error || '') + '</p>';
+        return;
+    }
+    const raices = datos.raices || [];
+    if (raices.length === 0) {
+        cont.innerHTML = '<p class="muted">No hay nodos raíz en el grafo.</p>';
+        return;
+    }
+
+    let html = '<ul style="margin:0; padding-left:20px; font-family:monospace; font-size:12px;">';
+    raices.forEach(r => {
+        const dato = r.dato ? ' <span class="muted">(' + _grafo_escape(r.dato) + ')</span>' : '';
+        html += '<li><code>' + _grafo_escape(r.id) + '</code>' + dato;
+        html += ' <button class="btn" data-ver-raiz="' + _grafo_escape(r.id) + '" style="padding:0 6px; font-size:11px;">Ver</button>';
+        if (r.adyacentes && r.adyacentes.length > 0) {
+            html += ' <span class="muted">→ ' + r.adyacentes.length + ' adyacente(s)</span>';
+        }
+        html += '</li>';
+    });
+    html += '</ul>';
+    cont.innerHTML = html;
+    cont.querySelectorAll('button[data-ver-raiz]').forEach(btn => {
+        btn.addEventListener('click', () => ver_nodo_grafo(btn.dataset.verRaiz));
+    });
+}
+
+// ============================================================
+// MIGRACIONES (v1.5piloto.76n)
+// ============================================================
+
+async function cargar_grafo_migraciones() {
+    const cont = document.getElementById('grafo_migraciones');
+    if (!cont) return;
+    cont.innerHTML = '<p class="muted">Cargando...</p>';
+
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "grafo/migraciones_listar",
+            nombre_solicitante: usuario_actual.nombre_usuario
+        })
+    });
+    const datos = await resp.json();
+    if (!datos.exito) {
+        cont.innerHTML = '<p class="muted">Error: ' + _grafo_escape(datos.error || '') + '</p>';
+        return;
+    }
+    const migraciones = datos.migraciones || [];
+    if (migraciones.length === 0) {
+        cont.innerHTML = '<p class="muted">No hay migraciones registradas.</p>';
+        return;
+    }
+
+    let html = '<table class="data-table" style="margin:0;">';
+    html += '<thead><tr><th>Migración</th><th>Estado</th><th></th></tr></thead><tbody>';
+    migraciones.forEach(m => {
+        const badge = m.aplicada
+            ? '<span style="color:#060;">Aplicada</span>'
+            : '<span style="color:#900;">Pendiente</span>';
+        const boton = m.aplicada
+            ? ''
+            : '<button class="btn primary" data-migrar="' + _grafo_escape(m.id) + '">Aplicar</button>';
+        html += '<tr>';
+        html += '<td><strong>' + _grafo_escape(m.nombre) + '</strong><br><span class="muted small">' + _grafo_escape(m.descripcion) + '</span></td>';
+        html += '<td>' + badge + '</td>';
+        html += '<td>' + boton + '</td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    cont.innerHTML = html;
+    cont.querySelectorAll('button[data-migrar]').forEach(btn => {
+        btn.addEventListener('click', () => aplicar_migracion(btn.dataset.migrar));
+    });
+}
+
+async function aplicar_migracion(id) {
+    if (!confirm('¿Aplicar la migración "' + id + '"? Esta acción modifica el grafo.')) return;
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "grafo/migraciones_aplicar",
+            nombre_solicitante: usuario_actual.nombre_usuario,
+            id
+        })
+    });
+    const datos = await resp.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al aplicar la migración", 'error');
+        return;
+    }
+    mostrar_aviso("Migración aplicada.", 'exito');
     await cargar_grafo();
 }
 

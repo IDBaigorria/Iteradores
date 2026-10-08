@@ -19,7 +19,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.76m
+ * @version   1.5piloto.76n
  */
 
 // --- Utilidades base ----------------------------------
@@ -83,6 +83,13 @@ require_once __DIR__ . '/Aplicacion/Pasajeros/Pasajero.php';
 require_once __DIR__ . '/Aplicacion/Rendiciones/Rendicion.php';
 require_once __DIR__ . '/Aplicacion/Liquidaciones/Liquidacion.php';
 require_once __DIR__ . '/Aplicacion/Enrutador.php';
+require_once __DIR__ . '/Aplicacion/Migraciones/Registro.php';
+require_once __DIR__ . '/Aplicacion/Migraciones/Comandos.php';
+
+// Registrar los comandos app:migracion_* en el Controlador.
+// El Controlador ya está inicializado (se autoinicializa al
+// final de Controlador.php, que se incluyó antes).
+registrar_comandos_migraciones();
 
 // Modo de ejecución. En local se considera modo pruebas
 // (habilita los botones de limpieza del admin). En
@@ -154,6 +161,26 @@ if (isset($_GET['probar_arbol'])) {
 if (isset($_GET['probar_contextos'])) {
     require_once __DIR__ . '/Pruebas/prueba_contextos.php';
     exit;
+}
+
+// Crear el nodo especial `aplicacion` con su contenedor
+// `migraciones`, si no existen. Se usa para marcar las
+// migraciones aplicadas.
+if (!Nodo::nodo_por_id('aplicacion')) {
+    $nodo_app_meta = Nodo::crear_con_id('aplicacion');
+    if ($nodo_app_meta) {
+        $contenedor_mig = Nodo::crear_con_dato('');
+        $nodo_app_meta->_adyacente_en($contenedor_mig, 'migraciones');
+        guardar_ambos($nombre_app);
+    }
+} else {
+    // Existe el nodo aplicacion pero puede faltar el contenedor.
+    $nodo_app_meta = Nodo::nodo_por_id('aplicacion');
+    if ($nodo_app_meta && !$nodo_app_meta->adyacente('migraciones')) {
+        $contenedor_mig = Nodo::crear_con_dato('');
+        $nodo_app_meta->_adyacente_en($contenedor_mig, 'migraciones');
+        guardar_ambos($nombre_app);
+    }
 }
 
 // ==== Migración de niveles de usuario (v76m) ====

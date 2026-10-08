@@ -596,6 +596,14 @@ costó un fallo real del runner y una iteración extra.
     de estilo visual interno o refactors sin cambio de
     comportamiento). Aun así, avisar al usuario que no se
     agregan pruebas y por qué.
+15. **Excepción adicional: herramientas de admin y pestaña
+    Grafo.** La pestaña Grafo (v74p en adelante) y todo lo
+    que cuelgue de ella (comandos `grafo:*`, sistema de
+    migraciones v76n, botones de eliminar huérfanos) NO
+    lleva pruebas del plugin. Es herramienta de uso manual
+    del admin, no flujo de negocio. Se documenta en el
+    prompt del piloto que la tanda no lleva pruebas, pero
+    no se agrega al plugin.
 15. **Verificar `git diff --stat` antes de commitear.** Un
     archivo que no debería haber cambiado puede aparecer con
     cientos de líneas modificadas. Caso real:

@@ -1851,6 +1851,43 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
 
             return ['migrados' => $migrados, 'saltados' => $saltados, 'errores' => $errores];
         }, null, false);
+
+        // ─── grafo:raices ─────────────────────────────────
+        //
+        // Devuelve todos los nodos raíz del grafo (IDs
+        // especiales) con sus adyacentes directos. Genérico:
+        // no conoce semántica de la aplicación.
+        //
+        // Devuelve: [ { id, dato, adyacentes: [{enlace,
+        //             id_destino, dato_destino}, ...] }, ... ]
+        self::registrar_comando('grafo:raices', function(string $token, array $args) {
+            $raices = [];
+            Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$raices) {
+                $id = (string)$nodo->id();
+                if (is_numeric($id)) return; // solo especiales
+
+                $adyacentes = [];
+                $ady = $nodo->adyacentes();
+                if ($ady) {
+                    foreach ($ady as $enlace => $destino) {
+                        $adyacentes[] = [
+                            'enlace' => (string)$enlace,
+                            'id_destino' => (string)$destino->id(),
+                            'dato_destino' => mb_substr((string)$destino->dato(), 0, 80),
+                        ];
+                    }
+                }
+                $raices[] = [
+                    'id' => $id,
+                    'dato' => mb_substr((string)$nodo->dato(), 0, 200),
+                    'adyacentes' => $adyacentes,
+                ];
+            }, null);
+
+            // Orden alfabético por id para estabilidad.
+            usort($raices, function($a, $b) { return strcmp($a['id'], $b['id']); });
+            return $raices;
+        }, null, false);
     }
 
     /**
