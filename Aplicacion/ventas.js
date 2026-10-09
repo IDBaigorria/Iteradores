@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.76z
+ * @version 1.5piloto.77
  */
 
 // (aplicar_cambios.php funcionó)
@@ -3190,13 +3190,21 @@ async function _buscar_pasajero_por_dni(index) {
                 fecha_modificacion: datos.pasajero.fecha_ultima_modificacion || ''
             };
         } else {
-            // Limpiar los campos no-DNI antes de habilitar. Si el
-            // usuario habia autocompletado un DNI previo y ahora
-            // corrige por uno no registrado, los datos viejos no
-            // deben quedar ni propagarse por ligadura.
-            _limpiar_campos_pasajero(index);
+            // Fix v77: si hay atadura activa apuntando a este
+            // pasajero, NO limpiar los campos. Los datos del
+            // pasajero vinieron del comprador y siguen siendo
+            // válidos, aunque el DNI no esté registrado todavía.
+            // Solo se limpia cuando no hay atadura (caso "corregí
+            // el DNI por uno nuevo y quiero empezar de cero").
+            const hay_atadura = window.atadura_actual
+                && window.atadura_actual.indice_pasajero === index;
+            if (!hay_atadura) {
+                _limpiar_campos_pasajero(index);
+                _mostrar_aviso_en_formulario(index, 'DNI no registrado. Complete los datos.', 'gris');
+            } else {
+                _mostrar_aviso_en_formulario(index, 'DNI no registrado. Datos copiados del comprador.', 'gris');
+            }
             _habilitar_campos_pasajero(index, true);
-            _mostrar_aviso_en_formulario(index, 'DNI no registrado. Complete los datos.', 'gris');
             window.pasajeros_autocompletado_estado[index] = {
                 dni_buscado: dni_norm,
                 encontrado: false,
@@ -3257,15 +3265,21 @@ async function _buscar_comprador_por_dni(forzar = false) {
             const antiguedad = _calcular_antiguedad_datos(datos.pasajero.fecha_ultima_modificacion);
             _mostrar_aviso_comprador(antiguedad.texto, antiguedad.clase);
         } else {
-            // Si antes se habian autocompletado datos para otro DNI
-            // y ahora el DNI cambio por uno no registrado, limpiar
-            // los campos del comprador para no arrastrar los datos
-            // del DNI anterior.
-            if (window.comprador_dni_con_datos && window.comprador_dni_con_datos !== dni_norm) {
-                _limpiar_campos_comprador();
-                window.comprador_dni_con_datos = null;
+            // Fix v77: si hay atadura activa, los datos del
+            // comprador vinieron del pasajero. No limpiar.
+            if (window.atadura_actual) {
+                _mostrar_aviso_comprador('DNI no registrado. Datos copiados del pasajero.', 'gris');
+            } else {
+                // Si antes se habian autocompletado datos para otro DNI
+                // y ahora el DNI cambio por uno no registrado, limpiar
+                // los campos del comprador para no arrastrar los datos
+                // del DNI anterior.
+                if (window.comprador_dni_con_datos && window.comprador_dni_con_datos !== dni_norm) {
+                    _limpiar_campos_comprador();
+                    window.comprador_dni_con_datos = null;
+                }
+                _mostrar_aviso_comprador('DNI no registrado. Complete los datos.', 'gris');
             }
-            _mostrar_aviso_comprador('DNI no registrado. Complete los datos.', 'gris');
         }
     } catch (e) {
         console.error("Error buscando comprador:", e);

@@ -75,26 +75,31 @@ cambio de enfoque respecto del plan original. En lugar del
   `listar_empresas_de_dueno`. Con esto queda cerrada la
   Fase B2.2.
 
-**Tanda actual:** v76z (fixes urgentes en el frontend del
-formulario de venta). Dos bugs detectados en producción:
+**Tanda actual:** v77 (fix del bug 1 de la atadura:
+DNI nuevo + datos ya cargados en el otro lado).
 
-1. **Atadura comprador-pasajero.** El badge "Vinculado"
-   aparecía un instante y desaparecía. Causa: el listener
-   del DNI disparaba varios fetches en paralelo, y uno
-   viejo pisaba el estado nuevo. Fix: chequear que el DNI
-   del input no haya cambiado cuando vuelve el fetch; si
-   cambió, descartar la respuesta. Además, activar la
-   atadura síncronamente antes del fetch.
-2. **Modal post venta.** No aparecía. Causa:
-   `confirmar_venta_modal` hacía dos `await` antes de
-   llamar `mostrar_opciones_impresion`. Si cualquiera
-   fallaba, el flujo saltaba al `catch` y el modal nunca
-   se mostraba. Fix: mostrar el modal primero y envolver
-   los refrescos en try/catch individual.
+**Bug 1 (atadura) — diagnóstico completo:**
+El usuario carga el comprador con un DNI nuevo (no existe
+en el grafo), llena todos los datos. Después, en el form
+del pasajero, ingresa el mismo DNI. La atadura se activa
+(por el fix v76z, corre antes del fetch) y copia los
+datos del comprador al pasajero. Se ve "Vinculado". Pero
+al volver el fetch, el backend responde "no existe" y
+`_buscar_pasajero_por_dni` limpiaba los campos del pasajero,
+borrando lo que la atadura acababa de copiar.
 
-**Bug detectado en v76x (sigue pendiente):** las funciones
-`detectar_*` devolvían `true` por vacío. Se arregla en v76y.
-Testigos mal puestos se limpian con "Re-detectar".
+**Fix v77:** si hay atadura activa apuntando a este
+formulario, no limpiar los campos. Los datos vinieron del
+otro lado y siguen siendo válidos aunque el DNI no esté
+registrado. Solo se limpia cuando no hay atadura (caso
+"corregí el DNI por uno nuevo y quiero empezar de cero").
+Mismo criterio aplicado a `_buscar_comprador_por_dni`.
+
+**Bug 2 (modal post venta) — resuelto en v76z:**
+`confirmar_venta_modal` ahora muestra el modal ANTES de
+los refrescos, y envuelve los refrescos en try/catch
+individuales. Un fallo en el refresco ya no bloquea el
+modal.
 
 ### 1.3 Decisiones de diseño en vigor
 
