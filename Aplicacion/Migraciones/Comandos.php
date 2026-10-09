@@ -106,6 +106,43 @@ function registrar_comandos_migraciones(): void {
         return ['exito' => true, 'detalles' => $res['detalles'] ?? []];
     }, null, false);
 
+    // ─── app:migracion_limpiar_marcadores ───────────────
+    //
+    // Fix v76y: permite limpiar el testigo persistente de una
+    // migración para que la auto-detección vuelva a correr en
+    // el próximo listado. Se usa cuando el testigo quedó mal
+    // puesto por la auto-detección por vacío de versiones
+    // anteriores.
+    //
+    // Args: ['id' => id_de_migracion] (o vacío para todas).
+    Controlador::registrar_comando('app:migracion_limpiar_marcadores', function(string $token, array $args) {
+        $id = (string)($args[0]['id'] ?? '');
+        $contenedor = _migraciones_contenedor();
+        if (!$contenedor) {
+            return ['exito' => false, 'error' => 'No existe el contenedor.'];
+        }
+        if ($id !== '') {
+            if ($contenedor->adyacente($id)) {
+                $contenedor->eliminar_adyacente($id);
+            }
+            return ['exito' => true, 'limpiados' => 1];
+        }
+        // Sin id: limpiar todos los testigos que no correspondan
+        // a migraciones del registro actual.
+        $registro = migraciones_registradas();
+        $limpiados = 0;
+        $ady = (array)$contenedor->adyacentes();
+        foreach ($ady as $enlace => $_nodo) {
+            $enlace = (string)$enlace;
+            if ($enlace === '_es_compartido') continue;
+            if (!isset($registro[$enlace])) {
+                $contenedor->eliminar_adyacente($enlace);
+                $limpiados++;
+            }
+        }
+        return ['exito' => true, 'limpiados' => $limpiados];
+    }, null, false);
+
     // ─── app:migracion_marcar ───────────────────────────
     Controlador::registrar_comando('app:migracion_marcar', function(string $token, array $args) {
         $id = (string)($args[0]['id'] ?? '');
@@ -313,6 +350,161 @@ function registrar_comandos_migraciones(): void {
         }, null);
 
         return ['creados' => $creados, 'salteados' => $salteados, 'errores' => $errores];
+    }, null, false);
+
+    // ─── app:construir_arboles_compartidos ──────────────
+    //
+    // Fase B2.3.3 del modelo topológico (v76x).
+    //
+    // Convierte los compartidos creados en B2.1 (que tenían
+    // enlaces planos por id) en árboles paralelos con nombres
+    // parametrizados. Para cada compartido `compartido_con_us_termX`
+    // de cada dueño:
+    //   1. Marca el compartido con `_es_compartido` (testigo).
+    //   2. Reconstruye el árbol del contenedor `ventas` con los
+    //      nombres hmi_<term>, hd_<term>, p_<term>.
+    //   3. Idem para `cancelaciones`.
+    //
+    // Los nodos venta y cancelación son los MISMOS que usa el
+    // dueño: se insertan también en el árbol del compartido con
+    // los nombres parametrizados. Cada venta pertenece a 2
+    // árboles (el del dueño y el del terminal que la vendió).
+    //
+    // Idempotente: si un compartido ya tiene `_es_compartido`,
+    // se saltea.
+    //
+    // Args: ['dueno' => nombre | 'todos',
+    //        'terminal' => nombre | 'todos']
+    // Devuelve: { marcados: int, saltados: int, errores: [] }.
+    Controlador::registrar_comando('app:construir_arboles_compartidos', function(string $token, array $args) {
+        $opciones = $args[0] ?? [];
+        $dueno_filtro = (string)($opciones['dueno'] ?? 'todos');
+        $terminal_filtro = (string)($opciones['terminal'] ?? 'todos');
+
+        $marcados = 0;
+        $saltados = 0;
+        $errores = [];
+
+        Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$marcados, &$saltados, &$errores, $dueno_filtro, $terminal_filtro) {
+            $id = (string)$nodo->id();
+            if (strpos($id, 'us_') !== 0) return null;
+
+            // Nivel del usuario: puede estar en la raíz o dentro de `publico`.
+            $nivel_nodo = $nodo->adyacente('nivel');
+            if (!$nivel_nodo) {
+                $publico = $nodo->adyacente('publico');
+                if ($publico) $nivel_nodo = $publico->adyacente('nivel');
+            }
+            $nivel = $nivel_nodo ? $nivel_nodo->dato() : '';
+            if ($nivel !== 'dueno') return null;
+
+            $nombre_dueno = (string)$nodo->dato();
+            if ($dueno_filtro !== 'todos' && $nombre_dueno !== $dueno_filtro) return null;
+
+            // Contenedor de ventas del dueño (para iterar el árbol default).
+            $cont_ventas_privado = $nodo->adyacente('ventas');
+            if (!$cont_ventas_privado) {
+                $priv = $nodo->adyacente('privado');
+                if ($priv) $cont_ventas_privado = $priv->adyacente('ventas');
+            }
+            // Contenedor de cancelaciones del dueño.
+            $cont_cancel_privado = $nodo->adyacente('cancelaciones');
+            if (!$cont_cancel_privado) {
+                $priv = $nodo->adyacente('privado');
+                if ($priv) $cont_cancel_privado = $priv->adyacente('cancelaciones');
+            }
+
+            // Recorrer todos los compartidos del dueño.
+            $ady = (array)$nodo->adyacentes();
+            foreach ($ady as $enlace => $hijo) {
+                $enlace = (string)$enlace;
+                if (strpos($enlace, 'compartido_con_') !== 0) continue;
+
+                $nombre_terminal = substr($enlace, strlen('compartido_con_'));
+                if ($nombre_terminal === '') continue;
+                if ($terminal_filtro !== 'todos' && $nombre_terminal !== $terminal_filtro) continue;
+
+                $compartido = $hijo;
+
+                // Idempotencia: si ya está marcado, saltear.
+                if ($compartido->adyacente('_es_compartido')) {
+                    $saltados++;
+                    continue;
+                }
+
+                // 1. Marcar el compartido.
+                $compartido->_adyacente_en(Nodo::crear_con_dato('1'), '_es_compartido');
+
+                $nombres = [
+                    'p'   => 'p_'   . $nombre_terminal,
+                    'hd'  => 'hd_'  . $nombre_terminal,
+                    'hmi' => 'hmi_' . $nombre_terminal,
+                ];
+
+                // 2. Árbol de ventas del compartido.
+                $c_ventas = $compartido->adyacente('ventas');
+                if ($c_ventas) {
+                    // Borrar todos los enlaces del contenedor (planos de B2.1).
+                    $enlaces_viejos = (array)$c_ventas->adyacentes();
+                    foreach ($enlaces_viejos as $e => $_) {
+                        $c_ventas->eliminar_adyacente((string)$e);
+                    }
+
+                    // Recolectar las ventas del terminal en el orden del árbol del dueño.
+                    $ventas_term = [];
+                    if ($cont_ventas_privado) {
+                        $venta = hmi($cont_ventas_privado);
+                        $seg = 0;
+                        while ($venta && $seg < 3000) {
+                            $nt = $venta->adyacente('terminal');
+                            if ($nt && $nt->dato() === $nombre_terminal) {
+                                $ventas_term[] = $venta;
+                            }
+                            $venta = hd($venta);
+                            $seg++;
+                        }
+                    }
+
+                    // Insertar en el árbol del compartido en orden inverso
+                    // con _hmi (que agrega al inicio) para preservar el orden.
+                    for ($i = count($ventas_term) - 1; $i >= 0; $i--) {
+                        _hmi($c_ventas, $ventas_term[$i], $nombres);
+                    }
+                }
+
+                // 3. Idem para cancelaciones.
+                $c_cancel = $compartido->adyacente('cancelaciones');
+                if ($c_cancel) {
+                    $enlaces_viejos = (array)$c_cancel->adyacentes();
+                    foreach ($enlaces_viejos as $e => $_) {
+                        $c_cancel->eliminar_adyacente((string)$e);
+                    }
+
+                    $cancel_term = [];
+                    if ($cont_cancel_privado) {
+                        $cancel = hmi($cont_cancel_privado);
+                        $seg = 0;
+                        while ($cancel && $seg < 3000) {
+                            $nt = $cancel->adyacente('terminal');
+                            if ($nt && $nt->dato() === $nombre_terminal) {
+                                $cancel_term[] = $cancel;
+                            }
+                            $cancel = hd($cancel);
+                            $seg++;
+                        }
+                    }
+
+                    for ($i = count($cancel_term) - 1; $i >= 0; $i--) {
+                        _hmi($c_cancel, $cancel_term[$i], $nombres);
+                    }
+                }
+
+                $marcados++;
+            }
+            return null;
+        }, null);
+
+        return ['marcados' => $marcados, 'saltados' => $saltados, 'errores' => $errores];
     }, null, false);
 }
 

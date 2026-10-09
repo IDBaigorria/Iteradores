@@ -19,7 +19,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.76v
+ * @version   1.5piloto.76y
  */
 
 // --- Utilidades base ----------------------------------
@@ -220,6 +220,27 @@ if (isset($_GET['migrar_compartidos_terminal'])) {
     echo "=========================================\n\n";
     echo "Creados:   " . $res['creados'] . "\n";
     echo "Salteados: " . $res['salteados'] . "\n";
+    if (!empty($res['errores'])) {
+        echo "Errores:\n";
+        foreach ($res['errores'] as $e) echo "  - $e\n";
+    }
+    echo "\nListo.\n";
+    exit;
+}
+
+// ==== Construcción de árboles paralelos en compartidos (v76x) ====
+// Marca los compartidos con `_es_compartido` y reconstruye
+// sus árboles de ventas y cancelaciones con nombres
+// parametrizados (hmi_<term>, hd_<term>, p_<term>). Borra
+// los enlaces planos que dejó B2.1. Idempotente.
+if (isset($_GET['construir_arboles_compartidos'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    require_once __DIR__ . '/miscelaneas/construir_arboles_compartidos.php';
+    $res = construir_arboles_compartidos();
+    echo "Construcción de árboles paralelos en compartidos\n";
+    echo "================================================\n\n";
+    echo "Marcados:  " . $res['marcados'] . "\n";
+    echo "Saltados:  " . $res['saltados'] . "\n";
     if (!empty($res['errores'])) {
         echo "Errores:\n";
         foreach ($res['errores'] as $e) echo "  - $e\n";

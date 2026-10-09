@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.76s
+ * @version   1.5piloto.76w
  */
 
 
@@ -650,18 +650,23 @@ function listar_ventas_por_terminal(string $nombre_terminal): array {
     $contenedor = obtener_contenedor_ventas_dueno((string)$contexto->dato(), $contexto);
     if (!$contenedor) return [];
 
+    // Fase B2.3.2 (v76w): calcular los nombres de enlace a
+    // partir del contexto. Mientras el contexto no sea un
+    // compartido marcado, devuelve null y usa los default.
+    $nombres = _nombres_arbol_para_contexto($contexto, $nombre_terminal);
+
     $ventas = [];
-    $actual = hmi($contenedor);
+    $actual = hmi($contenedor, $nombres);
     $seg = 0;
     while ($actual && $seg < 2000) {
         $seg++;
         $nodo_terminal = $actual->adyacente('terminal');
         if (!$nodo_terminal || $nodo_terminal->dato() !== $nombre_terminal) {
-            $actual = hd($actual);
+            $actual = hd($actual, $nombres);
             continue;
         }
         $ventas[] = formatear_venta_resumida($actual);
-        $actual = hd($actual);
+        $actual = hd($actual, $nombres);
     }
     return $ventas;
 }
@@ -990,13 +995,14 @@ function _buscar_venta_por_id(string $id_venta, ?string $nombre_terminal = null)
         $nombre_dueno = (string)$contexto->dato();
         $cont = obtener_contenedor_ventas_dueno($nombre_dueno, $contexto);
         if (!$cont) return [null, ''];
-        $actual = hmi($cont);
+        $nombres = _nombres_arbol_para_contexto($contexto, $nombre_terminal);
+        $actual = hmi($cont, $nombres);
         $seg = 0;
         while ($actual && $seg < 1000) {
             if ($actual->dato() === $id_venta) {
                 return [$actual, $nombre_dueno];
             }
-            $actual = hd($actual);
+            $actual = hd($actual, $nombres);
             $seg++;
         }
         return [null, ''];
@@ -1690,17 +1696,21 @@ function _config_pago_resuelta_para_venta(Nodo $nodo_venta): array {
  * @param callable $callback function(Nodo $nodo_venta): void
  * @return void
  */
-function _recorrer_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje, callable $callback): void {
-    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
+function _recorrer_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje, callable $callback, ?Nodo $nodo_contexto = null, ?string $nombre_terminal = null): void {
+    // Fase B2.3.2 (v76w): contexto opcional + nombres
+    // parametrizados. Si no hay contexto, comportamiento
+    // idéntico al actual.
+    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return;
-    $actual = hmi($contenedor);
+    $nombres = _nombres_arbol_para_contexto($nodo_contexto, $nombre_terminal ?? '');
+    $actual = hmi($contenedor, $nombres);
     $seg = 0;
     while ($actual && $seg < 2000) {
         $nodo_viaje = $actual->adyacente('viaje');
         if ($nodo_viaje && $nodo_viaje->dato() === $nombre_viaje) {
             $callback($actual);
         }
-        $actual = hd($actual);
+        $actual = hd($actual, $nombres);
         $seg++;
     }
 }
@@ -1715,10 +1725,13 @@ function _recorrer_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje, 
  * @param callable $callback function(Nodo $nodo_venta): void
  * @return void
  */
-function _recorrer_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, callable $callback): void {
-    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
+function _recorrer_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, callable $callback, ?Nodo $nodo_contexto = null): void {
+    // Fase B2.3.2 (v76w): contexto opcional + nombres
+    // parametrizados.
+    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return;
-    $actual = hmi($contenedor);
+    $nombres = _nombres_arbol_para_contexto($nodo_contexto, $nombre_terminal);
+    $actual = hmi($contenedor, $nombres);
     $seg = 0;
     while ($actual && $seg < 2000) {
         $nodo_viaje = $actual->adyacente('viaje');
@@ -1727,7 +1740,7 @@ function _recorrer_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje
             && $nodo_terminal && $nodo_terminal->dato() === $nombre_terminal) {
             $callback($actual);
         }
-        $actual = hd($actual);
+        $actual = hd($actual, $nombres);
         $seg++;
     }
 }

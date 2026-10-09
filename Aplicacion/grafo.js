@@ -7,7 +7,7 @@
  * Es la base para la auditoría de la fuga de nodos (Fase 2).
  * Ver prompts/prompt_piloto.md §8.6.
  *
- * @version 1.5piloto.76n
+ * @version 1.5piloto.76y
  */
 
 let grafo_offset_actual = 0;
@@ -409,9 +409,14 @@ async function cargar_grafo_migraciones() {
         const badge = m.aplicada
             ? '<span style="color:#060;">Aplicada</span>'
             : '<span style="color:#900;">Pendiente</span>';
-        const boton = m.aplicada
-            ? ''
-            : '<button class="btn primary" data-migrar="' + _grafo_escape(m.id) + '">Aplicar</button>';
+        let boton = '';
+        if (m.aplicada) {
+            // Fix v76y: botón "Re-detectar" para limpiar el testigo
+            // y dejar que la auto-detección vuelva a correr.
+            boton = '<button class="btn" data-limpiar="' + _grafo_escape(m.id) + '" title="Limpia el testigo. La próxima vez que se recargue, la auto-detección decide si está realmente aplicada.">Re-detectar</button>';
+        } else {
+            boton = '<button class="btn primary" data-migrar="' + _grafo_escape(m.id) + '">Aplicar</button>';
+        }
         html += '<tr>';
         html += '<td><strong>' + _grafo_escape(m.nombre) + '</strong><br><span class="muted small">' + _grafo_escape(m.descripcion) + '</span></td>';
         html += '<td>' + badge + '</td>';
@@ -423,6 +428,29 @@ async function cargar_grafo_migraciones() {
     cont.querySelectorAll('button[data-migrar]').forEach(btn => {
         btn.addEventListener('click', () => aplicar_migracion(btn.dataset.migrar));
     });
+    cont.querySelectorAll('button[data-limpiar]').forEach(btn => {
+        btn.addEventListener('click', () => limpiar_marcador_migracion(btn.dataset.limpiar));
+    });
+}
+
+async function limpiar_marcador_migracion(id) {
+    if (!confirm('¿Limpiar el testigo de "' + id + '"? Después se recalcula sola.')) return;
+    const resp = await fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "grafo/migracion_limpiar",
+            nombre_solicitante: usuario_actual.nombre_usuario,
+            id
+        })
+    });
+    const datos = await resp.json();
+    if (!datos.exito) {
+        mostrar_aviso(datos.error || "Error al limpiar", 'error');
+        return;
+    }
+    mostrar_aviso("Testigo limpiado. La migración se recalcula al recargar.", 'exito');
+    await cargar_grafo();
 }
 
 async function aplicar_migracion(id) {

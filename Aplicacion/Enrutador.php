@@ -1224,6 +1224,23 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     responder_json(['exito' => true, 'migraciones' => $lista['migraciones']]);
                     break;
 
+                case 'migracion_limpiar':
+                    // Limpia el testigo persistente de una migración
+                    // (o de todas) para que la auto-detección vuelva
+                    // a correr. Fix v76y.
+                    if (!function_exists('registrar_comandos_migraciones')) {
+                        responder_json(['exito' => false, 'error' => 'Módulo de migraciones no cargado.']);
+                    }
+                    $id_lim = $post['id'] ?? '';
+                    $res_lim = Controlador::ejecutar_comando('app:migracion_limpiar_marcadores', ['id' => $id_lim]);
+                    if (!is_array($res_lim) || empty($res_lim['exito'])) {
+                        $err = is_array($res_lim) && isset($res_lim['error']) ? $res_lim['error'] : 'Error al limpiar.';
+                        responder_json(['exito' => false, 'error' => $err]);
+                    }
+                    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                    responder_json(['exito' => true, 'limpiados' => $res_lim['limpiados'] ?? 0]);
+                    break;
+
                 case 'migraciones_aplicar':
                     // Aplica una migración y guarda.
                     if (!function_exists('registrar_comandos_migraciones')) {

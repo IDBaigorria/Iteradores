@@ -75,7 +75,17 @@ cambio de enfoque respecto del plan original. En lugar del
   `listar_empresas_de_dueno`. Con esto queda cerrada la
   Fase B2.2.
 
-**Tanda actual:** v76v (reorganización de prompts).
+**Tanda actual:** v76y (fix de auto-detección de migraciones).
+
+**Bug detectado en v76x:** las funciones `detectar_*` devolvían
+`true` por vacío (cuando no había nada que migrar). Como el
+listado de migraciones auto-crea el testigo cuando la
+detección da true, las migraciones quedaban marcadas como
+"Aplicada" aunque no se hubieran corrido. Se arregla en v76y:
+las funciones devuelven `false` si hay algo que migrar y falta.
+Nuevo comando `app:migracion_limpiar_marcadores` y botón
+"Re-detectar" en la pestaña Grafo para limpiar testigos mal
+puestos. Pendiente de aplicar B2.3.3 en serio.
 
 ### 1.3 Decisiones de diseño en vigor
 
@@ -183,23 +193,45 @@ así que solo participa en 2 árboles: el del dueño (con
 `hmi_<terminal>`/`hd_<terminal>`/`p_<terminal>`). No hay
 N+1 enlaces por nodo.
 
-**La raíz del árbol no se duplica.** El contenedor padre es el
-mismo nodo físico, referenciado desde dos lugares:
-`privado/ventas` y `compartido_con_us_termX/ventas`. Los hijos
-se enlazan con los nombres que correspondan a cada árbol.
+**La raíz del árbol SÍ se duplica (una por árbol).** Cada
+terminal tiene su propio contenedor `compartido_con_us_termX/ventas`,
+distinto del contenedor del dueño (`privado/ventas`). Eso
+es fundamental para que la topología no filtre todas las
+ventas al terminal: el BFS desde el terminal llega a su
+contenedor y recorre solo SU árbol. Si compartieran el
+contenedor, el BFS alcanzaría todas las ventas del dueño
+por el `hmi`/`hd` default del árbol principal.
+
+**Los nodos hijos SÍ se comparten (mismo nodo físico).** Cada
+venta pertenece a dos contextos: el del dueño y el del
+terminal que la vendió. Vive una sola vez, pero participa en
+dos árboles paralelos: uno con `hmi`/`hd`/`p` (el del dueño),
+otro con `hmi_<terminal>`/`hd_<terminal>`/`p_<terminal>` (el
+del terminal). Cero enlaces `hd_<otro_terminal>` porque la
+venta solo la vendió un terminal.
 
 **Sub-tandas de B2.3:**
 
-- **B2.3.1** — Parametrizar `miscelaneas/Arbol.php`. Las
-  funciones `_hmi`, `_hd`, `hmi`, `hd`, `p`, `eliminar_hmi` y
-  `eliminar_hd` aceptan un `?array $nombres = null`. Si es
-  null, usan los nombres default (`hmi`/`hd`/`p`). Refactor
-  sin cambio de comportamiento.
+- **B2.3.1** — Parametrizar `miscelaneas/Arbol.php`.
+  **Completada** (v76v).
 - **B2.3.2** — Ajustar las funciones del piloto para que el
-  terminal use los nombres parametrizados. Sin repuntar.
+  terminal use los nombres parametrizados. **Completada**
+  (v76w): helper `_nombres_arbol_para_contexto`, aplicado en
+  `listar_ventas_por_terminal`, `_buscar_venta_por_id` (rama
+  con contexto), `_recorrer_ventas_del_viaje` y
+  `_recorrer_ventas_de_terminal` (Venta.php) y
+  `_construir_indice_ventas_por_viaje` (Viaje.php). Como
+  todavía no hay compartidos marcados, el helper devuelve
+  null y los nombres son default. Sin cambio de comportamiento.
 - **B2.3.3** — Migración que convierte los compartidos
   existentes (B2.1) de enlaces planos a árboles paralelos
-  con los nombres parametrizados.
+  con los nombres parametrizados. **Completada** (v76x):
+  comando `app:construir_arboles_compartidos`. Marca cada
+  compartido con `_es_compartido`. Limpia el contenedor del
+  compartido (que tenía enlaces planos de B2.1) y lo
+  reconstruye como árbol con `_hmi` y nombres parametrizados.
+  Idem para `cancelaciones`. Idempotente. Bloque
+  `?construir_arboles_compartidos=1` en `index.php`.
 - **B2.3.4** — Repuntar `us_termX → dueno` al compartido.
   Acá se activa el aislamiento. Con pruebas del plugin.
 

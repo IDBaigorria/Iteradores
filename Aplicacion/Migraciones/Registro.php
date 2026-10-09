@@ -41,6 +41,12 @@ function migraciones_registradas(): array {
             'detectar' => 'detectar_compartidos_terminal',
             'aplicar' => 'aplicar_migracion_compartidos_terminal',
         ],
+        'arboles_compartidos' => [
+            'nombre' => 'Árboles paralelos en compartidos',
+            'descripcion' => 'Marca los compartidos y reconstruye sus árboles con nombres parametrizados (hmi_<term>, hd_<term>, p_<term>).',
+            'detectar' => 'detectar_arboles_compartidos',
+            'aplicar' => 'aplicar_migracion_arboles_compartidos',
+        ],
     ];
 }
 ?>

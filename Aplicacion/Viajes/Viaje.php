@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.76r
+ * @version   1.5piloto.76w
  */
 
 use Iteradores\Nodos\Nodo;
@@ -594,7 +594,12 @@ function _construir_indice_ventas_por_viaje(string $nombre_dueno, ?string $nombr
     $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor_ventas) return $indice;
 
-    $venta_iter = hmi($contenedor_ventas);
+    // Fase B2.3.2 (v76w): nombres de enlace calculados a partir
+    // del contexto. Si el contexto no es un compartido marcado,
+    // devuelve null y usa los default.
+    $nombres = _nombres_arbol_para_contexto($nodo_contexto, $nombre_terminal ?? '');
+
+    $venta_iter = hmi($contenedor_ventas, $nombres);
     $seg = 0;
     while ($venta_iter && $seg < 2000) {
         $nodo_viaje_venta = $venta_iter->adyacente('viaje');
@@ -630,7 +635,7 @@ function _construir_indice_ventas_por_viaje(string $nombre_dueno, ?string $nombr
                 }
             }
         }
-        $venta_iter = hd($venta_iter);
+        $venta_iter = hd($venta_iter, $nombres);
         $seg++;
     }
     return $indice;

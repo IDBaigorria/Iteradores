@@ -25,6 +25,37 @@ use Iteradores\Nodos\Nodo;
  * @param array|null $nombres ['p'=>..., 'hd'=>..., 'hmi'=>...]
  * @return array
  */
+/**
+ * Devuelve el array de nombres de enlace que un terminal
+ * debe usar para recorrer el árbol de un contenedor, según
+ * el contexto.
+ *
+ * Fase B2.3.2 del modelo topológico (v76w). Reglas:
+ * - Si no hay contexto (dueño o admin), devuelve null
+ *   → las funciones de árbol usan los nombres default.
+ * - Si el contexto tiene el marcador `_es_compartido`,
+ *   devuelve los nombres parametrizados con el sufijo del
+ *   terminal (p_<terminal>, hd_<terminal>, hmi_<terminal>).
+ * - Si el contexto no es un compartido (todavía), null.
+ *
+ * Mientras no existan compartidos marcados, esta función
+ * siempre devuelve null y el comportamiento es idéntico al
+ * actual. Los marcadores los agrega la migración de B2.3.3.
+ *
+ * @param Nodo|null $nodo_contexto
+ * @param string    $nombre_terminal
+ * @return array|null
+ */
+function _nombres_arbol_para_contexto(?Nodo $nodo_contexto, string $nombre_terminal): ?array {
+    if ($nodo_contexto === null || $nombre_terminal === '') return null;
+    if (!$nodo_contexto->adyacente('_es_compartido')) return null;
+    return [
+        'p'   => 'p_'   . $nombre_terminal,
+        'hd'  => 'hd_'  . $nombre_terminal,
+        'hmi' => 'hmi_' . $nombre_terminal,
+    ];
+}
+
 function _arbol_nombres(?array $nombres): array {
     if ($nombres === null) {
         return ['p' => 'p', 'hd' => 'hd', 'hmi' => 'hmi'];
