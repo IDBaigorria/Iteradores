@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.74e
+ * @version 1.5piloto.76z
  */
 
 // (aplicar_cambios.php funcionó)
@@ -172,16 +172,19 @@ async function abrir_modal_confirmacion_venta() {
     if (input_dni_comp_el) {
         input_dni_comp_el.addEventListener('input', function() {
             const dni_norm = _normalizar_dni_input(this.value);
+            // Fix v76z: intentar la atadura ANTES del fetch.
+            // Así el badge aparece apenas el DNI coincide, sin
+            // esperar a la respuesta del servidor. Después el
+            // fetch puede confirmar o ajustar, pero no rompe
+            // lo que ya está activo.
+            _verificar_atadura_por_dni();
             if (dni_norm.length >= 7 && dni_norm.length <= 8) {
                 if (window.comprador_autocompletado_dni !== dni_norm) {
                     _buscar_comprador_por_dni();
-                } else {
-                    _verificar_atadura_por_dni();
                 }
             } else {
                 window.comprador_autocompletado_dni = null;
                 _limpiar_aviso_comprador();
-                _verificar_atadura_por_dni();
             }
         });
     }
@@ -688,14 +691,31 @@ async function confirmar_venta_modal() {
             $("#info_asiento_viaje").classList.remove("hidden");
             venta_form_abierto = false;
             _notificar_cambio_venta_en_curso();
-            await solicitar_estado_asientos();
-            mostrar_boton_confirmar_venta();
-            // Refrescar contadores sin reconstruir el modal: así no parpadea
-            // el croquis ni el panel de asiento.
-            await refrescar_contadores_viaje_actual();
 
+            // Fix v76z: mostrar el modal post venta PRIMERO,
+            // antes de los refrescos. Si los refrescos fallan,
+            // el modal ya está en pantalla. Antes, un fallo
+            // en solicitar_estado_asientos o en
+            // refrescar_contadores_viaje_actual hacía saltar al
+            // catch de afuera y el modal nunca se mostraba.
             if (ultima_venta_id) {
                 mostrar_opciones_impresion(ultima_venta_id);
+            }
+
+            // Refrescos, cada uno en su try/catch para que un
+            // fallo no impida el flujo.
+            try {
+                await solicitar_estado_asientos();
+            } catch (e) {
+                console.error('Error refrescando asientos tras vender:', e);
+            }
+            mostrar_boton_confirmar_venta();
+            try {
+                // Refrescar contadores sin reconstruir el modal:
+                // así no parpadea el croquis ni el panel de asiento.
+                await refrescar_contadores_viaje_actual();
+            } catch (e) {
+                console.error('Error refrescando contadores tras vender:', e);
             }
         } else {
             // Mostrar error sin cerrar formulario
@@ -3082,11 +3102,15 @@ function _disparar_busqueda_por_dni(valor, index) {
     const dni_norm = _normalizar_dni_input(valor);
     const estado = window.pasajeros_autocompletado_estado[index];
 
+    // Fix v76z: intentar la atadura ANTES del fetch. Así el
+    // badge aparece apenas el DNI coincide, sin esperar al
+    // servidor.
+    _verificar_atadura_por_dni();
+
     if (dni_norm.length < 7 || dni_norm.length > 8) {
         if (estado && estado.dni_buscado && estado.dni_buscado !== dni_norm) {
             _resetear_autocompletado_pasajero(index);
         }
-        _verificar_atadura_por_dni();
         return;
     }
 
@@ -3154,6 +3178,10 @@ async function _buscar_pasajero_por_dni(index) {
         });
         const datos = await resp.json();
 
+        // Fix v76z: descartar respuestas viejas si el DNI del
+        // input ya cambió mientras el fetch estaba en vuelo.
+        if (_normalizar_dni_input(inputDni.value) !== dni_norm) return;
+
         if (datos.exito && datos.pasajero) {
             _aplicar_datos_pasajero(index, datos.pasajero);
             window.pasajeros_autocompletado_estado[index] = {
@@ -3179,6 +3207,9 @@ async function _buscar_pasajero_por_dni(index) {
         console.error("Error buscando pasajero:", e);
         _limpiar_aviso_en_formulario(index);
     }
+
+    // Idem antes de verificar la atadura.
+    if (_normalizar_dni_input(inputDni.value) !== dni_norm) return;
 
     _verificar_atadura_por_dni();
 }
@@ -3214,6 +3245,12 @@ async function _buscar_comprador_por_dni(forzar = false) {
         });
         const datos = await resp.json();
 
+        // Fix v76z: si el DNI del input ya cambió mientras el
+        // fetch estaba en vuelo, descartar la respuesta. Sin
+        // esto, un fetch viejo pisaba el estado nuevo y rompía
+        // la atadura recién activada.
+        if (_normalizar_dni_input(input.value) !== dni_norm) return;
+
         if (datos.exito && datos.pasajero) {
             _aplicar_datos_comprador(datos.pasajero);
             window.comprador_dni_con_datos = dni_norm;
@@ -3234,6 +3271,9 @@ async function _buscar_comprador_por_dni(forzar = false) {
         console.error("Error buscando comprador:", e);
         _limpiar_aviso_comprador();
     }
+
+    // Idem antes de verificar la atadura.
+    if (_normalizar_dni_input(input.value) !== dni_norm) return;
 
     _verificar_atadura_por_dni();
 }

@@ -75,17 +75,26 @@ cambio de enfoque respecto del plan original. En lugar del
   `listar_empresas_de_dueno`. Con esto queda cerrada la
   Fase B2.2.
 
-**Tanda actual:** v76y (fix de auto-detección de migraciones).
+**Tanda actual:** v76z (fixes urgentes en el frontend del
+formulario de venta). Dos bugs detectados en producción:
 
-**Bug detectado en v76x:** las funciones `detectar_*` devolvían
-`true` por vacío (cuando no había nada que migrar). Como el
-listado de migraciones auto-crea el testigo cuando la
-detección da true, las migraciones quedaban marcadas como
-"Aplicada" aunque no se hubieran corrido. Se arregla en v76y:
-las funciones devuelven `false` si hay algo que migrar y falta.
-Nuevo comando `app:migracion_limpiar_marcadores` y botón
-"Re-detectar" en la pestaña Grafo para limpiar testigos mal
-puestos. Pendiente de aplicar B2.3.3 en serio.
+1. **Atadura comprador-pasajero.** El badge "Vinculado"
+   aparecía un instante y desaparecía. Causa: el listener
+   del DNI disparaba varios fetches en paralelo, y uno
+   viejo pisaba el estado nuevo. Fix: chequear que el DNI
+   del input no haya cambiado cuando vuelve el fetch; si
+   cambió, descartar la respuesta. Además, activar la
+   atadura síncronamente antes del fetch.
+2. **Modal post venta.** No aparecía. Causa:
+   `confirmar_venta_modal` hacía dos `await` antes de
+   llamar `mostrar_opciones_impresion`. Si cualquiera
+   fallaba, el flujo saltaba al `catch` y el modal nunca
+   se mostraba. Fix: mostrar el modal primero y envolver
+   los refrescos en try/catch individual.
+
+**Bug detectado en v76x (sigue pendiente):** las funciones
+`detectar_*` devolvían `true` por vacío. Se arregla en v76y.
+Testigos mal puestos se limpian con "Re-detectar".
 
 ### 1.3 Decisiones de diseño en vigor
 
