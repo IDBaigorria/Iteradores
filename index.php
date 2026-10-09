@@ -19,7 +19,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.76n
+ * @version   1.5piloto.76q
  */
 
 // --- Utilidades base ----------------------------------
@@ -198,6 +198,28 @@ if (isset($_GET['migrar_niveles_usuario'])) {
     echo "Usuario objetivo: $usuario_obj\n\n";
     echo "Migrados: " . $res['migrados'] . "\n";
     echo "Saltados: " . $res['saltados'] . "\n";
+    if (!empty($res['errores'])) {
+        echo "Errores:\n";
+        foreach ($res['errores'] as $e) echo "  - $e\n";
+    }
+    echo "\nListo.\n";
+    exit;
+}
+
+// ==== Migración de compartidos por terminal (v76q) ====
+// Crea los contenedores `compartido_con_us_termX` en
+// cada dueño, con referencias filtradas a los viajes,
+// empresas, ventas y cancelaciones del terminal. NO
+// repunta los accesos viejos: los compartidos coexisten
+// con la estructura actual. Idempotente.
+if (isset($_GET['migrar_compartidos_terminal'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    require_once __DIR__ . '/miscelaneas/migrar_compartidos_terminal.php';
+    $res = migrar_compartidos_terminal();
+    echo "Migración de compartidos por terminal\n";
+    echo "=========================================\n\n";
+    echo "Creados:   " . $res['creados'] . "\n";
+    echo "Salteados: " . $res['salteados'] . "\n";
     if (!empty($res['errores'])) {
         echo "Errores:\n";
         foreach ($res['errores'] as $e) echo "  - $e\n";

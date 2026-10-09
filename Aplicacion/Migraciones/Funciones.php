@@ -93,4 +93,74 @@ function aplicar_migracion_niveles_usuario(string $token): array {
     }
     return ['exito' => true, 'detalles' => $res];
 }
+
+// ============================================================
+// COMPARTIDOS POR TERMINAL (Fase B2.1, v76q)
+// ============================================================
+
+/**
+ * ¿Todos los terminales autorizados en algún viaje tienen
+ * su contenedor `compartido_con_*` en el dueño?
+ *
+ * @param string $token
+ * @return bool
+ */
+function detectar_compartidos_terminal(string $token): bool {
+    $todos_ok = true;
+    Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$todos_ok) {
+        if (!$todos_ok) return null;
+        $id = (string)$nodo->id();
+        if (strpos($id, 'us_') !== 0) return null;
+
+        $nivel_nodo = $nodo->adyacente('nivel');
+        if (!$nivel_nodo) {
+            $publico = $nodo->adyacente('publico');
+            if ($publico) $nivel_nodo = $publico->adyacente('nivel');
+        }
+        if (!$nivel_nodo || $nivel_nodo->dato() !== 'dueno') return null;
+
+        $cont_viajes = $nodo->adyacente('viajes');
+        if (!$cont_viajes) {
+            $priv = $nodo->adyacente('privado');
+            if ($priv) $cont_viajes = $priv->adyacente('viajes');
+        }
+        if (!$cont_viajes) return null;
+
+        $terminales = [];
+        foreach ((array)$cont_viajes->adyacentes() as $nv => $nodo_viaje) {
+            $tas = $nodo_viaje->adyacente('terminales_autorizadas');
+            if (!$tas) continue;
+            foreach ((array)$tas->adyacentes() as $nombre_t => $nodo_tv) {
+                $terminales[(string)$nombre_t] = true;
+            }
+        }
+        foreach (array_keys($terminales) as $nombre_terminal) {
+            if (!$nodo->adyacente('compartido_con_' . $nombre_terminal)) {
+                $todos_ok = false;
+                return null;
+            }
+        }
+        return null;
+    }, null);
+    return $todos_ok;
+}
+
+/**
+ * Aplica la migración de compartidos por terminal.
+ *
+ * Delega en el comando `app:crear_compartidos_terminal`.
+ *
+ * @param string $token
+ * @return array{exito: bool, detalles: array}
+ */
+function aplicar_migracion_compartidos_terminal(string $token): array {
+    $res = Controlador::ejecutar_comando('app:crear_compartidos_terminal', ['dueno' => 'todos', 'terminal' => 'todos']);
+    if (!is_array($res)) {
+        return ['exito' => false, 'detalles' => ['El comando no devolvió un resumen válido.']];
+    }
+    if (!empty($res['errores'])) {
+        return ['exito' => false, 'detalles' => $res];
+    }
+    return ['exito' => true, 'detalles' => $res];
+}
 ?>

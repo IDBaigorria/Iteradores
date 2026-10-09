@@ -35,6 +35,12 @@ function migraciones_registradas(): array {
             'detectar' => 'detectar_niveles_usuario',
             'aplicar' => 'aplicar_migracion_niveles_usuario',
         ],
+        'compartidos_terminal' => [
+            'nombre' => 'Compartidos por terminal',
+            'descripcion' => 'Crea el contenedor compartido_con_us_termX en cada dueño con terminales autorizados.',
+            'detectar' => 'detectar_compartidos_terminal',
+            'aplicar' => 'aplicar_migracion_compartidos_terminal',
+        ],
     ];
 }
 ?>

@@ -877,6 +877,24 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76q**: Fase B2.1 del modelo topológico. Crea los
+  contenedores `compartido_con_us_termX` en cada dueño,
+  uno por terminal autorizado en algún viaje del dueño.
+  Estructura: `viajes` (solo los autorizados), `empresas`
+  (referenciadas por esos viajes), `pasajeros` (alias al
+  contenedor del dueño), `ventas` (del terminal),
+  `cancelaciones` (del terminal) y `terminales` (solo el
+  propio). **No repunta nada**: los compartidos coexisten
+  con la estructura actual. La migración es idempotente.
+  Nuevo comando `app:crear_compartidos_terminal` en
+  `Aplicacion/Migraciones/Comandos.php` (no en el
+  `Controlador` del framework, siguiendo la regla de
+  v76p). Función `detectar_compartidos_terminal` y
+  `aplicar_migracion_compartidos_terminal` en
+  `Funciones.php`; entrada `compartidos_terminal` en
+  `Registro.php`. Bloque `?migrar_compartidos_terminal=1`
+  en `index.php`. Plan completo de B2 (B2.1, B2.2, B2.3,
+  B2.4) documentado en §8.7.
 - **v76p**: solo documentación. Se documenta todo el
   aprendizaje sobre el sistema de comandos del framework:
   nueva sección §4.4 en el prompt del framework (registro,
@@ -1974,18 +1992,50 @@ asignados.
 
 **Fases de implementación.** El orden revisado es:
 
-1. Fase A (completada): usuarios como IDs especiales.
-2. Fase B1: crear `publico` y `privado` en cada usuario.
-   Mover los datos existentes. `usuarios` apunta al
-   `publico`. Los `compartido_con_X` todavía no existen.
-   Los terminales siguen accediendo como hoy.
-3. Fase B2: crear los `compartido_con_X` de cada dueño
-   (uno por terminal autorizado) y reescribir los enlaces
-   desde los terminales.
-4. Fase B3: eliminar los accesos viejos.
-5. Fase C: (opcional) tipos como IDs especiales,
+1. **Fase A** (completada en v76k): usuarios como IDs
+   especiales (`us_<nombre>`).
+2. **Fase B1** (completada en v76m): contenedores
+   `publico` y `privado` creados como alias de los
+   nodos existentes. Los enlaces viejos quedan vivos.
+3. **Fase B2.1** (completada en v76q): crear los
+   contenedores `compartido_con_us_termX` en cada dueño,
+   con referencias filtradas a los viajes, empresas,
+   ventas y cancelaciones del terminal. Alias al
+   contenedor de pasajeros del dueño. **No repunta
+   nada**: los compartidos coexisten con la estructura
+   actual. La migración es idempotente.
+4. **Fase B2.2** (pendiente): cambiar el código para que
+   el terminal navegue por su compartido. Se agrega un
+   parámetro opcional `?Nodo $nodo_contexto` a
+   `obtener_contenedor_viajes_dueno`,
+   `obtener_contenedor_ventas_dueno` y
+   `obtener_contenedor_pasajeros_dueno`. Si el llamador
+   pasa el compartido, la función navega desde ahí. Si
+   no, navega desde la raíz `usuarios` como hoy.
+5. **Fase B2.3** (pendiente): repuntar `us_termX → dueno`
+   al contenedor `compartido_con_us_termX`. A partir de
+   acá, el acceso del terminal al grafo del dueño pasa
+   por la topología.
+6. **Fase B2.4** (pendiente): mantener vivos los
+   compartidos. Cada operación que modifica viajes
+   autorizados, micros, empresas o ventas del terminal
+   actualiza el compartido correspondiente.
+7. **Fase B3** (pendiente): eliminar los accesos viejos.
+8. **Fase C** (opcional): tipos como IDs especiales,
    ortogonal.
-6. Fase D: aprovechar la carga parcial como optimización.
+9. **Fase D** (pendiente): aprovechar la carga parcial
+   como optimización.
+
+**Comandos asociados.**
+
+- `app:crear_compartidos_terminal` (v76q): crea los
+  compartidos. Args: `{dueno, terminal}`, cada uno
+  `nombre` o `todos`. Idempotente.
+- Los demás comandos de migración están en el módulo
+  `Aplicacion/Migraciones/`. Los tres primeros
+  (`grafo:crear_niveles_usuario`, además) son deuda
+  técnica: `grafo:crear_niveles_usuario` está en el
+  framework pero debería vivir en la app.
 
 Cada fase es una tanda, con migración idempotente y
 verificación en local antes de producción.
@@ -2847,6 +2897,22 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   Grafo. Si se quiere verificar desde el plugin, hay que
   exponer `globalThis.Controlador = Controlador` en el
   bootstrap del SW. Pendiente anotado, sin urgencia.
+- Cerramos en v76q la Fase B2.1 del modelo topológico.
+  Nuevo comando `app:crear_compartidos_terminal` (en el
+  módulo `Aplicacion/Migraciones/`, siguiendo la regla
+  de convivencia framework/app). Crea los contenedores
+  `compartido_con_us_termX` en cada dueño, con
+  referencias filtradas a los viajes autorizados,
+  empresas referenciadas por esos viajes, ventas y
+  cancelaciones del terminal. Alias al contenedor de
+  pasajeros del dueño (mismo nodo físico). **No repunta
+  los accesos viejos.** Bloque
+  `?migrar_compartidos_terminal=1` en `index.php`.
+  Idempotente. Plan completo de B2 (B2.1, B2.2, B2.3,
+  B2.4) documentado en §8.7. Pendientes: B2.2 (contexto
+  opcional en las funciones de contenedor), B2.3
+  (repuntar `us_termX → dueno`), B2.4 (mantener los
+  compartidos vivos en cada operación).
 - Cerramos en v76n la pestaña Grafo ampliada y el sistema
   de migraciones. Sección "Nodos raíz" (lista los IDs
   especiales con sus adyacentes; botón "Ver" reusa el
@@ -3020,7 +3086,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76p (framework 1.5i.7l).
+**Estado del proyecto al cierre:** v1.5piloto.76q (framework 1.5i.7l).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -3077,6 +3143,10 @@ como alias de los nodos existentes. Enlaces viejos
 intactos. Nuevo comando `grafo:crear_niveles_usuario` y
 script `miscelaneas/migrar_niveles_usuario.php` (idempotente).
 Bloque `?migrar_niveles_usuario=1` en `index.php`.
+v76q: Fase B2.1. Compartidos por terminal creados como
+contenedores filtrados en cada dueño. Nuevo comando
+`app:crear_compartidos_terminal` en la app. No repunta
+nada, coexiste con la estructura actual. Idempotente.
 v76n: pestaña Grafo con sección "Nodos raíz" y "Migraciones".
 Nuevo nodo especial `aplicacion` con contenedor `migraciones`.
 Módulo `Aplicacion/Migraciones/` con Registro, Funciones y
