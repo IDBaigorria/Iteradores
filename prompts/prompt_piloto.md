@@ -877,6 +877,16 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76r**: Fase B2.2.1 del modelo topológico. Refactor
+  sin cambio de comportamiento: `obtener_contenedor_viajes_dueno`
+  acepta un `?Nodo $nodo_contexto` opcional. Si viene, navega
+  desde ahí en lugar de resolver `usuarios → dueño` otra vez.
+  `listar_viajes_de_terminal` le pasa `$nodo_dueno` como
+  contexto. Nuevo helper `_contexto_terminal($nombre_terminal)`
+  en `Viaje.php`: devuelve el nodo desde el que un terminal
+  debe navegar (hoy el nodo dueño, tras B2.3 el compartido).
+  El comportamiento es idéntico al actual; el cambio prepara
+  el terreno para B2.3.
 - **v76q**: Fase B2.1 del modelo topológico. Crea los
   contenedores `compartido_con_us_termX` en cada dueño,
   uno por terminal autorizado en algún viaje del dueño.
@@ -2338,7 +2348,15 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76n
+**Última actualización de este prompt:** v1.5piloto.76r
+(Fase B2.2.1 del modelo topológico: `obtener_contenedor_viajes_dueno`
+acepta un `?Nodo $nodo_contexto` opcional, y
+`listar_viajes_de_terminal` le pasa el nodo del dueño como
+contexto. Nuevo helper `_contexto_terminal` en `Viaje.php`.
+Refactor sin cambio de comportamiento: el código del terminal
+sigue navegando por el nodo del dueño, pero ya con el
+mecanismo listo para B2.3 (repuntado).).
+Antes: v1.5piloto.76n
 (pestaña Grafo: sección "Nodos raíz" y sistema de
 migraciones. Nuevo comando `grafo:raices` en el framework
 (lista los IDs especiales con sus adyacentes). Nuevo nodo
@@ -2897,6 +2915,16 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   Grafo. Si se quiere verificar desde el plugin, hay que
   exponer `globalThis.Controlador = Controlador` en el
   bootstrap del SW. Pendiente anotado, sin urgencia.
+- Cerramos en v76r la Fase B2.2.1 del modelo topológico.
+  Refactor sin cambio de comportamiento: `obtener_contenedor_viajes_dueno`
+  acepta un `?Nodo $nodo_contexto` opcional. Nuevo helper
+  `_contexto_terminal($nombre_terminal)` en `Viaje.php`.
+  `listar_viajes_de_terminal` le pasa el nodo del dueño como
+  contexto. La idea es preparar el terreno para B2.3: cuando
+  el enlace `us_termX → dueno` apunte al compartido, el código
+  del terminal ya navega por el nodo correcto sin cambios.
+  Pendientes de B2.2: B2.2.2 (Venta.php), B2.2.3
+  (ViajeAsientos.php), B2.2.4 (Empresa.php).
 - Cerramos en v76q la Fase B2.1 del modelo topológico.
   Nuevo comando `app:crear_compartidos_terminal` (en el
   módulo `Aplicacion/Migraciones/`, siguiendo la regla
@@ -3086,7 +3114,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76q (framework 1.5i.7l).
+**Estado del proyecto al cierre:** v1.5piloto.76r (framework 1.5i.7l).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -3143,6 +3171,10 @@ como alias de los nodos existentes. Enlaces viejos
 intactos. Nuevo comando `grafo:crear_niveles_usuario` y
 script `miscelaneas/migrar_niveles_usuario.php` (idempotente).
 Bloque `?migrar_niveles_usuario=1` en `index.php`.
+v76r: Fase B2.2.1. Contexto opcional en
+`obtener_contenedor_viajes_dueno` y uso desde
+`listar_viajes_de_terminal`. Nuevo helper
+`_contexto_terminal`. Refactor sin cambio de comportamiento.
 v76q: Fase B2.1. Compartidos por terminal creados como
 contenedores filtrados en cada dueño. Nuevo comando
 `app:crear_compartidos_terminal` en la app. No repunta

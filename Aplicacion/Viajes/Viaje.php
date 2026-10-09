@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.76a
+ * @version   1.5piloto.76r
  */
 
 use Iteradores\Nodos\Nodo;
@@ -173,19 +173,58 @@ El titular de los datos (o su representante legal) puede ejercer los derechos de
 HTML;
 
 /**
- * Obtiene el contenedor de viajes de un dueño, creándolo si no existe.
+ * Devuelve el nodo desde el que un terminal debe navegar
+ * para acceder al subgrafo de su dueño.
+ *
+ * A partir de v76r (Fase B2.2.1 del modelo topológico).
+ * Antes de la Fase B2.3 (repuntado), el enlace `dueno` del
+ * terminal apunta al nodo real del dueño. Después del
+ * repuntado, apuntará al contenedor `compartido_con_<terminal>`.
+ *
+ * En ambos casos, el nodo devuelto tiene el mismo dato
+ * (nombre del dueño) y los mismos sub-contenedores (`viajes`,
+ * `empresas`, `ventas`, `pasajeros`, `cancelaciones`,
+ * `terminales`), así el código del terminal puede navegar
+ * por `adyacente()` sin saber si está viendo el grafo
+ * completo o solo lo compartido.
+ *
+ * @param string $nombre_terminal
+ * @return Nodo|null
  */
-function obtener_contenedor_viajes_dueno(string $nombre_dueno) {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return null;
+function _contexto_terminal(string $nombre_terminal) {
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return null;
+    $nodo_terminal = $raiz->adyacente($nombre_terminal);
+    if (!$nodo_terminal) return null;
+    return $nodo_terminal->adyacente('dueno');
+}
 
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
-    if (!$nodo_dueno) return null;
+/**
+ * Obtiene el contenedor de viajes de un dueño, creándolo si no existe.
+ *
+ * A partir de v76r (Fase B2.2.1 del modelo topológico): acepta
+ * un `?Nodo $nodo_contexto` opcional. Si viene, navega desde
+ * ahí en lugar de resolver `usuarios → dueño`. Es el mecanismo
+ * por el que un terminal accede a sus viajes compartidos sin
+ * pasar por la raíz `usuarios`.
+ *
+ * @param string    $nombre_dueno
+ * @param Nodo|null $nodo_contexto
+ * @return Nodo|null
+ */
+function obtener_contenedor_viajes_dueno(string $nombre_dueno, ?Nodo $nodo_contexto = null) {
+    if ($nodo_contexto === null) {
+        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_usuarios) return null;
 
-    $nodo_viajes = $nodo_dueno->adyacente('viajes');
+        $nodo_contexto = $raiz_usuarios->adyacente($nombre_dueno);
+    }
+    if (!$nodo_contexto) return null;
+
+    $nodo_viajes = $nodo_contexto->adyacente('viajes');
     if (!$nodo_viajes) {
         $nodo_viajes = Nodo::crear_con_dato('');
-        $nodo_dueno->_adyacente_en($nodo_viajes, 'viajes');
+        $nodo_contexto->_adyacente_en($nodo_viajes, 'viajes');
     }
     return $nodo_viajes;
 }
@@ -226,7 +265,13 @@ function listar_viajes_de_terminal(string $nombre_terminal): array {
     if (!$nodo_dueno) return [];
 
     $nombre_dueno = $nodo_dueno->dato();
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+
+    // Fase B2.2.1 del modelo topológico: pasar el nodo del
+    // dueño (o, tras el repuntado de B2.3, el compartido del
+    // terminal) como contexto, en lugar de resolver
+    // `usuarios → dueño` otra vez. Así el terminal navega por
+    // el subgrafo correcto sin depender de la raíz global.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_dueno);
     if (!$nodo_viajes) return [];
 
     // Fase 3, v76a: precalcular el índice de ventas por viaje
