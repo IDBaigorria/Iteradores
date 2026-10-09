@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.74y
+ * @version   1.5piloto.76u
  */
 
 use Iteradores\Nodos\Nodo;
@@ -21,14 +21,19 @@ include_once("./Aplicacion/FuncionesAuxiliares.php");
  * @param string $nombre_dueno Nombre del dueño.
  * @return array Lista de empresas con su información.
  */
-function listar_empresas_de_dueno(string $nombre_dueno): array {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return [];
+function listar_empresas_de_dueno(string $nombre_dueno, ?Nodo $nodo_contexto = null): array {
+    // Fase B2.2.4 (v76u): contexto opcional. Si viene, navega
+    // por ahí en lugar de resolver `usuarios → dueño`. Mismo
+    // patrón que Viaje y Venta. Lo usa el terminal para ver
+    // solo las empresas compartidas.
+    if ($nodo_contexto === null) {
+        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_usuarios) return [];
+        $nodo_contexto = $raiz_usuarios->adyacente($nombre_dueno);
+    }
+    if (!$nodo_contexto) return [];
 
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
-    if (!$nodo_dueno) return [];
-
-    $nodo_empresas = $nodo_dueno->adyacente('empresas');
+    $nodo_empresas = $nodo_contexto->adyacente('empresas');
     if (!$nodo_empresas) return [];
 
     $adyacentes = $nodo_empresas->adyacentes();

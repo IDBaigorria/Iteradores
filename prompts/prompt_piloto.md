@@ -877,6 +877,15 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76u**: Fase B2.2.4 del modelo topológico (Empresa.php).
+  Contexto opcional (`?Nodo $nodo_contexto`) en
+  `listar_empresas_de_dueno`. Las funciones de alta, edición
+  y baja no reciben contexto: son operaciones del dueño y
+  siguen navegando por la raíz `usuarios`. Con esto queda
+  cerrada la Fase B2.2 completa (Viaje, Venta, ViajeAsientos,
+  Empresa): todas las funciones que navegan por contenedores
+  del dueño aceptan contexto, pero el enrutador todavía no
+  lo pasa. Próximo paso: B2.3 (repuntar).
 - **v76t**: Fase B2.2.3 del modelo topológico
   (ViajeAsientos.php). Contexto opcional (`?Nodo $nodo_contexto`)
   en las funciones que navegan por el contenedor de viajes del
@@ -2373,7 +2382,15 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76t
+**Última actualización de este prompt:** v1.5piloto.76u
+(Fase B2.2.4 del modelo topológico: Empresa.php. Contexto
+opcional en `listar_empresas_de_dueno`. Las funciones de
+alta/edición/baja no reciben contexto: son operaciones del
+dueño y navegan por la raíz `usuarios`. Cierra la Fase B2.2
+completa (Viaje, Venta, ViajeAsientos, Empresa). Próximo paso:
+B2.3 — repuntar `us_termX → dueno` al contenedor compartido y
+empezar a pasar el contexto desde el enrutador.).
+Antes: v1.5piloto.76t
 (Fase B2.2.3 del modelo topológico: ViajeAsientos.php.
 Contexto opcional (`?Nodo $nodo_contexto`) en las funciones
 que navegan por el contenedor de viajes del dueño:
@@ -2960,6 +2977,16 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   Grafo. Si se quiere verificar desde el plugin, hay que
   exponer `globalThis.Controlador = Controlador` en el
   bootstrap del SW. Pendiente anotado, sin urgencia.
+- Cerramos en v76u la Fase B2.2.4 del modelo topológico
+  (Empresa.php) y con eso **la Fase B2.2 completa**. Contexto
+  opcional en `listar_empresas_de_dueno`. Las funciones de
+  alta, edición y baja no reciben contexto: son operaciones
+  del dueño. Estado: todas las funciones del piloto que
+  navegan por contenedores del dueño aceptan `?Nodo $nodo_contexto`,
+  pero el enrutador todavía no lo pasa. Refactor sin cambio
+  de comportamiento. Próximo: B2.3 (repuntar
+  `us_termX → dueno` al contenedor compartido y pasar el
+  contexto desde el enrutador).
 - Cerramos en v76t la Fase B2.2.3 del modelo topológico
   (ViajeAsientos.php). Contexto opcional (`?Nodo $nodo_contexto`)
   en `_dni_asignado_en_viaje`, `reservar_asiento_micro`,
@@ -3182,7 +3209,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76t (framework 1.5i.7l).
+**Estado del proyecto al cierre:** v1.5piloto.76u (framework 1.5i.7l).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -3239,6 +3266,10 @@ como alias de los nodos existentes. Enlaces viejos
 intactos. Nuevo comando `grafo:crear_niveles_usuario` y
 script `miscelaneas/migrar_niveles_usuario.php` (idempotente).
 Bloque `?migrar_niveles_usuario=1` en `index.php`.
+v76u: Fase B2.2.4 (Empresa.php). Contexto opcional en
+`listar_empresas_de_dueno`. Con esto queda cerrada la Fase
+B2.2 completa: todas las funciones del piloto que navegan
+por contenedores del dueño aceptan contexto.
 v76t: Fase B2.2.3 (ViajeAsientos.php). Contexto opcional en
 las funciones que navegan por el contenedor de viajes del
 dueño. `seleccionar_asiento_micro` y `deseleccionar_asiento_micro`
