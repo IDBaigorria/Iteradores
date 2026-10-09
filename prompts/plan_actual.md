@@ -75,8 +75,27 @@ cambio de enfoque respecto del plan original. En lugar del
   `listar_empresas_de_dueno`. Con esto queda cerrada la
   Fase B2.2.
 
-**Tanda actual:** v77 (fix del bug 1 de la atadura:
-DNI nuevo + datos ya cargados en el otro lado).
+**Tanda actual:** v77a (fix del bug 1, parte 2).
+
+**Bug 1 (atadura) — diagnóstico completo (v77 + v77a):**
+El usuario carga el comprador con un DNI nuevo (no existe
+en el grafo), llena todos los datos. Después, en el form
+del pasajero, ingresa el mismo DNI. La atadura se activa
+y copia los datos del comprador al pasajero. Pero:
+  a) (fix v77) al volver el fetch, el backend responde
+     "no existe" y `_buscar_pasajero_por_dni` limpiaba los
+     campos. Ahora no limpia si hay atadura activa.
+  b) (fix v77a) los campos no-DNI del pasajero quedaban
+     `disabled` hasta que volviera el fetch. Ahora
+     `_activar_atadura` los habilita al activar. Los
+     campos comunes reciben el dato del comprador; los
+     no comunes (celular_emergencia, fecha_nacimiento,
+     direccion, localidad) quedan libres para completar.
+
+**Bug 2 (modal post venta) — diagnóstico pendiente:**
+Vuelve a no aparecer. Se está diagnosticando con logs de
+consola. Fix anterior (v76z): mostrar el modal antes de
+los refrescos, envolver refrescos en try/catch.
 
 **Bug 1 (atadura) — diagnóstico completo:**
 El usuario carga el comprador con un DNI nuevo (no existe

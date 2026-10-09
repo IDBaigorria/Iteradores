@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.77
+ * @version 1.5piloto.77a
  */
 
 // (aplicar_cambios.php funcionó)
@@ -3476,6 +3476,17 @@ function _verificar_atadura_por_dni() {
  */
 function _activar_atadura(index_pasajero) {
     window.atadura_actual = { indice_pasajero: index_pasajero };
+
+    // Fix v77a: habilitar los campos no-DNI del pasajero al
+    // activar la atadura. Los campos comunes (apellido,
+    // nombres, email, celular) reciben el dato del comprador
+    // en el bloque de copia inicial. Los no comunes
+    // (celular_emergencia, fecha_nacimiento, direccion,
+    // localidad) quedan habilitados y vacios para que el
+    // usuario los complete. Sin esto, el usuario veia los
+    // datos copiados pero no podia escribir en los campos
+    // faltantes hasta que volvia el fetch del DNI.
+    _habilitar_campos_pasajero(index_pasajero, true);
 
     // Copia inicial bidireccional entre comprador y pasajero.
     //
