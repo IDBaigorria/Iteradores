@@ -2378,9 +2378,17 @@ function _venta_en_curso() {
 
 ---
 
-## 12. DISCUSIÓN ACTUAL
+## 12. DISCUSIÓN ACTUAL (CONGELADA)
 
-**Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
+**Este bloque está congelado desde v1.5piloto.76v.**
+
+El contenido vigente vive ahora en `prompts/plan_actual.md`,
+que es lo primero que hay que leer al retomar el trabajo y lo
+primero que se actualiza al cerrar cada tanda. Lo que sigue
+acá es histórico: se dejó como referencia, pero ya no se
+actualiza. Toda la información sobre qué se cerró, qué está
+pendiente, las decisiones en vigor y el plan de la línea
+de tandas está en `plan_actual.md`.
 
 **Última actualización de este prompt:** v1.5piloto.76u
 (Fase B2.2.4 del modelo topológico: Empresa.php. Contexto
@@ -3205,8 +3213,10 @@ podés retomar el trabajo.
 - Entregar un `aplicar_cambios.php` completo.
 - Bumpear versiones (los CSS no tienen `@version`).
 - Documentar cada cambio.
-- **Actualizar este prompt al cerrar cada tanda, incluyendo la sección
-  "Discusión actual".**
+- **Actualizar `prompts/plan_actual.md` al cerrar cada tanda,**
+  no este prompt. El prompt del piloto se toca solo cuando
+  cambia la estructura del piloto (módulos, roles, archivos,
+  estructura de nodos).
 - Avisar de riesgos.
 
 **Estado del proyecto al cierre:** v1.5piloto.76u (framework 1.5i.7l).

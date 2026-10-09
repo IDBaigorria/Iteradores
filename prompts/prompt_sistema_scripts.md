@@ -498,8 +498,14 @@ saber dónde retomar.
 
 ### Cuándo se actualiza cada prompt
 
-- **`prompts/prompt_piloto.md`**: siempre que se toque código del piloto
-  (backend o frontend) o cambien decisiones de diseño del piloto.
+- **`prompts/plan_actual.md`**: **siempre, al cerrar cada tanda.**
+  Es la fuente de verdad sobre dónde quedamos. Se actualiza con
+  la entrada de la versión, el estado de la conversación, las
+  decisiones vigentes y el avance del plan de la línea.
+- **`prompts/prompt_piloto.md`**: solo cuando cambia la estructura
+  del piloto (módulos, roles, archivos, estructura de nodos).
+  No se toca por cada tanda. Desde v76v su sección §12 está
+  congelada: el contenido vivo está en `plan_actual.md`.
 - **`prompts/prompt_framework_iteradores.md`**: solo si se toca el
   framework Iteradores (clases `Nodo`, `Iterador`, `Controlador`,
   persistencia, etc.). No cambia cuando se toca solo el piloto.

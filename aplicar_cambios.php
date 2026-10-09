@@ -2,14 +2,15 @@
 /**
  * Aplicador de cambios — Proyecto iteradores (PHP).
  *
- * Tanda V1.5piloto.76u (Fase B2.2.4 del modelo topológico).
- *   - Empresa.php: contexto opcional en listar_empresas_de_dueno.
- *     Las funciones de alta/edición/baja no reciben contexto: son
- *     operaciones del dueño (navega por la raíz `usuarios`).
+ * Tanda V1.5piloto.76w (Fase B2.3.2 del modelo topológico).
+ *   - Arbol.php: nuevo helper _nombres_arbol_para_contexto.
+ *   - Venta.php: las funciones de lectura de ventas calculan los
+ *     nombres de enlace a partir del contexto y los pasan a las
+ *     funciones de Arbol.php. Como todavía no hay compartidos
+ *     marcados (_es_compartido), el helper devuelve null y los
+ *     nombres son default. Refactor sin cambio de comportamiento.
+ *   - Viaje.php: idem para _construir_indice_ventas_por_viaje.
  *   - index.php: bump.
- *   - prompts/prompt_piloto.md: registro.
- *
- * Refactor sin cambio de comportamiento. Cierra B2.2.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -20,57 +21,379 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ============================================================
-    // Empresa.php — bump de versión
+    // Arbol.php — helper _nombres_arbol_para_contexto
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Empresas/Empresa.php',
-        'descripcion' => 'Empresa.php: bump @version a 1.5piloto.76u',
+        'archivo' => 'miscelaneas/Arbol.php',
+        'descripcion' => 'Arbol.php: helper _nombres_arbol_para_contexto',
         'buscar' => [
-            ' * @since     1.5piloto.5',
-            ' * @version   1.5piloto.74y',
+            'function _arbol_nombres(?array $nombres): array {',
         ],
         'reemplazar' => [
-            ' * @since     1.5piloto.5',
-            ' * @version   1.5piloto.76u',
+            '/**',
+            ' * Devuelve el array de nombres de enlace que un terminal',
+            ' * debe usar para recorrer el árbol de un contenedor, según',
+            ' * el contexto.',
+            ' *',
+            ' * Fase B2.3.2 del modelo topológico (v76w). Reglas:',
+            ' * - Si no hay contexto (dueño o admin), devuelve null',
+            ' *   → las funciones de árbol usan los nombres default.',
+            ' * - Si el contexto tiene el marcador `_es_compartido`,',
+            ' *   devuelve los nombres parametrizados con el sufijo del',
+            ' *   terminal (p_<terminal>, hd_<terminal>, hmi_<terminal>).',
+            ' * - Si el contexto no es un compartido (todavía), null.',
+            ' *',
+            ' * Mientras no existan compartidos marcados, esta función',
+            ' * siempre devuelve null y el comportamiento es idéntico al',
+            ' * actual. Los marcadores los agrega la migración de B2.3.3.',
+            ' *',
+            ' * @param Nodo|null $nodo_contexto',
+            ' * @param string    $nombre_terminal',
+            ' * @return array|null',
+            ' */',
+            'function _nombres_arbol_para_contexto(?Nodo $nodo_contexto, string $nombre_terminal): ?array {',
+            '    if ($nodo_contexto === null || $nombre_terminal === \'\') return null;',
+            '    if (!$nodo_contexto->adyacente(\'_es_compartido\')) return null;',
+            '    return [',
+            '        \'p\'   => \'p_\'   . $nombre_terminal,',
+            '        \'hd\'  => \'hd_\'  . $nombre_terminal,',
+            '        \'hmi\' => \'hmi_\' . $nombre_terminal,',
+            '    ];',
+            '}',
+            '',
+            'function _arbol_nombres(?array $nombres): array {',
         ],
     ],
 
     // ============================================================
-    // Empresa.php — listar_empresas_de_dueno con contexto
+    // Venta.php — bump de versión
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Empresas/Empresa.php',
-        'descripcion' => 'Empresa.php: listar_empresas_de_dueno con contexto',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'Venta.php: bump @version a 1.5piloto.76w',
         'buscar' => [
-            'function listar_empresas_de_dueno(string $nombre_dueno): array {',
-            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz_usuarios) return [];',
-            '',
-            '    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);',
-            '    if (!$nodo_dueno) return [];',
-            '',
-            '    $nodo_empresas = $nodo_dueno->adyacente(\'empresas\');',
-            '    if (!$nodo_empresas) return [];',
+            ' * @since     1.5piloto.14',
+            ' * @version   1.5piloto.76s',
         ],
         'reemplazar' => [
-            'function listar_empresas_de_dueno(string $nombre_dueno, ?Nodo $nodo_contexto = null): array {',
-            '    // Fase B2.2.4 (v76u): contexto opcional. Si viene, navega',
-            '    // por ahí en lugar de resolver `usuarios → dueño`. Mismo',
-            '    // patrón que Viaje y Venta. Lo usa el terminal para ver',
-            '    // solo las empresas compartidas.',
-            '    if ($nodo_contexto === null) {',
-            '        $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '        if (!$raiz_usuarios) return [];',
-            '        $nodo_contexto = $raiz_usuarios->adyacente($nombre_dueno);',
-            '    }',
-            '    if (!$nodo_contexto) return [];',
+            ' * @since     1.5piloto.14',
+            ' * @version   1.5piloto.76w',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — listar_ventas_por_terminal con nombres
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'Venta.php: listar_ventas_por_terminal con nombres',
+        'buscar' => [
+            '    $contenedor = obtener_contenedor_ventas_dueno((string)$contexto->dato(), $contexto);',
+            '    if (!$contenedor) return [];',
             '',
-            '    $nodo_empresas = $nodo_contexto->adyacente(\'empresas\');',
-            '    if (!$nodo_empresas) return [];',
+            '    $ventas = [];',
+            '    $actual = hmi($contenedor);',
+            '    $seg = 0;',
+            '    while ($actual && $seg < 2000) {',
+            '        $seg++;',
+            '        $nodo_terminal = $actual->adyacente(\'terminal\');',
+            '        if (!$nodo_terminal || $nodo_terminal->dato() !== $nombre_terminal) {',
+            '            $actual = hd($actual);',
+            '            continue;',
+            '        }',
+            '        $ventas[] = formatear_venta_resumida($actual);',
+            '        $actual = hd($actual);',
+            '    }',
+            '    return $ventas;',
+        ],
+        'reemplazar' => [
+            '    $contenedor = obtener_contenedor_ventas_dueno((string)$contexto->dato(), $contexto);',
+            '    if (!$contenedor) return [];',
+            '',
+            '    // Fase B2.3.2 (v76w): calcular los nombres de enlace a',
+            '    // partir del contexto. Mientras el contexto no sea un',
+            '    // compartido marcado, devuelve null y usa los default.',
+            '    $nombres = _nombres_arbol_para_contexto($contexto, $nombre_terminal);',
+            '',
+            '    $ventas = [];',
+            '    $actual = hmi($contenedor, $nombres);',
+            '    $seg = 0;',
+            '    while ($actual && $seg < 2000) {',
+            '        $seg++;',
+            '        $nodo_terminal = $actual->adyacente(\'terminal\');',
+            '        if (!$nodo_terminal || $nodo_terminal->dato() !== $nombre_terminal) {',
+            '            $actual = hd($actual, $nombres);',
+            '            continue;',
+            '        }',
+            '        $ventas[] = formatear_venta_resumida($actual);',
+            '        $actual = hd($actual, $nombres);',
+            '    }',
+            '    return $ventas;',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — _buscar_venta_por_id (rama con contexto) con nombres
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'Venta.php: _buscar_venta_por_id con nombres',
+        'buscar' => [
+            '        $contexto = _contexto_terminal($nombre_terminal);',
+            '        if (!$contexto) return [null, \'\'];',
+            '        $nombre_dueno = (string)$contexto->dato();',
+            '        $cont = obtener_contenedor_ventas_dueno($nombre_dueno, $contexto);',
+            '        if (!$cont) return [null, \'\'];',
+            '        $actual = hmi($cont);',
+            '        $seg = 0;',
+            '        while ($actual && $seg < 1000) {',
+            '            if ($actual->dato() === $id_venta) {',
+            '                return [$actual, $nombre_dueno];',
+            '            }',
+            '            $actual = hd($actual);',
+            '            $seg++;',
+            '        }',
+            '        return [null, \'\'];',
+        ],
+        'reemplazar' => [
+            '        $contexto = _contexto_terminal($nombre_terminal);',
+            '        if (!$contexto) return [null, \'\'];',
+            '        $nombre_dueno = (string)$contexto->dato();',
+            '        $cont = obtener_contenedor_ventas_dueno($nombre_dueno, $contexto);',
+            '        if (!$cont) return [null, \'\'];',
+            '        $nombres = _nombres_arbol_para_contexto($contexto, $nombre_terminal);',
+            '        $actual = hmi($cont, $nombres);',
+            '        $seg = 0;',
+            '        while ($actual && $seg < 1000) {',
+            '            if ($actual->dato() === $id_venta) {',
+            '                return [$actual, $nombre_dueno];',
+            '            }',
+            '            $actual = hd($actual, $nombres);',
+            '            $seg++;',
+            '        }',
+            '        return [null, \'\'];',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — _recorrer_ventas_del_viaje con contexto opcional
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'Venta.php: _recorrer_ventas_del_viaje con contexto',
+        'buscar' => [
+            'function _recorrer_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje, callable $callback): void {',
+            '    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);',
+            '    if (!$contenedor) return;',
+            '    $actual = hmi($contenedor);',
+            '    $seg = 0;',
+            '    while ($actual && $seg < 2000) {',
+            '        $nodo_viaje = $actual->adyacente(\'viaje\');',
+            '        if ($nodo_viaje && $nodo_viaje->dato() === $nombre_viaje) {',
+            '            $callback($actual);',
+            '        }',
+            '        $actual = hd($actual);',
+            '        $seg++;',
+            '    }',
+            '}',
+        ],
+        'reemplazar' => [
+            'function _recorrer_ventas_del_viaje(string $nombre_dueno, string $nombre_viaje, callable $callback, ?Nodo $nodo_contexto = null, ?string $nombre_terminal = null): void {',
+            '    // Fase B2.3.2 (v76w): contexto opcional + nombres',
+            '    // parametrizados. Si no hay contexto, comportamiento',
+            '    // idéntico al actual.',
+            '    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);',
+            '    if (!$contenedor) return;',
+            '    $nombres = _nombres_arbol_para_contexto($nodo_contexto, $nombre_terminal ?? \'\');',
+            '    $actual = hmi($contenedor, $nombres);',
+            '    $seg = 0;',
+            '    while ($actual && $seg < 2000) {',
+            '        $nodo_viaje = $actual->adyacente(\'viaje\');',
+            '        if ($nodo_viaje && $nodo_viaje->dato() === $nombre_viaje) {',
+            '            $callback($actual);',
+            '        }',
+            '        $actual = hd($actual, $nombres);',
+            '        $seg++;',
+            '    }',
+            '}',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — _recorrer_ventas_de_terminal con contexto
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'Venta.php: _recorrer_ventas_de_terminal con contexto',
+        'buscar' => [
+            'function _recorrer_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, callable $callback): void {',
+            '    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);',
+            '    if (!$contenedor) return;',
+            '    $actual = hmi($contenedor);',
+            '    $seg = 0;',
+            '    while ($actual && $seg < 2000) {',
+            '        $nodo_viaje = $actual->adyacente(\'viaje\');',
+            '        $nodo_terminal = $actual->adyacente(\'terminal\');',
+            '        if ($nodo_viaje && $nodo_viaje->dato() === $nombre_viaje',
+            '            && $nodo_terminal && $nodo_terminal->dato() === $nombre_terminal) {',
+            '            $callback($actual);',
+            '        }',
+            '        $actual = hd($actual);',
+            '        $seg++;',
+            '    }',
+            '}',
+        ],
+        'reemplazar' => [
+            'function _recorrer_ventas_de_terminal(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, callable $callback, ?Nodo $nodo_contexto = null): void {',
+            '    // Fase B2.3.2 (v76w): contexto opcional + nombres',
+            '    // parametrizados.',
+            '    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);',
+            '    if (!$contenedor) return;',
+            '    $nombres = _nombres_arbol_para_contexto($nodo_contexto, $nombre_terminal);',
+            '    $actual = hmi($contenedor, $nombres);',
+            '    $seg = 0;',
+            '    while ($actual && $seg < 2000) {',
+            '        $nodo_viaje = $actual->adyacente(\'viaje\');',
+            '        $nodo_terminal = $actual->adyacente(\'terminal\');',
+            '        if ($nodo_viaje && $nodo_viaje->dato() === $nombre_viaje',
+            '            && $nodo_terminal && $nodo_terminal->dato() === $nombre_terminal) {',
+            '            $callback($actual);',
+            '        }',
+            '        $actual = hd($actual, $nombres);',
+            '        $seg++;',
+            '    }',
+            '}',
+        ],
+    ],
+
+    // ============================================================
+    // Viaje.php — _construir_indice_ventas_por_viaje con nombres
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/Viaje.php',
+        'descripcion' => 'Viaje.php: _construir_indice_ventas_por_viaje con nombres',
+        'buscar' => [
+            ' * @since     1.5piloto.8',
+            ' * @version   1.5piloto.76r',
+        ],
+        'reemplazar' => [
+            ' * @since     1.5piloto.8',
+            ' * @version   1.5piloto.76w',
+        ],
+    ],
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/Viaje.php',
+        'descripcion' => 'Viaje.php: indice ventas con nombres parametrizados',
+        'buscar' => [
+            '    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);',
+            '    if (!$contenedor_ventas) return $indice;',
+            '',
+            '    $venta_iter = hmi($contenedor_ventas);',
+            '    $seg = 0;',
+            '    while ($venta_iter && $seg < 2000) {',
+            '        $nodo_viaje_venta = $venta_iter->adyacente(\'viaje\');',
+            '        if ($nodo_viaje_venta) {',
+            '            $nombre_viaje = $nodo_viaje_venta->dato();',
+            '            $indice[\'tiene_ventas\'][$nombre_viaje] = true;',
+            '',
+            '            if ($nombre_terminal !== null) {',
+            '                $nodo_terminal_venta = $venta_iter->adyacente(\'terminal\');',
+            '                $nodo_micro_venta = $venta_iter->adyacente(\'micro\');',
+            '                if ($nodo_terminal_venta && $nodo_terminal_venta->dato() === $nombre_terminal',
+            '                    && $nodo_micro_venta) {',
+            '                    $micro_id = $nodo_micro_venta->id();',
+            '                    $cabeza = $venta_iter->adyacente(\'asientos\');',
+            '                    $cantidad = 0;',
+            '                    if ($cabeza) {',
+            '                        $asiento = $cabeza->adyacente(\'primer\');',
+            '                        $seg2 = 0;',
+            '                        while ($asiento && $seg2 < 100) {',
+            '                            $cantidad++;',
+            '                            $asiento = $asiento->adyacente(\'siguiente\');',
+            '                            $seg2++;',
+            '                        }',
+            '                    }',
+            '                    if (!isset($indice[\'vendidos_por_micro\'][$nombre_viaje])) {',
+            '                        $indice[\'vendidos_por_micro\'][$nombre_viaje] = [];',
+            '                    }',
+            '                    if (!isset($indice[\'vendidos_por_micro\'][$nombre_viaje][$nombre_terminal])) {',
+            '                        $indice[\'vendidos_por_micro\'][$nombre_viaje][$nombre_terminal] = [];',
+            '                    }',
+            '                    $indice[\'vendidos_por_micro\'][$nombre_viaje][$nombre_terminal][$micro_id] =',
+            '                        ($indice[\'vendidos_por_micro\'][$nombre_viaje][$nombre_terminal][$micro_id] ?? 0) + $cantidad;',
+            '                }',
+            '            }',
+            '        }',
+            '        $venta_iter = hd($venta_iter);',
+            '        $seg++;',
+            '    }',
+            '    return $indice;',
+        ],
+        'reemplazar' => [
+            '    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);',
+            '    if (!$contenedor_ventas) return $indice;',
+            '',
+            '    // Fase B2.3.2 (v76w): nombres de enlace calculados a partir',
+            '    // del contexto. Si el contexto no es un compartido marcado,',
+            '    // devuelve null y usa los default.',
+            '    $nombres = _nombres_arbol_para_contexto($nodo_contexto, $nombre_terminal ?? \'\');',
+            '',
+            '    $venta_iter = hmi($contenedor_ventas, $nombres);',
+            '    $seg = 0;',
+            '    while ($venta_iter && $seg < 2000) {',
+            '        $nodo_viaje_venta = $venta_iter->adyacente(\'viaje\');',
+            '        if ($nodo_viaje_venta) {',
+            '            $nombre_viaje = $nodo_viaje_venta->dato();',
+            '            $indice[\'tiene_ventas\'][$nombre_viaje] = true;',
+            '',
+            '            if ($nombre_terminal !== null) {',
+            '                $nodo_terminal_venta = $venta_iter->adyacente(\'terminal\');',
+            '                $nodo_micro_venta = $venta_iter->adyacente(\'micro\');',
+            '                if ($nodo_terminal_venta && $nodo_terminal_venta->dato() === $nombre_terminal',
+            '                    && $nodo_micro_venta) {',
+            '                    $micro_id = $nodo_micro_venta->id();',
+            '                    $cabeza = $venta_iter->adyacente(\'asientos\');',
+            '                    $cantidad = 0;',
+            '                    if ($cabeza) {',
+            '                        $asiento = $cabeza->adyacente(\'primer\');',
+            '                        $seg2 = 0;',
+            '                        while ($asiento && $seg2 < 100) {',
+            '                            $cantidad++;',
+            '                            $asiento = $asiento->adyacente(\'siguiente\');',
+            '                            $seg2++;',
+            '                        }',
+            '                    }',
+            '                    if (!isset($indice[\'vendidos_por_micro\'][$nombre_viaje])) {',
+            '                        $indice[\'vendidos_por_micro\'][$nombre_viaje] = [];',
+            '                    }',
+            '                    if (!isset($indice[\'vendidos_por_micro\'][$nombre_viaje][$nombre_terminal])) {',
+            '                        $indice[\'vendidos_por_micro\'][$nombre_viaje][$nombre_terminal] = [];',
+            '                    }',
+            '                    $indice[\'vendidos_por_micro\'][$nombre_viaje][$nombre_terminal][$micro_id] =',
+            '                        ($indice[\'vendidos_por_micro\'][$nombre_viaje][$nombre_terminal][$micro_id] ?? 0) + $cantidad;',
+            '                }',
+            '            }',
+            '        }',
+            '        $venta_iter = hd($venta_iter, $nombres);',
+            '        $seg++;',
+            '    }',
+            '    return $indice;',
         ],
     ],
 
@@ -81,139 +404,76 @@ $cambios = [
     [
         'tipo' => 'reemplazar',
         'archivo' => 'index.php',
-        'descripcion' => 'index.php: bump @version a 1.5piloto.76u',
+        'descripcion' => 'index.php: bump @version a 1.5piloto.76w',
         'buscar' => [
             ' * @since     1.0.0',
-            ' * @version   1.5piloto.76t',
+            ' * @version   1.5piloto.76v',
         ],
         'reemplazar' => [
             ' * @since     1.0.0',
-            ' * @version   1.5piloto.76u',
+            ' * @version   1.5piloto.76w',
         ],
     ],
 
     // ============================================================
-    // prompts/prompt_piloto.md — "Última actualización"
+    // prompts/plan_actual.md — actualizar
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt_piloto: "Última actualización"',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual: última actualización a v76w',
         'buscar' => [
-            '**Última actualización de este prompt:** v1.5piloto.76t',
-            '(Fase B2.2.3 del modelo topológico: ViajeAsientos.php.',
-            'Contexto opcional (`?Nodo $nodo_contexto`) en las funciones',
-            'que navegan por el contenedor de viajes del dueño:',
-            '`_dni_asignado_en_viaje`, `reservar_asiento_micro`,',
-            '`asignar_pasajero_a_reserva`, `liberar_reserva_asiento_micro`,',
-            '`obtener_estados_asientos_micro`. `seleccionar_asiento_micro`',
-            'y `deseleccionar_asiento_micro` resuelven su contexto vía',
-            '`_contexto_terminal($nombre_terminal)`. Refactor sin cambio',
-            'de comportamiento: el enrutador todavía no pasa el contexto.).',
+            '**Última actualización de este archivo:** v1.5piloto.76v',
+            '(reorganización de prompts + inicio de la Fase B2.3).',
+            'Con v76u quedó cerrada la Fase B2.2 completa (Viaje, Venta,',
+            'ViajeAsientos, Empresa). Próximo paso: **Fase B2.3**, con un',
+            'cambio de enfoque respecto del plan original. En lugar del',
+            '"compartido plano" (opción A original), se va con la **opción D**:',
+            'árboles paralelos con nombres de enlace parametrizados en',
+            '`miscelaneas/Arbol.php`. Detalle en §2.3.)',
         ],
-        'reemplazar' => [
-            '**Última actualización de este prompt:** v1.5piloto.76u',
-            '(Fase B2.2.4 del modelo topológico: Empresa.php. Contexto',
-            'opcional en `listar_empresas_de_dueno`. Las funciones de',
-            'alta/edición/baja no reciben contexto: son operaciones del',
-            'dueño y navegan por la raíz `usuarios`. Cierra la Fase B2.2',
-            'completa (Viaje, Venta, ViajeAsientos, Empresa). Próximo paso:',
-            'B2.3 — repuntar `us_termX → dueno` al contenedor compartido y',
-            'empezar a pasar el contexto desde el enrutador.).',
-            'Antes: v1.5piloto.76t',
-            '(Fase B2.2.3 del modelo topológico: ViajeAsientos.php.',
-            'Contexto opcional (`?Nodo $nodo_contexto`) en las funciones',
-            'que navegan por el contenedor de viajes del dueño:',
-            '`_dni_asignado_en_viaje`, `reservar_asiento_micro`,',
-            '`asignar_pasajero_a_reserva`, `liberar_reserva_asiento_micro`,',
-            '`obtener_estados_asientos_micro`. `seleccionar_asiento_micro`',
-            'y `deseleccionar_asiento_micro` resuelven su contexto vía',
-            '`_contexto_terminal($nombre_terminal)`. Refactor sin cambio',
-            'de comportamiento: el enrutador todavía no pasa el contexto.).',
-        ],
+        'reemplazar_mal' => [],
     ],
 
-    // ============================================================
-    // prompts/prompt_piloto.md — historial
-    // ============================================================
-
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt_piloto: historial v76u',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual: v76w en el estado',
         'buscar' => [
-            '- **v76t**: Fase B2.2.3 del modelo topológico',
+            '**Tanda actual:** v76v (reorganización de prompts).',
         ],
         'reemplazar' => [
-            '- **v76u**: Fase B2.2.4 del modelo topológico (Empresa.php).',
-            '  Contexto opcional (`?Nodo $nodo_contexto`) en',
-            '  `listar_empresas_de_dueno`. Las funciones de alta, edición',
-            '  y baja no reciben contexto: son operaciones del dueño y',
-            '  siguen navegando por la raíz `usuarios`. Con esto queda',
-            '  cerrada la Fase B2.2 completa (Viaje, Venta, ViajeAsientos,',
-            '  Empresa): todas las funciones que navegan por contenedores',
-            '  del dueño aceptan contexto, pero el enrutador todavía no',
-            '  lo pasa. Próximo paso: B2.3 (repuntar).',
-            '- **v76t**: Fase B2.2.3 del modelo topológico',
-        ],
-    ],
-
-    // ============================================================
-    // prompts/prompt_piloto.md — §12 bullet
-    // ============================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => '§12: agregar bullet v76u',
-        'buscar' => [
-            '- Cerramos en v76t la Fase B2.2.3 del modelo topológico',
-        ],
-        'reemplazar' => [
-            '- Cerramos en v76u la Fase B2.2.4 del modelo topológico',
-            '  (Empresa.php) y con eso **la Fase B2.2 completa**. Contexto',
-            '  opcional en `listar_empresas_de_dueno`. Las funciones de',
-            '  alta, edición y baja no reciben contexto: son operaciones',
-            '  del dueño. Estado: todas las funciones del piloto que',
-            '  navegan por contenedores del dueño aceptan `?Nodo $nodo_contexto`,',
-            '  pero el enrutador todavía no lo pasa. Refactor sin cambio',
-            '  de comportamiento. Próximo: B2.3 (repuntar',
-            '  `us_termX → dueno` al contenedor compartido y pasar el',
-            '  contexto desde el enrutador).',
-            '- Cerramos en v76t la Fase B2.2.3 del modelo topológico',
-        ],
-    ],
-
-    // ============================================================
-    // prompts/prompt_piloto.md — §13 estado
-    // ============================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => '§13: estado al cierre a v76u',
-        'buscar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.76t (framework 1.5i.7l).',
-        ],
-        'reemplazar' => [
-            '**Estado del proyecto al cierre:** v1.5piloto.76u (framework 1.5i.7l).',
+            '**Tanda actual:** v76w (Fase B2.3.2, refactor de funciones',
+            'para árboles parametrizados).',
         ],
     ],
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => '§13: agregar v76u al bloque de estado',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual: B2.3.1 y B2.3.2 completadas',
         'buscar' => [
-            'v76t: Fase B2.2.3 (ViajeAsientos.php). Contexto opcional en',
+            '- **B2.3.1** — Parametrizar `miscelaneas/Arbol.php`. Las',
+            '  funciones `_hmi`, `_hd`, `hmi`, `hd`, `p`, `eliminar_hmi` y',
+            '  `eliminar_hd` aceptan un `?array $nombres = null`. Si es',
+            '  null, usan los nombres default (`hmi`/`hd`/`p`). Refactor',
+            '  sin cambio de comportamiento.',
+            '- **B2.3.2** — Ajustar las funciones del piloto para que el',
+            '  terminal use los nombres parametrizados. Sin repuntar.',
         ],
         'reemplazar' => [
-            'v76u: Fase B2.2.4 (Empresa.php). Contexto opcional en',
-            '`listar_empresas_de_dueno`. Con esto queda cerrada la Fase',
-            'B2.2 completa: todas las funciones del piloto que navegan',
-            'por contenedores del dueño aceptan contexto.',
-            'v76t: Fase B2.2.3 (ViajeAsientos.php). Contexto opcional en',
+            '- **B2.3.1** — Parametrizar `miscelaneas/Arbol.php`.',
+            '  **Completada** (v76v).',
+            '- **B2.3.2** — Ajustar las funciones del piloto para que el',
+            '  terminal use los nombres parametrizados. **Completada**',
+            '  (v76w): helper `_nombres_arbol_para_contexto`, aplicado en',
+            '  `listar_ventas_por_terminal`, `_buscar_venta_por_id` (rama',
+            '  con contexto), `_recorrer_ventas_del_viaje` y',
+            '  `_recorrer_ventas_de_terminal` (Venta.php) y',
+            '  `_construir_indice_ventas_por_viaje` (Viaje.php). Como',
+            '  todavía no hay compartidos marcados, el helper devuelve',
+            '  null y los nombres son default. Sin cambio de comportamiento.',
         ],
     ],
 
