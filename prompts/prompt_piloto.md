@@ -877,6 +877,17 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76t**: Fase B2.2.3 del modelo topológico
+  (ViajeAsientos.php). Contexto opcional (`?Nodo $nodo_contexto`)
+  en las funciones que navegan por el contenedor de viajes del
+  dueño: `_dni_asignado_en_viaje`, `reservar_asiento_micro`,
+  `asignar_pasajero_a_reserva`, `liberar_reserva_asiento_micro`,
+  `obtener_estados_asientos_micro`. `seleccionar_asiento_micro`
+  y `deseleccionar_asiento_micro` resuelven el contexto interno
+  con `_contexto_terminal($nombre_terminal)`. Refactor sin cambio
+  de comportamiento: el enrutador todavía no pasa el contexto a
+  las funciones de reserva; la preparación para B2.3 queda
+  avanzada.
 - **v76s**: Fase B2.2.2 del modelo topológico (Venta.php).
   Refactor sin cambio de comportamiento:
   `obtener_contenedor_ventas_dueno` acepta un `?Nodo $nodo_contexto`
@@ -2362,7 +2373,17 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76s
+**Última actualización de este prompt:** v1.5piloto.76t
+(Fase B2.2.3 del modelo topológico: ViajeAsientos.php.
+Contexto opcional (`?Nodo $nodo_contexto`) en las funciones
+que navegan por el contenedor de viajes del dueño:
+`_dni_asignado_en_viaje`, `reservar_asiento_micro`,
+`asignar_pasajero_a_reserva`, `liberar_reserva_asiento_micro`,
+`obtener_estados_asientos_micro`. `seleccionar_asiento_micro`
+y `deseleccionar_asiento_micro` resuelven su contexto vía
+`_contexto_terminal($nombre_terminal)`. Refactor sin cambio
+de comportamiento: el enrutador todavía no pasa el contexto.).
+Antes: v1.5piloto.76s
 (Fase B2.2.2 del modelo topológico: Venta.php. Contexto
 opcional en `obtener_contenedor_ventas_dueno`; filtro opcional
 por terminal en `_buscar_venta_por_id`, `obtener_venta_por_id`,
@@ -2939,6 +2960,15 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   Grafo. Si se quiere verificar desde el plugin, hay que
   exponer `globalThis.Controlador = Controlador` en el
   bootstrap del SW. Pendiente anotado, sin urgencia.
+- Cerramos en v76t la Fase B2.2.3 del modelo topológico
+  (ViajeAsientos.php). Contexto opcional (`?Nodo $nodo_contexto`)
+  en `_dni_asignado_en_viaje`, `reservar_asiento_micro`,
+  `asignar_pasajero_a_reserva`, `liberar_reserva_asiento_micro`
+  y `obtener_estados_asientos_micro`. `seleccionar_asiento_micro`
+  y `deseleccionar_asiento_micro` resuelven el contexto vía
+  `_contexto_terminal($nombre_terminal)`. Refactor sin cambio
+  de comportamiento. Pendiente: B2.2.4 (Empresa.php). Después:
+  B2.3 (repuntar `us_termX → dueno` al compartido).
 - Cerramos en v76s la Fase B2.2.2 del modelo topológico
   (Venta.php). Refactor sin cambio de comportamiento:
   `obtener_contenedor_ventas_dueno` acepta un `?Nodo $nodo_contexto`
@@ -3152,7 +3182,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76s (framework 1.5i.7l).
+**Estado del proyecto al cierre:** v1.5piloto.76t (framework 1.5i.7l).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -3209,6 +3239,11 @@ como alias de los nodos existentes. Enlaces viejos
 intactos. Nuevo comando `grafo:crear_niveles_usuario` y
 script `miscelaneas/migrar_niveles_usuario.php` (idempotente).
 Bloque `?migrar_niveles_usuario=1` en `index.php`.
+v76t: Fase B2.2.3 (ViajeAsientos.php). Contexto opcional en
+las funciones que navegan por el contenedor de viajes del
+dueño. `seleccionar_asiento_micro` y `deseleccionar_asiento_micro`
+resuelven su contexto vía `_contexto_terminal`. Refactor sin
+cambio de comportamiento.
 v76s: Fase B2.2.2 (Venta.php). Contexto opcional en
 `obtener_contenedor_ventas_dueno` y filtro opcional por
 terminal en las búsquedas por id. `listar_ventas_por_terminal`

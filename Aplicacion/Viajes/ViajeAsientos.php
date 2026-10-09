@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.74x
+ * @version   1.5piloto.76t
  */
 
 use Iteradores\Nodos\Nodo;
@@ -97,11 +97,13 @@ function obtener_configuracion_piso_con_estado($nodo_piso): ?array {
  * @param string $dni
  * @return bool
  */
-function _dni_asignado_en_viaje(string $nombre_dueno, string $nombre_viaje, string $dni): bool {
+function _dni_asignado_en_viaje(string $nombre_dueno, string $nombre_viaje, string $dni, ?Nodo $nodo_contexto = null): bool {
     $dni_norm = normalizar_dni($dni);
     if ($dni_norm === '') return false;
 
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    // Fase B2.2.3 (v76t): contexto opcional. Si viene, navega por
+    // ahí en lugar de resolver `usuarios → dueño`.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return false;
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -153,8 +155,9 @@ function _dni_asignado_en_viaje(string $nombre_dueno, string $nombre_viaje, stri
  * @param array  $datos_pasajero Datos opcionales del pasajero (mismo formato que en venta).
  * @return array
  */
-function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, array $datos_pasajero = []): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, array $datos_pasajero = [], ?Nodo $nodo_contexto = null): array {
+    // Fase B2.2.3 (v76t): contexto opcional.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -226,7 +229,7 @@ function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, stri
         $err = validar_direccion($datos_pasajero['direccion'] ?? '');
         if ($err !== null) return ['exito' => false, 'error' => 'Dirección: ' . $err];
 
-        if (_dni_asignado_en_viaje($nombre_dueno, $nombre_viaje, $datos_pasajero['dni'])) {
+        if (_dni_asignado_en_viaje($nombre_dueno, $nombre_viaje, $datos_pasajero['dni'], $nodo_contexto)) {
             return ['exito' => false, 'error' => 'El DNI ya está asignado a otro asiento de este viaje'];
         }
     }
@@ -273,8 +276,9 @@ function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, stri
  * @param array  $datos_pasajero
  * @return array
  */
-function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, array $datos_pasajero): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, array $datos_pasajero, ?Nodo $nodo_contexto = null): array {
+    // Fase B2.2.3 (v76t): contexto opcional.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -341,7 +345,7 @@ function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, 
     $err = validar_direccion($datos_pasajero['direccion'] ?? '');
     if ($err !== null) return ['exito' => false, 'error' => 'Dirección: ' . $err];
 
-    if (_dni_asignado_en_viaje($nombre_dueno, $nombre_viaje, $datos_pasajero['dni'])) {
+    if (_dni_asignado_en_viaje($nombre_dueno, $nombre_viaje, $datos_pasajero['dni'], $nodo_contexto)) {
         return ['exito' => false, 'error' => 'El DNI ya está asignado a otro asiento de este viaje'];
     }
 
@@ -366,8 +370,9 @@ function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, 
  * A partir de v1.5piloto.38 también elimina el enlace `pasajero` si existía,
  * dejando el asiento limpio para un futuro uso.
  */
-function liberar_reserva_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function liberar_reserva_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, ?Nodo $nodo_contexto = null): array {
+    // Fase B2.2.3 (v76t): contexto opcional.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -430,8 +435,9 @@ function liberar_reserva_asiento_micro(string $nombre_viaje, string $nombre_micr
  *  - pasajero: objeto con datos básicos o null
  *  - venta_id: id de la venta si el asiento está vendido, o null
  */
-function obtener_estados_asientos_micro(string $nombre_viaje, string $nombre_micro, string $nombre_dueno): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function obtener_estados_asientos_micro(string $nombre_viaje, string $nombre_micro, string $nombre_dueno, ?Nodo $nodo_contexto = null): array {
+    // Fase B2.2.3 (v76t): contexto opcional.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -547,7 +553,10 @@ function obtener_estados_asientos_micro(string $nombre_viaje, string $nombre_mic
  * Selecciona un asiento para una terminal.
  */
 function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, string $nombre_terminal): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    // Fase B2.2.3 (v76t): el terminal navega por su contexto
+    // (hoy el nodo del dueño, tras B2.3 el compartido).
+    $nodo_contexto = _contexto_terminal($nombre_terminal);
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -706,7 +715,9 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
  * Deselecciona un asiento previamente seleccionado por la terminal.
  */
 function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, string $nombre_terminal): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    // Fase B2.2.3 (v76t): el terminal navega por su contexto.
+    $nodo_contexto = _contexto_terminal($nombre_terminal);
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
