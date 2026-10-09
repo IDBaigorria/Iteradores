@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.75a
+ * @version   1.5piloto.76s
  */
 
 
@@ -20,18 +20,29 @@ include_once("./Aplicacion/FuncionesAuxiliares.php");
 
 /**
  * Obtiene el contenedor de ventas de un dueño (raíz del árbol de ventas), creándolo si no existe.
+ *
+ * A partir de v76s (Fase B2.2.2 del modelo topológico): acepta
+ * un `?Nodo $nodo_contexto` opcional. Si viene, navega desde
+ * ahí en lugar de resolver `usuarios → dueño`. Mismo patrón
+ * que `obtener_contenedor_viajes_dueno` (v76r).
+ *
+ * @param string    $nombre_dueno
+ * @param Nodo|null $nodo_contexto
+ * @return Nodo|null
  */
-function obtener_contenedor_ventas_dueno(string $nombre_dueno) {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return null;
+function obtener_contenedor_ventas_dueno(string $nombre_dueno, ?Nodo $nodo_contexto = null) {
+    if ($nodo_contexto === null) {
+        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_usuarios) return null;
 
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
-    if (!$nodo_dueno) return null;
+        $nodo_contexto = $raiz_usuarios->adyacente($nombre_dueno);
+    }
+    if (!$nodo_contexto) return null;
 
-    $nodo_ventas = $nodo_dueno->adyacente('ventas');
+    $nodo_ventas = $nodo_contexto->adyacente('ventas');
     if (!$nodo_ventas) {
         $nodo_ventas = Nodo::crear_con_dato('');
-        $nodo_dueno->_adyacente_en($nodo_ventas, 'ventas');
+        $nodo_contexto->_adyacente_en($nodo_ventas, 'ventas');
     }
     return $nodo_ventas;
 }
@@ -189,7 +200,9 @@ function confirmar_venta_actual(
     if (!$nodo_dueno) return ['exito' => false, 'error' => 'La terminal no tiene dueño asignado'];
     $nombre_dueno = $nodo_dueno->dato();
 
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    // Fase B2.2.2: navegar por el contexto del terminal (hoy el
+    // nodo del dueño, tras B2.3 el compartido).
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_dueno);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'No se encontraron viajes del dueño'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -571,8 +584,10 @@ function confirmar_venta_actual(
         $nodo_banco->_dato((string)($monto_banco_actual + $monto_pagado));
     }
 
-    // Insertar venta en el árbol de ventas del dueño usando _hmi
-    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    // Insertar venta en el árbol de ventas del dueño usando _hmi.
+    // Fase B2.2.2: se navega por el contexto del terminal para
+    // que la venta se inserte en el contenedor correcto.
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno);
     if (!$contenedor_ventas) {
         return ['exito' => false, 'error' => 'No se pudo obtener contenedor de ventas'];
     }
@@ -616,25 +631,39 @@ function listar_ventas_por_dueno(string $nombre_dueno): array {
 }
 
 /**
- * Lista ventas de una terminal (filtra las del dueño).
+ * Lista ventas de una terminal, navegando por el contexto
+ * del terminal.
+ *
+ * A partir de v76s (Fase B2.2.2): en lugar de recorrer todas
+ * las ventas del dueño y filtrar, navega por el contexto del
+ * terminal (hoy el nodo del dueño, tras B2.3 el compartido).
+ * El filtro por `terminal` se mantiene para que el resultado
+ * sea idéntico en ambos modos.
+ *
+ * @param string $nombre_terminal
+ * @return array
  */
 function listar_ventas_por_terminal(string $nombre_terminal): array {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return [];
+    $contexto = _contexto_terminal($nombre_terminal);
+    if (!$contexto) return [];
 
-    $nodo_terminal = $raiz_usuarios->adyacente($nombre_terminal);
-    if (!$nodo_terminal) return [];
+    $contenedor = obtener_contenedor_ventas_dueno((string)$contexto->dato(), $contexto);
+    if (!$contenedor) return [];
 
-    $nodo_dueno = $nodo_terminal->adyacente('dueno');
-    if (!$nodo_dueno) return [];
-
-    $nombre_dueno = $nodo_dueno->dato();
-    $ventas_dueno = listar_ventas_por_dueno($nombre_dueno);
-    $ventas_terminal = array_filter($ventas_dueno, function($venta) use ($nombre_terminal) {
-        return $venta['terminal'] === $nombre_terminal;
-    });
-
-    return array_values($ventas_terminal);
+    $ventas = [];
+    $actual = hmi($contenedor);
+    $seg = 0;
+    while ($actual && $seg < 2000) {
+        $seg++;
+        $nodo_terminal = $actual->adyacente('terminal');
+        if (!$nodo_terminal || $nodo_terminal->dato() !== $nombre_terminal) {
+            $actual = hd($actual);
+            continue;
+        }
+        $ventas[] = formatear_venta_resumida($actual);
+        $actual = hd($actual);
+    }
+    return $ventas;
 }
 
 /**
@@ -814,26 +843,13 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
 /**
  * Obtiene el detalle completo de una venta por su ID.
  */
-function obtener_venta_por_id(string $id_venta): ?array {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return null;
-
-    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
-        $nodo_nivel = $nodo_dueno->adyacente('nivel');
-        if (!$nodo_nivel || $nodo_nivel->dato() !== 'dueno') continue;
-
-        $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
-        if (!$contenedor) continue;
-
-        $actual = hmi($contenedor);
-        while ($actual) {
-            if ($actual->dato() === $id_venta) {
-                return formatear_venta_completa($actual);
-            }
-            $actual = hd($actual);
-        }
-    }
-    return null;
+function obtener_venta_por_id(string $id_venta, ?string $nombre_terminal = null): ?array {
+    // Fase B2.2.2: si se pasa el terminal, restringir la búsqueda
+    // a su contexto. Si no, buscar en todos los dueños (compat
+    // para admin/soporte).
+    [$nodo_venta, ] = _buscar_venta_por_id($id_venta, $nombre_terminal);
+    if (!$nodo_venta) return null;
+    return formatear_venta_completa($nodo_venta);
 }
 
 /**
@@ -964,7 +980,29 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
  * @param string $id_venta
  * @return array{0: ?Nodo, 1: string}
  */
-function _buscar_venta_por_id(string $id_venta): array {
+function _buscar_venta_por_id(string $id_venta, ?string $nombre_terminal = null): array {
+    // Fase B2.2.2: si se pasa el terminal, restringir la búsqueda
+    // a su contexto (hoy el nodo del dueño, tras B2.3 el
+    // compartido). Acelera la búsqueda y prepara el aislamiento.
+    if ($nombre_terminal !== null && $nombre_terminal !== '') {
+        $contexto = _contexto_terminal($nombre_terminal);
+        if (!$contexto) return [null, ''];
+        $nombre_dueno = (string)$contexto->dato();
+        $cont = obtener_contenedor_ventas_dueno($nombre_dueno, $contexto);
+        if (!$cont) return [null, ''];
+        $actual = hmi($cont);
+        $seg = 0;
+        while ($actual && $seg < 1000) {
+            if ($actual->dato() === $id_venta) {
+                return [$actual, $nombre_dueno];
+            }
+            $actual = hd($actual);
+            $seg++;
+        }
+        return [null, ''];
+    }
+
+    // Sin filtro: comportamiento actual, buscar en todos los dueños.
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     if (!$raiz_usuarios) return [null, ''];
 
@@ -1042,8 +1080,8 @@ function _calcular_devolucion_venta(Nodo $nodo_venta): array {
  * @param string $id_venta
  * @return array
  */
-function obtener_info_cancelacion(string $id_venta): array {
-    [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta);
+function obtener_info_cancelacion(string $id_venta, ?string $nombre_terminal = null): array {
+    [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta, $nombre_terminal);
     if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
 
     // Datos de viaje y micro.
@@ -1251,8 +1289,8 @@ function _destruir_venta_actual(Nodo $nodo_venta_actual): void {
  * @param string $id_venta
  * @return array
  */
-function cancelar_venta(string $id_venta, string $motivo = ''): array {
-    [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta);
+function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_terminal = null): array {
+    [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta, $nombre_terminal);
     if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
 
     // Desglose: parte en terminal vs parte ya rendida.
@@ -1844,31 +1882,13 @@ function _eliminar_cupon_del_contenedor(Nodo $contenedor, Nodo $cupon): void {
  * @param string $metodo_pago
  * @return array
  */
-function pagar_cupon_venta(string $id_venta, string $numero_cupon, string $monto, string $metodo_pago): array {
+function pagar_cupon_venta(string $id_venta, string $numero_cupon, string $monto, string $metodo_pago, ?string $nombre_terminal = null): array {
     $monto_num = (float)$monto;
     if ($monto_num <= 0) return ['exito' => false, 'error' => 'Monto inválido'];
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-
-    // Buscar la venta en el árbol del dueño.
-    $nodo_venta = null;
-    $nombre_dueno_venta = '';
-    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
-        $nivel = $nodo_dueno->adyacente('nivel');
-        if (!$nivel || $nivel->dato() !== 'dueno') continue;
-        $cont = obtener_contenedor_ventas_dueno($nombre_dueno);
-        if (!$cont) continue;
-        $actual = hmi($cont);
-        while ($actual) {
-            if ($actual->dato() === $id_venta) {
-                $nodo_venta = $actual;
-                $nombre_dueno_venta = $nombre_dueno;
-                break 2;
-            }
-            $actual = hd($actual);
-        }
-    }
+    // Fase B2.2.2: buscar la venta con filtro opcional por
+    // terminal. Si viene, restringe la búsqueda a su contexto.
+    [$nodo_venta, $nombre_dueno_venta] = _buscar_venta_por_id($id_venta, $nombre_terminal);
     if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
 
     // Resolver métodos permitidos.

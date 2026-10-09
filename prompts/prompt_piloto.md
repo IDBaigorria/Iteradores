@@ -877,6 +877,20 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v76s**: Fase B2.2.2 del modelo topológico (Venta.php).
+  Refactor sin cambio de comportamiento:
+  `obtener_contenedor_ventas_dueno` acepta un `?Nodo $nodo_contexto`
+  opcional. `_buscar_venta_por_id` acepta un `?string $nombre_terminal`
+  opcional; si viene, restringe la búsqueda a su contexto.
+  `obtener_venta_por_id`, `pagar_cupon_venta`, `cancelar_venta` y
+  `obtener_info_cancelacion` heredan el filtro. `listar_ventas_por_terminal`
+  y `confirmar_venta_actual` navegan por el contexto del
+  terminal. `_construir_indice_ventas_por_viaje` (en Viaje.php)
+  acepta contexto, y `listar_viajes_de_terminal` le pasa el nodo
+  del dueño. El enrutador todavía no pasa el `$nombre_terminal`
+  a las funciones de búsqueda, así que el comportamiento es
+  idéntico al actual. La preparación para B2.3 (repuntado)
+  queda completa.
 - **v76r**: Fase B2.2.1 del modelo topológico. Refactor
   sin cambio de comportamiento: `obtener_contenedor_viajes_dueno`
   acepta un `?Nodo $nodo_contexto` opcional. Si viene, navega
@@ -2348,7 +2362,17 @@ function _venta_en_curso() {
 
 **Este bloque es lo primero que hay que actualizar al cerrar cada tanda.**
 
-**Última actualización de este prompt:** v1.5piloto.76r
+**Última actualización de este prompt:** v1.5piloto.76s
+(Fase B2.2.2 del modelo topológico: Venta.php. Contexto
+opcional en `obtener_contenedor_ventas_dueno`; filtro opcional
+por terminal en `_buscar_venta_por_id`, `obtener_venta_por_id`,
+`pagar_cupon_venta`, `cancelar_venta` y `obtener_info_cancelacion`;
+`listar_ventas_por_terminal` y `confirmar_venta_actual` navegan
+por el contexto del terminal. Refactor sin cambio de
+comportamiento: el enrutador todavía no pasa el `$nombre_terminal`,
+así que la búsqueda sigue siendo global. La preparación de B2.3
+está completa.).
+Antes: v1.5piloto.76r
 (Fase B2.2.1 del modelo topológico: `obtener_contenedor_viajes_dueno`
 acepta un `?Nodo $nodo_contexto` opcional, y
 `listar_viajes_de_terminal` le pasa el nodo del dueño como
@@ -2915,6 +2939,20 @@ piloto PHP). El asistente ya leyó el framework JS: `Objeto`,
   Grafo. Si se quiere verificar desde el plugin, hay que
   exponer `globalThis.Controlador = Controlador` en el
   bootstrap del SW. Pendiente anotado, sin urgencia.
+- Cerramos en v76s la Fase B2.2.2 del modelo topológico
+  (Venta.php). Refactor sin cambio de comportamiento:
+  `obtener_contenedor_ventas_dueno` acepta un `?Nodo $nodo_contexto`
+  opcional. `_buscar_venta_por_id` y sus llamadores
+  (`obtener_venta_por_id`, `pagar_cupon_venta`, `cancelar_venta`,
+  `obtener_info_cancelacion`) aceptan un `?string $nombre_terminal`
+  opcional que restringe la búsqueda al contexto del terminal.
+  `listar_ventas_por_terminal` navega por el contexto.
+  `confirmar_venta_actual` usa el contexto al resolver viajes y
+  al insertar la venta. `_construir_indice_ventas_por_viaje`
+  (en Viaje.php) acepta contexto y `listar_viajes_de_terminal`
+  lo pasa. Pendiente: B2.2.3 (ViajeAsientos.php) y B2.2.4
+  (Empresa.php). Después: B2.3 (repuntar `us_termX → dueno`
+  al compartido).
 - Cerramos en v76r la Fase B2.2.1 del modelo topológico.
   Refactor sin cambio de comportamiento: `obtener_contenedor_viajes_dueno`
   acepta un `?Nodo $nodo_contexto` opcional. Nuevo helper
@@ -3114,7 +3152,7 @@ podés retomar el trabajo.
   "Discusión actual".**
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76r (framework 1.5i.7l).
+**Estado del proyecto al cierre:** v1.5piloto.76s (framework 1.5i.7l).
 Todo funcional. Fixes de v74k a v74o acumulados. Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
@@ -3171,6 +3209,11 @@ como alias de los nodos existentes. Enlaces viejos
 intactos. Nuevo comando `grafo:crear_niveles_usuario` y
 script `miscelaneas/migrar_niveles_usuario.php` (idempotente).
 Bloque `?migrar_niveles_usuario=1` en `index.php`.
+v76s: Fase B2.2.2 (Venta.php). Contexto opcional en
+`obtener_contenedor_ventas_dueno` y filtro opcional por
+terminal en las búsquedas por id. `listar_ventas_por_terminal`
+y `confirmar_venta_actual` navegan por el contexto. Refactor
+sin cambio de comportamiento.
 v76r: Fase B2.2.1. Contexto opcional en
 `obtener_contenedor_viajes_dueno` y uso desde
 `listar_viajes_de_terminal`. Nuevo helper

@@ -278,7 +278,9 @@ function listar_viajes_de_terminal(string $nombre_terminal): array {
     // UNA VEZ, con el terminal como filtro. Antes, formatear_viaje
     // recorría todo el contenedor de ventas del dueño por cada
     // viaje (O(V × W)).
-    $indice_ventas = _construir_indice_ventas_por_viaje($nombre_dueno, $nombre_terminal);
+    // Fase B2.2.2 (v76s): pasar el contexto del terminal
+    // (hoy el nodo del dueño, tras B2.3 el compartido).
+    $indice_ventas = _construir_indice_ventas_por_viaje($nombre_dueno, $nombre_terminal, $nodo_dueno);
 
     $viajes_autorizados = [];
     $adyacentes = (array) $nodo_viajes->adyacentes();
@@ -584,12 +586,12 @@ function _calcular_vendidos_por_micro_de_viaje(string $nombre_dueno, string $nom
  * @param string|null $nombre_terminal
  * @return array
  */
-function _construir_indice_ventas_por_viaje(string $nombre_dueno, ?string $nombre_terminal = null): array {
+function _construir_indice_ventas_por_viaje(string $nombre_dueno, ?string $nombre_terminal = null, ?Nodo $nodo_contexto = null): array {
     $indice = [
         'tiene_ventas' => [],
         'vendidos_por_micro' => [],
     ];
-    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor_ventas) return $indice;
 
     $venta_iter = hmi($contenedor_ventas);
