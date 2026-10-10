@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.76t
+ * @version   1.5piloto.77b
  */
 
 use Iteradores\Nodos\Nodo;
@@ -830,4 +830,221 @@ function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro,
 
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
+}
+
+/**
+ * Cambia un pasaje de un asiento a otro dentro del mismo micro.
+ *
+ * Tanda v77b.
+ *
+ * Reglas:
+ * - El asiento viejo debe estar vendido o reservado y tener
+ *   pasajero asignado.
+ * - Terminal: solo puede mover asientos que él mismo vendió.
+ *   El asiento nuevo debe estar libre.
+ * - Dueño, admin o soporte: puede mover vendidos y reservados.
+ *   El asiento nuevo debe estar libre o reservado sin pasajero.
+ * - Si el asiento viejo era reservado y $dejar_reservado_viejo
+ *   es true, el asiento viejo queda reservado sin pasajero.
+ *   Si no, queda libre.
+ * - El id_venta no cambia. Solo se mueve el enlace del
+ *   asiento-en-venta persistente al nodo asiento nuevo.
+ *
+ * @param string $nombre_viaje
+ * @param string $nombre_micro
+ * @param string $fila_vieja
+ * @param string $columna_vieja
+ * @param string $fila_nueva
+ * @param string $columna_nueva
+ * @param string $nombre_dueno
+ * @param string $nombre_solicitante
+ * @param bool   $dejar_reservado_viejo
+ * @return array
+ */
+function cambiar_asiento_pasaje(
+    string $nombre_viaje,
+    string $nombre_micro,
+    string $fila_vieja,
+    string $columna_vieja,
+    string $fila_nueva,
+    string $columna_nueva,
+    string $nombre_dueno,
+    string $nombre_solicitante,
+    bool $dejar_reservado_viejo = false
+): array {
+    if ($nombre_viaje === '' || $nombre_micro === '' || $nombre_dueno === '' || $nombre_solicitante === '') {
+        return ['exito' => false, 'error' => 'Parámetros incompletos'];
+    }
+    if ($fila_vieja === $fila_nueva && $columna_vieja === $columna_nueva) {
+        return ['exito' => false, 'error' => 'El asiento nuevo es el mismo que el actual'];
+    }
+
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) return ['exito' => false, 'error' => 'No hay micros'];
+    $nodo_micro = $nodo_micros->adyacente($nombre_micro);
+    if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
+    $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$nodo_copia) return ['exito' => false, 'error' => 'No existe copia del vehículo'];
+
+    // Buscar los dos asientos.
+    $nodo_asiento_viejo = null;
+    $nodo_asiento_nuevo = null;
+    $nodo_asientos = $nodo_copia->adyacente('asientos');
+    if ($nodo_asientos) {
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$piso) continue;
+            $cabeza = $piso->adyacente('asientos');
+            if (!$cabeza) continue;
+            $actual = $cabeza->adyacente('primer');
+            $seg = 0;
+            while ($actual && $actual->id() !== $cabeza->id() && $seg < 200) {
+                $f = $actual->adyacente('fila');
+                $c = $actual->adyacente('columna');
+                if ($f && $c) {
+                    if ($f->dato() === $fila_vieja && $c->dato() === $columna_vieja) $nodo_asiento_viejo = $actual;
+                    if ($f->dato() === $fila_nueva && $c->dato() === $columna_nueva) $nodo_asiento_nuevo = $actual;
+                }
+                $actual = $actual->adyacente('siguiente');
+                $seg++;
+            }
+        }
+    }
+    if (!$nodo_asiento_viejo) return ['exito' => false, 'error' => 'Asiento actual no encontrado'];
+    if (!$nodo_asiento_nuevo) return ['exito' => false, 'error' => 'Asiento nuevo no encontrado'];
+    if ($nodo_asiento_viejo->id() === $nodo_asiento_nuevo->id()) {
+        return ['exito' => false, 'error' => 'El asiento nuevo es el mismo que el actual'];
+    }
+
+    // El asiento viejo debe tener pasajero.
+    $nodo_pasajero = $nodo_asiento_viejo->adyacente('pasajero');
+    if (!$nodo_pasajero) return ['exito' => false, 'error' => 'El asiento actual no tiene pasajero asignado'];
+
+    $nodo_estado_viejo = $nodo_asiento_viejo->adyacente('estado');
+    $estado_viejo = $nodo_estado_viejo ? $nodo_estado_viejo->dato() : '';
+    if ($estado_viejo !== 'vendido' && $estado_viejo !== 'reservado') {
+        return ['exito' => false, 'error' => 'Solo se pueden cambiar asientos vendidos o reservados'];
+    }
+
+    // Validar permisos del solicitante.
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios'];
+    $nodo_sol = $raiz_usuarios->adyacente($nombre_solicitante);
+    if (!$nodo_sol) return ['exito' => false, 'error' => 'Solicitante no encontrado'];
+    $nodo_nivel_sol = $nodo_sol->adyacente('nivel');
+    $nivel_sol = $nodo_nivel_sol ? $nodo_nivel_sol->dato() : '';
+
+    $nodo_venta_viejo = null;
+    if ($estado_viejo === 'vendido') {
+        $nodo_venta_viejo = $nodo_asiento_viejo->adyacente('venta');
+        if ($nivel_sol === 'terminal') {
+            if (!$nodo_venta_viejo) return ['exito' => false, 'error' => 'No se pudo verificar la venta del asiento'];
+            $nodo_term_vta = $nodo_venta_viejo->adyacente('terminal');
+            $nombre_term_vta = $nodo_term_vta ? $nodo_term_vta->dato() : '';
+            if ($nombre_term_vta !== $nombre_solicitante) {
+                return ['exito' => false, 'error' => 'Solo podés cambiar asientos vendidos por tu terminal'];
+            }
+        }
+    } elseif ($estado_viejo === 'reservado') {
+        if ($nivel_sol === 'terminal') {
+            return ['exito' => false, 'error' => 'No podés cambiar asientos reservados'];
+        }
+    }
+
+    // Validar el asiento nuevo.
+    $nodo_pasajero_nuevo = $nodo_asiento_nuevo->adyacente('pasajero');
+    if ($nodo_pasajero_nuevo) return ['exito' => false, 'error' => 'El asiento nuevo ya tiene un pasajero asignado'];
+
+    $nodo_estado_nuevo = $nodo_asiento_nuevo->adyacente('estado');
+    $estado_nuevo = $nodo_estado_nuevo ? $nodo_estado_nuevo->dato() : 'libre';
+    if ($nivel_sol === 'terminal') {
+        if ($estado_nuevo !== 'libre') return ['exito' => false, 'error' => 'Solo podés mover a un asiento libre'];
+    } else {
+        if ($estado_nuevo !== 'libre' && $estado_nuevo !== 'reservado') {
+            return ['exito' => false, 'error' => 'El asiento nuevo no está disponible'];
+        }
+    }
+
+    // Guardar referencias antes de tocar el grafo.
+    $nodo_reservado_por_viejo = $nodo_asiento_viejo->adyacente('reservado_por');
+    $nodo_av_persistente = null;
+    if ($nodo_venta_viejo) {
+        $nodo_av_persistente = _buscar_asiento_en_venta_persistente($nodo_venta_viejo, $nodo_asiento_viejo);
+    }
+
+    // === Liberar el asiento viejo ===
+    $estado_viejo_str = ($estado_viejo === 'reservado' && $dejar_reservado_viejo) ? 'reservado' : 'libre';
+    if ($nodo_estado_viejo) {
+        $nodo_estado_viejo->_dato($estado_viejo_str);
+    } else {
+        $nodo_asiento_viejo->_adyacente_en(Nodo::crear_con_dato($estado_viejo_str), 'estado');
+    }
+    $nodo_asiento_viejo->eliminar_adyacente('pasajero');
+    if ($estado_viejo_str === 'libre') {
+        $nodo_asiento_viejo->eliminar_adyacente('reservado_por');
+        $nodo_asiento_viejo->eliminar_adyacente('venta');
+    }
+
+    // === Ocupar el asiento nuevo ===
+    if ($nodo_estado_nuevo) {
+        $nodo_estado_nuevo->_dato($estado_viejo);
+    } else {
+        $nodo_asiento_nuevo->_adyacente_en(Nodo::crear_con_dato($estado_viejo), 'estado');
+    }
+    $nodo_asiento_nuevo->eliminar_adyacente('pasajero');
+    $nodo_asiento_nuevo->_adyacente_en($nodo_pasajero, 'pasajero');
+
+    if ($estado_viejo === 'reservado') {
+        // Heredar reservado_por del viejo si quedó reservado.
+        if ($dejar_reservado_viejo && $nodo_reservado_por_viejo) {
+            $nodo_asiento_nuevo->eliminar_adyacente('reservado_por');
+            $nodo_asiento_nuevo->_adyacente_en($nodo_reservado_por_viejo, 'reservado_por');
+        }
+    } else {
+        // Vendido: heredar la venta.
+        if ($nodo_venta_viejo) {
+            $nodo_asiento_nuevo->eliminar_adyacente('venta');
+            $nodo_asiento_nuevo->_adyacente_en($nodo_venta_viejo, 'venta');
+        }
+    }
+
+    // === Actualizar el asiento-en-venta persistente ===
+    if ($nodo_av_persistente) {
+        $nodo_av_persistente->eliminar_adyacente('asiento');
+        $nodo_av_persistente->_adyacente_en($nodo_asiento_nuevo, 'asiento');
+    }
+
+    actualizar_contadores_micro($nodo_micro);
+    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    return ['exito' => true];
+}
+
+/**
+ * Busca el nodo asiento-en-venta persistente que referencia
+ * al asiento dado dentro de una venta. Devuelve null si no
+ * lo encuentra. La lista es simple (`primer`/`siguiente`).
+ *
+ * @param Nodo $nodo_venta
+ * @param Nodo $nodo_asiento
+ * @return Nodo|null
+ */
+function _buscar_asiento_en_venta_persistente(Nodo $nodo_venta, Nodo $nodo_asiento) {
+    $cabeza = $nodo_venta->adyacente('asientos');
+    if (!$cabeza) return null;
+    $actual = $cabeza->adyacente('primer');
+    $seg = 0;
+    while ($actual && $seg < 200) {
+        $nodo_asiento_ref = $actual->adyacente('asiento');
+        if ($nodo_asiento_ref && $nodo_asiento_ref->id() === $nodo_asiento->id()) {
+            return $actual;
+        }
+        $actual = $actual->adyacente('siguiente');
+        $seg++;
+    }
+    return null;
 }

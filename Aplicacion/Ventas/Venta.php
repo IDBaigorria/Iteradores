@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.76w
+ * @version   1.5piloto.77b
  */
 
 
@@ -702,11 +702,28 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
     // flujos que puedan necesitarlo.
     $nombre_micro = '';
     $micro_nombre_visible = '';
+    $micro_enlace = '';
     if ($nodo_micro) {
         $nombre_micro = $nodo_micro->dato();
         $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
         if ($nodo_copia && $nodo_copia->adyacente('nombre')) {
             $micro_nombre_visible = $nodo_copia->adyacente('nombre')->dato();
+        }
+        // v77b: nombre del enlace del micro dentro del contenedor
+        // `micros` del viaje. El dato del nodo micro es vacío por
+        // diseño, así que la única forma de referenciarlo desde
+        // otros flujos (por ejemplo, el cambio de asiento desde
+        // la pestaña Clientes) es a través del nombre del enlace.
+        if ($nodo_viaje) {
+            $nodos_micros_v = $nodo_viaje->adyacente('micros');
+            if ($nodos_micros_v) {
+                foreach ((array)$nodos_micros_v->adyacentes() as $nombre_e => $nodo_m) {
+                    if ($nodo_m->id() === $nodo_micro->id()) {
+                        $micro_enlace = (string)$nombre_e;
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -826,6 +843,7 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
         'viaje' => $viaje_id,
         'viaje_visible' => $viaje_visible,
         'micro' => $nombre_micro,
+        'micro_enlace' => $micro_enlace,
         'micro_nombre_visible' => $micro_nombre_visible,
         'total' => $total,
         'pagado' => $pagado,

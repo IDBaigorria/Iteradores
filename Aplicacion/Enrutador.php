@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.76n
+ * @version   1.5piloto.77b
  */
 
 use Iteradores\Nodos\Nodo;
@@ -640,6 +640,29 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
                     $resultado = liberar_reserva_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno);
+                    responder_json($resultado);
+                    break;
+
+                case 'cambiar_asiento':
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $fila_vieja = $post['fila_vieja'] ?? '';
+                    $columna_vieja = $post['columna_vieja'] ?? '';
+                    $fila_nueva = $post['fila_nueva'] ?? '';
+                    $columna_nueva = $post['columna_nueva'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $nombre_solicitante = $post['nombre_solicitante'] ?? '';
+                    $dejar_reservado_viejo = (($post['dejar_reservado_viejo'] ?? '0') === '1');
+                    if (empty($nombre_viaje) || empty($nombre_micro) || $fila_vieja === '' || $columna_vieja === '' || $fila_nueva === '' || $columna_nueva === '' || empty($nombre_dueno) || empty($nombre_solicitante)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $resultado = cambiar_asiento_pasaje(
+                        $nombre_viaje, $nombre_micro,
+                        $fila_vieja, $columna_vieja,
+                        $fila_nueva, $columna_nueva,
+                        $nombre_dueno, $nombre_solicitante,
+                        $dejar_reservado_viejo
+                    );
                     responder_json($resultado);
                     break;
 

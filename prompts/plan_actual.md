@@ -75,7 +75,39 @@ cambio de enfoque respecto del plan original. En lugar del
   `listar_empresas_de_dueno`. Con esto queda cerrada la
   Fase B2.2.
 
-**Tanda actual:** v77a (fix del bug 1, parte 2).
+**Tanda actual:** v77b (nueva funcionalidad: cambiar de
+asiento). Backend.
+
+**Nueva funcionalidad "Cambiar de asiento".** Desde el
+detalle de un pasaje (croquis o pestaña Clientes), botón
+para mover el pasaje a otro asiento del mismo micro.
+Reglas:
+
+- Terminal: solo puede mover asientos que él mismo vendió,
+  y solo a un asiento libre. No toca reservados.
+- Dueño/admin/soporte: puede mover vendidos y reservados,
+  a un asiento libre o reservado sin pasajero.
+- El asiento viejo vendido queda libre.
+- El asiento viejo reservado puede quedar libre o
+  reservado sin pasajero (checkbox "Dejar el asiento
+  viejo reservado", por defecto tildado).
+- El asiento nuevo reservado solo se acepta si NO tiene
+  pasajero asignado (regla confirmada por el usuario).
+- El id_venta no cambia. El asiento-en-venta persistente
+  solo cambia su enlace `asiento`.
+- El `punto_subida_bajada` del asiento-en-venta no cambia.
+- Solo se puede cambiar dentro del mismo micro.
+
+**Backend v77b:** `Venta.php` agrega `micro_enlace` a
+`formatear_venta_resumida` (el dato del micro es vacío, el
+nombre del enlace es la única referencia). Nueva función
+`cambiar_asiento_pasaje` en `ViajeAsientos.php` + helper
+`_buscar_asiento_en_venta_persistente`. Subacción
+`viajes/cambiar_asiento` en el enrutador.
+
+**Frontend pendiente (v77c):** botón "Cambiar de asiento"
+en los dos modales de detalle del pasaje, modal con croquis
+y selector de asientos disponibles.
 
 **Bug 1 (atadura) — diagnóstico completo (v77 + v77a):**
 El usuario carga el comprador con un DNI nuevo (no existe
