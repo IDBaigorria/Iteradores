@@ -451,3 +451,35 @@
     resize: vertical;
     min-height: 400px;
 }
+
+/* ===== v1.5piloto.77c: modal de cambiar de asiento ===== */
+
+/* Asiento elegible como destino del cambio. */
+.seat-elegible {
+    cursor: pointer;
+    outline: 2px dashed #2196f3;
+    outline-offset: -3px;
+}
+.seat-elegible:hover {
+    outline: 2px solid #1565c0;
+    transform: scale(1.05);
+}
+
+/* Asiento elegido como destino (selección actual). */
+.seat-elegido {
+    outline: 3px solid #1565c0;
+    outline-offset: -3px;
+    box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.35);
+}
+
+/* Asiento origen (el que se está cambiando). No se puede elegir. */
+.seat-origen {
+    opacity: 0.55;
+    cursor: default;
+}
+
+/* Asiento no elegible (vendido, seleccionado, con pasajero, etc.). */
+.seat-deshabilitado {
+    opacity: 0.35;
+    cursor: not-allowed;
+}

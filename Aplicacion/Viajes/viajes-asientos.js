@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.76h
+ * @version 1.5piloto.77c
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -822,14 +822,21 @@ function ver_pasaje_asiento(fila, columna) {
     const nv = viaje_seleccionado ? viaje_seleccionado.nombre_viaje : '';
     const nm = micro_seleccionado || '';
     const nd = obtener_dueno_viaje_seleccionado();
+    // v77c: botón "Cambiar de asiento" si el usuario tiene permiso.
+    const puede_cambiar = _puede_cambiar_asiento(asiento);
+    const btn_cambiar_html = puede_cambiar
+        ? `<button class="btn" id="btn_cambiar_asiento_pasaje">Cambiar de asiento</button>`
+        : '';
     if (asiento.venta_id) {
         html += `<div class="actions" style="margin-top:15px;">
             <button class="btn primary" id="btn_imprimir_pasaje_asiento" data-modo="venta" data-venta-id="${asiento.venta_id}" data-dni="${p.dni || ''}">Imprimir pasaje</button>
+            ${btn_cambiar_html}
             <button class="btn" id="btn_cerrar_ver_pasaje">Cerrar</button>
         </div>`;
     } else {
         html += `<div class="actions" style="margin-top:15px;">
             <button class="btn primary" id="btn_imprimir_pasaje_asiento" data-modo="reserva" data-dueno="${nd}" data-viaje="${nv}" data-micro="${nm}" data-fila="${fila}" data-columna="${columna}">Imprimir pasaje</button>
+            ${btn_cambiar_html}
             <button class="btn" id="btn_cerrar_ver_pasaje">Cerrar</button>
         </div>`;
     }
@@ -859,6 +866,14 @@ function ver_pasaje_asiento(fila, columna) {
                     '_blank'
                 );
             }
+        });
+    }
+
+    // v77c: listener del botón "Cambiar de asiento".
+    const btnCambiar = document.getElementById('btn_cambiar_asiento_pasaje');
+    if (btnCambiar) {
+        btnCambiar.addEventListener('click', () => {
+            abrir_modal_cambiar_asiento(nd, nv, nm, fila, columna);
         });
     }
 
@@ -1294,3 +1309,336 @@ function actualizar_bloqueo_botones_asientos() {
 }
 
 window.actualizar_bloqueo_botones_asientos = actualizar_bloqueo_botones_asientos;
+
+// ============================================================
+// v77c: cambiar de asiento de un pasaje.
+//
+// El modal pide los datos al backend (estado de asientos +
+// configuración del micro), arma el croquis, deja elegir un
+// asiento nuevo y hace el POST a `viajes/cambiar_asiento`.
+// Funciona desde el croquis (viajes-asientos.js) y desde la
+// pestaña Clientes (pasajeros.js).
+// ============================================================
+
+// Estado del modal de cambiar asiento.
+let cambiar_asiento_datos_modal = null;
+
+/**
+ * Determina si el usuario actual puede cambiar el asiento dado.
+ * Reglas:
+ *  - Dueño/admin/soporte: puede mover vendidos y reservados.
+ *  - Terminal: solo puede mover asientos vendidos por él mismo.
+ */
+function _puede_cambiar_asiento(asiento) {
+    if (!asiento) return false;
+    if (!asiento.tiene_pasajero) return false;
+    if (asiento.estado !== 'vendido' && asiento.estado !== 'reservado') return false;
+
+    if (usuario_actual.nivel === 'dueno' || es_admin_o_soporte()) return true;
+
+    if (usuario_actual.nivel === 'terminal') {
+        if (asiento.estado === 'reservado') return false;
+        return asiento.venta_terminal === usuario_actual.nombre_usuario;
+    }
+    return false;
+}
+
+/**
+ * Determina si un asiento es válido como destino del cambio.
+ *
+ * @param {object} a            Asiento candidato (estado + tiene_pasajero).
+ * @param {string} estado_origen 'vendido' o 'reservado'.
+ * @param {boolean} es_terminal  Si el usuario actual es terminal.
+ */
+function _es_destino_valido(a, estado_origen, es_terminal) {
+    if (!a) return false;
+    if (a.tiene_pasajero === true) return false;
+    if (a.estado === 'vendido') return false;
+    if (a.estado === 'seleccionado') return false;
+    if (a.estado === 'no disponible') return false;
+
+    if (es_terminal) {
+        return a.estado === 'libre';
+    }
+    return a.estado === 'libre' || a.estado === 'reservado';
+}
+
+/**
+ * Abre el modal de cambio de asiento.
+ *
+ * @param {string} nombre_dueno
+ * @param {string} nombre_viaje
+ * @param {string} nombre_micro
+ * @param {string} fila_origen
+ * @param {string} columna_origen
+ */
+async function abrir_modal_cambiar_asiento(nombre_dueno, nombre_viaje, nombre_micro, fila_origen, columna_origen) {
+    if (_venta_en_curso()) {
+        mostrar_aviso('Hay una venta en curso. Termínala o cancelala antes de cambiar un asiento.', 'error');
+        return;
+    }
+
+    // Fetch de estado de asientos.
+    let estados = [];
+    try {
+        const r = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/estado_asientos",
+                nombre_viaje,
+                nombre_micro,
+                nombre_dueno
+            })
+        });
+        const d = await r.json();
+        if (!d.exito || !Array.isArray(d.asientos)) {
+            mostrar_aviso(d.error || 'No se pudo cargar el estado de asientos', 'error');
+            return;
+        }
+        estados = d.asientos;
+    } catch (e) {
+        console.error('Error cargando asientos:', e);
+        mostrar_aviso('Error de comunicación', 'error');
+        return;
+    }
+
+    // Fetch de configuración del micro.
+    let micro_data = null;
+    try {
+        const r = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/obtener_micro",
+                nombre_viaje,
+                nombre_micro,
+                nombre_dueno
+            })
+        });
+        const d = await r.json();
+        if (!d.exito || !d.micro) {
+            mostrar_aviso(d.error || 'No se pudo cargar el micro', 'error');
+            return;
+        }
+        micro_data = d.micro;
+    } catch (e) {
+        console.error('Error cargando micro:', e);
+        mostrar_aviso('Error de comunicación', 'error');
+        return;
+    }
+
+    const origen = estados.find(a => String(a.fila) === String(fila_origen) && String(a.columna) === String(columna_origen));
+    if (!origen) {
+        mostrar_aviso('No se encontró el asiento actual', 'error');
+        return;
+    }
+    if (!origen.tiene_pasajero) {
+        mostrar_aviso('El asiento actual no tiene pasajero asignado', 'error');
+        return;
+    }
+
+    const es_terminal = usuario_actual.nivel === 'terminal';
+
+    // Guardar estado del modal.
+    cambiar_asiento_datos_modal = {
+        dueno: nombre_dueno,
+        viaje: nombre_viaje,
+        micro: nombre_micro,
+        origen_fila: String(fila_origen),
+        origen_columna: String(columna_origen),
+        origen_numero: origen.numero,
+        origen_estado: origen.estado,
+        origen_venta_id: origen.venta_id || null,
+        origen_pasajero_dni: origen.pasajero ? origen.pasajero.dni : null,
+        micro_config: micro_data.configuracion,
+        destino: null,
+        dejar_reservado: origen.estado === 'reservado'
+    };
+
+    // Armar croquis.
+    let croquis_html = '';
+    const configuracion = micro_data.configuracion || {};
+    if (configuracion.pisos && configuracion.pisos.length > 0) {
+        configuracion.pisos.forEach((piso, index) => {
+            croquis_html += `<div class="section-title">Piso ${index + 1}</div>`;
+            croquis_html += '<div class="bus"><div class="bus-front">FRENTE · CONDUCTOR</div>';
+            for (let f = 1; f <= piso.filas; f++) {
+                croquis_html += '<div class="seat-row">';
+                for (let c = 1; c <= piso.columnas; c++) {
+                    const a = piso.asientos.find(x => parseInt(x.fila) === f && parseInt(x.columna) === c);
+                    if (a) {
+                        const a_estado = estados.find(e => String(e.fila) === String(a.fila) && String(e.columna) === String(a.columna));
+                        const a_estado_str = a_estado ? a_estado.estado : 'libre';
+                        const a_tiene_pas = a_estado ? (a_estado.tiene_pasajero === true) : false;
+                        const es_origen = (String(a.fila) === String(fila_origen) && String(a.columna) === String(columna_origen));
+                        const valido = !es_origen && _es_destino_valido({ estado: a_estado_str, tiene_pasajero: a_tiene_pas }, origen.estado, es_terminal);
+                        const clases = ['seat', `seat-${a_estado_str}`];
+                        if (es_origen) clases.push('seat-origen');
+                        if (!valido && !es_origen) clases.push('seat-deshabilitado');
+                        if (valido) clases.push('seat-elegible');
+                        croquis_html += `<div class="${clases.join(' ')}" data-fila="${a.fila}" data-columna="${a.columna}" data-numero="${a.numero}" data-valido="${valido ? '1' : '0'}" data-origen="${es_origen ? '1' : '0'}">${String(a.numero).padStart(2, '0')}</div>`;
+                    } else {
+                        croquis_html += '<div class="aisle"></div>';
+                    }
+                }
+                croquis_html += '</div>';
+            }
+            croquis_html += '<div class="bus-back">PARTE TRASERA</div></div>';
+        });
+    } else {
+        croquis_html = '<p class="muted">No hay configuración de asientos.</p>';
+    }
+
+    const checkbox_html = origen.estado === 'reservado'
+        ? `<div class="field" style="margin-top:15px;">
+            <label><input type="checkbox" id="cambiar_dejar_reservado" checked> Dejar el asiento viejo reservado (sin pasajero).</label>
+           </div>`
+        : '';
+
+    const pasajero_nombre = origen.pasajero ? (origen.pasajero.nombre_completo || origen.pasajero.dni_visible || '') : '';
+
+    const html = `
+        <h3>Cambiar de asiento</h3>
+        <p class="muted">Pasajero: <b>${pasajero_nombre}</b><br>Asiento actual: <b>${origen.numero}</b></p>
+        <p class="muted small">Hacé click en el asiento nuevo. Los asientos elegibles están marcados.</p>
+        <div style="max-height: 55vh; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 10px; background: #fafafa;">
+            ${croquis_html}
+        </div>
+        <div class="legend" style="margin-top:10px;">
+            <div class="legend-item"><span class="swatch sw-free"></span> Libre</div>
+            <div class="legend-item"><span class="swatch sw-reserved"></span> Reservado sin pasajero</div>
+            <div class="legend-item"><span class="swatch sw-sold"></span> Vendido</div>
+        </div>
+        ${checkbox_html}
+        <div class="actions" style="margin-top:15px;">
+            <button class="btn primary" id="btn_confirmar_cambiar_asiento" disabled>Confirmar cambio</button>
+            <button class="btn" id="btn_cancelar_cambiar_asiento">Cancelar</button>
+        </div>
+    `;
+
+    abrir_modal_apilado('Cambiar de asiento', html);
+
+    const cont = document.getElementById('modal_apilado_contenido');
+    if (!cont) return;
+
+    cont.querySelectorAll('.seat').forEach(seat => {
+        seat.addEventListener('click', () => {
+            if (seat.dataset.valido !== '1') return;
+            cont.querySelectorAll('.seat-elegido').forEach(s => s.classList.remove('seat-elegido'));
+            seat.classList.add('seat-elegido');
+            if (cambiar_asiento_datos_modal) {
+                cambiar_asiento_datos_modal.destino = {
+                    fila: seat.dataset.fila,
+                    columna: seat.dataset.columna,
+                    numero: seat.dataset.numero
+                };
+            }
+            const btn = cont.querySelector('#btn_confirmar_cambiar_asiento');
+            if (btn) btn.disabled = false;
+        });
+    });
+
+    const chk = cont.querySelector('#cambiar_dejar_reservado');
+    if (chk) {
+        chk.addEventListener('change', () => {
+            if (cambiar_asiento_datos_modal) {
+                cambiar_asiento_datos_modal.dejar_reservado = chk.checked;
+            }
+        });
+    }
+
+    cont.querySelector('#btn_cancelar_cambiar_asiento').addEventListener('click', () => {
+        cambiar_asiento_datos_modal = null;
+        cerrar_modal_apilado();
+    });
+    cont.querySelector('#btn_confirmar_cambiar_asiento').addEventListener('click', _confirmar_cambiar_asiento);
+}
+
+/**
+ * Confirma el cambio de asiento. Hace el POST y maneja el
+ * resultado: refresca el croquis si corresponde, ofrece
+ * reimprimir el pasaje.
+ */
+async function _confirmar_cambiar_asiento() {
+    const d = cambiar_asiento_datos_modal;
+    if (!d || !d.destino) return;
+
+    const btn = document.getElementById('btn_confirmar_cambiar_asiento');
+    if (btn) btn.disabled = true;
+
+    try {
+        const resp = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/cambiar_asiento",
+                nombre_viaje: d.viaje,
+                nombre_micro: d.micro,
+                fila_vieja: d.origen_fila,
+                columna_vieja: d.origen_columna,
+                fila_nueva: d.destino.fila,
+                columna_nueva: d.destino.columna,
+                nombre_dueno: d.dueno,
+                nombre_solicitante: usuario_actual.nombre_usuario,
+                dejar_reservado_viejo: d.dejar_reservado ? '1' : '0'
+            })
+        });
+        const resultado = await resp.json();
+
+        if (resultado.exito) {
+            mostrar_aviso("Asiento cambiado", 'exito');
+
+            // Snapshot antes de limpiar el estado.
+            const snap = {
+                estado: d.origen_estado,
+                dueno: d.dueno,
+                viaje: d.viaje,
+                micro: d.micro,
+                destino_fila: d.destino.fila,
+                destino_columna: d.destino.columna,
+                destino_numero: d.destino.numero,
+                pasajero_dni: d.origen_pasajero_dni
+            };
+
+            cambiar_asiento_datos_modal = null;
+            cerrar_modal_apilado();
+
+            // Refrescar el croquis de atrás si estamos en el croquis.
+            if (typeof viaje_seleccionado !== 'undefined' && viaje_seleccionado
+                && viaje_seleccionado.nombre_viaje === snap.viaje
+                && typeof micro_seleccionado !== 'undefined' && micro_seleccionado === snap.micro) {
+                try { await solicitar_estado_asientos(); } catch (e) { console.error(e); }
+                try { await refrescar_contadores_viaje_actual(); } catch (e) { console.error(e); }
+                if (typeof refrescar_info_asientos_propios === 'function') {
+                    refrescar_info_asientos_propios(true);
+                }
+            }
+
+            // Ofrecer reimprimir el pasaje.
+            if (snap.estado === 'vendido' && snap.pasajero_dni) {
+                if (typeof mostrar_modal_chico_impresion_pasajero === 'function') {
+                    mostrar_modal_chico_impresion_pasajero(snap.pasajero_dni, snap.dueno);
+                }
+            } else if (snap.estado === 'reservado') {
+                if (typeof mostrar_modal_chico_impresion_reserva === 'function') {
+                    mostrar_modal_chico_impresion_reserva(
+                        snap.dueno,
+                        snap.viaje,
+                        snap.micro,
+                        snap.destino_fila,
+                        snap.destino_columna,
+                        snap.destino_numero
+                    );
+                }
+            }
+        } else {
+            mostrar_aviso(resultado.error || "No se pudo cambiar el asiento", 'error');
+            if (btn) btn.disabled = false;
+        }
+    } catch (e) {
+        console.error("Error al cambiar asiento:", e);
+        mostrar_aviso("Error de comunicación", 'error');
+        if (btn) btn.disabled = false;
+    }
+}

@@ -1,6 +1,6 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.74o
+ * @version 1.5piloto.77c
  */
 /**
  * Normaliza un DNI dejando solo dígitos.
@@ -351,6 +351,20 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
     const viaje = venta;
     const micro_nombre = venta.micro_nombre_visible || venta.patente || '';
 
+    // v77c: ¿el usuario puede cambiar el asiento de este pasaje?
+    // Dueño/admin/soporte pueden; terminal solo si la venta es suya.
+    let puede_cambiar_asiento = false;
+    if (usuario_actual && venta) {
+        if (es_admin_o_soporte() || usuario_actual.nivel === 'dueno') {
+            puede_cambiar_asiento = true;
+        } else if (usuario_actual.nivel === 'terminal') {
+            puede_cambiar_asiento = (venta.terminal === usuario_actual.nombre_usuario);
+        }
+    }
+    const btn_cambiar_asiento_html = puede_cambiar_asiento
+        ? `<button class="btn btn_cambiar_asiento_individual">Cambiar de asiento</button>`
+        : '';
+
     const contenido = `
         <h3>Detalle del pasaje</h3>
         <div class="seccion">
@@ -369,6 +383,7 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
         </div>
         <div class="actions" style="margin-top:15px;">
             <button class="btn primary imprimir_pasaje_individual" data-id="${id_venta}" data-dni="${pasajero.dni}">Imprimir pasaje</button>
+            ${btn_cambiar_asiento_html}
             <button class="btn volver_listado_pasajes" data-dni="${pasajero.dni}">Volver</button>
         </div>
     `;
@@ -386,6 +401,25 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
         const dniOriginal = this.dataset.dni;
         ver_pasajes_pasajero(dniOriginal);
     });
+
+    // v77c: listener del botón "Cambiar de asiento".
+    const btn_cambiar_ind = document.querySelector('.btn_cambiar_asiento_individual');
+    if (btn_cambiar_ind) {
+        btn_cambiar_ind.addEventListener('click', () => {
+            // El backend (v77b) devuelve `micro_enlace` con el
+            // nombre del nodo del micro dentro del contenedor
+            // `micros` del viaje. Si por alguna razón no viene,
+            // cae a `venta.micro` como último recurso.
+            const nombre_micro_real = venta.micro_enlace || venta.micro;
+            abrir_modal_cambiar_asiento(
+                nombre_dueno,
+                venta.viaje,
+                nombre_micro_real,
+                asientoInfo.fila,
+                asientoInfo.columna
+            );
+        });
+    }
 }
 
 

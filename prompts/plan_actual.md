@@ -75,8 +75,8 @@ cambio de enfoque respecto del plan original. En lugar del
   `listar_empresas_de_dueno`. Con esto queda cerrada la
   Fase B2.2.
 
-**Tanda actual:** v77b (nueva funcionalidad: cambiar de
-asiento). Backend.
+**Tanda actual:** v77c (nueva funcionalidad: cambiar de
+asiento). Frontend.
 
 **Nueva funcionalidad "Cambiar de asiento".** Desde el
 detalle de un pasaje (croquis o pestaña Clientes), botón
@@ -105,9 +105,22 @@ nombre del enlace es la única referencia). Nueva función
 `_buscar_asiento_en_venta_persistente`. Subacción
 `viajes/cambiar_asiento` en el enrutador.
 
-**Frontend pendiente (v77c):** botón "Cambiar de asiento"
-en los dos modales de detalle del pasaje, modal con croquis
-y selector de asientos disponibles.
+**Frontend v77c:** botón "Cambiar de asiento" en los dos
+modales de detalle del pasaje (`ver_pasaje_asiento` en
+`viajes-asientos.js`, `ver_detalle_pasaje_individual` en
+`pasajeros.js`). Función compartida
+`abrir_modal_cambiar_asiento` en `viajes-asientos.js`. El
+modal hace 2 fetches (estado de asientos + configuración del
+micro), arma el croquis con asientos elegibles marcados,
+checkbox "Dejar el asiento viejo reservado" (solo si el viejo
+es reservado, tildado por defecto) y confirmación por POST.
+Después del éxito: refresca el croquis si estamos ahí y
+ofrece reimprimir el pasaje (modal chico de pasajero para
+vendido, modal chico de reserva para reservado).
+
+**Con esto queda cerrada la funcionalidad "cambiar de asiento".**
+Para activarla: correr el backend (v77b) y el frontend (v77c)
+y probar desde el croquis y desde la pestaña Clientes.
 
 **Bug 1 (atadura) — diagnóstico completo (v77 + v77a):**
 El usuario carga el comprador con un DNI nuevo (no existe
