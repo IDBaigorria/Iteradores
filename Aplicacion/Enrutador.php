@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.77g
+ * @version   1.5piloto.77h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -662,7 +662,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                             $datos_pasajero = $decodificado;
                         }
                     }
-                    $resultado = reservar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $datos_pasajero);
+                    // Fase B2.3.5b.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = reservar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $datos_pasajero, $nodo_contexto);
                     responder_json($resultado);
                     break;
                     
@@ -680,7 +682,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (!is_array($datos_pasajero)) {
                         responder_json(['exito' => false, 'error' => 'Datos del pasajero inválidos']);
                     }
-                    $resultado = asignar_pasajero_a_reserva($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $datos_pasajero);
+                    // Fase B2.3.5b.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = asignar_pasajero_a_reserva($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $datos_pasajero, $nodo_contexto);
                     responder_json($resultado);
                     break;
 
@@ -693,7 +697,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = liberar_reserva_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno);
+                    // Fase B2.3.5b.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = liberar_reserva_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nodo_contexto);
                     responder_json($resultado);
                     break;
 
@@ -710,12 +716,15 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_viaje) || empty($nombre_micro) || $fila_vieja === '' || $columna_vieja === '' || $fila_nueva === '' || $columna_nueva === '' || empty($nombre_dueno) || empty($nombre_solicitante)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
+                    // Fase B2.3.5b.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
                     $resultado = cambiar_asiento_pasaje(
                         $nombre_viaje, $nombre_micro,
                         $fila_vieja, $columna_vieja,
                         $fila_nueva, $columna_nueva,
                         $nombre_dueno, $nombre_solicitante,
-                        $dejar_reservado_viejo
+                        $dejar_reservado_viejo,
+                        $nodo_contexto
                     );
                     responder_json($resultado);
                     break;

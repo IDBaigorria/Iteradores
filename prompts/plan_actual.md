@@ -112,8 +112,23 @@ Detalle en §2.3.)
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
 
-**Tanda actual:** v77g (Fase B2.3.5b.1: el enrutador pasa
-contexto del solicitante terminal).
+**Tanda actual:** v77h (Fase B2.3.5b.2: contexto en
+cambiar_asiento_pasaje y reservas).
+
+**v77h — Fase B2.3.5b.2.**
+
+- `ViajeAsientos.php`:
+  - `cambiar_asiento_pasaje` acepta `?Nodo $nodo_contexto = null`
+    y lo pasa a `obtener_contenedor_viajes_dueno`.
+  - `cambiar_asiento_pasaje` resuelve el solicitante por ID
+    especial `us_<nombre>` en vez de `nodo_por_id('usuarios')`.
+- `Enrutador.php`:
+  - `viajes/reservar_asiento`, `viajes/asignar_pasajero_reserva`,
+    `viajes/liberar_reserva_asiento` y `viajes/cambiar_asiento`
+    pasan el contexto del solicitante (o null si no es terminal).
+
+Sin cambio de comportamiento hoy. Falta B2.3.5b.3 (empresas,
+vehículos, pasajeros) y B2.3.5b.4 (pruebas del plugin).
 
 **v77g — Fase B2.3.5b.1.**
 

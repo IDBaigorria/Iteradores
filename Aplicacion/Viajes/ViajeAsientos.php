@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.77b
+ * @version   1.5piloto.77h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -870,7 +870,8 @@ function cambiar_asiento_pasaje(
     string $columna_nueva,
     string $nombre_dueno,
     string $nombre_solicitante,
-    bool $dejar_reservado_viejo = false
+    bool $dejar_reservado_viejo = false,
+    ?Nodo $nodo_contexto = null
 ): array {
     if ($nombre_viaje === '' || $nombre_micro === '' || $nombre_dueno === '' || $nombre_solicitante === '') {
         return ['exito' => false, 'error' => 'Parámetros incompletos'];
@@ -879,7 +880,9 @@ function cambiar_asiento_pasaje(
         return ['exito' => false, 'error' => 'El asiento nuevo es el mismo que el actual'];
     }
 
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    // Fase B2.3.5b.2: contexto opcional. Si viene, el terminal
+    // navega por su subgrafo compartido.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
     if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
@@ -931,11 +934,14 @@ function cambiar_asiento_pasaje(
     }
 
     // Validar permisos del solicitante.
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios'];
-    $nodo_sol = $raiz_usuarios->adyacente($nombre_solicitante);
+    // Fase B2.3.5b.2: ID especial `us_<nombre>`.
+    $nodo_sol = Nodo::nodo_por_id('us_' . $nombre_solicitante);
     if (!$nodo_sol) return ['exito' => false, 'error' => 'Solicitante no encontrado'];
     $nodo_nivel_sol = $nodo_sol->adyacente('nivel');
+    if (!$nodo_nivel_sol) {
+        $publico = $nodo_sol->adyacente('publico');
+        if ($publico) $nodo_nivel_sol = $publico->adyacente('nivel');
+    }
     $nivel_sol = $nodo_nivel_sol ? $nodo_nivel_sol->dato() : '';
 
     $nodo_venta_viejo = null;
