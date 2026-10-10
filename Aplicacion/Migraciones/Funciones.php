@@ -242,4 +242,63 @@ function aplicar_migracion_arboles_compartidos(string $token): array {
     }
     return ['exito' => true, 'detalles' => $res];
 }
+
+// ============================================================
+// REPUNTADO DE TERMINALES AL COMPARTIDO (Fase B2.3.5a, v77f)
+// ============================================================
+
+/**
+ * ¿Está aplicado el repuntado?
+ *
+ * Devuelve true si todos los terminales con dueño apuntan al
+ * compartido (que tiene `_es_compartido`), o si no hay
+ * terminales. Devuelve false si algún terminal con dueño
+ * sigue apuntando al nodo del dueño real.
+ *
+ * @param string $token
+ * @return bool
+ */
+function detectar_repuntado_compartido(string $token): bool {
+    $falta_alguno = false;
+    Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$falta_alguno) {
+        if ($falta_alguno) return null;
+        $id = (string)$nodo->id();
+        if (strpos($id, 'us_') !== 0) return null;
+
+        $nivel_nodo = $nodo->adyacente('nivel');
+        if (!$nivel_nodo) {
+            $publico = $nodo->adyacente('publico');
+            if ($publico) $nivel_nodo = $publico->adyacente('nivel');
+        }
+        if (!$nivel_nodo || $nivel_nodo->dato() !== 'terminal') return null;
+
+        $nodo_dueno = $nodo->adyacente('dueno');
+        if (!$nodo_dueno) return null; // terminal sin dueño: no aplica
+
+        if (!$nodo_dueno->adyacente('_es_compartido')) {
+            $falta_alguno = true;
+        }
+        return null;
+    }, null);
+    return !$falta_alguno;
+}
+
+/**
+ * Aplica el repuntado.
+ *
+ * Delega en el comando `app:repuntar_terminales_compartido`.
+ *
+ * @param string $token
+ * @return array{exito: bool, detalles: array}
+ */
+function aplicar_migracion_repuntado_compartido(string $token): array {
+    $res = Controlador::ejecutar_comando('app:repuntar_terminales_compartido', ['dueno' => 'todos', 'terminal' => 'todos']);
+    if (!is_array($res)) {
+        return ['exito' => false, 'detalles' => ['El comando no devolvió un resumen válido.']];
+    }
+    if (!empty($res['errores'])) {
+        return ['exito' => false, 'detalles' => $res];
+    }
+    return ['exito' => true, 'detalles' => $res];
+}
 ?>

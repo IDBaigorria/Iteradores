@@ -112,8 +112,32 @@ Detalle en §2.3.)
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
 
-**Tanda actual:** v77e (Fase B2.3.4: escrituras de venta
-para dos árboles paralelos).
+**Tanda actual:** v77f (Fase B2.3.5a: migración de repuntado
+de terminales al compartido).
+
+**v77f — Fase B2.3.5a.**
+
+Comando `app:repuntar_terminales_compartido`. Para cada
+dueño y cada compartido `compartido_con_us_termX`:
+
+1. Marca el compartido con `dato = nombre_dueno` (opción A).
+2. Repunta el enlace `dueno` del terminal `us_termX` para
+   que apunte al compartido en vez del nodo del dueño real.
+
+Idempotente. Bloque `?repuntar_terminales_compartido=1` en
+`index.php`. **NO toca el enrutador ni el código de flujo.**
+La app sigue funcionando igual porque el código ya está
+preparado (B2.2 + B2.3.4). El enrutador empieza a pasar
+contexto en B2.3.5b.
+
+**Por qué se parte B2.3.5 en a y b.** B2.3.5a es de bajo
+riesgo: solo cambia el destino del enlace `dueno` en el
+grafo. Se puede probar end-to-end antes de tocar el
+enrutador. Si algo se rompe, se revierte manualmente
+repuntando el enlace al nodo del dueño real (o borrando el
+testigo del comando y volviendo a correrlo desde el nodo
+original). B2.3.5b es de alto riesgo: toca el enrutador, el
+corazón del flujo.
 
 **v77e — Fase B2.3.4.**
 

@@ -47,6 +47,12 @@ function migraciones_registradas(): array {
             'detectar' => 'detectar_arboles_compartidos',
             'aplicar' => 'aplicar_migracion_arboles_compartidos',
         ],
+        'repuntado_compartido' => [
+            'nombre' => 'Repuntado de terminales al compartido',
+            'descripcion' => 'Cambia el enlace `dueno` de cada terminal para que apunte al contenedor `compartido_con_us_termX` en vez del nodo del dueño real. Activa el aislamiento por topología.',
+            'detectar' => 'detectar_repuntado_compartido',
+            'aplicar' => 'aplicar_migracion_repuntado_compartido',
+        ],
     ];
 }
 ?>

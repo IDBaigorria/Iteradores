@@ -19,7 +19,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.77e
+ * @version   1.5piloto.77f
  */
 
 // --- Utilidades base ----------------------------------
@@ -241,6 +241,27 @@ if (isset($_GET['construir_arboles_compartidos'])) {
     echo "================================================\n\n";
     echo "Marcados:  " . $res['marcados'] . "\n";
     echo "Saltados:  " . $res['saltados'] . "\n";
+    if (!empty($res['errores'])) {
+        echo "Errores:\n";
+        foreach ($res['errores'] as $e) echo "  - $e\n";
+    }
+    echo "\nListo.\n";
+    exit;
+}
+
+// ==== Repuntado de terminales al compartido (v77f) ====
+// Cambia el enlace `dueno` de cada terminal para que
+// apunte a su contenedor `compartido_con_us_termX` en vez
+// del nodo del dueño real. Activa el aislamiento por
+// topología. Idempotente.
+if (isset($_GET['repuntar_terminales_compartido'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    require_once __DIR__ . '/miscelaneas/repuntar_terminales_compartido.php';
+    $res = repuntar_terminales_compartido();
+    echo "Repuntado de terminales al compartido\n";
+    echo "======================================\n\n";
+    echo "Repuntados:      " . $res['repuntados'] . "\n";
+    echo "Ya repuntados:   " . $res['ya_repuntados'] . "\n";
     if (!empty($res['errores'])) {
         echo "Errores:\n";
         foreach ($res['errores'] as $e) echo "  - $e\n";
