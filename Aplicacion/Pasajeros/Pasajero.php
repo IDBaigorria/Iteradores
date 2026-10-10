@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.76
+ * @version   1.5piloto.77i
  */
 
 use Iteradores\Nodos\Nodo;
@@ -36,11 +36,16 @@ function formatear_nombre_completo(string $apellido, string $nombres): string {
 /**
  * Obtiene el contenedor de pasajeros de un dueño, creándolo si no existe.
  */
-function obtener_contenedor_pasajeros_dueno(string $nombre_dueno): ?Nodo {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return null;
-
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+function obtener_contenedor_pasajeros_dueno(string $nombre_dueno, ?Nodo $nodo_contexto = null): ?Nodo {
+    // Fase B2.3.5b.3: contexto opcional. Si viene (terminal),
+    // navega por su compartido.
+    if ($nodo_contexto !== null) {
+        $nodo_dueno = $nodo_contexto;
+    } else {
+        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_usuarios) return null;
+        $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    }
     if (!$nodo_dueno) return null;
 
     $contenedor = $nodo_dueno->adyacente('pasajeros');
@@ -61,8 +66,8 @@ function obtener_raiz_pasajeros(): ?Nodo {
 /**
  * Obtiene el nodo pasajero por DNI si existe, sin crearlo.
  */
-function obtener_pasajero_nodo_por_dni(string $nombre_dueno, string $dni): ?Nodo {
-    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+function obtener_pasajero_nodo_por_dni(string $nombre_dueno, string $dni, ?Nodo $nodo_contexto = null): ?Nodo {
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return null;
     return $contenedor->adyacente($dni);
 }
@@ -70,8 +75,8 @@ function obtener_pasajero_nodo_por_dni(string $nombre_dueno, string $dni): ?Nodo
 /**
  * Lista todos los pasajeros registrados de un dueño.
  */
-function listar_pasajeros(string $nombre_dueno): array {
-    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+function listar_pasajeros(string $nombre_dueno, ?Nodo $nodo_contexto = null): array {
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return [];
 
     $adyacentes = (array) $contenedor->adyacentes();
@@ -91,9 +96,9 @@ function listar_pasajeros(string $nombre_dueno): array {
 /**
  * Busca pasajeros por término (nombres, apellido o DNI) dentro de un dueño.
  */
-function buscar_pasajeros(string $nombre_dueno, string $termino): array {
+function buscar_pasajeros(string $nombre_dueno, string $termino, ?Nodo $nodo_contexto = null): array {
     $termino = strtolower(trim($termino));
-    $todos = listar_pasajeros($nombre_dueno);
+    $todos = listar_pasajeros($nombre_dueno, $nodo_contexto);
     if (empty($termino)) return $todos;
 
     $dni_norm_buscado = normalizar_dni($termino);
@@ -154,8 +159,8 @@ function formatear_pasajero(string $dni, Nodo $nodo_pasajero): array {
 /**
  * Obtiene un pasajero por DNI con sus ventas.
  */
-function obtener_pasajero_por_dni(string $nombre_dueno, string $dni): ?array {
-    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+function obtener_pasajero_por_dni(string $nombre_dueno, string $dni, ?Nodo $nodo_contexto = null): ?array {
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return null;
 
     $nodo_pasajero = $contenedor->adyacente($dni);
@@ -200,7 +205,7 @@ function obtener_pasajero_por_dni(string $nombre_dueno, string $dni): ?array {
 /**
  * Actualiza los datos de un pasajero (excepto DNI que es inmutable).
  */
-function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): array {
+function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos, ?Nodo $nodo_contexto = null): array {
     // Validaciones (solo si vienen campos)
     if (isset($datos['apellido'])) {
         $err = validar_nombre_o_apellido($datos['apellido']);
@@ -231,7 +236,7 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
         if ($err !== null) return ['exito' => false, 'error' => 'Dirección: ' . $err];
     }
 
-    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return ['exito' => false, 'error' => 'No hay pasajeros registrados'];
 
     $nodo_pasajero = $contenedor->adyacente($dni);
@@ -295,7 +300,7 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos): a
  * @param array  $datos
  * @return array
  */
-function crear_pasajero(string $nombre_dueno, array $datos): array {
+function crear_pasajero(string $nombre_dueno, array $datos, ?Nodo $nodo_contexto = null): array {
     // Validaciones
     $err = validar_dni($datos['dni'] ?? '');
     if ($err !== null) return ['exito' => false, 'error' => 'DNI: ' . $err];
@@ -319,7 +324,7 @@ function crear_pasajero(string $nombre_dueno, array $datos): array {
     $dni_norm = normalizar_dni($datos['dni']);
     if ($dni_norm === '') return ['exito' => false, 'error' => 'DNI invalido'];
 
-    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return ['exito' => false, 'error' => 'Dueno no encontrado'];
 
     if ($contenedor->adyacente($dni_norm)) {

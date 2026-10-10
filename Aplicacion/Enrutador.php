@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.77h
+ * @version   1.5piloto.77i
  */
 
 use Iteradores\Nodos\Nodo;
@@ -344,7 +344,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
                     }
-                    $empresas = listar_empresas_de_dueno($nombre_dueno);
+                    // Fase B2.3.5b.3: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $empresas = listar_empresas_de_dueno($nombre_dueno, $nodo_contexto);
                     responder_json(['exito' => true, 'empresas' => $empresas]);
                     break;
 
@@ -385,7 +387,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_empresa)) {
                         responder_json(['exito' => false, 'error' => 'Empresa no especificada']);
                     }
-                    $vehiculos = listar_vehiculos_de_empresa($nombre_empresa);
+                    // Fase B2.3.5b.3: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $vehiculos = listar_vehiculos_de_empresa($nombre_empresa, $nodo_contexto);
                     responder_json(['exito' => true, 'vehiculos' => $vehiculos]);
                     break;
 
@@ -919,7 +923,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         'direccion' => $post['direccion'] ?? '',
                         'localidad' => $post['localidad'] ?? '',
                     ];
-                    $resultado = crear_pasajero($nombre_dueno, $datos);
+                    // Fase B2.3.5b.3: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = crear_pasajero($nombre_dueno, $datos, $nodo_contexto);
                     responder_json($resultado);
                     break;
 
@@ -951,7 +957,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
                     }
-                    responder_json(['exito' => true, 'pasajeros' => listar_pasajeros($nombre_dueno)]);
+                    // Fase B2.3.5b.3: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    responder_json(['exito' => true, 'pasajeros' => listar_pasajeros($nombre_dueno, $nodo_contexto)]);
                     break;
 
                 case 'buscar':
@@ -960,7 +968,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
                     }
-                    responder_json(['exito' => true, 'pasajeros' => buscar_pasajeros($nombre_dueno, $termino)]);
+                    // Fase B2.3.5b.3: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    responder_json(['exito' => true, 'pasajeros' => buscar_pasajeros($nombre_dueno, $termino, $nodo_contexto)]);
                     break;
 
                 case 'obtener':
@@ -969,7 +979,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_dueno) || empty($dni)) {
                         responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
                     }
-                    $pasajero = obtener_pasajero_por_dni($nombre_dueno, $dni);
+                    // Fase B2.3.5b.3: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $pasajero = obtener_pasajero_por_dni($nombre_dueno, $dni, $nodo_contexto);
                     if ($pasajero) {
                         responder_json(['exito' => true, 'pasajero' => $pasajero]);
                     } else {
@@ -992,7 +1004,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         'direccion' => $post['direccion'] ?? '',
                         'localidad' => $post['localidad'] ?? '',
                     ];
-                    $resultado = actualizar_pasajero($nombre_dueno, $dni, $datos);
+                    // Fase B2.3.5b.3: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = actualizar_pasajero($nombre_dueno, $dni, $datos, $nodo_contexto);
                     responder_json($resultado);
                     break;
 

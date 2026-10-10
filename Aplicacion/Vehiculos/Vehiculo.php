@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.75a
+ * @version   1.5piloto.77i
  */
 
 use Iteradores\Nodos\Nodo;
@@ -21,7 +21,17 @@ include_once("./Aplicacion/FuncionesAuxiliares.php");
  * @param string $nombre_empresa Nombre identificador de la empresa.
  * @return array Lista de vehículos con su información.
  */
-function listar_vehiculos_de_empresa(string $nombre_empresa): array {
+function listar_vehiculos_de_empresa(string $nombre_empresa, ?Nodo $nodo_contexto = null): array {
+    // Fase B2.3.5b.3: contexto opcional. Si viene (terminal),
+    // navega por su compartido.
+    if ($nodo_contexto !== null) {
+        $nodo_empresas = $nodo_contexto->adyacente('empresas');
+        if (!$nodo_empresas) return [];
+        $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
+        if (!$nodo_empresa) return [];
+        return _formatear_vehiculos_de_empresa($nodo_empresa);
+    }
+
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     if (!$raiz_usuarios) return [];
 
@@ -31,48 +41,61 @@ function listar_vehiculos_de_empresa(string $nombre_empresa): array {
         $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
         if (!$nodo_empresa) continue;
 
-        $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
-        if (!$nodo_vehiculos) return [];
+        return _formatear_vehiculos_de_empresa($nodo_empresa);
+    }
+    return [];
+}
 
-        $adyacentes = $nodo_vehiculos->adyacentes();
-        if (!$adyacentes) return [];
+/**
+ * Formatea la lista de vehículos de una empresa.
+ *
+ * Extraído de listar_vehiculos_de_empresa para que el
+ * llamador con contexto y el default compartan el código.
+ *
+ * @param Nodo $nodo_empresa
+ * @return array
+ */
+function _formatear_vehiculos_de_empresa(Nodo $nodo_empresa): array {
+    $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
+    if (!$nodo_vehiculos) return [];
 
-        $vehiculos = [];
-        foreach ($adyacentes as $nombre_vehiculo => $nodo_vehiculo) {
-            $nombre_vehiculo = (string)$nombre_vehiculo;
-            $nodo_nombre = $nodo_vehiculo->adyacente('nombre');
-            $nodo_asientos = $nodo_vehiculo->adyacente('asientos');
-            $asientos = $nodo_asientos ? $nodo_asientos->dato() : '0';
+    $adyacentes = $nodo_vehiculos->adyacentes();
+    if (!$adyacentes) return [];
 
-            // Foto
-            $nodo_foto = $nodo_vehiculo->adyacente('foto');
-            $foto = $nodo_foto ? $nodo_foto->dato() : '';
+    $vehiculos = [];
+    foreach ($adyacentes as $nombre_vehiculo => $nodo_vehiculo) {
+        $nombre_vehiculo = (string)$nombre_vehiculo;
+        $nodo_nombre = $nodo_vehiculo->adyacente('nombre');
+        $nodo_asientos = $nodo_vehiculo->adyacente('asientos');
+        $asientos = $nodo_asientos ? $nodo_asientos->dato() : '0';
 
-            // Configuración
-            $configuracion = ['pisos' => []];
-            if ($nodo_asientos) {
-                for ($i = 1; $i <= 2; $i++) {
-                    $piso = $nodo_asientos->adyacente("piso_$i");
-                    if ($piso) {
-                        $config_piso = obtener_configuracion_piso($piso);
-                        if ($config_piso) {
-                            $configuracion['pisos'][] = $config_piso;
-                        }
+        // Foto
+        $nodo_foto = $nodo_vehiculo->adyacente('foto');
+        $foto = $nodo_foto ? $nodo_foto->dato() : '';
+
+        // Configuración
+        $configuracion = ['pisos' => []];
+        if ($nodo_asientos) {
+            for ($i = 1; $i <= 2; $i++) {
+                $piso = $nodo_asientos->adyacente("piso_$i");
+                if ($piso) {
+                    $config_piso = obtener_configuracion_piso($piso);
+                    if ($config_piso) {
+                        $configuracion['pisos'][] = $config_piso;
                     }
                 }
             }
-
-            $vehiculos[] = [
-                'nombre_vehiculo' => $nombre_vehiculo,
-                'nombre' => $nodo_nombre ? $nodo_nombre->dato() : $nombre_vehiculo,
-                'asientos' => $asientos,
-                'foto' => $foto,
-                'configuracion' => $configuracion
-            ];
         }
-        return $vehiculos;
+
+        $vehiculos[] = [
+            'nombre_vehiculo' => $nombre_vehiculo,
+            'nombre' => $nodo_nombre ? $nodo_nombre->dato() : $nombre_vehiculo,
+            'asientos' => $asientos,
+            'foto' => $foto,
+            'configuracion' => $configuracion
+        ];
     }
-    return [];
+    return $vehiculos;
 }
 
 /**

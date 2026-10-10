@@ -112,8 +112,26 @@ Detalle en §2.3.)
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
 
-**Tanda actual:** v77h (Fase B2.3.5b.2: contexto en
-cambiar_asiento_pasaje y reservas).
+**Tanda actual:** v77i (Fase B2.3.5b.3: contexto en
+empresas, vehículos y pasajeros).
+
+**v77i — Fase B2.3.5b.3.**
+
+- `Pasajero.php`: contexto opcional en
+  `obtener_contenedor_pasajeros_dueno`,
+  `obtener_pasajero_nodo_por_dni`, `listar_pasajeros`,
+  `buscar_pasajeros`, `obtener_pasajero_por_dni`,
+  `crear_pasajero`, `actualizar_pasajero`.
+- `Vehiculo.php`: contexto opcional en
+  `listar_vehiculos_de_empresa`. Nuevo helper
+  `_formatear_vehiculos_de_empresa`.
+- `Enrutador.php`: `empresas/listar`, `vehiculos/listar`,
+  `pasajeros/crear`, `pasajeros/listar`, `pasajeros/buscar`,
+  `pasajeros/obtener` y `pasajeros/actualizar` pasan el
+  contexto del solicitante.
+
+Sin cambio de comportamiento hoy. Falta B2.3.5b.4 (pruebas
+del plugin).
 
 **v77h — Fase B2.3.5b.2.**
 
