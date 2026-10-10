@@ -75,8 +75,17 @@ cambio de enfoque respecto del plan original. En lugar del
   `listar_empresas_de_dueno`. Con esto queda cerrada la
   Fase B2.2.
 
-**Tanda actual:** v77c (nueva funcionalidad: cambiar de
-asiento). Frontend.
+**Tanda actual:** v77d (cambiar de asiento: refrescar modal
+de pasajero).
+
+**v77d — refresco del modal de pasajero.** Al cambiar el
+asiento desde el detalle de un pasaje (pestaña Clientes), el
+modal genérico quedaba con el asiento viejo. `abrir_modal_cambiar_asiento`
+ahora acepta un 6to parámetro opcional `on_exito`, que se
+ejecuta tras confirmar el cambio. Desde `pasajeros.js` se
+pasa un callback que re-abre `ver_detalle_pasaje_individual`
+con el nuevo número de asiento. Desde el croquis no se pasa
+nada: sigue funcionando igual.
 
 **Nueva funcionalidad "Cambiar de asiento".** Desde el
 detalle de un pasaje (croquis o pestaña Clientes), botón

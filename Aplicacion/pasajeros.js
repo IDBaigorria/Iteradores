@@ -1,6 +1,6 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.77c
+ * @version 1.5piloto.77d
  */
 /**
  * Normaliza un DNI dejando solo dígitos.
@@ -416,7 +416,20 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
                 venta.viaje,
                 nombre_micro_real,
                 asientoInfo.fila,
-                asientoInfo.columna
+                asientoInfo.columna,
+                (info) => {
+                    // v77d: re-abrir el detalle con el asiento
+                    // nuevo. El modal apilado ya está cerrado,
+                    // así que el modal genérico se actualiza
+                    // con los datos frescos del backend.
+                    if (info && info.destino_numero) {
+                        ver_detalle_pasaje_individual(
+                            venta.id_venta,
+                            pasajero.dni,
+                            info.destino_numero
+                        );
+                    }
+                }
             );
         });
     }

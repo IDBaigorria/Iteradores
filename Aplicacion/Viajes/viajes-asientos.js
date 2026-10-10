@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.77c
+ * @version 1.5piloto.77d
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -1372,7 +1372,7 @@ function _es_destino_valido(a, estado_origen, es_terminal) {
  * @param {string} fila_origen
  * @param {string} columna_origen
  */
-async function abrir_modal_cambiar_asiento(nombre_dueno, nombre_viaje, nombre_micro, fila_origen, columna_origen) {
+async function abrir_modal_cambiar_asiento(nombre_dueno, nombre_viaje, nombre_micro, fila_origen, columna_origen, on_exito) {
     if (_venta_en_curso()) {
         mostrar_aviso('Hay una venta en curso. Termínala o cancelala antes de cambiar un asiento.', 'error');
         return;
@@ -1453,7 +1453,12 @@ async function abrir_modal_cambiar_asiento(nombre_dueno, nombre_viaje, nombre_mi
         origen_pasajero_dni: origen.pasajero ? origen.pasajero.dni : null,
         micro_config: micro_data.configuracion,
         destino: null,
-        dejar_reservado: origen.estado === 'reservado'
+        dejar_reservado: origen.estado === 'reservado',
+        // v77d: callback opcional que el llamador puede pasar
+        // para refrescar su propia UI tras el cambio (por
+        // ejemplo, re-abrir el detalle del pasajero con el
+        // asiento nuevo).
+        on_exito: (typeof on_exito === 'function') ? on_exito : null
     };
 
     // Armar croquis.
@@ -1601,8 +1606,18 @@ async function _confirmar_cambiar_asiento() {
                 pasajero_dni: d.origen_pasajero_dni
             };
 
+            // v77d: guardar el callback antes de limpiar el
+            // estado, y ejecutarlo después de cerrar el modal
+            // apilado. Se usa para que el llamador pueda
+            // refrescar su UI (por ejemplo, el modal de detalle
+            // del pasajero en la pestaña Clientes).
+            const on_exito_snap = d.on_exito;
             cambiar_asiento_datos_modal = null;
             cerrar_modal_apilado();
+
+            if (typeof on_exito_snap === 'function') {
+                try { on_exito_snap(snap); } catch (e) { console.error(e); }
+            }
 
             // Refrescar el croquis de atrás si estamos en el croquis.
             if (typeof viaje_seleccionado !== 'undefined' && viaje_seleccionado
