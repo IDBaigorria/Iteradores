@@ -112,8 +112,19 @@ Detalle en §2.3.)
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
 
-**Tanda actual:** v77i (Fase B2.3.5b.3: contexto en
-empresas, vehículos y pasajeros).
+**Tanda actual:** v77j (fix de zona horaria).
+
+**v77j — Fix de zona horaria.** El servidor no tenía
+`date_default_timezone_set`, así que PHP usaba UTC por
+defecto. Entre las 21 y las 24 hora argentina,
+`date('Y-m-d')` devolvía la fecha del día siguiente
+respecto del navegador. El cálculo de antigüedad del
+autocompletado de pasajeros (`_calcular_antiguedad_datos`
+en `aplicacion.js`) comparaba la fecha del servidor con la
+del navegador y daba `diff_dias < 0`, mostrando "Fecha de
+actualizacion invalida". Fix: `date_default_timezone_set(
+'America/Argentina/Buenos_Aires')` al inicio de `index.php`.
+Bug latente desde que existe el autocompletado (v58).
 
 **v77i — Fase B2.3.5b.3.**
 

@@ -1,4 +1,12 @@
 <?php
+// Zona horaria del servidor. Sin esto, PHP usa UTC por
+// defecto y date('Y-m-d') puede quedar un día adelantado
+// respecto del navegador del usuario entre las 21 y las
+// 24 hora argentina. Eso rompía el cálculo de antigüedad
+// de los datos del pasajero en el autocompletado por DNI
+// (avisaba "Fecha de actualizacion invalida").
+date_default_timezone_set('America/Argentina/Buenos_Aires');
+
 session_start();
 header("Cache-control: no-cache, must-revalidate");
 
@@ -19,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.77i
+ * @version   1.5piloto.77j
  */
 
 // --- Utilidades base ----------------------------------
