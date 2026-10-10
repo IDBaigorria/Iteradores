@@ -112,8 +112,30 @@ Detalle en §2.3.)
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
 
-**Tanda actual:** v77f (Fase B2.3.5a: migración de repuntado
-de terminales al compartido).
+**Tanda actual:** v77g (Fase B2.3.5b.1: el enrutador pasa
+contexto del solicitante terminal).
+
+**v77g — Fase B2.3.5b.1.**
+
+Enrutador:
+
+- Nuevo helper `_contexto_solicitante($nombre_solicitante)`
+  que devuelve el nodo compartido si el solicitante es
+  terminal, o null en otros casos.
+- Nuevo helper `_nombre_terminal_solicitante($nombre_solicitante)`
+  que devuelve el nombre si es terminal, o null.
+- `viajes/estado_asientos`: pasa `$nodo_contexto` a
+  `obtener_estados_asientos_micro`.
+- `ventas/obtener`, `ventas/cancelar`, `ventas/pagar_cupon`,
+  `ventas/info_cancelacion`: pasan `$nombre_terminal_sol` como
+  filtro a la función correspondiente. Restringe la búsqueda
+  al contexto del terminal solicitante.
+
+Sin cambio de comportamiento visible hoy (los nodos son
+los mismos). Se activa cuando el framework haga carga
+parcial por contextos. Falta B2.3.5b.2 (contexto en
+`cambiar_asiento_pasaje` y reservas), B2.3.5b.3 (empresas,
+vehículos, pasajeros), B2.3.5b.4 (pruebas del plugin).
 
 **v77f — Fase B2.3.5a.**
 

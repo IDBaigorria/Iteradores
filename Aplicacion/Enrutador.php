@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.77b
+ * @version   1.5piloto.77g
  */
 
 use Iteradores\Nodos\Nodo;
@@ -20,6 +20,57 @@ function responder_json(array $datos): void {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($datos, JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+/**
+ * Devuelve el nodo del compartido del solicitante si es
+ * terminal, o null en otros casos.
+ *
+ * Fase B2.3.5b.1. Después del repuntado (B2.3.5a), el enlace
+ * `dueno` del terminal apunta al compartido. Las funciones
+ * de navegación que aceptan un `?Nodo $nodo_contexto` lo
+ * usan para navegar por el subgrafo del terminal.
+ *
+ * Dueño, admin y soporte devuelven null: navegan por el
+ * camino default (`usuarios → dueño`).
+ *
+ * @param string $nombre_solicitante
+ * @return Nodo|null
+ */
+function _contexto_solicitante(string $nombre_solicitante): ?Nodo {
+    if ($nombre_solicitante === '') return null;
+    $nodo_sol = Nodo::nodo_por_id('us_' . $nombre_solicitante);
+    if (!$nodo_sol) return null;
+    $nivel = $nodo_sol->adyacente('nivel');
+    if (!$nivel) {
+        $publico = $nodo_sol->adyacente('publico');
+        if ($publico) $nivel = $publico->adyacente('nivel');
+    }
+    if (!$nivel || $nivel->dato() !== 'terminal') return null;
+    return $nodo_sol->adyacente('dueno');
+}
+
+/**
+ * Devuelve el nombre del solicitante si es terminal, o null
+ * en otros casos. Se usa como filtro opcional en las
+ * funciones que reciben `?string $nombre_terminal`.
+ *
+ * Fase B2.3.5b.1.
+ *
+ * @param string $nombre_solicitante
+ * @return string|null
+ */
+function _nombre_terminal_solicitante(string $nombre_solicitante): ?string {
+    if ($nombre_solicitante === '') return null;
+    $nodo_sol = Nodo::nodo_por_id('us_' . $nombre_solicitante);
+    if (!$nodo_sol) return null;
+    $nivel = $nodo_sol->adyacente('nivel');
+    if (!$nivel) {
+        $publico = $nodo_sol->adyacente('publico');
+        if ($publico) $nivel = $publico->adyacente('nivel');
+    }
+    if (!$nivel || $nivel->dato() !== 'terminal') return null;
+    return $nombre_solicitante;
 }
 
 /**
@@ -559,7 +610,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = obtener_estados_asientos_micro($nombre_viaje, $nombre_micro, $nombre_dueno);
+                    // Fase B2.3.5b.1: si el solicitante es terminal,
+                    // navegar por su subgrafo compartido.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = obtener_estados_asientos_micro($nombre_viaje, $nombre_micro, $nombre_dueno, $nodo_contexto);
                     responder_json($resultado);
                     break;
 
@@ -771,7 +825,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($id_venta)) {
                         responder_json(['exito' => false, 'error' => 'ID de venta no especificado']);
                     }
-                    $venta = obtener_venta_por_id($id_venta);
+                    // Fase B2.3.5b.1: si el solicitante es terminal,
+                    // restringir la búsqueda a su contexto.
+                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
+                    $venta = obtener_venta_por_id($id_venta, $nombre_terminal_sol);
                     if ($venta) {
                         responder_json(['exito' => true, 'venta' => $venta]);
                     } else {
@@ -785,7 +842,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($id_venta)) {
                         responder_json(['exito' => false, 'error' => 'ID de venta no especificado']);
                     }
-                    $resultado = cancelar_venta($id_venta, $motivo);
+                    // Fase B2.3.5b.1: filtro opcional por terminal.
+                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
+                    $resultado = cancelar_venta($id_venta, $motivo, $nombre_terminal_sol);
                     responder_json($resultado);
                     break;
                 case 'pagar_cupon':
@@ -796,7 +855,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($id_venta) || empty($numero_cupon) || empty($monto) || empty($metodo_pago)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = pagar_cupon_venta($id_venta, $numero_cupon, $monto, $metodo_pago);
+                    // Fase B2.3.5b.1: filtro opcional por terminal.
+                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
+                    $resultado = pagar_cupon_venta($id_venta, $numero_cupon, $monto, $metodo_pago, $nombre_terminal_sol);
                     responder_json($resultado);
                     break;
                 case 'info_cancelacion':
@@ -804,7 +865,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($id_venta)) {
                         responder_json(['exito' => false, 'error' => 'ID de venta no especificado']);
                     }
-                    $resultado = obtener_info_cancelacion($id_venta);
+                    // Fase B2.3.5b.1: filtro opcional por terminal.
+                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
+                    $resultado = obtener_info_cancelacion($id_venta, $nombre_terminal_sol);
                     responder_json($resultado);
                     break;
                 case 'listar':
