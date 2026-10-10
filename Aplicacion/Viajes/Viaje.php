@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.76w
+ * @version   1.5piloto.77e
  */
 
 use Iteradores\Nodos\Nodo;
@@ -192,9 +192,9 @@ HTML;
  * @return Nodo|null
  */
 function _contexto_terminal(string $nombre_terminal) {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return null;
-    $nodo_terminal = $raiz->adyacente($nombre_terminal);
+    // Fase B2.3.4: resolver el terminal por ID especial
+    // `us_<nombre>` en vez de la raíz global `usuarios`.
+    $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre_terminal);
     if (!$nodo_terminal) return null;
     return $nodo_terminal->adyacente('dueno');
 }

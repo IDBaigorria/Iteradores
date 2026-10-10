@@ -2,12 +2,17 @@
 /**
  * Aplicador de cambios — Proyecto iteradores (PHP).
  *
- * Tanda V1.5piloto.77d-05 (documentación).
- *   - prompts/plan_actual.md: refresh de la última actualización,
- *     cadena de cierres v76v–v76y, §1.7 deuda técnica, y detalle
- *     de B2.3.4 / B2.3.5.
+ * Tanda V1.5piloto.77e (Fase B2.3.4 del modelo topológico).
+ *   - Venta.php: confirmar_venta_actual y cancelar_venta escriben
+ *     en AMBOS árboles paralelos cuando el contexto es un compartido.
+ *     Resolución de terminal/dueño por ID especial. Nuevo helper
+ *     _desenlazar_venta_de_arbol.
+ *   - Viaje.php: _contexto_terminal por ID especial.
+ *   - index.php: bump.
+ *   - prompts/plan_actual.md: registro.
  *
- * Sin cambios de código. Solo documentación.
+ * Sin cambio de comportamiento hoy: el enrutador sigue pasando el
+ * nodo del dueño real como contexto. Se activa con B2.3.5.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -18,236 +23,455 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ============================================================
-    // plan_actual.md — §1.1 última actualización
+    // Venta.php — bump @version
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: §1.1 última actualización a v77d',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'Venta.php: bump @version a 1.5piloto.77e',
         'buscar' => [
-            '**Última actualización de este archivo:** v1.5piloto.76v',
-            '(reorganización de prompts + inicio de la Fase B2.3).',
-            'Con v76u quedó cerrada la Fase B2.2 completa (Viaje, Venta,',
-            'ViajeAsientos, Empresa). Próximo paso: **Fase B2.3**, con un',
-            'cambio de enfoque respecto del plan original. En lugar del',
-            '"compartido plano" (opción A original), se va con la **opción D**:',
-            'árboles paralelos con nombres de enlace parametrizados en',
-            '`miscelaneas/Arbol.php`. Detalle en §2.3.)',
+            ' * @since     1.5piloto.14',
+            ' * @version   1.5piloto.77b',
         ],
         'reemplazar' => [
-            '**Última actualización de este archivo:** v1.5piloto.77d',
-            '(fix del modal de pasajero tras cambiar de asiento).',
-            'Con v76u quedó cerrada la Fase B2.2 completa (Viaje, Venta,',
-            'ViajeAsientos, Empresa). Después vinieron B2.3.1, B2.3.2 y',
-            'B2.3.3 (árboles paralelos parametrizados, aplicados también',
-            'en producción). Hubo un paréntesis de bugs (v76z a v77d) que',
-            'incluyó el fix de atadura comprador-pasajero, el modal',
-            'post-venta, y la funcionalidad completa de "cambiar de',
-            'asiento". Próximo paso: **Fase B2.3.4** (ajustar las',
-            'escrituras de venta para que inserten y borren en los dos',
-            'árboles paralelos cuando el contexto sea un compartido).',
-            'Detalle en §2.3.)',
+            ' * @since     1.5piloto.14',
+            ' * @version   1.5piloto.77e',
         ],
     ],
 
     // ============================================================
-    // plan_actual.md — cadena de cierres v76v–v76y
+    // Venta.php — confirmar_venta_actual: resolver terminal por ID
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'confirmar_venta_actual: resolver terminal por ID especial',
+        'buscar' => [
+            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
+            '    if (!$raiz_usuarios) return [\'exito\' => false, \'error\' => \'No hay usuarios registrados\'];',
+            '',
+            '    $nodo_terminal = $raiz_usuarios->adyacente($nombre_terminal);',
+            '    if (!$nodo_terminal) return [\'exito\' => false, \'error\' => \'Terminal no encontrada\'];',
+        ],
+        'reemplazar' => [
+            '    // Fase B2.3.4: resolver el terminal por ID especial',
+            '    // `us_<nombre>` en vez de la raíz global `usuarios`',
+            '    // (compatible con carga parcial por contextos).',
+            '    $nodo_terminal = Nodo::nodo_por_id(\'us_\' . $nombre_terminal);',
+            '    if (!$nodo_terminal) return [\'exito\' => false, \'error\' => \'Terminal no encontrada\'];',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — confirmar_venta_actual: insertar en ambos árboles
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'confirmar_venta_actual: insertar en ambos árboles paralelos',
+        'buscar' => [
+            '    // Insertar venta en el árbol de ventas del dueño usando _hmi.',
+            '    // Fase B2.2.2: se navega por el contexto del terminal para',
+            '    // que la venta se inserte en el contenedor correcto.',
+            '    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno);',
+            '    if (!$contenedor_ventas) {',
+            '        return [\'exito\' => false, \'error\' => \'No se pudo obtener contenedor de ventas\'];',
+            '    }',
+            '    _hmi($contenedor_ventas, $nodo_venta);',
+        ],
+        'reemplazar' => [
+            '    // Insertar la venta en el/los árboles correspondientes.',
+            '    // Fase B2.3.4: si el contexto es un compartido, la venta',
+            '    // participa en DOS árboles paralelos (mismo nodo físico):',
+            '    // el del dueño (default) y el del terminal que la vendió',
+            '    // (parametrizado). Orden: dueño primero, compartido después.',
+            '    $nombres_arbol = _nombres_arbol_para_contexto($nodo_dueno, $nombre_terminal);',
+            '',
+            '    if ($nombres_arbol === null) {',
+            '        // Contexto = nodo del dueño real (o admin). Insertar',
+            '        // solo en el árbol del dueño, con enlaces default.',
+            '        $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno);',
+            '        if (!$contenedor_ventas) {',
+            '            return [\'exito\' => false, \'error\' => \'No se pudo obtener contenedor de ventas\'];',
+            '        }',
+            '        _hmi($contenedor_ventas, $nodo_venta);',
+            '    } else {',
+            '        // Contexto = compartido del terminal. Insertar en',
+            '        // AMBOS árboles.',
+            '        // (1) Árbol del dueño real, default.',
+            '        $nodo_dueno_real = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
+            '        if ($nodo_dueno_real) {',
+            '            $contenedor_ventas_dueno = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno_real);',
+            '            if ($contenedor_ventas_dueno) {',
+            '                _hmi($contenedor_ventas_dueno, $nodo_venta);',
+            '            }',
+            '        }',
+            '        // (2) Árbol del compartido, parametrizado.',
+            '        $contenedor_ventas_compartido = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno);',
+            '        if ($contenedor_ventas_compartido) {',
+            '            _hmi($contenedor_ventas_compartido, $nodo_venta, $nombres_arbol);',
+            '        }',
+            '    }',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — cancelar_venta: resolver dueño por ID especial
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'cancelar_venta: resolver dueño por ID especial',
+        'buscar' => [
+            '    // 1b. Revertir montos del dueño (parte rendida que puede cubrir).',
+            '    $raiz_usuarios_c = Nodo::nodo_por_id(\'usuarios\');',
+            '    $nodo_dueno_c = $raiz_usuarios_c ? $raiz_usuarios_c->adyacente($nombre_dueno) : null;',
+        ],
+        'reemplazar' => [
+            '    // 1b. Revertir montos del dueño (parte rendida que puede cubrir).',
+            '    // Fase B2.3.4: ID especial.',
+            '    $nodo_dueno_c = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — cancelar_venta: desenlazar de ambos árboles
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'cancelar_venta: desenlazar de ambos árboles paralelos',
+        'buscar' => [
+            '    // 7. Desenlazar la venta del árbol del dueño.',
+            '    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);',
+            '    if ($contenedor_ventas) {',
+            '        $anterior = null;',
+            '        $actual = hmi($contenedor_ventas);',
+            '        $seg = 0;',
+            '        while ($actual && $seg < 1000) {',
+            '            if ($actual->id() === $nodo_venta->id()) {',
+            '                if ($anterior) {',
+            '                    $siguiente = hd($actual);',
+            '                    if ($siguiente) {',
+            '                        $anterior->_adyacente_en($siguiente, \'hd\', true);',
+            '                    } else {',
+            '                        $anterior->eliminar_adyacente(\'hd\');',
+            '                    }',
+            '                } else {',
+            '                    $siguiente = hd($actual);',
+            '                    if ($siguiente) {',
+            '                        $contenedor_ventas->_adyacente_en($siguiente, \'hmi\', true);',
+            '                    } else {',
+            '                        $contenedor_ventas->eliminar_adyacente(\'hmi\');',
+            '                    }',
+            '                }',
+            '                break;',
+            '            }',
+            '            $anterior = $actual;',
+            '            $actual = hd($actual);',
+            '            $seg++;',
+            '        }',
+            '    }',
+        ],
+        'reemplazar' => [
+            '    // 7. Desenlazar la venta de los árboles paralelos.',
+            '    // Fase B2.3.4: la venta puede estar en DOS árboles',
+            '    // (dueño + compartido del terminal que la vendió).',
+            '    // Orden inverso al de la inserción: compartido primero,',
+            '    // después el dueño.',
+            '    $nodo_terminal_venta = $nodo_venta->adyacente(\'terminal\');',
+            '    $nombre_terminal_venta = $nodo_terminal_venta ? (string)$nodo_terminal_venta->dato() : \'\';',
+            '',
+            '    // 7a. Desenlazar del árbol del compartido (si la venta',
+            '    // fue hecha por un terminal y su dueño tiene el',
+            '    // compartido marcado con `_es_compartido`).',
+            '    if ($nombre_terminal_venta !== \'\') {',
+            '        $nodo_terminal_resuelto = Nodo::nodo_por_id(\'us_\' . $nombre_terminal_venta);',
+            '        if ($nodo_terminal_resuelto) {',
+            '            $nodo_dueno_ctx = $nodo_terminal_resuelto->adyacente(\'dueno\');',
+            '            if ($nodo_dueno_ctx && $nodo_dueno_ctx->adyacente(\'_es_compartido\')) {',
+            '                $nombres_comp = _nombres_arbol_para_contexto($nodo_dueno_ctx, $nombre_terminal_venta);',
+            '                if ($nombres_comp !== null) {',
+            '                    $cont_comp = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno_ctx);',
+            '                    _desenlazar_venta_de_arbol($cont_comp, $nodo_venta, $nombres_comp);',
+            '                }',
+            '            }',
+            '        }',
+            '    }',
+            '',
+            '    // 7b. Desenlazar del árbol del dueño (default).',
+            '    $nodo_dueno_real = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
+            '    if ($nodo_dueno_real) {',
+            '        $cont_dueno = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno_real);',
+            '        _desenlazar_venta_de_arbol($cont_dueno, $nodo_venta, null);',
+            '    }',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — cancelar_venta: limpiar parametrizados residuales
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'cancelar_venta: limpiar enlaces parametrizados residuales',
+        'buscar' => [
+            '    $nodo_venta->eliminar_adyacente(\'hmi\');',
+            '    $nodo_venta->eliminar_adyacente(\'hd\');',
+            '    $nodo_venta->eliminar_adyacente(\'p\');',
+        ],
+        'reemplazar' => [
+            '    $nodo_venta->eliminar_adyacente(\'hmi\');',
+            '    $nodo_venta->eliminar_adyacente(\'hd\');',
+            '    $nodo_venta->eliminar_adyacente(\'p\');',
+            '    // Fase B2.3.4: también los parametrizados por si quedaron',
+            '    // residuales (defensivo).',
+            '    if ($nombre_terminal_venta !== \'\') {',
+            '        $nodo_venta->eliminar_adyacente(\'hmi_\' . $nombre_terminal_venta);',
+            '        $nodo_venta->eliminar_adyacente(\'hd_\' . $nombre_terminal_venta);',
+            '        $nodo_venta->eliminar_adyacente(\'p_\' . $nombre_terminal_venta);',
+            '    }',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — _calcular_cobertura_dueno: ID especial
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => '_calcular_cobertura_dueno: resolver dueño por ID especial',
+        'buscar' => [
+            'function _calcular_cobertura_dueno(string $nombre_dueno, float $monto_ef, float $monto_ba): array {',
+            '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
+            '    if (!$raiz) return [\'cubierto_ef\' => 0.0, \'cubierto_ba\' => 0.0, \'no_cubierto_ef\' => $monto_ef, \'no_cubierto_ba\' => $monto_ba];',
+            '    $nodo = $raiz->adyacente($nombre_dueno);',
+            '    if (!$nodo) return [\'cubierto_ef\' => 0.0, \'cubierto_ba\' => 0.0, \'no_cubierto_ef\' => $monto_ef, \'no_cubierto_ba\' => $monto_ba];',
+        ],
+        'reemplazar' => [
+            'function _calcular_cobertura_dueno(string $nombre_dueno, float $monto_ef, float $monto_ba): array {',
+            '    // Fase B2.3.4: ID especial.',
+            '    $nodo = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
+            '    if (!$nodo) return [\'cubierto_ef\' => 0.0, \'cubierto_ba\' => 0.0, \'no_cubierto_ef\' => $monto_ef, \'no_cubierto_ba\' => $monto_ba];',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — _crear_nodo_cancelacion: ID especial
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => '_crear_nodo_cancelacion: resolver dueño por ID especial',
+        'buscar' => [
+            'function _crear_nodo_cancelacion(string $nombre_dueno, string $id_venta, string $motivo, Nodo $nodo_venta, array $desglose, array $cubierto, int $asientos_liberados): string {',
+            '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
+            '    if (!$raiz) return \'\';',
+            '    $nodo_dueno = $raiz->adyacente($nombre_dueno);',
+            '    if (!$nodo_dueno) return \'\';',
+        ],
+        'reemplazar' => [
+            'function _crear_nodo_cancelacion(string $nombre_dueno, string $id_venta, string $motivo, Nodo $nodo_venta, array $desglose, array $cubierto, int $asientos_liberados): string {',
+            '    // Fase B2.3.4: ID especial.',
+            '    $nodo_dueno = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
+            '    if (!$nodo_dueno) return \'\';',
+        ],
+    ],
+
+    // ============================================================
+    // Venta.php — helper _desenlazar_venta_de_arbol
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Ventas/Venta.php',
+        'descripcion' => 'Venta.php: helper _desenlazar_venta_de_arbol',
+        'buscar' => [
+            '/**',
+            ' * Calcula cuánto hay que devolver por cada método al cancelar una',
+            ' * venta, leyendo los cupones pagados. Cada cupón aporta su monto al',
+            ' * método que tenga asignado, o al de la venta si no tiene uno propio.',
+            ' *',
+            ' * @param Nodo $nodo_venta',
+            ' * @return array{efectivo: float, banco: float, total: float}',
+            ' */',
+            'function _calcular_devolucion_venta(Nodo $nodo_venta): array {',
+        ],
+        'reemplazar' => [
+            '/**',
+            ' * Desenlaza un nodo venta de un árbol (del dueño o de un',
+            ' * compartido). El árbol puede usar nombres default',
+            ' * (`hmi`/`hd`/`p`) o parametrizados por terminal',
+            ' * (`hmi_<term>`/`hd_<term>`/`p_<term>`).',
+            ' *',
+            ' * Fase B2.3.4. Devuelve true si la venta estaba en el',
+            ' * árbol y se desenlazó. Si no estaba, devuelve false y no',
+            ' * modifica nada.',
+            ' *',
+            ' * @param Nodo|null $contenedor Contenedor raíz del árbol.',
+            ' * @param Nodo      $nodo_venta Nodo venta a desenlazar.',
+            ' * @param array|null $nombres   Nombres de enlace (`hmi`/`hd`/`p`) o',
+            ' *                              null para usar los default.',
+            ' * @return bool',
+            ' */',
+            'function _desenlazar_venta_de_arbol(?Nodo $contenedor, Nodo $nodo_venta, ?array $nombres): bool {',
+            '    if (!$contenedor) return false;',
+            '    $n = $nombres !== null ? $nombres : [\'hmi\' => \'hmi\', \'hd\' => \'hd\', \'p\' => \'p\'];',
+            '    $anterior = null;',
+            '    $actual = $contenedor->adyacente($n[\'hmi\']);',
+            '    $seg = 0;',
+            '    while ($actual && $seg < 2000) {',
+            '        if ($actual->id() === $nodo_venta->id()) {',
+            '            $siguiente = $actual->adyacente($n[\'hd\']);',
+            '            if ($anterior) {',
+            '                if ($siguiente) {',
+            '                    $anterior->_adyacente_en($siguiente, $n[\'hd\'], true);',
+            '                } else {',
+            '                    $anterior->eliminar_adyacente($n[\'hd\']);',
+            '                }',
+            '            } else {',
+            '                if ($siguiente) {',
+            '                    $contenedor->_adyacente_en($siguiente, $n[\'hmi\'], true);',
+            '                } else {',
+            '                    $contenedor->eliminar_adyacente($n[\'hmi\']);',
+            '                }',
+            '            }',
+            '            // Desenlazar el enlace `p` del nodo venta al contenedor.',
+            '            $nodo_venta->eliminar_adyacente($n[\'p\']);',
+            '            return true;',
+            '        }',
+            '        $anterior = $actual;',
+            '        $actual = $actual->adyacente($n[\'hd\']);',
+            '        $seg++;',
+            '    }',
+            '    return false;',
+            '}',
+            '',
+            '/**',
+            ' * Calcula cuánto hay que devolver por cada método al cancelar una',
+            ' * venta, leyendo los cupones pagados. Cada cupón aporta su monto al',
+            ' * método que tenga asignado, o al de la venta si no tiene uno propio.',
+            ' *',
+            ' * @param Nodo $nodo_venta',
+            ' * @return array{efectivo: float, banco: float, total: float}',
+            ' */',
+            'function _calcular_devolucion_venta(Nodo $nodo_venta): array {',
+        ],
+    ],
+
+    // ============================================================
+    // Viaje.php — bump @version
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/Viaje.php',
+        'descripcion' => 'Viaje.php: bump @version a 1.5piloto.77e',
+        'buscar' => [
+            ' * @since     1.5piloto.8',
+            ' * @version   1.5piloto.76w',
+        ],
+        'reemplazar' => [
+            ' * @since     1.5piloto.8',
+            ' * @version   1.5piloto.77e',
+        ],
+    ],
+
+    // ============================================================
+    // Viaje.php — _contexto_terminal por ID especial
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/Viaje.php',
+        'descripcion' => 'Viaje.php: _contexto_terminal por ID especial',
+        'buscar' => [
+            'function _contexto_terminal(string $nombre_terminal) {',
+            '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
+            '    if (!$raiz) return null;',
+            '    $nodo_terminal = $raiz->adyacente($nombre_terminal);',
+            '    if (!$nodo_terminal) return null;',
+            '    return $nodo_terminal->adyacente(\'dueno\');',
+            '}',
+        ],
+        'reemplazar' => [
+            'function _contexto_terminal(string $nombre_terminal) {',
+            '    // Fase B2.3.4: resolver el terminal por ID especial',
+            '    // `us_<nombre>` en vez de la raíz global `usuarios`.',
+            '    $nodo_terminal = Nodo::nodo_por_id(\'us_\' . $nombre_terminal);',
+            '    if (!$nodo_terminal) return null;',
+            '    return $nodo_terminal->adyacente(\'dueno\');',
+            '}',
+        ],
+    ],
+
+    // ============================================================
+    // index.php — bump
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'index.php',
+        'descripcion' => 'index.php: bump @version a 1.5piloto.77e',
+        'buscar' => [
+            ' * @since     1.0.0',
+            ' * @version   1.5piloto.77b',
+        ],
+        'reemplazar' => [
+            ' * @since     1.0.0',
+            ' * @version   1.5piloto.77e',
+        ],
+    ],
+
+    // ============================================================
+    // plan_actual.md — tanda actual
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: agregar cierres v76v–v76y',
+        'descripcion' => 'plan_actual: tanda actual a v77e',
         'buscar' => [
-            '- **v76u**: Fase B2.2.4. Empresa.php: contexto opcional en',
-            '  `listar_empresas_de_dueno`. Con esto queda cerrada la',
-            '  Fase B2.2.',
-            '',
-            '**Tanda actual:** v77d (cambiar de asiento: refrescar modal',
-            'de pasajero).',
-        ],
-        'reemplazar' => [
-            '- **v76u**: Fase B2.2.4. Empresa.php: contexto opcional en',
-            '  `listar_empresas_de_dueno`. Con esto queda cerrada la',
-            '  Fase B2.2.',
-            '- **v76v**: reorganización de prompts (nuevo `plan_actual.md`,',
-            '  §12 del piloto congelada, regla de actualización) +',
-            '  parametrización de `miscelaneas/Arbol.php` (las 7 funciones',
-            '  aceptan `?array $nombres = null`). Fase B2.3.1.',
-            '- **v76w**: helper `_nombres_arbol_para_contexto` y ajuste',
-            '  de las funciones del piloto para pasarle los nombres',
-            '  parametrizados a `hmi`/`hd`. Sin cambio de comportamiento.',
-            '  Fase B2.3.2.',
-            '- **v76x**: migración `app:construir_arboles_compartidos`.',
-            '  Marca cada compartido con `_es_compartido`, limpia los',
-            '  enlaces planos que dejó B2.1 y reconstruye los árboles',
-            '  de `ventas` y `cancelaciones` con nombres parametrizados.',
-            '  Idempotente. Fase B2.3.3.',
-            '- **v76y**: fix de auto-detección de migraciones. Las',
-            '  funciones `detectar_*` ya no devuelven `true` por vacío.',
-            '  Nuevo comando `app:migracion_limpiar_marcadores` y botón',
-            '  "Re-detectar" en la pestaña Grafo.',
-            '- **v76z**: fix del modal post-venta. `confirmar_venta_modal`',
-            '  muestra el modal ANTES de los refrescos y envuelve los',
-            '  refrescos en try/catch.',
-            '- **v77 / v77a**: fix del Bug 1 (atadura). v77 no limpia',
-            '  campos si hay atadura activa. v77a habilita los campos',
-            '  no-DNI del pasajero al activar la atadura.',
-            '- **v77b**: backend de "cambiar de asiento".',
-            '  `formatear_venta_resumida` agrega `micro_enlace`. Nueva',
-            '  función `cambiar_asiento_pasaje` en `ViajeAsientos.php`.',
-            '  Subacción `viajes/cambiar_asiento` en el enrutador.',
-            '- **v77c**: frontend de "cambiar de asiento". Botón en los',
-            '  dos modales de detalle. Función compartida',
-            '  `abrir_modal_cambiar_asiento`.',
-            '- **v77d**: refresco del modal de pasajero tras cambiar de',
-            '  asiento. `abrir_modal_cambiar_asiento` acepta un callback',
-            '  `on_exito`.',
-            '',
             '**Tanda actual:** v77d-05 (documentación: refresh del plan',
             'actual + preparación de B2.3.4).',
         ],
-    ],
-
-    // ============================================================
-    // plan_actual.md — §1.7 deuda técnica
-    // ============================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: agregar §1.7 deuda técnica',
-        'buscar' => [
-            '### 1.6 Preguntas abiertas',
-            '',
-            'Ninguna. La conversación quedó en un punto de pausa limpio.',
-            '',
-            '---',
-            '',
-            '## 2. PLAN DE LA LÍNEA DE TANDAS',
-        ],
         'reemplazar' => [
-            '### 1.6 Preguntas abiertas',
+            '**Tanda actual:** v77e (Fase B2.3.4: escrituras de venta',
+            'para dos árboles paralelos).',
             '',
-            'Ninguna. La conversación quedó en un punto de pausa limpio.',
+            '**v77e — Fase B2.3.4.**',
             '',
-            '### 1.7 Deuda técnica',
-            '',
-            '**Uso de `Nodo::nodo_por_id(\'usuarios\')`.** Es la raíz global',
-            'del grafo y su uso impide la carga parcial por contextos: para',
-            'resolverla hay que tener todo el grafo cargado. El objetivo de',
-            'la Fase B es dejar de usarla, resolviendo los nodos por IDs',
-            'especiales (`Nodo::nodo_por_id(\'us_<nombre>\')`) o por',
-            'navegación de contexto.',
-            '',
-            '**Inventario actual (22 usos):**',
-            '',
-            '- **`Venta.php` (8):**',
-            '  - `obtener_contenedor_ventas_dueno` — rama sin contexto.',
-            '  - `confirmar_venta_actual` — resuelve el terminal.',
-            '  - `_buscar_venta_por_id` — rama sin contexto (itera dueños).',
-            '  - `cancelar_venta` — resuelve el dueño.',
-            '  - `_calcular_cobertura_dueno` — resuelve el dueño.',
-            '  - `_crear_nodo_cancelacion` — resuelve el dueño.',
-            '  - `obtener_cancelacion_por_id` — resuelve el dueño (itera).',
-            '  - `listar_cancelaciones_de_dueno` — resuelve el dueño.',
-            '- **`Enrutador.php` (6):**',
-            '  - `autenticar/verificar` — dueño de un terminal.',
-            '  - Módulo `administrador` — nivel del solicitante.',
-            '  - `dueno/listar_sesiones_terminales` — nivel del solicitante.',
-            '  - `viajes/limpiar_prueba` — nivel del solicitante.',
-            '  - `pasajeros/limpiar_prueba` — nivel del solicitante.',
-            '  - Módulo `grafo` — nivel del solicitante.',
-            '- **`Viaje.php` (6):**',
-            '  - `_contexto_terminal` — terminal y su dueño.',
-            '  - `obtener_contenedor_viajes_dueno` — rama sin contexto.',
-            '  - `listar_viajes_de_terminal` — terminal y dueño.',
-            '  - `viaje_tiene_ventas` — resuelve dueño.',
-            '  - `agregar_terminal_autorizada` — resuelve terminal.',
-            '  - `formatear_viaje` — resuelve dueño para `empresas`.',
-            '- **`Funciones.php` (2):**',
-            '  - `detectar_usuarios_especiales`.',
-            '  - `detectar_niveles_usuario`.',
-            '',
-            '**Plan de limpieza:**',
-            '',
-            '- **B2.3.4 (en curso):** reemplazar los usos que están dentro',
-            '  del flujo de ventas y de contexto del terminal',
-            '  (`confirmar_venta_actual`, `cancelar_venta`,',
-            '  `_calcular_cobertura_dueno`, `_crear_nodo_cancelacion` y',
-            '  `_contexto_terminal`). Se reemplazan por',
-            '  `Nodo::nodo_por_id(\'us_\' . $nombre)`. Sin cambio visible',
-            '  (funciona igual hoy con el grafo completo).',
-            '- **B3 (limpieza final):** reemplazar el resto. Los 6 del',
-            '  enrutador son los más delicados: requieren que el enrutador',
-            '  empiece a pasar contexto (repuntado de B2.3.5). Los fallbacks',
-            '  "sin contexto" de las funciones contenedoras se eliminan en',
-            '  B3.',
-            '',
-            '**Contenedores raíz de árboles paralelos.** Cada árbol tiene su',
-            'propio contenedor raíz. `privado/ventas` es un nodo, y',
-            '`compartido_con_us_termX/ventas` es otro nodo (distinto). Los',
-            'nodos venta son compartidos entre árboles (mismo nodo físico)',
-            'y cada uno lleva dos juegos de enlaces (`hmi`/`hd`/`p` para el',
-            'árbol del dueño, `hmi_<term>`/`hd_<term>`/`p_<term>` para el',
-            'del terminal). Es la condición para que la topología aísle',
-            'correctamente: si el contenedor fuera el mismo, el BFS desde',
-            'el terminal alcanzaría todas las ventas del dueño.',
-            '',
-            '**Dato del compartido (opción A).** El nodo',
-            '`compartido_con_us_termX` tiene `dato = nombre_del_dueño` para',
-            'que el código que hace `$nodo_dueno->dato()` siga funcionando',
-            'después del repuntado (B2.3.5). **NO** se agrega un enlace',
-            '`dueno` en el compartido apuntando al nodo del dueño real:',
-            'eso rompería la privacidad topológica (el terminal podría',
-            'llegar al dueño por el enlace y desde ahí a todo el grafo).',
-            '',
-            '---',
-            '',
-            '## 2. PLAN DE LA LÍNEA DE TANDAS',
-        ],
-    ],
-
-    // ============================================================
-    // plan_actual.md — §2.3 sub-tandas B2.3.4 y B2.3.5
-    // ============================================================
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: detalle de B2.3.4 y B2.3.5',
-        'buscar' => [
-            '- **B2.3.4** — Repuntar `us_termX → dueno` al compartido.',
-            '  Acá se activa el aislamiento. Con pruebas del plugin.',
-        ],
-        'reemplazar' => [
-            '- **B2.3.4** — Ajustar las escrituras de venta para que',
-            '  inserten y borren en los dos árboles paralelos. **En curso.**',
-            '  Alcance:',
-            '  - Reemplazar `Nodo::nodo_por_id(\'usuarios\')->adyacente(...)`',
-            '    por `Nodo::nodo_por_id(\'us_\' . $nombre)` en',
-            '    `confirmar_venta_actual`, `cancelar_venta`,',
-            '    `_calcular_cobertura_dueno`, `_crear_nodo_cancelacion`',
-            '    (Venta.php) y `_contexto_terminal` (Viaje.php).',
-            '  - En `confirmar_venta_actual`: si el contexto tiene',
-            '    `_es_compartido`, insertar la venta también en el árbol',
-            '    parametrizado del compartido, además del árbol del dueño',
-            '    real. Orden de inserción: dueño primero (default),',
-            '    compartido después (parametrizado).',
-            '  - En `cancelar_venta`: desenlazar del compartido primero,',
-            '    después del árbol del dueño (orden inverso al de la',
-            '    inserción).',
-            '  - **NO toca el enrutador.** Los 6 chequeos de nivel siguen',
-            '    usando `nodo_por_id(\'usuarios\')`. Eso es B3.',
-            '  - Dato del compartido: `dato = nombre_dueno` (opción A). No',
-            '    se agrega enlace `dueno` en el compartido: apuntar al',
-            '    nodo del dueño real rompería la privacidad topológica.',
-            '  - Sin pruebas del plugin todavía: el aislamiento no se',
-            '    activa hasta B2.3.5.',
-            '- **B2.3.5** — Repuntar `us_termX → dueno` al compartido y',
-            '  pasar el contexto desde el enrutador. Acá se activa el',
-            '  aislamiento. Con pruebas del plugin.',
+            '- `Venta.php`:',
+            '  - `confirmar_venta_actual` resuelve el terminal por',
+            '    `Nodo::nodo_por_id(\'us_\' . $nombre_terminal)`.',
+            '  - `confirmar_venta_actual` inserta la venta en AMBOS',
+            '    árboles paralelos si el contexto tiene `_es_compartido`:',
+            '    primero el del dueño (default), después el del compartido',
+            '    (parametrizado).',
+            '  - `cancelar_venta` resuelve el dueño por ID especial.',
+            '  - `cancelar_venta` desenlaza del compartido primero y del',
+            '    árbol del dueño después (orden inverso al de la',
+            '    inserción). Nuevo helper `_desenlazar_venta_de_arbol`.',
+            '  - `cancelar_venta` limpia también los enlaces',
+            '    parametrizados residuales.',
+            '  - `_calcular_cobertura_dueno` y `_crear_nodo_cancelacion`',
+            '    resuelven el dueño por ID especial.',
+            '- `Viaje.php`: `_contexto_terminal` resuelve el terminal',
+            '  por ID especial.',
+            '- **Sin cambio de comportamiento hoy.** El enrutador sigue',
+            '  pasando el nodo del dueño real como contexto, entonces',
+            '  `_nombres_arbol_para_contexto` devuelve null y no se',
+            '  activa la rama nueva. Se activa con B2.3.5.',
+            '- **No toca el enrutador.** Los 6 chequeos de nivel siguen',
+            '  usando `nodo_por_id(\'usuarios\')`. Eso es B3.',
         ],
     ],
 

@@ -112,8 +112,34 @@ Detalle en §2.3.)
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
 
-**Tanda actual:** v77d-05 (documentación: refresh del plan
-actual + preparación de B2.3.4).
+**Tanda actual:** v77e (Fase B2.3.4: escrituras de venta
+para dos árboles paralelos).
+
+**v77e — Fase B2.3.4.**
+
+- `Venta.php`:
+  - `confirmar_venta_actual` resuelve el terminal por
+    `Nodo::nodo_por_id('us_' . $nombre_terminal)`.
+  - `confirmar_venta_actual` inserta la venta en AMBOS
+    árboles paralelos si el contexto tiene `_es_compartido`:
+    primero el del dueño (default), después el del compartido
+    (parametrizado).
+  - `cancelar_venta` resuelve el dueño por ID especial.
+  - `cancelar_venta` desenlaza del compartido primero y del
+    árbol del dueño después (orden inverso al de la
+    inserción). Nuevo helper `_desenlazar_venta_de_arbol`.
+  - `cancelar_venta` limpia también los enlaces
+    parametrizados residuales.
+  - `_calcular_cobertura_dueno` y `_crear_nodo_cancelacion`
+    resuelven el dueño por ID especial.
+- `Viaje.php`: `_contexto_terminal` resuelve el terminal
+  por ID especial.
+- **Sin cambio de comportamiento hoy.** El enrutador sigue
+  pasando el nodo del dueño real como contexto, entonces
+  `_nombres_arbol_para_contexto` devuelve null y no se
+  activa la rama nueva. Se activa con B2.3.5.
+- **No toca el enrutador.** Los 6 chequeos de nivel siguen
+  usando `nodo_por_id('usuarios')`. Eso es B3.
 
 **v77d — refresco del modal de pasajero.** Al cambiar el
 asiento desde el detalle de un pasaje (pestaña Clientes), el

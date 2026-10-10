@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.77b
+ * @version   1.5piloto.77e
  */
 
 
@@ -178,10 +178,10 @@ function confirmar_venta_actual(
     ?string $fecha_hora = null,
     ?string $fecha_pago = null
 ): array {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-
-    $nodo_terminal = $raiz_usuarios->adyacente($nombre_terminal);
+    // Fase B2.3.4: resolver el terminal por ID especial
+    // `us_<nombre>` en vez de la raíz global `usuarios`
+    // (compatible con carga parcial por contextos).
+    $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre_terminal);
     if (!$nodo_terminal) return ['exito' => false, 'error' => 'Terminal no encontrada'];
 
     $venta_actual = $nodo_terminal->adyacente('venta_actual');
@@ -584,14 +584,38 @@ function confirmar_venta_actual(
         $nodo_banco->_dato((string)($monto_banco_actual + $monto_pagado));
     }
 
-    // Insertar venta en el árbol de ventas del dueño usando _hmi.
-    // Fase B2.2.2: se navega por el contexto del terminal para
-    // que la venta se inserte en el contenedor correcto.
-    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno);
-    if (!$contenedor_ventas) {
-        return ['exito' => false, 'error' => 'No se pudo obtener contenedor de ventas'];
+    // Insertar la venta en el/los árboles correspondientes.
+    // Fase B2.3.4: si el contexto es un compartido, la venta
+    // participa en DOS árboles paralelos (mismo nodo físico):
+    // el del dueño (default) y el del terminal que la vendió
+    // (parametrizado). Orden: dueño primero, compartido después.
+    $nombres_arbol = _nombres_arbol_para_contexto($nodo_dueno, $nombre_terminal);
+
+    if ($nombres_arbol === null) {
+        // Contexto = nodo del dueño real (o admin). Insertar
+        // solo en el árbol del dueño, con enlaces default.
+        $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno);
+        if (!$contenedor_ventas) {
+            return ['exito' => false, 'error' => 'No se pudo obtener contenedor de ventas'];
+        }
+        _hmi($contenedor_ventas, $nodo_venta);
+    } else {
+        // Contexto = compartido del terminal. Insertar en
+        // AMBOS árboles.
+        // (1) Árbol del dueño real, default.
+        $nodo_dueno_real = Nodo::nodo_por_id('us_' . $nombre_dueno);
+        if ($nodo_dueno_real) {
+            $contenedor_ventas_dueno = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno_real);
+            if ($contenedor_ventas_dueno) {
+                _hmi($contenedor_ventas_dueno, $nodo_venta);
+            }
+        }
+        // (2) Árbol del compartido, parametrizado.
+        $contenedor_ventas_compartido = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno);
+        if ($contenedor_ventas_compartido) {
+            _hmi($contenedor_ventas_compartido, $nodo_venta, $nombres_arbol);
+        }
     }
-    _hmi($contenedor_ventas, $nodo_venta);
 
     // Desenlazar la venta actual de la terminal y destruir
     // su subárbol completo. Fase 2, v74w: antes solo se
@@ -1049,6 +1073,55 @@ function _buscar_venta_por_id(string $id_venta, ?string $nombre_terminal = null)
 }
 
 /**
+ * Desenlaza un nodo venta de un árbol (del dueño o de un
+ * compartido). El árbol puede usar nombres default
+ * (`hmi`/`hd`/`p`) o parametrizados por terminal
+ * (`hmi_<term>`/`hd_<term>`/`p_<term>`).
+ *
+ * Fase B2.3.4. Devuelve true si la venta estaba en el
+ * árbol y se desenlazó. Si no estaba, devuelve false y no
+ * modifica nada.
+ *
+ * @param Nodo|null $contenedor Contenedor raíz del árbol.
+ * @param Nodo      $nodo_venta Nodo venta a desenlazar.
+ * @param array|null $nombres   Nombres de enlace (`hmi`/`hd`/`p`) o
+ *                              null para usar los default.
+ * @return bool
+ */
+function _desenlazar_venta_de_arbol(?Nodo $contenedor, Nodo $nodo_venta, ?array $nombres): bool {
+    if (!$contenedor) return false;
+    $n = $nombres !== null ? $nombres : ['hmi' => 'hmi', 'hd' => 'hd', 'p' => 'p'];
+    $anterior = null;
+    $actual = $contenedor->adyacente($n['hmi']);
+    $seg = 0;
+    while ($actual && $seg < 2000) {
+        if ($actual->id() === $nodo_venta->id()) {
+            $siguiente = $actual->adyacente($n['hd']);
+            if ($anterior) {
+                if ($siguiente) {
+                    $anterior->_adyacente_en($siguiente, $n['hd'], true);
+                } else {
+                    $anterior->eliminar_adyacente($n['hd']);
+                }
+            } else {
+                if ($siguiente) {
+                    $contenedor->_adyacente_en($siguiente, $n['hmi'], true);
+                } else {
+                    $contenedor->eliminar_adyacente($n['hmi']);
+                }
+            }
+            // Desenlazar el enlace `p` del nodo venta al contenedor.
+            $nodo_venta->eliminar_adyacente($n['p']);
+            return true;
+        }
+        $anterior = $actual;
+        $actual = $actual->adyacente($n['hd']);
+        $seg++;
+    }
+    return false;
+}
+
+/**
  * Calcula cuánto hay que devolver por cada método al cancelar una
  * venta, leyendo los cupones pagados. Cada cupón aporta su monto al
  * método que tenga asignado, o al de la venta si no tiene uno propio.
@@ -1347,8 +1420,8 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
     }
 
     // 1b. Revertir montos del dueño (parte rendida que puede cubrir).
-    $raiz_usuarios_c = Nodo::nodo_por_id('usuarios');
-    $nodo_dueno_c = $raiz_usuarios_c ? $raiz_usuarios_c->adyacente($nombre_dueno) : null;
+    // Fase B2.3.4: ID especial.
+    $nodo_dueno_c = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if ($nodo_dueno_c) {
         if ($cubierto['cubierto_ef'] > 0) {
             $nodo_ef_d = $nodo_dueno_c->adyacente('efectivo');
@@ -1473,35 +1546,36 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
         actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
     }
 
-    // 7. Desenlazar la venta del árbol del dueño.
-    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
-    if ($contenedor_ventas) {
-        $anterior = null;
-        $actual = hmi($contenedor_ventas);
-        $seg = 0;
-        while ($actual && $seg < 1000) {
-            if ($actual->id() === $nodo_venta->id()) {
-                if ($anterior) {
-                    $siguiente = hd($actual);
-                    if ($siguiente) {
-                        $anterior->_adyacente_en($siguiente, 'hd', true);
-                    } else {
-                        $anterior->eliminar_adyacente('hd');
-                    }
-                } else {
-                    $siguiente = hd($actual);
-                    if ($siguiente) {
-                        $contenedor_ventas->_adyacente_en($siguiente, 'hmi', true);
-                    } else {
-                        $contenedor_ventas->eliminar_adyacente('hmi');
-                    }
+    // 7. Desenlazar la venta de los árboles paralelos.
+    // Fase B2.3.4: la venta puede estar en DOS árboles
+    // (dueño + compartido del terminal que la vendió).
+    // Orden inverso al de la inserción: compartido primero,
+    // después el dueño.
+    $nodo_terminal_venta = $nodo_venta->adyacente('terminal');
+    $nombre_terminal_venta = $nodo_terminal_venta ? (string)$nodo_terminal_venta->dato() : '';
+
+    // 7a. Desenlazar del árbol del compartido (si la venta
+    // fue hecha por un terminal y su dueño tiene el
+    // compartido marcado con `_es_compartido`).
+    if ($nombre_terminal_venta !== '') {
+        $nodo_terminal_resuelto = Nodo::nodo_por_id('us_' . $nombre_terminal_venta);
+        if ($nodo_terminal_resuelto) {
+            $nodo_dueno_ctx = $nodo_terminal_resuelto->adyacente('dueno');
+            if ($nodo_dueno_ctx && $nodo_dueno_ctx->adyacente('_es_compartido')) {
+                $nombres_comp = _nombres_arbol_para_contexto($nodo_dueno_ctx, $nombre_terminal_venta);
+                if ($nombres_comp !== null) {
+                    $cont_comp = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno_ctx);
+                    _desenlazar_venta_de_arbol($cont_comp, $nodo_venta, $nombres_comp);
                 }
-                break;
             }
-            $anterior = $actual;
-            $actual = hd($actual);
-            $seg++;
         }
+    }
+
+    // 7b. Desenlazar del árbol del dueño (default).
+    $nodo_dueno_real = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if ($nodo_dueno_real) {
+        $cont_dueno = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno_real);
+        _desenlazar_venta_de_arbol($cont_dueno, $nodo_venta, null);
     }
 
     // 8. Destruir el nodo venta entero y sus campos hoja.
@@ -1518,6 +1592,13 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
     $nodo_venta->eliminar_adyacente('hmi');
     $nodo_venta->eliminar_adyacente('hd');
     $nodo_venta->eliminar_adyacente('p');
+    // Fase B2.3.4: también los parametrizados por si quedaron
+    // residuales (defensivo).
+    if ($nombre_terminal_venta !== '') {
+        $nodo_venta->eliminar_adyacente('hmi_' . $nombre_terminal_venta);
+        $nodo_venta->eliminar_adyacente('hd_' . $nombre_terminal_venta);
+        $nodo_venta->eliminar_adyacente('p_' . $nombre_terminal_venta);
+    }
 
     // Destruir el sub-nodo opciones_cobro (si existe).
     $nodo_opciones_cobro = $nodo_venta->adyacente('opciones_cobro');
@@ -2316,9 +2397,8 @@ function _calcular_devolucion_desglosada(Nodo $nodo_venta): array {
  * @return array{cubierto_ef: float, cubierto_ba: float, no_cubierto_ef: float, no_cubierto_ba: float}
  */
 function _calcular_cobertura_dueno(string $nombre_dueno, float $monto_ef, float $monto_ba): array {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return ['cubierto_ef' => 0.0, 'cubierto_ba' => 0.0, 'no_cubierto_ef' => $monto_ef, 'no_cubierto_ba' => $monto_ba];
-    $nodo = $raiz->adyacente($nombre_dueno);
+    // Fase B2.3.4: ID especial.
+    $nodo = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo) return ['cubierto_ef' => 0.0, 'cubierto_ba' => 0.0, 'no_cubierto_ef' => $monto_ef, 'no_cubierto_ba' => $monto_ba];
 
     $nodo_ef = $nodo->adyacente('efectivo');
@@ -2364,9 +2444,8 @@ function _existe_cancelacion(Nodo $contenedor, string $id): bool {
  * @return string
  */
 function _crear_nodo_cancelacion(string $nombre_dueno, string $id_venta, string $motivo, Nodo $nodo_venta, array $desglose, array $cubierto, int $asientos_liberados): string {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return '';
-    $nodo_dueno = $raiz->adyacente($nombre_dueno);
+    // Fase B2.3.4: ID especial.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return '';
 
     $contenedor = $nodo_dueno->adyacente('cancelaciones');
