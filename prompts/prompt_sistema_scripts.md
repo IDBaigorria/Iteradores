@@ -651,7 +651,12 @@ costó un fallo real del runner y una iteración extra.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.74q. Se
+**Última actualización de este prompt:** v1.5piloto.77o.
+Se confirma que el sistema de scripts sigue igual. Recordatorio:
+los prompts del proyecto PHP (framework, piloto, sistema de
+scripts, plan actual) y del plugin (`iteradoresJS/prompts/`)
+se actualizan en la misma tanda que el código.
+Antes: v1.5piloto.74q. Se
 agregan tres aprendizajes a la fuerza (15-17): verificar
 `git diff --stat` antes de commitear (caso del `Vehiculo.php`
 pisado con el output del script); nunca usar `>` con `php` en

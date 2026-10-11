@@ -877,6 +877,39 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v77o**: cierre de B2.3.5 + auditoría de B2.4/B3.
+  Repuntado aplicado en producción, `_asegurar_compartido_y_repuntar`
+  (v77l) repunta terminales nuevos al vuelo, pruebas del
+  plugin 57/58/59 verdes. La auditoría completa de B2.4 y B3
+  está en `plan_actual.md` §1.9.
+- **v77m**: fix del `DivisionByZeroError` en
+  `_crear_lista_cupones_venta` con `cuotas=1` y
+  `monto_pagado < total`. Validación temprana en
+  `confirmar_venta_actual` + defensivo en el helper.
+- **v77k**: framework 1.5i.7m. `grafo:nodo` agrega el
+  campo `destino_es_compartido` a cada adyacente.
+- **v77j**: fix de zona horaria. `date_default_timezone_set(
+  'America/Argentina/Buenos_Aires')` en `index.php`.
+- **v77i** (B2.3.5b.3): contexto del solicitante en empresas,
+  vehículos, pasajeros.
+- **v77h** (B2.3.5b.2): contexto en `cambiar_asiento_pasaje`
+  y en reservas.
+- **v77g** (B2.3.5b.1): contexto del solicitante en
+  `estado_asientos`, `ventas/obtener`, `ventas/cancelar`,
+  `ventas/pagar_cupon`, `ventas/info_cancelacion`.
+- **v77f** (B2.3.5a): comando `app:repuntar_terminales_compartido`.
+- **v77e** (B2.3.4): `confirmar_venta_actual` y `cancelar_venta`
+  mantienen ambos árboles paralelos.
+- **v77b/c/d**: funcionalidad "cambiar de asiento" (backend,
+  frontend, refresco del modal de pasajero).
+- **v77/v77a**: fix del Bug 1 (atadura comprador-pasajero,
+  casos restantes).
+- **v76z**: fix del modal post-venta.
+- **v76y**: fix de auto-detección de migraciones.
+- **v76x**: migración `app:construir_arboles_compartidos`.
+- **v76w**: helper `_nombres_arbol_para_contexto`.
+- **v76v**: reorganización de prompts (nuevo `plan_actual.md`,
+  §12 del prompt del piloto congelada, regla de actualización).
 - **v76u**: Fase B2.2.4 del modelo topológico (Empresa.php).
   Contexto opcional (`?Nodo $nodo_contexto`) en
   `listar_empresas_de_dueno`. Las funciones de alta, edición

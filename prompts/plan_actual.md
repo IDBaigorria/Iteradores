@@ -19,16 +19,15 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 **Última actualización de este archivo:** v1.5piloto.77o
 (cierre de la fase B2.3.5: pruebas del plugin + fixes).
-Con v76u quedó cerrada la Fase B2.2 completa (Viaje, Venta,
-ViajeAsientos, Empresa). Después vinieron B2.3.1, B2.3.2 y
-B2.3.3 (árboles paralelos parametrizados, aplicados también
-en producción). Hubo un paréntesis de bugs (v76z a v77d) que
-incluyó el fix de atadura comprador-pasajero, el modal
-post-venta, y la funcionalidad completa de "cambiar de
-asiento". Próximo paso: **Fase B2.3.4** (ajustar las
-escrituras de venta para que inserten y borren en los dos
-árboles paralelos cuando el contexto sea un compartido).
-Detalle en §2.3.)
+La Fase B2.3 quedó cerrada completa (B2.3.1 a B2.3.5). El
+repuntado de terminales al compartido está aplicado en
+producción, los terminales nuevos se repuntan al vuelo
+(`_asegurar_compartido_y_repuntar`, v77l), y las 3 pruebas
+del plugin (57, 58, 59) están verdes. La auditoría completa
+de B2.4 ("mantener vivos los compartidos") y B3 ("eliminar
+los usos de `Nodo::nodo_por_id('usuarios')`") está en §1.9.
+Próximo paso: **Fase B2.4** (los 5 bugs funcionales que
+detectó la auditoría), empezando por B2.4.2 + B2.4.5.
 
 ### 1.2 Estado de la conversación
 
@@ -634,6 +633,84 @@ Ninguna. La conversación quedó en un punto de pausa limpio.
     modal de cambiar asiento hace 2 fetches en serie
     (estado + configuración) antes de armar el croquis.
     En un grafo grande puede tardar varios segundos.
+
+### 1.9 Auditoría de B2.4 y B3 (v77o)
+
+Auditoría completa del estado de la Fase B2.4 ("mantener
+vivos los compartidos") y de los usos pendientes de
+`Nodo::nodo_por_id('usuarios')` (B3). Se hizo leyendo el
+código actual de los módulos del piloto, no de memoria.
+
+**B2.4 — lo que YA está cubierto:**
+
+- `confirmar_venta_actual` inserta en ambos árboles
+  (dueño + compartido). OK desde B2.3.4.
+- `cancelar_venta` desenlaza de ambos árboles. OK desde
+  B2.3.4.
+- `_asegurar_compartido_y_repuntar` (v77l) crea el
+  compartido al vuelo cuando se crea/edita un terminal.
+  OK.
+- Micros, vehículos y empresas cuelgan de nodos compartidos
+  por transitividad (mismo nodo físico). Los flujos
+  existentes los ven sin cambios. OK.
+
+**B2.4 — lo que FALTA (5 bugs funcionales):**
+
+1. `eliminar_viaje` (Viaje.php) no desenlaza del compartido
+   de cada terminal autorizado. Consecuencia:
+   `Nodo::eliminar` falla en silencio y el viaje queda
+   huérfano. **Bug real: hoy no se puede eliminar un viaje
+   con terminales autorizadas.**
+2. `agregar_terminal_autorizada` (Viaje.php) no actualiza
+   el compartido del terminal autorizado. El terminal no
+   ve el viaje hasta que corre una migración manual.
+3. `eliminar_terminal_autorizada` (Viaje.php) no limpia
+   el compartido. El terminal sigue viendo el viaje aunque
+   ya no esté autorizado.
+4. `eliminar_empresa` (Empresa.php) no desenlaza del
+   `empresas` de los compartidos. Quedan enlaces a un
+   nodo destruido.
+5. `agregar_micro_a_viaje` (ViajeMicros.php) no agrega la
+   empresa al `empresas` del compartido. El terminal no
+   ve la nueva empresa en su listado.
+
+**B3 — usos pendientes de `Nodo::nodo_por_id('usuarios')`:**
+
+Más de 22 usos. Agrupados por archivo:
+
+- `Venta.php`: 4 (`obtener_contenedor_ventas_dueno` rama
+  sin contexto, `_buscar_venta_por_id` rama sin contexto,
+  `obtener_cancelacion_por_id`, `listar_cancelaciones_de_dueno`).
+- `Enrutador.php`: 6 (chequeos de nivel del solicitante).
+- `Viaje.php`: 5 (`obtener_contenedor_viajes_dueno` rama
+  sin contexto, `listar_viajes_de_terminal`,
+  `viaje_tiene_ventas`, `agregar_terminal_autorizada`,
+  `formatear_viaje`).
+- `Usuario.php`: muchos (prácticamente todo el archivo).
+- `Empresa.php`: 4 (rama sin contexto + alta/edición/baja).
+- `Vehiculo.php`: 6 (rama sin contexto + alta/actualizaciones/
+  baja/subir_foto).
+- `ViajeMicros.php`: 4 (incluye `agregar_micro_a_viaje`).
+- `Pasajero.php`: ~7 (`obtener_pasajero_por_dni`,
+  `pasajero_tiene_pasajes`, `obtener_reservas_de_pasajero`,
+  `_recorrer_reservas_de_pasajero`).
+- `Migraciones/Funciones.php`: 2 (`detectar_usuarios_especiales`,
+  `detectar_niveles_usuario`).
+
+Estrategia de limpieza en 3 fases: B3.1 (reemplazar por
+`us_<nombre>` cuando hay nombre), B3.2 (eliminar los
+fallbacks "sin contexto"), B3.3 (repensar los helpers
+que iteran "sobre todos los dueños": requieren contexto
+o índice auxiliar).
+
+**Pruebas nuevas del plugin que hacen falta (Tanda A):**
+
+- 60 `cancelar_venta_desaparece_de_ambos_arboles`:
+  simétrica de la 58.
+- 61 `eliminar_viaje_con_terminal_autorizado`.
+- 62 `autorizar_terminal_aparece_en_compartido`.
+- 63 `desautorizar_terminal_desaparece_del_compartido`.
+- 64 `agregar_micro_actualiza_empresas_compartido`.
 
 ### 1.7 Deuda técnica
 
