@@ -121,15 +121,44 @@ detectó la auditoría), empezando por B2.4.2 + B2.4.5.
   desincroniza de los compartidos del dueño. `aplicacion_POST.php`
   actualizado al modelo topológico.
 
-**Tanda actual:** v77t (B3.3a).
+**Tanda actual:** v77u (B3.3b).
 
 **B3.3a (v77t).** `Liquidacion.php` y `Rendicion.php`:
 3 y 4 resoluciones de dueño/terminal pasadas a
-`us_<nombre>`. Quedan sin tocar los 3 helpers que iteran
-sobre todos los dueños buscando por id
-(`obtener_liquidacion_por_id`, `aceptar_ajuste_rendicion`,
-`obtener_rendicion_por_id`); requieren diseño y son
-B3.3c.
+`us_<nombre>`.
+
+**B3.3b (v77u).** `Pasajero.php`: rama sin contexto de
+`obtener_contenedor_pasajeros_dueno` → `us_<nombre>`.
+`ViajeAsientos.php`: 3 resoluciones de terminal
+(`seleccionar_asiento_micro`, `deseleccionar_asiento_micro`,
+`obtener_estados_asientos_micro`) → `us_<nombre>`.
+
+**B3.3c — pendientes de rediseño.** Los siguientes usos
+iteran sobre TODOS los dueños porque no reciben contexto.
+Requieren decisión de diseño (¿pasar contexto desde el
+enrutador? ¿crear índices auxiliares por id?). No se
+resuelven con `us_<nombre>` directo:
+
+- `Venta.php`: `_buscar_venta_por_id` (rama sin filtro)
+  y `obtener_cancelacion_por_id`.
+- `Impresion.php` (2): resuelven dueño/viaje para armar
+  la impresión.
+- `Liquidacion.php`: `obtener_liquidacion_por_id`.
+- `Rendicion.php`: `aceptar_ajuste_rendicion` y
+  `obtener_rendicion_por_id`.
+- `Pasajero.php`: `obtener_pasajero_por_dni` (arma
+  historial de ventas iterando todos los dueños).
+- `Vehiculo.php` (6): las 6 funciones buscan la empresa
+  entre todos los dueños.
+- `Migraciones/Funciones.php` (2) y `Comandos.php` (1):
+  pueden reescribirse con `Nodo::por_cada_nodo_ejecutar`
+  (B3.3e, cosmético).
+
+**B3.3d — Vehiculo.php.** El más grande. Requiere pasar
+el dueño desde el Enrutador a cada una de las 6 funciones
+(`listar_vehiculos_de_empresa`, `agregar_vehiculo`,
+`actualizar_vehiculo`, `actualizar_configuracion_vehiculo`,
+`eliminar_vehiculo`, `subir_foto_vehiculo`).
 
 **B3.1 (v77r + v77s).** Reemplazo de
 `Nodo::nodo_por_id('usuarios')` por

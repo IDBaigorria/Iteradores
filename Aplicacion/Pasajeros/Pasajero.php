@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.77i
+ * @version   1.5piloto.77u
  */
 
 use Iteradores\Nodos\Nodo;
@@ -42,9 +42,8 @@ function obtener_contenedor_pasajeros_dueno(string $nombre_dueno, ?Nodo $nodo_co
     if ($nodo_contexto !== null) {
         $nodo_dueno = $nodo_contexto;
     } else {
-        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-        if (!$raiz_usuarios) return null;
-        $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+        // Fase B3.3b: ID especial directo (sin la raíz `usuarios`).
+        $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     }
     if (!$nodo_dueno) return null;
 

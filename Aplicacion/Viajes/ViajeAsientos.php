@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.77h
+ * @version   1.5piloto.77u
  */
 
 use Iteradores\Nodos\Nodo;
@@ -478,12 +478,10 @@ function obtener_estados_asientos_micro(string $nombre_viaje, string $nombre_mic
                 $seleccionado_por_usuario = $seleccionado_por ? $seleccionado_por->dato() : null;
                 $seleccionado_por_real = $seleccionado_por_usuario;
                 if ($seleccionado_por_usuario !== null) {
-                    $raiz_usuarios_sel = Nodo::nodo_por_id('usuarios');
-                    if ($raiz_usuarios_sel) {
-                        $nodo_sel_usuario = $raiz_usuarios_sel->adyacente($seleccionado_por_usuario);
-                        if ($nodo_sel_usuario && $nodo_sel_usuario->adyacente('nombre_real')) {
-                            $seleccionado_por_real = $nodo_sel_usuario->adyacente('nombre_real')->dato();
-                        }
+                    // Fase B3.3b: ID especial directo.
+                    $nodo_sel_usuario = Nodo::nodo_por_id('us_' . $seleccionado_por_usuario);
+                    if ($nodo_sel_usuario && $nodo_sel_usuario->adyacente('nombre_real')) {
+                        $seleccionado_por_real = $nodo_sel_usuario->adyacente('nombre_real')->dato();
                     }
                 }
 
@@ -568,8 +566,8 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
     $nodo_micro = $nodo_micros->adyacente($nombre_micro);
     if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    $nodo_terminal = $raiz_usuarios ? $raiz_usuarios->adyacente($nombre_terminal) : null;
+    // Fase B3.3b: ID especial directo.
+    $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre_terminal);
     if (!$nodo_terminal) return ['exito' => false, 'error' => 'Terminal no encontrada'];
 
     $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
@@ -768,8 +766,8 @@ function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro,
     $estado->_dato('libre');
     $nodo_asiento->eliminar_adyacente('seleccionado_por');
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    $nodo_terminal = $raiz_usuarios ? $raiz_usuarios->adyacente($nombre_terminal) : null;
+    // Fase B3.3b: ID especial directo.
+    $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre_terminal);
     if ($nodo_terminal) {
         $venta_actual = $nodo_terminal->adyacente('venta_actual');
         if ($venta_actual) {

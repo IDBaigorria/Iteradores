@@ -2,9 +2,11 @@
 /**
  * Aplicador de cambios — Proyecto iteradores (PHP).
  *
- * Tanda V1.5piloto.77t (Fase B3.3a).
- *   - Liquidacion.php: 3 resoluciones de dueño → us_<nombre>.
- *   - Rendicion.php: 4 resoluciones de dueño/terminal → us_<nombre>.
+ * Tanda V1.5piloto.77u (Fase B3.3b).
+ *   - Pasajero.php: rama sin contexto de
+ *     obtener_contenedor_pasajeros_dueno → us_<nombre>.
+ *   - ViajeAsientos.php: 3 resoluciones de terminal → us_<nombre>.
+ *   - Anotar los pendientes de rediseño (B3.3c) en plan_actual.md.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -15,173 +17,144 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ============================================================
-    // Liquidacion.php
+    // 1. Pasajero.php — rama sin contexto
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Liquidaciones/Liquidacion.php',
-        'descripcion' => 'Liquidacion: obtener_contenedor_liquidaciones_dueno via us_',
+        'archivo' => 'Aplicacion/Pasajeros/Pasajero.php',
+        'descripcion' => 'Pasajero: contenedor sin contexto via us_',
         'buscar' => [
-            'function obtener_contenedor_liquidaciones_dueno(string $nombre_dueno): ?Nodo {',
-            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz_usuarios) return null;',
-            '    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);',
+            '    if ($nodo_contexto !== null) {',
+            '        $nodo_dueno = $nodo_contexto;',
+            '    } else {',
+            '        $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
+            '        if (!$raiz_usuarios) return null;',
+            '        $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);',
+            '    }',
             '    if (!$nodo_dueno) return null;',
-            '    $nodo_liquidaciones = $nodo_dueno->adyacente(\'liquidaciones\');',
         ],
         'reemplazar' => [
-            'function obtener_contenedor_liquidaciones_dueno(string $nombre_dueno): ?Nodo {',
-            '    // Fase B3.3a: ID especial directo.',
-            '    $nodo_dueno = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
+            '    if ($nodo_contexto !== null) {',
+            '        $nodo_dueno = $nodo_contexto;',
+            '    } else {',
+            '        // Fase B3.3b: ID especial directo (sin la raíz `usuarios`).',
+            '        $nodo_dueno = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
+            '    }',
             '    if (!$nodo_dueno) return null;',
-            '    $nodo_liquidaciones = $nodo_dueno->adyacente(\'liquidaciones\');',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Liquidaciones/Liquidacion.php',
-        'descripcion' => 'Liquidacion: previsualizar_liquidacion via us_',
-        'buscar' => [
-            'function previsualizar_liquidacion(string $nombre_dueno): array {',
-            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz_usuarios) return [\'exito\' => false, \'error\' => \'No hay usuarios registrados\'];',
-            '    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);',
-            '    if (!$nodo_dueno) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-        ],
-        'reemplazar' => [
-            'function previsualizar_liquidacion(string $nombre_dueno): array {',
-            '    // Fase B3.3a: ID especial directo.',
-            '    $nodo_dueno = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
-            '    if (!$nodo_dueno) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Liquidaciones/Liquidacion.php',
-        'descripcion' => 'Liquidacion: confirmar_liquidacion via us_',
-        'buscar' => [
-            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz_usuarios) return [\'exito\' => false, \'error\' => \'No hay usuarios registrados\'];',
-            '    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);',
-            '    if (!$nodo_dueno) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-            '',
-            '    $nodo_ef = $nodo_dueno->adyacente(\'efectivo\');',
-        ],
-        'reemplazar' => [
-            '    // Fase B3.3a: ID especial directo.',
-            '    $nodo_dueno = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
-            '    if (!$nodo_dueno) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-            '',
-            '    $nodo_ef = $nodo_dueno->adyacente(\'efectivo\');',
         ],
     ],
 
-    // Bump de version en Liquidacion.php
+    // Bump de version en Pasajero.php
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Liquidaciones/Liquidacion.php',
-        'descripcion' => 'Liquidacion: bump a 1.5piloto.77t',
+        'archivo' => 'Aplicacion/Pasajeros/Pasajero.php',
+        'descripcion' => 'Pasajero: bump a 1.5piloto.77u',
         'buscar' => [
-            ' * @since     1.5piloto.54',
-            ' * @version   1.5piloto.70',
+            ' * @since     1.5piloto.13',
+            ' * @version   1.5piloto.77i',
         ],
         'reemplazar' => [
-            ' * @since     1.5piloto.54',
-            ' * @version   1.5piloto.77t',
+            ' * @since     1.5piloto.13',
+            ' * @version   1.5piloto.77u',
         ],
     ],
 
     // ============================================================
-    // Rendicion.php
+    // 2. ViajeAsientos.php — seleccionar_asiento_micro
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Rendiciones/Rendicion.php',
-        'descripcion' => 'Rendicion: obtener_contenedor_rendiciones_dueno via us_',
+        'archivo' => 'Aplicacion/Viajes/ViajeAsientos.php',
+        'descripcion' => 'ViajeAsientos: seleccionar_asiento_micro via us_',
         'buscar' => [
-            'function obtener_contenedor_rendiciones_dueno(string $nombre_dueno): ?Nodo {',
             '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz_usuarios) return null;',
-            '    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);',
-            '    if (!$nodo_dueno) return null;',
-            '    $nodo_rendiciones = $nodo_dueno->adyacente(\'rendiciones\');',
-        ],
-        'reemplazar' => [
-            'function obtener_contenedor_rendiciones_dueno(string $nombre_dueno): ?Nodo {',
-            '    // Fase B3.3a: ID especial directo.',
-            '    $nodo_dueno = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
-            '    if (!$nodo_dueno) return null;',
-            '    $nodo_rendiciones = $nodo_dueno->adyacente(\'rendiciones\');',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Rendiciones/Rendicion.php',
-        'descripcion' => 'Rendicion: previsualizar_rendicion via us_',
-        'buscar' => [
-            'function previsualizar_rendicion(string $nombre_dueno, array $filtros): array {',
-            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz_usuarios) return [\'exito\' => false, \'error\' => \'No hay usuarios registrados\'];',
-            '    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);',
-            '    if (!$nodo_dueno) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-        ],
-        'reemplazar' => [
-            'function previsualizar_rendicion(string $nombre_dueno, array $filtros): array {',
-            '    // Fase B3.3a: ID especial directo.',
-            '    $nodo_dueno = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
-            '    if (!$nodo_dueno) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Rendiciones/Rendicion.php',
-        'descripcion' => 'Rendicion: confirmar_rendicion via us_ (dueño + terminales)',
-        'buscar' => [
-            '    $raiz_usuarios_mov = Nodo::nodo_por_id(\'usuarios\');',
-            '    $nodo_dueno_mov = $raiz_usuarios_mov ? $raiz_usuarios_mov->adyacente($nombre_dueno) : null;',
+            '    $nodo_terminal = $raiz_usuarios ? $raiz_usuarios->adyacente($nombre_terminal) : null;',
+            '    if (!$nodo_terminal) return [\'exito\' => false, \'error\' => \'Terminal no encontrada\'];',
             '',
-            '    if ($nodo_dueno_mov) {',
-            '        // Descontar de cada terminal involucrada.',
-            '        foreach (array_values($por_terminal) as $t) {',
-            '            $nodo_term = $raiz_usuarios_mov->adyacente($t[\'terminal\']);',
-            '            if (!$nodo_term) continue;',
+            '    $nodo_copia = $nodo_micro->adyacente(\'vehiculo_copia\');',
         ],
         'reemplazar' => [
-            '    // Fase B3.3a: IDs especiales directos.',
-            '    $nodo_dueno_mov = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
+            '    // Fase B3.3b: ID especial directo.',
+            '    $nodo_terminal = Nodo::nodo_por_id(\'us_\' . $nombre_terminal);',
+            '    if (!$nodo_terminal) return [\'exito\' => false, \'error\' => \'Terminal no encontrada\'];',
             '',
-            '    if ($nodo_dueno_mov) {',
-            '        // Descontar de cada terminal involucrada.',
-            '        foreach (array_values($por_terminal) as $t) {',
-            '            $nodo_term = Nodo::nodo_por_id(\'us_\' . $t[\'terminal\']);',
-            '            if (!$nodo_term) continue;',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Rendiciones/Rendicion.php',
-        'descripcion' => 'Rendicion: bump a 1.5piloto.77t',
-        'buscar' => [
-            ' * @since     1.5piloto.50',
-            ' * @version   1.5piloto.70',
-        ],
-        'reemplazar' => [
-            ' * @since     1.5piloto.50',
-            ' * @version   1.5piloto.77t',
+            '    $nodo_copia = $nodo_micro->adyacente(\'vehiculo_copia\');',
         ],
     ],
 
     // ============================================================
-    // plan_actual.md — tanda actual + avance B3.3a
+    // 3. ViajeAsientos.php — deseleccionar_asiento_micro
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/ViajeAsientos.php',
+        'descripcion' => 'ViajeAsientos: deseleccionar_asiento_micro via us_',
+        'buscar' => [
+            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
+            '    $nodo_terminal = $raiz_usuarios ? $raiz_usuarios->adyacente($nombre_terminal) : null;',
+            '    if ($nodo_terminal) {',
+            '        $venta_actual = $nodo_terminal->adyacente(\'venta_actual\');',
+        ],
+        'reemplazar' => [
+            '    // Fase B3.3b: ID especial directo.',
+            '    $nodo_terminal = Nodo::nodo_por_id(\'us_\' . $nombre_terminal);',
+            '    if ($nodo_terminal) {',
+            '        $venta_actual = $nodo_terminal->adyacente(\'venta_actual\');',
+        ],
+    ],
+
+    // ============================================================
+    // 4. ViajeAsientos.php — obtener_estados_asientos_micro
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/ViajeAsientos.php',
+        'descripcion' => 'ViajeAsientos: obtener_estados_asientos_micro via us_',
+        'buscar' => [
+            '                if ($seleccionado_por_usuario !== null) {',
+            '                    $raiz_usuarios_sel = Nodo::nodo_por_id(\'usuarios\');',
+            '                    if ($raiz_usuarios_sel) {',
+            '                        $nodo_sel_usuario = $raiz_usuarios_sel->adyacente($seleccionado_por_usuario);',
+            '                        if ($nodo_sel_usuario && $nodo_sel_usuario->adyacente(\'nombre_real\')) {',
+            '                            $seleccionado_por_real = $nodo_sel_usuario->adyacente(\'nombre_real\')->dato();',
+            '                        }',
+            '                    }',
+            '                }',
+        ],
+        'reemplazar' => [
+            '                if ($seleccionado_por_usuario !== null) {',
+            '                    // Fase B3.3b: ID especial directo.',
+            '                    $nodo_sel_usuario = Nodo::nodo_por_id(\'us_\' . $seleccionado_por_usuario);',
+            '                    if ($nodo_sel_usuario && $nodo_sel_usuario->adyacente(\'nombre_real\')) {',
+            '                        $seleccionado_por_real = $nodo_sel_usuario->adyacente(\'nombre_real\')->dato();',
+            '                    }',
+            '                }',
+        ],
+    ],
+
+    // Bump de version en ViajeAsientos.php
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/ViajeAsientos.php',
+        'descripcion' => 'ViajeAsientos: bump a 1.5piloto.77u',
+        'buscar' => [
+            ' * @since     1.5piloto.8',
+            ' * @version   1.5piloto.77h',
+        ],
+        'reemplazar' => [
+            ' * @since     1.5piloto.8',
+            ' * @version   1.5piloto.77u',
+        ],
+    ],
+
+    // ============================================================
+    // 5. plan_actual.md — tanda actual + pendientes B3.3c
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: tanda actual a v77t (B3.3a)',
+        'descripcion' => 'plan_actual: tanda actual a v77u + pendientes B3.3c',
         'buscar' => [
-            '**Tanda actual:** v77s (fix del `$raiz` en eliminar_usuario).',
-        ],
-        'reemplazar' => [
             '**Tanda actual:** v77t (B3.3a).',
             '',
             '**B3.3a (v77t).** `Liquidacion.php` y `Rendicion.php`:',
@@ -192,40 +165,81 @@ $cambios = [
             '`obtener_rendicion_por_id`); requieren diseño y son',
             'B3.3c.',
         ],
+        'reemplazar' => [
+            '**Tanda actual:** v77u (B3.3b).',
+            '',
+            '**B3.3a (v77t).** `Liquidacion.php` y `Rendicion.php`:',
+            '3 y 4 resoluciones de dueño/terminal pasadas a',
+            '`us_<nombre>`.',
+            '',
+            '**B3.3b (v77u).** `Pasajero.php`: rama sin contexto de',
+            '`obtener_contenedor_pasajeros_dueno` → `us_<nombre>`.',
+            '`ViajeAsientos.php`: 3 resoluciones de terminal',
+            '(`seleccionar_asiento_micro`, `deseleccionar_asiento_micro`,',
+            '`obtener_estados_asientos_micro`) → `us_<nombre>`.',
+            '',
+            '**B3.3c — pendientes de rediseño.** Los siguientes usos',
+            'iteran sobre TODOS los dueños porque no reciben contexto.',
+            'Requieren decisión de diseño (¿pasar contexto desde el',
+            'enrutador? ¿crear índices auxiliares por id?). No se',
+            'resuelven con `us_<nombre>` directo:',
+            '',
+            '- `Venta.php`: `_buscar_venta_por_id` (rama sin filtro)',
+            '  y `obtener_cancelacion_por_id`.',
+            '- `Impresion.php` (2): resuelven dueño/viaje para armar',
+            '  la impresión.',
+            '- `Liquidacion.php`: `obtener_liquidacion_por_id`.',
+            '- `Rendicion.php`: `aceptar_ajuste_rendicion` y',
+            '  `obtener_rendicion_por_id`.',
+            '- `Pasajero.php`: `obtener_pasajero_por_dni` (arma',
+            '  historial de ventas iterando todos los dueños).',
+            '- `Vehiculo.php` (6): las 6 funciones buscan la empresa',
+            '  entre todos los dueños.',
+            '- `Migraciones/Funciones.php` (2) y `Comandos.php` (1):',
+            '  pueden reescribirse con `Nodo::por_cada_nodo_ejecutar`',
+            '  (B3.3e, cosmético).',
+            '',
+            '**B3.3d — Vehiculo.php.** El más grande. Requiere pasar',
+            'el dueño desde el Enrutador a cada una de las 6 funciones',
+            '(`listar_vehiculos_de_empresa`, `agregar_vehiculo`,',
+            '`actualizar_vehiculo`, `actualizar_configuracion_vehiculo`,',
+            '`eliminar_vehiculo`, `subir_foto_vehiculo`).',
+        ],
     ],
 
     // ============================================================
-    // prompt_piloto.md — agregar v77t
+    // 6. prompt_piloto.md — agregar v77u
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt_piloto: agregar v77t',
+        'descripcion' => 'prompt_piloto: agregar v77u',
         'buscar' => [
-            '- **v77s**: fix del `$raiz` residual en `eliminar_usuario`',
+            '- **v77t** (Fase B3.3a): `Liquidacion.php` y `Rendicion.php`',
         ],
         'reemplazar' => [
+            '- **v77u** (Fase B3.3b): `Pasajero.php` rama sin contexto',
+            '  de `obtener_contenedor_pasajeros_dueno` → `us_<nombre>`.',
+            '  `ViajeAsientos.php`: 3 resoluciones de terminal →',
+            '  `us_<nombre>`. Se anotan en `plan_actual.md` los',
+            '  pendientes de rediseño (B3.3c) que iteran sobre todos',
+            '  los dueños.',
             '- **v77t** (Fase B3.3a): `Liquidacion.php` y `Rendicion.php`',
-            '  pasan a `us_<nombre>` en las 7 resoluciones de dueño/terminal',
-            '  que reciben el nombre por parámetro. Quedan sin tocar los',
-            '  3 helpers que iteran sobre todos los dueños buscando por',
-            '  id (B3.3c).',
-            '- **v77s**: fix del `$raiz` residual en `eliminar_usuario`',
         ],
     ],
 
     // ============================================================
-    // index.php — bump @version
+    // 7. index.php — bump @version
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'index.php',
-        'descripcion' => 'index.php: bump a 1.5piloto.77t',
+        'descripcion' => 'index.php: bump a 1.5piloto.77u',
         'buscar' => [
-            ' * @version   1.5piloto.77s',
+            ' * @version   1.5piloto.77t',
         ],
         'reemplazar' => [
-            ' * @version   1.5piloto.77t',
+            ' * @version   1.5piloto.77u',
         ],
     ],
 

@@ -877,6 +877,12 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v77u** (Fase B3.3b): `Pasajero.php` rama sin contexto
+  de `obtener_contenedor_pasajeros_dueno` → `us_<nombre>`.
+  `ViajeAsientos.php`: 3 resoluciones de terminal →
+  `us_<nombre>`. Se anotan en `plan_actual.md` los
+  pendientes de rediseño (B3.3c) que iteran sobre todos
+  los dueños.
 - **v77t** (Fase B3.3a): `Liquidacion.php` y `Rendicion.php`
   pasan a `us_<nombre>` en las 7 resoluciones de dueño/terminal
   que reciben el nombre por parámetro. Quedan sin tocar los
