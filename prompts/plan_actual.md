@@ -110,8 +110,18 @@ detectó la auditoría), empezando por B2.4.2 + B2.4.5.
 - **v77d**: refresco del modal de pasajero tras cambiar de
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
+- **v77q** (Tanda A, B2.4.2 + B2.4.5): fixes del aislamiento
+  por topología. `Aplicacion/Compartidos.php` nuevo (5 helpers
+  para sincronizar/desincronizar viajes, terminales y
+  empresas en los compartidos). `eliminar_viaje` desincroniza
+  de los compartidos de sus terminales. `agregar_terminal_autorizada`
+  y `eliminar_terminal_autorizada` sincronizan/desincronizan
+  el compartido. `agregar_micro_a_viaje` propaga la empresa
+  al `empresas` de cada compartido. `eliminar_empresa`
+  desincroniza de los compartidos del dueño. `aplicacion_POST.php`
+  actualizado al modelo topológico.
 
-**Tanda actual:** v77o (cierre de B2.3.5 + documentación).
+**Tanda actual:** v77q (Tanda A, B2.4.2 + B2.4.5).
 
 **Estado al cierre.** La fase B2.3.5 quedó completa:
 el repuntado de terminales al compartido está aplicado en

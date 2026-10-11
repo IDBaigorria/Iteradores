@@ -13,6 +13,7 @@ use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
+include_once("./Aplicacion/Compartidos.php");
 
 /**
  * Clona la estructura completa de un vehículo original para asociarla a un viaje.
@@ -203,6 +204,21 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
 
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
+
+    // Fase B2.4.3 (v77q): si el viaje ya estaba autorizado
+    // a alguna terminal, la empresa del micro nuevo tiene
+    // que aparecer en el `empresas` del compartido. Se
+    // sincroniza cada terminal autorizada del viaje.
+    // Idempotente: si el viaje y la empresa ya estaban, no
+    // hace nada.
+    $nodo_tas = $nodo_viaje->adyacente('terminales_autorizadas');
+    if ($nodo_tas) {
+        foreach ((array)$nodo_tas->adyacentes() as $nombre_terminal => $nodo_tv) {
+            $nombre_terminal = (string)$nombre_terminal;
+            if ($nombre_terminal === '') continue;
+            _sincronizar_terminal_en_compartido_del_viaje($nodo_viaje, $nombre_terminal, $nombre_dueno);
+        }
+    }
 
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true, 'nombre_micro' => $nombre_micro];

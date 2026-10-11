@@ -884,6 +884,13 @@ function eliminar_viaje(string $nombre_viaje, string $nombre_dueno): array {
         return ['exito' => false, 'error' => 'No se pueden eliminar viajes con ventas ya realizadas'];
     }
 
+    // Fase B2.4.2 (v77q): desincronizar el viaje de los
+    // compartidos de TODAS sus terminales autorizadas,
+    // antes de destruir el subárbol. Si no, el compartido
+    // queda con una referencia entrante al viaje y
+    // Nodo::eliminar falla en silencio.
+    _desincronizar_viaje_de_compartidos($nodo_viaje);
+
     // Fase 2: destruir el subárbol completo del viaje.
     // Ver §8.6 del prompt del piloto para el contexto y las
     // reglas de destrucción.
@@ -942,6 +949,12 @@ function agregar_terminal_autorizada(string $nombre_viaje, string $nombre_termin
 
     $nodo_terminales->_adyacente_en($nodo_terminal_viaje, $nombre_terminal);
 
+    // Fase B2.4.5 (v77q): sincronizar el viaje en el
+    // compartido del terminal que se acaba de autorizar.
+    // Si el compartido no existe, lo crea; si existe,
+    // agrega el viaje + sus empresas. Idempotente.
+    _sincronizar_terminal_en_compartido_del_viaje($nodo_viaje, $nombre_terminal, $nombre_dueno);
+
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
 }
@@ -981,6 +994,11 @@ function eliminar_terminal_autorizada(string $nombre_viaje, string $nombre_termi
     // (referencia a un nodo parada del viaje, que sigue vivo).
     $nodo_terminales->eliminar_adyacente($nombre_terminal);
     _destruir_terminal_viaje($nodo_terminal_viaje);
+
+    // Fase B2.4.5 (v77q): sacar el viaje del compartido del
+    // terminal que se acaba de desautorizar. Los demás
+    // compartidos no se tocan.
+    _desincronizar_terminal_de_compartido_del_viaje($nodo_viaje, $nombre_terminal);
 
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
@@ -1590,6 +1608,9 @@ function _destruir_viaje_completo(Nodo $nodo_viaje): void {
     //    origen, destino, dueno, contadores).
     _destruir_campos_simples($nodo_viaje);
 }
+
+// Incluir helpers de compartidos (Fase B2.4.2 + B2.4.5).
+require_once __DIR__ . '/../Compartidos.php';
 
 // Incluir submódulos de viajes
 require_once __DIR__ . '/ViajeMicros.php';

@@ -877,6 +877,15 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v77q** (Tanda A, B2.4.2 + B2.4.5): fixes del
+  aislamiento por topología. `Aplicacion/Compartidos.php`
+  nuevo (5 helpers para sincronizar/desincronizar viajes,
+  terminales y empresas en los compartidos). 5 flujos del
+  piloto sincronizan/desincronizan el compartido:
+  eliminar_viaje, agregar/eliminar_terminal_autorizada,
+  agregar_micro_a_viaje, eliminar_empresa. `aplicacion_POST.php`
+  actualizado al modelo topológico actual. Ver
+  `plan_actual.md` §1.9.
 - **v77o**: cierre de B2.3.5 + auditoría de B2.4/B3.
   Repuntado aplicado en producción, `_asegurar_compartido_y_repuntar`
   (v77l) repunta terminales nuevos al vuelo, pruebas del

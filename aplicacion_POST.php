@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.58)
+ * ## Estructura de nodos actual (v1.5piloto.77q)
  *
  * ### Nodos raíz especiales
  *
@@ -42,13 +42,14 @@
  * `sesiones`. Los datos visibles del usuario viven en el grafo de la
  * aplicación; las credenciales y las sesiones viven en el de credenciales.
  *
- * ### Persistencia (SQL + JSON)
+ * ### Persistencia (solo SQL)
  *
- * A partir de v1.5piloto.70, cada operación de guardado escribe en SQL
- * (fuente de verdad, se lee al arrancar) y en JSON (respaldo, no se lee
- * automáticamente). El helper `guardar_ambos($nombre)` se encarga del doble
- * guardado. Si la escritura JSON falla, se registra con `Controlador::_error()`
- * (el sistema de errores de `Objeto`) y la operación SQL sigue siendo válida.
+ * A partir de v1.5piloto.74m, `guardar_ambos($nombre)` solo escribe en
+ * SQL. El respaldo JSON automático se eliminó porque el `json_encode`
+ * de todo el grafo se volvió el cuello de botella cuando el grafo
+ * creció (varias terminales, vehículos, ventas). El respaldo en
+ * formatos alternativos (JSON, XML) pasa a ser una acción manual del
+ * admin, a implementar en el rediseño del panel.
  *
  * ### Nodo Usuario (dato del nodo: nombre de usuario)
  *
@@ -71,8 +72,11 @@
  * |                 | Este nodo tiene además enlaces salientes:                                               |
  * |                 | ├─ `nombre` → Nodo con dato string: nombre del banco. Para `dueno` es opcional.        |
  * |                 | └─ `cuenta` → Nodo con dato string: número de cuenta bancaria. Para `dueno` es opcional. |
- * | `dueno`         | Enlace directo al nodo del usuario dueño (solo para `terminal`).                       |
- * |                 | El nodo destino tiene como dato el nombre del dueño (string).                          |
+ * | `dueno`         | Enlace directo al **compartido** del terminal en el dueño (solo para `terminal`).      |
+ * |                 | El nodo destino tiene como dato el nombre del dueño (string) y el marcador           |
+ * |                 | `_es_compartido`. A partir de v1.5piloto.77f (Fase B2.3.5a), el enlace ya no apunta    |
+ * |                 | al nodo del dueño real: apunta al contenedor `compartido_con_us_<terminal>` en el      |
+ * |                 | dueño. Esa es la base del aislamiento por topología.                                    |
  * | `terminales`    | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
  * |                 | └─ Enlaces salientes con nombre de cada terminal apuntando a su nodo usuario.          |
  * | `empresas`      | Nodo contenedor con dato vacío (solo para `dueno`).                                    |
@@ -690,12 +694,14 @@
  * - Panel de administración usa `listar_usuarios()`, `listar_sesiones()` y
  *   `listar_duenos()` para mostrar y gestionar datos.
  *
- * ## Diseño propuesto: contenedores por nivel de exposición (v1.5piloto.76l)
+ * ## Modelo topológico: contenedores por nivel de exposición (v1.5piloto.77q)
  * 
- * **Estado:** diseño consensuado, todavía no implementado.
- * La migración se hace por fases (ver §8.7 del prompt
- * del piloto). Una vez implementado, esta sección
- * reemplazará a la descripción "actual" de más arriba.
+ * **Estado:** implementado. Fases B1 (contenedores `publico`/`privado`),
+ * B2.1 (compartidos por terminal), B2.2 (contexto opcional en las
+ * funciones del piloto) y B2.3 (árboles paralelos parametrizados +
+ * repuntado de terminales al compartido) aplicadas. Próximo paso:
+ * Fase B2.4 (mantener vivos los compartidos en cada operación de
+ * escritura; ver `prompts/plan_actual.md` §1.9).
  * 
  * ### Idea general
  * 
@@ -848,7 +854,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.76l
+ * @version   1.5piloto.77q
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

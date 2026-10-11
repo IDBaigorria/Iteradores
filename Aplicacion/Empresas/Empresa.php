@@ -14,6 +14,7 @@ include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./Aplicacion/FuncionesAuxiliares.php");
+include_once("./Aplicacion/Compartidos.php");
 
 /**
  * Lista las empresas asociadas a un dueño.
@@ -170,6 +171,12 @@ function eliminar_empresa(string $nombre_dueno, string $nombre_empresa): array {
         _destruir_campos_simples($nodo_vehiculos);
         Nodo::eliminar($nodo_vehiculos);
     }
+
+    // Fase B2.4.4 (v77q): desincronizar la empresa de TODOS
+    // los compartidos del dueño. Si no, los compartidos
+    // quedan con un enlace entrante al nodo empresa y
+    // Nodo::eliminar falla en silencio.
+    _desincronizar_empresa_de_compartidos($nodo_dueno, $nombre_empresa);
 
     // Desenlazar la empresa del contenedor del dueño y destruirla.
     $nodo_empresas->eliminar_adyacente($nombre_empresa);
