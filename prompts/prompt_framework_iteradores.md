@@ -852,6 +852,14 @@ actual el campo en el nodo funciona; no bloquea nada.
   `Nodo.nodo_por_id`, para replicar el comportamiento de PHP.
   Ver §12.3 y §11.4.
 
+- **1.5i.7m**: `grafo:nodo` agrega el campo
+  `destino_es_compartido` a cada adyacente. Se calcula
+  con `$ady->adyacente('_es_compartido') !== null`, que
+  es O(1) porque el nodo destino ya está en memoria.
+  Permite verificar topología por topología (por ejemplo,
+  "el enlace `dueno` del terminal apunta al compartido")
+  con una sola consulta, sin seguir IDs numéricos (que
+  no son estables entre cargas).
 - **1.5i.7l**: comando `grafo:raices` agregado al framework
   PHP (tanda 76n) y espejado en JS. Lista los nodos raíz
   del grafo (IDs especiales) con sus adyacentes directos.
@@ -1166,6 +1174,20 @@ Cada una costó un bug en producción o en pruebas.
     exponer `globalThis.Controlador = Controlador` en el
     bootstrap. Los imports estáticos del bootstrap sí
     funcionan.
+
+**Nodos, IDs y navegación:**
+
+28. **Los IDs numéricos son referencias de memoria.**
+    Cambian entre cada carga del grafo. Solo los IDs
+    especiales (strings no numéricos) son estables entre
+    cargas. La tabla de equivalencias del framework vive
+    solo dentro de una carga.
+29. **Buscar nodos = navegar desde una raíz. Siempre.**
+    No buscar por dato (los datos pueden repetirse),
+    no buscar por ID numérico entre consultas. La única
+    forma robusta es recorrer desde una raíz dentro de
+    una sola carga del grafo. `grafo:nodo_por_dato` fue
+    propuesto y descartado por esta razón.
 
 **Regla de oro:** cualquier cambio al framework PHP se refleja en
 JS en la misma tanda, con dos scripts y dos commits.

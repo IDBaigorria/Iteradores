@@ -17,8 +17,8 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 ### 1.1 Última actualización
 
-**Última actualización de este archivo:** v1.5piloto.77d
-(fix del modal de pasajero tras cambiar de asiento).
+**Última actualización de este archivo:** v1.5piloto.77o
+(cierre de la fase B2.3.5: pruebas del plugin + fixes).
 Con v76u quedó cerrada la Fase B2.2 completa (Viaje, Venta,
 ViajeAsientos, Empresa). Después vinieron B2.3.1, B2.3.2 y
 B2.3.3 (árboles paralelos parametrizados, aplicados también
@@ -112,7 +112,76 @@ Detalle en §2.3.)
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
 
-**Tanda actual:** v77m (fix del DivisionByZeroError).
+**Tanda actual:** v77o (cierre de B2.3.5 + documentación).
+
+**Estado al cierre.** La fase B2.3.5 quedó completa:
+el repuntado de terminales al compartido está aplicado en
+producción, los terminales nuevos se repuntan al vuelo, y
+las 3 pruebas del plugin (57, 58, 59) están verdes.
+
+**Cadena de cierres desde v77f hasta v77o:**
+
+- **v77f** (B2.3.5a): comando `app:repuntar_terminales_compartido`.
+  Cambia el enlace `dueno` de cada terminal para que apunte
+  a su compartido. Idempotente. Aplicado en producción.
+- **v77g** (B2.3.5b.1): el enrutador pasa contexto del
+  solicitante terminal en `estado_asientos`, `ventas/obtener`,
+  `ventas/cancelar`, `ventas/pagar_cupon`, `ventas/info_cancelacion`.
+- **v77h** (B2.3.5b.2): contexto en `cambiar_asiento_pasaje`
+  y en reservas.
+- **v77i** (B2.3.5b.3): contexto en empresas, vehículos,
+  pasajeros.
+- **v77j**: fix de zona horaria (`date_default_timezone_set(`
+  'America/Argentina/Buenos_Aires')`). Bug latente desde v58,
+  hacía que el autocompletado por DNI dijera "Fecha de
+  actualización inválida" entre las 21 y 24 hora argentina.
+- **v77k** (B2.3.5c.1, framework 1.5i.7m): `grafo:nodo`
+  agrega `destino_es_compartido` a cada adyacente. Permite
+  verificar topología con una sola consulta.
+- **v77l** (B2.3.5c.2 + c.3): fix del flujo de alta de
+  terminal. Nuevo helper `_asegurar_compartido_y_repuntar`
+  en `Usuario.php` que crea el compartido y repunta el
+  enlace `dueno` al vuelo. `app:repuntar_terminales_compartido`
+  reescrito para iterar sobre terminales (no sobre
+  compartidos existentes).
+- **v77m**: fix del `DivisionByZeroError` en
+  `_crear_lista_cupones_venta` cuando `cuotas = 1` y
+  `monto_pagado < total`. Validación temprana en
+  `confirmar_venta_actual` + defensivo en el helper.
+- **v77n**: descartado sin aplicar. Se había propuesto
+  `grafo:nodo_por_dato` para que las pruebas encontraran
+  nodos por dato. Descartado por el usuario: los datos
+  pueden repetirse, y todo recorrido debe partir de una
+  raíz.
+
+**Pruebas del plugin (B2.3.5b.4):**
+
+- **Prueba 57** (`enlace_dueno_apunta_al_compartido`):
+  verifica que el enlace `dueno` del terminal apunta a
+  un compartido. Usa `grafo:nodo` con el campo
+  `destino_es_compartido`.
+- **Prueba 58** (`venta_terminal_arbol_dual`): verifica
+  que una venta hecha por un terminal aparece en los
+  dos listados (`ventas/listar` tipo=dueno y tipo=terminal),
+  que navegan por los árboles paralelos.
+- **Prueba 59** (`cambiar_asiento_desde_croquis`): flujo
+  completo de cambiar de asiento desde el croquis.
+
+**Pendientes de la línea B:**
+
+- **B2.4** (próxima): mantener vivos los compartidos en
+  cada operación de escritura. Tanda grande, transversal.
+  Se puede partir por operación: alta/edición/baja de viaje,
+  micro, empresa, confirmar venta, cancelar venta, cambiar
+  asiento, reservar/liberar reserva, asignar pasajero.
+- **B3**: eliminar los 22 usos de `Nodo::nodo_por_id('usuarios')`
+  que quedan. Los 6 del enrutador son los más delicados:
+  requieren que el enrutador empiece a pasar contexto
+  (B2.3.5. ya lo hace en las acciones del terminal, falta
+  en los chequeos de nivel).
+- **C** (opcional): tipos como IDs especiales.
+- **D**: carga parcial como optimización. Requiere Fase 4
+  del framework (`guardar_parcial` real con merge).
 
 **Bug detectado al correr la prueba 58 del plugin.**
 
@@ -473,6 +542,98 @@ cobro, Bug 2 ligadura comprador-pasajero) están resueltos.
 ### 1.6 Preguntas abiertas
 
 Ninguna. La conversación quedó en un punto de pausa limpio.
+
+### 1.8 Lecciones aprendidas en esta sesión (v77f a v77o)
+
+**Sobre el framework y los IDs.**
+
+1. **Los IDs numéricos son referencias de memoria.**
+   Cambian entre cada carga del grafo. Solo los IDs
+   especiales (strings no numéricos) son estables entre
+   cargas. Nunca usar un ID numérico para "seguir" un
+   enlace entre dos llamadas POST distintas.
+2. **`grafo:nodo` devuelve IDs numéricos que solo son
+   válidos dentro de una misma carga.** Cada POST a
+   `grafo/nodo` recarga el grafo y regenera todos los
+   IDs numéricos. La tabla de equivalencias del framework
+   vive solo dentro de una carga.
+3. **Buscar nodos = recorrer desde una raíz. Siempre.**
+   No buscar por dato (los datos pueden repetirse),
+   no buscar por ID numérico. La única forma robusta
+   es navegar desde una raíz dentro de una sola carga.
+4. **Un comando del estilo `nodo_por_dato` es frágil.**
+   Aunque hoy los datos sean únicos (por ejemplo, los
+   `id_venta` tienen timestamp), mañana pueden repetirse.
+   Invita a construir cosas frágiles encima. Descartado.
+
+**Sobre el flujo de alta y los compartidos.**
+
+5. **Las migraciones que iteran sobre "lo que ya existe"
+   no cubren los elementos creados después.**
+   `app:repuntar_terminales_compartido` (v77f) iteraba
+   sobre los compartidos ya existentes del dueño, no
+   sobre los terminales. Un terminal creado después
+   quedaba sin compartido y sin repuntar, silenciosamente.
+   Fix (v77l): iterar sobre la entidad fuente (terminales),
+   no sobre el derivado (compartidos).
+6. **Los flujos de alta deben mantener la topología al
+   vuelo.** Si la topología se mantiene solo con comandos
+   manuales, cada alta que no los corre deja el grafo
+   inconsistente. Fix (v77l): `_asegurar_compartido_y_repuntar`
+   se llama desde `agregar_usuario` y `actualizar_usuario`.
+
+**Sobre validaciones en el backend.**
+
+7. **Los flujos sin sentido de negocio deben rechazarse
+   temprano.** El `DivisionByZeroError` en
+   `_crear_lista_cupones_venta` con `cuotas=1` y
+   `monto_pagado < total` era un caso imposible para el
+   usuario (el frontend bloquea el input), pero el
+   backend no lo chequeaba. Fix (v77m): validación
+   temprana + defensivo en el helper.
+
+**Sobre zonas horarias.**
+
+8. **El servidor y el navegador deben compartir zona
+   horaria.** Sin `date_default_timezone_set`, PHP usa
+   UTC. Entre las 21 y las 24 hora argentina, `date('Y-m-d')`
+   queda un día adelantado respecto del navegador y rompe
+   comparaciones de fechas del lado del frontend.
+   Fix (v77j): `date_default_timezone_set(`
+   'America/Argentina/Buenos_Aires')` en `index.php`.
+
+**Sobre pruebas del plugin (JS).**
+
+9. **Verificar topología entre POSTs requiere navegación,
+   no seguimiento de IDs.** Las pruebas 57 y 58 fallaron
+   al principio porque seguían IDs numéricos entre
+   consultas. La verificación debe ser: una sola llamada
+   que navegue desde la raíz y devuelva todo lo necesario
+   para comparar.
+10. **`ventas/listar` ya navega los árboles paralelos.**
+    Con `tipo=dueno` recorre `privado/ventas` con
+    `hmi`/`hd`/`p`. Con `tipo=terminal` recorre el
+    compartido con `hmi_<term>`/`hd_<term>`/`p_<term>`.
+    Verificar pertenencia = buscar el `id_venta` en los
+    dos listados.
+11. **En modales apilados, acotar selectores a
+    `#modal_apilado_contenido`.** El croquis del modal y
+    el del viaje de atrás comparten clase `.seat`. Sin
+    acotar, `querySelector` devuelve el primero en el DOM
+    (el de atrás) y el click no hace nada útil.
+12. **Chequear efecto visual (`.seat-elegido`) antes que
+    atributo booleano `disabled`.** `getAttribute('disabled')`
+    puede devolver `[null]`, `[""]` o `["disabled"]` según
+    cómo se serialice. La presencia o ausencia de una
+    clase es más confiable.
+13. **No pisar el monto pagado con cuotas = 1.** El
+    frontend autocompleta el input con el total y lo deja
+    `disabled`. Forzarlo a un valor menor dispara el
+    rechazo del backend introducido en v77m.
+14. **Polling activo en lugar de pausas fijas.** El
+    modal de cambiar asiento hace 2 fetches en serie
+    (estado + configuración) antes de armar el croquis.
+    En un grafo grande puede tardar varios segundos.
 
 ### 1.7 Deuda técnica
 
