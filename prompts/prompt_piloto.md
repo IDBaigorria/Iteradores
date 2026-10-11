@@ -877,6 +877,13 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v77v** (Fase B3.3d): `Vehiculo.php` pasa a `us_<nombre>`
+  en sus 6 funciones. Cambio de firma: `$nombre_dueno`
+  como parámetro requerido. `Enrutador.php` pasa el dueño
+  en las 6 acciones de `vehiculos/*`. `micros.js` agrega
+  helper `_obtener_nombre_dueno_micros()` y manda
+  `nombre_dueno` en los 5 POST. `aplicacion_GET.html` bump
+  del `?v=` de micros.js.
 - **v77u** (Fase B3.3b): `Pasajero.php` rama sin contexto
   de `obtener_contenedor_pasajeros_dueno` → `us_<nombre>`.
   `ViajeAsientos.php`: 3 resoluciones de terminal →

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.77i
+ * @version   1.5piloto.77v
  */
 
 use Iteradores\Nodos\Nodo;
@@ -21,7 +21,7 @@ include_once("./Aplicacion/FuncionesAuxiliares.php");
  * @param string $nombre_empresa Nombre identificador de la empresa.
  * @return array Lista de vehículos con su información.
  */
-function listar_vehiculos_de_empresa(string $nombre_empresa, ?Nodo $nodo_contexto = null): array {
+function listar_vehiculos_de_empresa(string $nombre_empresa, string $nombre_dueno, ?Nodo $nodo_contexto = null): array {
     // Fase B2.3.5b.3: contexto opcional. Si viene (terminal),
     // navega por su compartido.
     if ($nodo_contexto !== null) {
@@ -32,18 +32,14 @@ function listar_vehiculos_de_empresa(string $nombre_empresa, ?Nodo $nodo_context
         return _formatear_vehiculos_de_empresa($nodo_empresa);
     }
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return [];
-
-    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
-        $nodo_empresas = $nodo_dueno->adyacente('empresas');
-        if (!$nodo_empresas) continue;
-        $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
-        if (!$nodo_empresa) continue;
-
-        return _formatear_vehiculos_de_empresa($nodo_empresa);
-    }
-    return [];
+    // Fase B3.3d: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if (!$nodo_dueno) return [];
+    $nodo_empresas = $nodo_dueno->adyacente('empresas');
+    if (!$nodo_empresas) return [];
+    $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
+    if (!$nodo_empresa) return [];
+    return _formatear_vehiculos_de_empresa($nodo_empresa);
 }
 
 /**
@@ -148,43 +144,40 @@ function obtener_configuracion_piso($nodo_piso): ?array {
  * @param string $nombre_real Nombre visible del vehículo.
  * @return array Resultado de la operación.
  */
-function agregar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, string $nombre_real = ''): array {
+function agregar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno, string $nombre_real = ''): array {
     $nombre_vehiculo = trim($nombre_vehiculo);
     if (empty($nombre_vehiculo)) {
         return ['exito' => false, 'error' => 'El nombre del vehículo es obligatorio'];
     }
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
+    // Fase B3.3d: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+    $nodo_empresas = $nodo_dueno->adyacente('empresas');
+    if (!$nodo_empresas) return ['exito' => false, 'error' => 'El dueño no tiene empresas'];
+    $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
+    if (!$nodo_empresa) return ['exito' => false, 'error' => 'Empresa no encontrada'];
 
-    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
-        $nodo_empresas = $nodo_dueno->adyacente('empresas');
-        if (!$nodo_empresas) continue;
-        $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
-        if (!$nodo_empresa) continue;
-
-        $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
-        if (!$nodo_vehiculos) {
-            $nodo_vehiculos = Nodo::crear_con_dato('');
-            $nodo_empresa->_adyacente_en($nodo_vehiculos, 'vehiculos');
-        }
-
-        if ($nodo_vehiculos->adyacente($nombre_vehiculo)) {
-            return ['exito' => false, 'error' => 'Ya existe un vehículo con ese nombre'];
-        }
-
-        $nodo_vehiculo = Nodo::crear_con_dato($nombre_vehiculo);
-        $nodo_vehiculo->_adyacente_en(Nodo::crear_con_dato($nombre_real ?: $nombre_vehiculo), 'nombre');
-        $nodo_asientos = Nodo::crear_con_dato('0');
-        $nodo_vehiculo->_adyacente_en($nodo_asientos, 'asientos');
-
-        $nodo_vehiculos->_adyacente_en($nodo_vehiculo, $nombre_vehiculo);
-
-        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
-
-        return ['exito' => true];
+    $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
+    if (!$nodo_vehiculos) {
+        $nodo_vehiculos = Nodo::crear_con_dato('');
+        $nodo_empresa->_adyacente_en($nodo_vehiculos, 'vehiculos');
     }
-    return ['exito' => false, 'error' => 'Empresa no encontrada'];
+
+    if ($nodo_vehiculos->adyacente($nombre_vehiculo)) {
+        return ['exito' => false, 'error' => 'Ya existe un vehículo con ese nombre'];
+    }
+
+    $nodo_vehiculo = Nodo::crear_con_dato($nombre_vehiculo);
+    $nodo_vehiculo->_adyacente_en(Nodo::crear_con_dato($nombre_real ?: $nombre_vehiculo), 'nombre');
+    $nodo_asientos = Nodo::crear_con_dato('0');
+    $nodo_vehiculo->_adyacente_en($nodo_asientos, 'asientos');
+
+    $nodo_vehiculos->_adyacente_en($nodo_vehiculo, $nombre_vehiculo);
+
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+
+    return ['exito' => true];
 }
 
 /**
@@ -195,68 +188,61 @@ function agregar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, strin
  * @param array $datos Datos a actualizar. Claves: 'nombre_real', 'asientos'.
  * @return array Resultado.
  */
-function actualizar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, array $datos): array {
+function actualizar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno, array $datos): array {
     $nombre_vehiculo = trim($nombre_vehiculo);
     if (empty($nombre_vehiculo)) {
         return ['exito' => false, 'error' => 'El identificador del vehículo es obligatorio'];
     }
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) {
-        return ['exito' => false, 'error' => 'No hay usuarios registrados'];
+    // Fase B3.3d: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+    $nodo_empresas = $nodo_dueno->adyacente('empresas');
+    if (!$nodo_empresas) return ['exito' => false, 'error' => 'El dueño no tiene empresas'];
+    $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
+    if (!$nodo_empresa) return ['exito' => false, 'error' => 'Empresa no encontrada'];
+
+    $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
+    if (!$nodo_vehiculos) {
+        return ['exito' => false, 'error' => 'La empresa no tiene vehículos registrados'];
     }
 
-    // Buscar la empresa globalmente
-    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
-        $nodo_empresas = $nodo_dueno->adyacente('empresas');
-        if (!$nodo_empresas) continue;
-        $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
-        if (!$nodo_empresa) continue;
-
-        $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
-        if (!$nodo_vehiculos) {
-            return ['exito' => false, 'error' => 'La empresa no tiene vehículos registrados'];
-        }
-
-        $nodo_vehiculo = $nodo_vehiculos->adyacente($nombre_vehiculo);
-        if (!$nodo_vehiculo) {
-            return ['exito' => false, 'error' => 'Vehículo no encontrado en esta empresa'];
-        }
-
-        // Actualizar nombre visible
-        if (array_key_exists('nombre_real', $datos)) {
-            $nombre_real = trim($datos['nombre_real']);
-            if (empty($nombre_real)) {
-                $nombre_real = $nombre_vehiculo;
-            }
-            $nodo_nombre = $nodo_vehiculo->adyacente('nombre');
-            if ($nodo_nombre) {
-                $nodo_nombre->_dato($nombre_real);
-            } else {
-                $nodo_vehiculo->_adyacente_en(Nodo::crear_con_dato($nombre_real), 'nombre');
-            }
-        }
-
-        // Actualizar cantidad de asientos
-        if (array_key_exists('asientos', $datos)) {
-            $asientos = (int)$datos['asientos'];
-            if ($asientos <= 0) {
-                return ['exito' => false, 'error' => 'La cantidad de asientos debe ser mayor que cero'];
-            }
-            $nodo_asientos = $nodo_vehiculo->adyacente('asientos');
-            if ($nodo_asientos) {
-                $nodo_asientos->_dato((string)$asientos);
-            } else {
-                $nodo_vehiculo->_adyacente_en(Nodo::crear_con_dato((string)$asientos), 'asientos');
-            }
-        }
-
-        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
-
-        return ['exito' => true];
+    $nodo_vehiculo = $nodo_vehiculos->adyacente($nombre_vehiculo);
+    if (!$nodo_vehiculo) {
+        return ['exito' => false, 'error' => 'Vehículo no encontrado en esta empresa'];
     }
 
-    return ['exito' => false, 'error' => 'Empresa no encontrada'];
+    // Actualizar nombre visible
+    if (array_key_exists('nombre_real', $datos)) {
+        $nombre_real = trim($datos['nombre_real']);
+        if (empty($nombre_real)) {
+            $nombre_real = $nombre_vehiculo;
+        }
+        $nodo_nombre = $nodo_vehiculo->adyacente('nombre');
+        if ($nodo_nombre) {
+            $nodo_nombre->_dato($nombre_real);
+        } else {
+            $nodo_vehiculo->_adyacente_en(Nodo::crear_con_dato($nombre_real), 'nombre');
+        }
+    }
+
+    // Actualizar cantidad de asientos
+    if (array_key_exists('asientos', $datos)) {
+        $asientos = (int)$datos['asientos'];
+        if ($asientos <= 0) {
+            return ['exito' => false, 'error' => 'La cantidad de asientos debe ser mayor que cero'];
+        }
+        $nodo_asientos = $nodo_vehiculo->adyacente('asientos');
+        if ($nodo_asientos) {
+            $nodo_asientos->_dato((string)$asientos);
+        } else {
+            $nodo_vehiculo->_adyacente_en(Nodo::crear_con_dato((string)$asientos), 'asientos');
+        }
+    }
+
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+
+    return ['exito' => true];
 }
 /**
  * Actualiza la configuración física completa de un vehículo.
@@ -266,7 +252,7 @@ function actualizar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, ar
  * @param array $configuracion Arreglo con 'pisos' => [ ['filas'=>int, 'columnas'=>int, 'asientos'=>[ ['fila'=>string, 'columna'=>string, 'numero'=>string] ] ], ... ].
  * @return array Resultado.
  */
-function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombre_vehiculo, array $configuracion): array {
+function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno, array $configuracion): array {
     $nombre_vehiculo = trim($nombre_vehiculo);
     if (empty($nombre_vehiculo)) {
         return ['exito' => false, 'error' => 'El identificador del vehículo es obligatorio'];
@@ -276,26 +262,23 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
         return ['exito' => false, 'error' => 'Configuración inválida'];
     }
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) {
-        return ['exito' => false, 'error' => 'No hay usuarios registrados'];
+    // Fase B3.3d: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+    $nodo_empresas = $nodo_dueno->adyacente('empresas');
+    if (!$nodo_empresas) return ['exito' => false, 'error' => 'El dueño no tiene empresas'];
+    $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
+    if (!$nodo_empresa) return ['exito' => false, 'error' => 'Empresa no encontrada'];
+
+    $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
+    if (!$nodo_vehiculos) {
+        return ['exito' => false, 'error' => 'La empresa no tiene vehículos'];
     }
 
-    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
-        $nodo_empresas = $nodo_dueno->adyacente('empresas');
-        if (!$nodo_empresas) continue;
-        $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
-        if (!$nodo_empresa) continue;
-
-        $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
-        if (!$nodo_vehiculos) {
-            return ['exito' => false, 'error' => 'La empresa no tiene vehículos'];
-        }
-
-        $nodo_vehiculo = $nodo_vehiculos->adyacente($nombre_vehiculo);
-        if (!$nodo_vehiculo) {
-            return ['exito' => false, 'error' => 'Vehículo no encontrado'];
-        }
+    $nodo_vehiculo = $nodo_vehiculos->adyacente($nombre_vehiculo);
+    if (!$nodo_vehiculo) {
+        return ['exito' => false, 'error' => 'Vehículo no encontrado'];
+    }
 
         $nodo_asientos = $nodo_vehiculo->adyacente('asientos');
         if (!$nodo_asientos) {
@@ -364,14 +347,11 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
             $indice_piso++;
         }
 
-        $nodo_asientos->_dato((string)$total_asientos);
+    $nodo_asientos->_dato((string)$total_asientos);
 
-        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
-        return ['exito' => true];
-    }
-
-    return ['exito' => false, 'error' => 'Empresa no encontrada'];
+    return ['exito' => true];
 }
 
 /**
@@ -381,39 +361,35 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
  * @param string $nombre_vehiculo Identificador del vehículo (patente).
  * @return array Resultado.
  */
-function eliminar_vehiculo(string $nombre_empresa, string $nombre_vehiculo): array {
+function eliminar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno): array {
     $nombre_vehiculo = trim($nombre_vehiculo);
     if (empty($nombre_vehiculo)) {
         return ['exito' => false, 'error' => 'Identificador de vehículo obligatorio'];
     }
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
+    // Fase B3.3d: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+    $nodo_empresas = $nodo_dueno->adyacente('empresas');
+    if (!$nodo_empresas) return ['exito' => false, 'error' => 'El dueño no tiene empresas'];
+    $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
+    if (!$nodo_empresa) return ['exito' => false, 'error' => 'Empresa no encontrada'];
 
-    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
-        $nodo_empresas = $nodo_dueno->adyacente('empresas');
-        if (!$nodo_empresas) continue;
-        $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
-        if (!$nodo_empresa) continue;
+    $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
+    if (!$nodo_vehiculos) return ['exito' => false, 'error' => 'La empresa no tiene vehículos'];
 
-        $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
-        if (!$nodo_vehiculos) return ['exito' => false, 'error' => 'La empresa no tiene vehículos'];
+    $nodo_vehiculo = $nodo_vehiculos->adyacente($nombre_vehiculo);
+    if (!$nodo_vehiculo) return ['exito' => false, 'error' => 'Vehículo no encontrado'];
 
-        $nodo_vehiculo = $nodo_vehiculos->adyacente($nombre_vehiculo);
-        if (!$nodo_vehiculo) return ['exito' => false, 'error' => 'Vehículo no encontrado'];
+    // Fase 2, v74y: destruir el vehículo completo (asientos,
+    // pisos, listas circulares de asientos, campos nombre y
+    // foto). Antes solo se desenlazaba del contenedor,
+    // dejando ~100 nodos huérfanos por vehículo.
+    $nodo_vehiculos->eliminar_adyacente($nombre_vehiculo);
+    _destruir_vehiculo_completo($nodo_vehiculo);
 
-        // Fase 2, v74y: destruir el vehículo completo (asientos,
-        // pisos, listas circulares de asientos, campos nombre y
-        // foto). Antes solo se desenlazaba del contenedor,
-        // dejando ~100 nodos huérfanos por vehículo.
-        $nodo_vehiculos->eliminar_adyacente($nombre_vehiculo);
-        _destruir_vehiculo_completo($nodo_vehiculo);
-
-        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
-        return ['exito' => true];
-    }
-
-    return ['exito' => false, 'error' => 'Empresa no encontrada'];
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    return ['exito' => true];
 }
 
 /**
@@ -424,7 +400,7 @@ function eliminar_vehiculo(string $nombre_empresa, string $nombre_vehiculo): arr
  * @param array $archivo Arreglo $_FILES['foto'].
  * @return array Resultado con la ruta de la foto si éxito.
  */
-function subir_foto_vehiculo(string $nombre_empresa, string $nombre_vehiculo, array $archivo): array {
+function subir_foto_vehiculo(string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno, array $archivo): array {
     $nombre_vehiculo = trim($nombre_vehiculo);
     if (empty($nombre_vehiculo)) {
         return ['exito' => false, 'error' => 'Identificador de vehículo obligatorio'];
@@ -458,16 +434,14 @@ function subir_foto_vehiculo(string $nombre_empresa, string $nombre_vehiculo, ar
     $ruta_relativa = 'uploads/vehiculos/' . $nombre_archivo;
 
     // Buscar vehículo y guardar enlace (insensible a mayúsculas/minúsculas)
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) {
+    // Fase B3.3d: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if (!$nodo_dueno) {
         unlink($ruta_destino);
-        return ['exito' => false, 'error' => 'No hay usuarios registrados'];
+        return ['exito' => false, 'error' => 'Dueño no encontrado'];
     }
-
-    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
-        $nodo_empresas = $nodo_dueno->adyacente('empresas');
-        if (!$nodo_empresas) continue;
-
+    $nodo_empresas = $nodo_dueno->adyacente('empresas');
+    if ($nodo_empresas) {
         // Buscar empresa comparando sin mayúsculas
         $empresa_encontrada = null;
         foreach ($nodo_empresas->adyacentes() as $nombre_empresa_actual => $nodo_empresa_actual) {
@@ -477,10 +451,8 @@ function subir_foto_vehiculo(string $nombre_empresa, string $nombre_vehiculo, ar
                 break;
             }
         }
-        if (!$empresa_encontrada) continue;
 
-        $nodo_vehiculos = $empresa_encontrada->adyacente('vehiculos');
-        if (!$nodo_vehiculos) continue;
+        $nodo_vehiculos = $empresa_encontrada ? $empresa_encontrada->adyacente('vehiculos') : null;
 
         // Buscar vehículo comparando sin mayúsculas
         $vehiculo_encontrado = null;

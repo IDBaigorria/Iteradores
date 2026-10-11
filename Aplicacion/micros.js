@@ -1,10 +1,27 @@
 /***
  * Funciones de empresas, vehículos y editor de asientos.
- * @version 1.5piloto.76c
+ * @version 1.5piloto.77v
  */
 
 // Variable global para el editor de asientos
 let editor_pisos_actuales = [];
+
+// Fase B3.3d: nombre del dueño cuya pestaña Micros se está
+// gestionando. Se usa para mandar `nombre_dueno` en cada POST
+// de vehiculos/*. Para admin/soporte es el elegido en el
+// selector; para dueño es él mismo.
+let dueno_micros_seleccionado = '';
+
+function _obtener_nombre_dueno_micros() {
+    if (es_admin_o_soporte()) {
+        const select = document.getElementById('selector_dueno_micros');
+        return dueno_micros_seleccionado || (select ? select.value : '') || '';
+    }
+    if (usuario_actual && usuario_actual.nivel === 'dueno') {
+        return usuario_actual.nombre_usuario;
+    }
+    return '';
+}
 
 async function cargar_datos_micros() {
     // Limpiar selects
@@ -25,6 +42,7 @@ async function cargar_datos_micros() {
         $("#panel_selector_dueno_micros").style.display = 'block';
         await cargar_duenos_en_select_micros();
     } else if (usuario_actual.nivel === 'dueno') {
+        dueno_micros_seleccionado = usuario_actual.nombre_usuario;
         await cargar_empresas_de_dueno(usuario_actual.nombre_usuario);
         $("#panel_empresas_micros").style.display = 'block';
     }
@@ -49,6 +67,7 @@ async function cargar_duenos_en_select_micros() {
             });
             select.onchange = async () => {
                 const nombre_dueno = select.value;
+                dueno_micros_seleccionado = nombre_dueno;
                 if (nombre_dueno) {
                     await cargar_empresas_de_dueno(nombre_dueno);
                     $("#panel_empresas_micros").style.display = 'block';
@@ -92,11 +111,12 @@ async function cargar_empresas_de_dueno(nombre_dueno) {
 }
 
 async function cargar_vehiculos_de_empresa(nombre_empresa) {
+    const nombre_dueno = _obtener_nombre_dueno_micros();
     try {
         const respuesta = await fetch("index.php", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({ accion: "vehiculos/listar", nombre_empresa })
+            body: new URLSearchParams({ accion: "vehiculos/listar", nombre_empresa, nombre_dueno })
         });
         const datos = await respuesta.json();
         if (datos.exito) {
@@ -329,7 +349,8 @@ async function _guardar_vehiculo_desde_modal() {
         accion: "vehiculos/agregar",
         nombre_empresa,
         nombre_vehiculo,
-        nombre_real
+        nombre_real,
+        nombre_dueno: _obtener_nombre_dueno_micros()
     };
     const respuesta = await fetch("index.php", {
         method: "POST",
@@ -617,7 +638,8 @@ async function guardar_configuracion() {
         accion: "vehiculos/actualizar_configuracion",
         nombre_empresa,
         nombre_vehiculo,
-        configuracion: JSON.stringify(configuracion)
+        configuracion: JSON.stringify(configuracion),
+        nombre_dueno: _obtener_nombre_dueno_micros()
     };
 
     const respuesta = await fetch("index.php", {
@@ -693,6 +715,7 @@ $("#input_foto_vehiculo").addEventListener("change", async (e) => {
     formData.append('accion', 'vehiculos/subir_foto');
     formData.append('nombre_empresa', nombre_empresa);
     formData.append('nombre_vehiculo', nombre_vehiculo);
+    formData.append('nombre_dueno', _obtener_nombre_dueno_micros());
     formData.append('foto', archivo);
 
     const respuesta = await fetch("index.php", {

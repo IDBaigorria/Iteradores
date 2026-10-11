@@ -121,7 +121,16 @@ detectó la auditoría), empezando por B2.4.2 + B2.4.5.
   desincroniza de los compartidos del dueño. `aplicacion_POST.php`
   actualizado al modelo topológico.
 
-**Tanda actual:** v77u (B3.3b).
+**Tanda actual:** v77v (B3.3d).
+
+**B3.3d (v77v).** `Vehiculo.php`: las 6 funciones reciben
+`$nombre_dueno` y resuelven por `us_<nombre>` en lugar de
+iterar sobre todos los dueños. `Enrutador.php`: las 6
+acciones de `vehiculos/*` pasan el dueño. `micros.js`:
+nuevo helper `_obtener_nombre_dueno_micros()` y las 5
+llamadas mandan `nombre_dueno`. Queda pendiente B3.3c
+(helpers que iteran sobre todos los dueños buscando por
+id) y B3.3e (Migraciones).
 
 **B3.3a (v77t).** `Liquidacion.php` y `Rendicion.php`:
 3 y 4 resoluciones de dueño/terminal pasadas a

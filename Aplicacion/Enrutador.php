@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.77i
+ * @version   1.5piloto.77v
  */
 
 use Iteradores\Nodos\Nodo;
@@ -384,12 +384,16 @@ function enrutar_peticion_post(string $accion, array $post): void {
             switch ($subaccion) {
                 case 'listar':
                     $nombre_empresa = $post['nombre_empresa'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
                     if (empty($nombre_empresa)) {
                         responder_json(['exito' => false, 'error' => 'Empresa no especificada']);
                     }
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
                     // Fase B2.3.5b.3: contexto del solicitante.
                     $nodo_contexto = _contexto_solicitante($nombre_solicitante);
-                    $vehiculos = listar_vehiculos_de_empresa($nombre_empresa, $nodo_contexto);
+                    $vehiculos = listar_vehiculos_de_empresa($nombre_empresa, $nombre_dueno, $nodo_contexto);
                     responder_json(['exito' => true, 'vehiculos' => $vehiculos]);
                     break;
 
@@ -397,7 +401,11 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombre_empresa = $post['nombre_empresa'] ?? '';
                     $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
                     $nombre_real = $post['nombre_real'] ?? '';
-                    $resultado = agregar_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_real);
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado = agregar_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_dueno, $nombre_real);
                     responder_json($resultado);
                     break;
                 case 'actualizar':
@@ -405,9 +413,13 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
                     $nombre_real = $post['nombre_real'] ?? null;
                     $asientos = $post['asientos'] ?? null;
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
 
                     if (empty($nombre_empresa) || empty($nombre_vehiculo)) {
                         responder_json(['exito' => false, 'error' => 'Empresa y vehículo son obligatorios']);
+                    }
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
                     }
 
                     $datos = [];
@@ -418,16 +430,20 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         $datos['asientos'] = (int)$asientos;
                     }
 
-                    $resultado = actualizar_vehiculo($nombre_empresa, $nombre_vehiculo, $datos);
+                    $resultado = actualizar_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_dueno, $datos);
                     responder_json($resultado);
                     break;
                 case 'actualizar_configuracion':
                     $nombre_empresa = $post['nombre_empresa'] ?? '';
                     $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
                     $configuracion_json = $post['configuracion'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
 
                     if (empty($nombre_empresa) || empty($nombre_vehiculo)) {
                         responder_json(['exito' => false, 'error' => 'Empresa y vehículo son obligatorios']);
+                    }
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
                     }
 
                     $configuracion = json_decode($configuracion_json, true);
@@ -435,28 +451,36 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'Configuración inválida']);
                     }
 
-                    $resultado = actualizar_configuracion_vehiculo($nombre_empresa, $nombre_vehiculo, $configuracion);
+                    $resultado = actualizar_configuracion_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_dueno, $configuracion);
                     responder_json($resultado);
                     break;
                 case 'eliminar':
                     $nombre_empresa = $post['nombre_empresa'] ?? '';
                     $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
                     if (empty($nombre_empresa) || empty($nombre_vehiculo)) {
                         responder_json(['exito' => false, 'error' => 'Empresa y vehículo son obligatorios']);
                     }
-                    $resultado = eliminar_vehiculo($nombre_empresa, $nombre_vehiculo);
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado = eliminar_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_dueno);
                     responder_json($resultado);
                     break;
                 case 'subir_foto':
                     $nombre_empresa = $post['nombre_empresa'] ?? '';
                     $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
                     if (empty($nombre_empresa) || empty($nombre_vehiculo)) {
                         responder_json(['exito' => false, 'error' => 'Empresa y vehículo son obligatorios']);
+                    }
+                    if (empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
                     }
                     if (!isset($_FILES['foto'])) {
                         responder_json(['exito' => false, 'error' => 'Archivo no enviado']);
                     }
-                    $resultado = subir_foto_vehiculo($nombre_empresa, $nombre_vehiculo, $_FILES['foto']);
+                    $resultado = subir_foto_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_dueno, $_FILES['foto']);
                     responder_json($resultado);
                     break;
                 default:
