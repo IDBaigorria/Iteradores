@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.77e
+ * @version   1.5piloto.77m
  */
 
 
@@ -346,6 +346,15 @@ function confirmar_venta_actual(
         $monto_pagado = $total;
     } else {
         $cuotas_restantes = max(0, $cuotas - 1);
+    }
+
+    // Fix v77m: con 1 sola cuota, si el monto pagado no cubre
+    // el total, la venta no tiene forma de saldarse (no hay
+    // cuotas siguientes donde cobrar la diferencia). Antes
+    // esto llegaba hasta _crear_lista_cupones_venta y
+    // reventaba con division by zero.
+    if ($cuotas === 1 && $monto_pagado < $total) {
+        return ['exito' => false, 'error' => 'Con 1 sola cuota, el monto a pagar debe cubrir el total'];
     }
 
     // Crear nodo venta persistente
@@ -2249,6 +2258,14 @@ function _crear_lista_cupones_venta(Nodo $nodo_venta, int $cuotas, string $total
     $anterior = $cupon_1;
 
     // Cupones 2..N (pendientes).
+    if ($cuotas_restantes <= 0) {
+        // Defensivo (fix v77m): la validación temprana en
+        // confirmar_venta_actual previene este caso. Si por
+        // algún flujo viejo llega acá con cuotas_restantes
+        // <= 0 y saldo > 0, no creamos cupones pendientes
+        // ni dividimos por cero.
+        return;
+    }
     $teorico_pendiente = round($saldo / $cuotas_restantes, 2);
     for ($i = 2; $i <= $cuotas; $i++) {
         $es_ultimo = ($i === $cuotas);

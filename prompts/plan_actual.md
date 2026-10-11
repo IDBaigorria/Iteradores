@@ -112,8 +112,35 @@ Detalle en §2.3.)
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
 
-**Tanda actual:** v77l (Fase B2.3.5c.2 + c.3: fix del
-flujo de alta de terminal).
+**Tanda actual:** v77m (fix del DivisionByZeroError).
+
+**Bug detectado al correr la prueba 58 del plugin.**
+
+Cuando se confirma una venta con `cuotas = 1` y
+`monto_pagado < total`, el flujo de confirmar_venta_actual
+no lo valida. Calcula `cuotas_restantes = max(0, 1-1) = 0` y
+lo pasa a `_crear_lista_cupones_venta`, que en el caso B
+hace `$saldo / $cuotas_restantes` → division by zero →
+fatal error de PHP → respuesta HTML (no JSON) → el
+frontend muestra "Error de comunicación".
+
+Ningún usuario real llega a este estado: el frontend
+autocompleta `monto_pagado = total` y lo deja `disabled`
+cuando `cuotas = 1`. La prueba 58 lo forzó con
+`setear_monto_pagado(1000)` pisando el valor correcto.
+
+**Fix v77m (Venta.php):**
+
+- Validación temprana en `confirmar_venta_actual`: si
+  `cuotas === 1` y `monto_pagado < total`, devolver
+  error claro ("Con 1 sola cuota, el monto a pagar debe
+  cubrir el total").
+- Defensivo en `_crear_lista_cupones_venta`: si llega
+  con `cuotas_restantes <= 0` y saldo > 0, no dividir
+  (ni crear cupones pendientes). Cinturón y tiradores.
+
+**Pendiente (test del plugin):** reescribir la prueba 58
+para no pisar el monto pagado cuando `cuotas = 1`.
 
 **v77l — Fase B2.3.5c.2 + c.3.**
 
