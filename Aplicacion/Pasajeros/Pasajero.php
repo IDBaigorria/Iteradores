@@ -358,10 +358,8 @@ function crear_pasajero(string $nombre_dueno, array $datos, ?Nodo $nodo_contexto
  * Verifica si un pasajero tiene pasajes comprados en los viajes de un dueño.
  */
 function pasajero_tiene_pasajes(string $nombre_dueno, string $dni): bool {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return false;
-
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.1: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return false;
 
     $contenedor_ventas = $nodo_dueno->adyacente('ventas');
@@ -1001,12 +999,10 @@ function obtener_reservas_de_pasajero(string $nombre_dueno, string $dni): array 
         if ($nodo_reservado_por) {
             $nombre_usuario_reservo = $nodo_reservado_por->dato();
             $reservado_por = $nombre_usuario_reservo;
-            $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-            if ($raiz_usuarios) {
-                $nodo_usuario_reservo = $raiz_usuarios->adyacente($nombre_usuario_reservo);
-                if ($nodo_usuario_reservo && $nodo_usuario_reservo->adyacente('nombre_real')) {
-                    $reservado_por = $nodo_usuario_reservo->adyacente('nombre_real')->dato();
-                }
+            // Fase B3.1: ID especial directo.
+            $nodo_usuario_reservo = Nodo::nodo_por_id('us_' . $nombre_usuario_reservo);
+            if ($nodo_usuario_reservo && $nodo_usuario_reservo->adyacente('nombre_real')) {
+                $reservado_por = $nodo_usuario_reservo->adyacente('nombre_real')->dato();
             }
         }
 

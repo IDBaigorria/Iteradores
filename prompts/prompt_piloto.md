@@ -877,6 +877,19 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v77s**: fix del `$raiz` residual en `eliminar_usuario`
+  (Usuario.php). Al cambiar el bloque por ID especial en
+  v77r se borró la declaración, pero quedó un
+  `$raiz->eliminar_adyacente($nombre_usuario)` al final.
+  Se resuelve la raíz solo en ese punto.
+- **v77r** (Fase B3.1): aislación de usuarios. Reemplazo
+  de `nodo_por_id('usuarios')->adyacente($nombre)` por
+  `nodo_por_id('us_'.$nombre)` en Venta, Viaje, Enrutador,
+  Usuario, Empresa, ViajeMicros, Pasajero e index.php.
+  `agregar_usuario` ya no autocrea la raíz `usuarios`.
+  Los listados que iteran sobre todos los usuarios y los
+  helpers que iteran sobre todos los dueños quedan
+  pendientes para B3.3.
 - **v77q** (Tanda A, B2.4.2 + B2.4.5): fixes del
   aislamiento por topología. `Aplicacion/Compartidos.php`
   nuevo (5 helpers para sincronizar/desincronizar viajes,

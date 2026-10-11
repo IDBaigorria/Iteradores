@@ -28,9 +28,8 @@ function listar_empresas_de_dueno(string $nombre_dueno, ?Nodo $nodo_contexto = n
     // patrón que Viaje y Venta. Lo usa el terminal para ver
     // solo las empresas compartidas.
     if ($nodo_contexto === null) {
-        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-        if (!$raiz_usuarios) return [];
-        $nodo_contexto = $raiz_usuarios->adyacente($nombre_dueno);
+        // Fase B3.1: ID especial directo.
+        $nodo_contexto = Nodo::nodo_por_id('us_' . $nombre_dueno);
     }
     if (!$nodo_contexto) return [];
 
@@ -65,10 +64,8 @@ function agregar_empresa(string $nombre_dueno, string $nombre_empresa, string $n
         return ['exito' => false, 'error' => 'El nombre de la empresa es obligatorio'];
     }
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.1: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_empresas = $nodo_dueno->adyacente('empresas');
@@ -107,10 +104,8 @@ function editar_empresa(string $nombre_dueno, string $nombre_empresa, string $nu
         return ['exito' => false, 'error' => 'El nombre visible no puede estar vacío'];
     }
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.1: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_empresas = $nodo_dueno->adyacente('empresas');
@@ -143,10 +138,8 @@ function eliminar_empresa(string $nombre_dueno, string $nombre_empresa): array {
         return ['exito' => false, 'error' => 'Nombre de empresa obligatorio'];
     }
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.1: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_empresas = $nodo_dueno->adyacente('empresas');

@@ -121,7 +121,76 @@ detectó la auditoría), empezando por B2.4.2 + B2.4.5.
   desincroniza de los compartidos del dueño. `aplicacion_POST.php`
   actualizado al modelo topológico.
 
-**Tanda actual:** v77q (Tanda A, B2.4.2 + B2.4.5).
+**Tanda actual:** v77s (fix del `$raiz` en eliminar_usuario).
+
+**B3.1 (v77r + v77s).** Reemplazo de
+`Nodo::nodo_por_id('usuarios')` por
+`Nodo::nodo_por_id('us_<nombre>')` en los flujos que
+ya tienen el nombre a mano. Alcanza a Venta, Viaje,
+Enrutador, Usuario, Empresa, ViajeMicros, Pasajero e
+index.php. Los listados que iteran sobre todos los
+usuarios y los helpers que iteran sobre todos los dueños
+quedan como están (B3.3). `agregar_usuario` ya no
+autocrea la raíz `usuarios`: el chequeo de duplicado se
+hace por `Nodo::existe('us_<nombre>')`.
+
+**Fix v77s.** `eliminar_usuario` tenía un `$raiz` residual
+al final: se había borrado la declaración al cambiar el
+bloque por ID especial, pero quedó el
+`$raiz->eliminar_adyacente($nombre_usuario)` que desenlaza
+al usuario del contenedor `usuarios`. Se resuelve la raíz
+solo en ese punto, con comentario que explica por qué.
+
+**B3.3 — pendiente (helpers que iteran "sobre todos los
+dueños").** El inventario actualizado (post v77r) es:
+
+- `Liquidacion.php` (4): recibe `$nombre_dueno` en la firma.
+  Cambio directo a `us_<nombre>`.
+- `Rendicion.php` (5): idem, recibe `$nombre_dueno`.
+- `Pasajero.php` (2): `obtener_pasajero_por_dni` arma
+  historial iterando dueños. Requiere ver el código.
+- `ViajeAsientos.php` (3): resuelven terminal/dueño en
+  flujos sin contexto.
+- `Venta.php` (2): `_buscar_venta_por_id` sin contexto y
+  `obtener_cancelacion_por_id`.
+- `Impresion.php` (2): resuelven dueño/viaje para armar
+  la impresión.
+- `Vehiculo.php` (6): las 6 funciones buscan la empresa
+  entre todos los dueños. El más grande.
+- `Migraciones/Funciones.php` (2): `detectar_*` que pueden
+  reescribirse con `Nodo::por_cada_nodo_ejecutar`.
+- `Migraciones/Comandos.php` (1): idem.
+
+**Sub-tandas propuestas (de menor a mayor riesgo):**
+
+- **B3.3a:** `Liquidacion.php` + `Rendicion.php`. Cambio
+  directo a `us_<nombre>` en cada resolución.
+- **B3.3b:** `Pasajero.php` + `ViajeAsientos.php`. Casos
+  sueltos, requieren ver el código para saber qué
+  contexto hay disponible.
+- **B3.3c:** `Venta.php` + `Impresion.php`. Requieren
+  decisión de diseño: ¿contexto o iteración más acotada?
+- **B3.3d:** `Vehiculo.php`. El más grande. Puede requerir
+  cambios en el Enrutador para pasar el dueño.
+- **B3.3e:** `Migraciones/Funciones.php` + `Comandos.php`.
+  Reescribir con `por_cada_nodo_ejecutar`.
+
+**Usos legítimos que NO se tocan:**
+
+- `Autenticacion.php` (4): busca por `codigo_hash` en
+  credenciales, itera por todos.
+- `GrafoCredenciales.php` (2): helper del grafo de
+  credenciales.
+- `index.php` (4): crea la raíz y el admin al arrancar.
+- `Usuario.php`: `listar_usuarios`, `listar_duenos`,
+  `listar_soportes`, `buscar_usuario_por_codigo`.
+- `Controlador.php` (1): es del framework. Se aborda en
+  una tanda del framework, no acá.
+- `miscelaneas/migrar_usuarios_especiales.php` (1):
+  migración manual que recorre el grafo.
+
+**Anterior:** v77r (B3.1: aislación de usuarios, sin el fix).
+Antes: v77q (Tanda A, B2.4.2 + B2.4.5).
 
 **Estado al cierre.** La fase B2.3.5 quedó completa:
 el repuntado de terminales al compartido está aplicado en

@@ -214,10 +214,8 @@ function _contexto_terminal(string $nombre_terminal) {
  */
 function obtener_contenedor_viajes_dueno(string $nombre_dueno, ?Nodo $nodo_contexto = null) {
     if ($nodo_contexto === null) {
-        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-        if (!$raiz_usuarios) return null;
-
-        $nodo_contexto = $raiz_usuarios->adyacente($nombre_dueno);
+        // Fase B3.1: ID especial directo.
+        $nodo_contexto = Nodo::nodo_por_id('us_' . $nombre_dueno);
     }
     if (!$nodo_contexto) return null;
 
@@ -255,10 +253,9 @@ function listar_viajes_de_dueno(string $nombre_dueno): array {
  * Lista viajes autorizados para una terminal.
  */
 function listar_viajes_de_terminal(string $nombre_terminal): array {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return [];
-
-    $nodo_terminal = $raiz_usuarios->adyacente($nombre_terminal);
+    // Fase B3.1: ID especial directo para el terminal. El
+    // enlace `dueno` ya apunta al compartido (post B2.3.5).
+    $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre_terminal);
     if (!$nodo_terminal) return [];
 
     $nodo_dueno = $nodo_terminal->adyacente('dueno');
@@ -374,9 +371,9 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
         }
     }
 
-    // Pre-cargar el contenedor de empresas del dueño (para resolver nombres visibles)
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    $nodo_dueno_iter = $raiz_usuarios ? $raiz_usuarios->adyacente($datos['dueno']) : null;
+    // Pre-cargar el contenedor de empresas del dueño (para
+    // resolver nombres visibles). Fase B3.1: ID especial.
+    $nodo_dueno_iter = Nodo::nodo_por_id('us_' . $datos['dueno']);
     $nodo_empresas = $nodo_dueno_iter ? $nodo_dueno_iter->adyacente('empresas') : null;
 
     // Micros
@@ -488,10 +485,8 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
  * Verifica si un viaje tiene ventas registradas.
  */
 function viaje_tiene_ventas(string $nombre_dueno, string $nombre_viaje): bool {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return false;
-
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.1: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return false;
 
     $contenedor_ventas = $nodo_dueno->adyacente('ventas');
@@ -922,11 +917,9 @@ function agregar_terminal_autorizada(string $nombre_viaje, string $nombre_termin
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
     if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
 
-    // Verificar que exista el Nodo Usuario terminal
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios'];
-
-    $nodo_usuario_terminal = $raiz_usuarios->adyacente($nombre_terminal);
+    // Verificar que exista el Nodo Usuario terminal.
+    // Fase B3.1: ID especial directo.
+    $nodo_usuario_terminal = Nodo::nodo_por_id('us_' . $nombre_terminal);
     if (!$nodo_usuario_terminal) {
         return ['exito' => false, 'error' => 'La terminal no existe'];
     }

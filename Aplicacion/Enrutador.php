@@ -110,10 +110,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
 
                     if ($usuario) {
-                        // Si es terminal, incluir el nombre del dueño
+                        // Si es terminal, incluir el nombre del dueño.
+                        // Fase B3.1: ID especial directo.
                         if ($usuario['nivel'] === 'terminal') {
-                            $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-                            $nodo_usuario = $raiz_usuarios ? $raiz_usuarios->adyacente($usuario['nombre_usuario']) : null;
+                            $nodo_usuario = Nodo::nodo_por_id('us_' . $usuario['nombre_usuario']);
                             $nodo_dueno = $nodo_usuario ? $nodo_usuario->adyacente('dueno') : null;
                             $usuario['dueno'] = $nodo_dueno ? $nodo_dueno->dato() : '';
                         }
@@ -129,9 +129,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
         case 'administrador':
             // Determinar el nivel del solicitante (excepto verificar).
+            // Fase B3.1: ID especial directo.
             $nombre_sol_admin = $post['nombre_solicitante'] ?? '';
-            $raiz_admin = Nodo::nodo_por_id('usuarios');
-            $nodo_sol_admin = ($raiz_admin && $nombre_sol_admin !== '') ? $raiz_admin->adyacente($nombre_sol_admin) : null;
+            $nodo_sol_admin = ($nombre_sol_admin !== '') ? Nodo::nodo_por_id('us_' . $nombre_sol_admin) : null;
             $nodo_nivel_sol = $nodo_sol_admin ? $nodo_sol_admin->adyacente('nivel') : null;
             $nivel_sol = $nodo_nivel_sol ? $nodo_nivel_sol->dato() : '';
             if ($subaccion !== 'verificar' && !in_array($nivel_sol, ['admin', 'soporte'], true)) {
@@ -259,9 +259,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
                 case 'listar_sesiones_terminales':
                     // Chequeo de nivel: solo admin, soporte y dueño.
+                    // Fase B3.1: ID especial directo.
                     $nombre_sol_dueno = $post['nombre_solicitante'] ?? '';
-                    $raiz_sol_dueno = Nodo::nodo_por_id('usuarios');
-                    $nodo_sol_dueno = ($raiz_sol_dueno && $nombre_sol_dueno !== '') ? $raiz_sol_dueno->adyacente($nombre_sol_dueno) : null;
+                    $nodo_sol_dueno = ($nombre_sol_dueno !== '') ? Nodo::nodo_por_id('us_' . $nombre_sol_dueno) : null;
                     $nodo_nivel_dueno = $nodo_sol_dueno ? $nodo_sol_dueno->adyacente('nivel') : null;
                     $nivel_sol_dueno = $nodo_nivel_dueno ? $nodo_nivel_dueno->dato() : '';
                     if (!in_array($nivel_sol_dueno, ['admin', 'soporte', 'dueno'], true)) {
@@ -485,9 +485,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
                 case 'limpiar_prueba':
                     // Solo admin.
+                    // Fase B3.1: ID especial directo.
                     $nombre_sol_lp = $post['nombre_solicitante'] ?? '';
-                    $raiz_sol_lp = Nodo::nodo_por_id('usuarios');
-                    $nodo_sol_lp = ($raiz_sol_lp && $nombre_sol_lp !== '') ? $raiz_sol_lp->adyacente($nombre_sol_lp) : null;
+                    $nodo_sol_lp = ($nombre_sol_lp !== '') ? Nodo::nodo_por_id('us_' . $nombre_sol_lp) : null;
                     $nodo_nivel_lp = $nodo_sol_lp ? $nodo_sol_lp->adyacente('nivel') : null;
                     $nivel_sol_lp = $nodo_nivel_lp ? $nodo_nivel_lp->dato() : '';
                     if ($nivel_sol_lp !== 'admin') {
@@ -1025,9 +1025,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (!\Iteradores\Configuracion\Entorno::es_pruebas()) {
                         responder_json(['exito' => false, 'error' => 'Disponible solo en modo pruebas']);
                     }
+                    // Fase B3.1: ID especial directo.
                     $nombre_sol_lpp = $post['nombre_solicitante'] ?? '';
-                    $raiz_sol_lpp = Nodo::nodo_por_id('usuarios');
-                    $nodo_sol_lpp = ($raiz_sol_lpp && $nombre_sol_lpp !== '') ? $raiz_sol_lpp->adyacente($nombre_sol_lpp) : null;
+                    $nodo_sol_lpp = ($nombre_sol_lpp !== '') ? Nodo::nodo_por_id('us_' . $nombre_sol_lpp) : null;
                     $nodo_nivel_lpp = $nodo_sol_lpp ? $nodo_sol_lpp->adyacente('nivel') : null;
                     $nivel_sol_lpp = $nodo_nivel_lpp ? $nodo_nivel_lpp->dato() : '';
                     if ($nivel_sol_lpp !== 'admin') {
@@ -1236,9 +1236,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
 
         case 'grafo':
             // Solo admin y soporte.
+            // Fase B3.1: ID especial directo.
             $nombre_sol_gr = $post['nombre_solicitante'] ?? '';
-            $raiz_sol_gr = Nodo::nodo_por_id('usuarios');
-            $nodo_sol_gr = ($raiz_sol_gr && $nombre_sol_gr !== '') ? $raiz_sol_gr->adyacente($nombre_sol_gr) : null;
+            $nodo_sol_gr = ($nombre_sol_gr !== '') ? Nodo::nodo_por_id('us_' . $nombre_sol_gr) : null;
             $nodo_nivel_gr = $nodo_sol_gr ? $nodo_sol_gr->adyacente('nivel') : null;
             $nivel_sol_gr = $nodo_nivel_gr ? $nodo_nivel_gr->dato() : '';
             if (!in_array($nivel_sol_gr, ['admin', 'soporte'], true)) {

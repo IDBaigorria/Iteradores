@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.77q
+ * @version   1.5piloto.77s
  */
 
 // --- Utilidades base ----------------------------------
@@ -326,8 +326,9 @@ if (isset($_GET['migrar_usuarios_especiales'])) {
 // (bloque ?migrar_separar_grafos eliminado en v73r)
 
 // Crear usuario administrador si no existe (en ambos grafos).
+// Fase B3.1: el chequeo del admin se hace por ID especial.
 $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-$nodo_admin_existente = $raiz_usuarios ? $raiz_usuarios->adyacente(ConfiguracionApli::NOMBRE_ADMIN) : null;
+$nodo_admin_existente = Nodo::nodo_por_id('us_' . ConfiguracionApli::NOMBRE_ADMIN);
 if (!$nodo_admin_existente) {
     if (!$raiz_usuarios) {
         Nodo::crear_con_id('usuarios');
@@ -350,7 +351,8 @@ en_grafo_credenciales(function() {
         Nodo::crear_con_id('usuarios');
         $raiz_cred = Nodo::nodo_por_id('usuarios');
     }
-    if (!$raiz_cred->adyacente(ConfiguracionApli::NOMBRE_ADMIN)) {
+    // Fase B3.1: chequeo por ID especial.
+    if (!Nodo::nodo_por_id('us_' . ConfiguracionApli::NOMBRE_ADMIN)) {
         $id_especial_admin_cred = 'us_' . ConfiguracionApli::NOMBRE_ADMIN;
         $nodo_admin_cred = Nodo::crear_con_dato_e_id(ConfiguracionApli::NOMBRE_ADMIN, $id_especial_admin_cred);
         if ($nodo_admin_cred) {

@@ -32,10 +32,8 @@ include_once("./Aplicacion/FuncionesAuxiliares.php");
  */
 function obtener_contenedor_ventas_dueno(string $nombre_dueno, ?Nodo $nodo_contexto = null) {
     if ($nodo_contexto === null) {
-        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-        if (!$raiz_usuarios) return null;
-
-        $nodo_contexto = $raiz_usuarios->adyacente($nombre_dueno);
+        // Fase B3.1: ID especial directo.
+        $nodo_contexto = Nodo::nodo_por_id('us_' . $nombre_dueno);
     }
     if (!$nodo_contexto) return null;
 
@@ -2702,9 +2700,8 @@ function _marcar_rendiciones_afectadas(Nodo $nodo_venta, string $id_venta): void
  * @return array
  */
 function listar_cancelaciones_de_dueno(string $nombre_dueno, array $filtros = []): array {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return [];
-    $nodo_dueno = $raiz->adyacente($nombre_dueno);
+    // Fase B3.1: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return [];
     $cont = $nodo_dueno->adyacente('cancelaciones');
     if (!$cont) return [];

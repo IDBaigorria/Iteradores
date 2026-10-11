@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.77k
+ * @version   1.5piloto.77s
  */
 
 use Iteradores\Nodos\Nodo;
@@ -222,9 +222,8 @@ function listar_soportes(): array {
  * @return array Lista de dueños con nombre_usuario y nombre_real.
  */
 function listar_duenos_de_soporte(string $nombre_soporte): array {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return [];
-    $nodo_soporte = $raiz->adyacente($nombre_soporte);
+    // Fase B3.1: ID especial directo.
+    $nodo_soporte = Nodo::nodo_por_id('us_' . $nombre_soporte);
     if (!$nodo_soporte) return [];
 
     $nodo_nivel = $nodo_soporte->adyacente('nivel');
@@ -253,9 +252,8 @@ function listar_duenos_de_soporte(string $nombre_soporte): array {
  * @return array Lista de usuarios.
  */
 function listar_usuarios_de_soporte(string $nombre_soporte): array {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return [];
-    $nodo_soporte = $raiz->adyacente($nombre_soporte);
+    // Fase B3.1: ID especial directo.
+    $nodo_soporte = Nodo::nodo_por_id('us_' . $nombre_soporte);
     if (!$nodo_soporte) return [];
 
     $nodo_duenos = $nodo_soporte->adyacente('duenos');
@@ -303,9 +301,8 @@ function listar_nombres_usuarios_para_soporte(string $nombre_soporte, string $no
     // Siempre se incluye a sí mismo.
     $nombres[$nombre_soporte] = true;
 
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return array_keys($nombres);
-    $nodo_soporte = $raiz->adyacente($nombre_soporte);
+    // Fase B3.1: ID especial directo.
+    $nodo_soporte = Nodo::nodo_por_id('us_' . $nombre_soporte);
     if (!$nodo_soporte) return array_keys($nombres);
 
     $nodo_duenos = $nodo_soporte->adyacente('duenos');
@@ -418,9 +415,8 @@ function _verificar_permiso_dueno(string $nombre_solicitante, string $nombre_due
     if ($nombre_solicitante === $nombre_dueno) return true;
     if ($nombre_solicitante === ConfiguracionApli::NOMBRE_ADMIN) return true;
 
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return false;
-    $nodo_sol = $raiz->adyacente($nombre_solicitante);
+    // Fase B3.1: ID especial directo.
+    $nodo_sol = Nodo::nodo_por_id('us_' . $nombre_solicitante);
     if (!$nodo_sol) return false;
 
     $nodo_nivel = $nodo_sol->adyacente('nivel');
@@ -472,9 +468,8 @@ function _puede_cerrar_sesion(string $nombre_solicitante, string $token): bool {
     // Es su propia sesión.
     if ($usuario_de_sesion === $nombre_solicitante) return true;
 
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return false;
-    $nodo_sol = $raiz->adyacente($nombre_solicitante);
+    // Fase B3.1: ID especial directo.
+    $nodo_sol = Nodo::nodo_por_id('us_' . $nombre_solicitante);
     if (!$nodo_sol) return false;
     $nodo_nivel = $nodo_sol->adyacente('nivel');
     $nivel = $nodo_nivel ? $nodo_nivel->dato() : '';
@@ -513,8 +508,7 @@ function _puede_cerrar_sesion(string $nombre_solicitante, string $token): bool {
  * @return void
  */
 function _asignar_duenos_a_soporte(Nodo $nodo_soporte, array $nuevos_duenos): void {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return;
+    // Fase B3.1: los dueños se resuelven por ID especial.
 
     // Asegurar que exista el contenedor.
     $nodo_duenos = $nodo_soporte->adyacente('duenos');
@@ -545,7 +539,7 @@ function _asignar_duenos_a_soporte(Nodo $nodo_soporte, array $nuevos_duenos): vo
     // Agregar los nuevos.
     foreach ($lista_nuevos as $nombre_dueno => $_) {
         if (isset($actuales[$nombre_dueno])) continue;
-        $nodo_dueno = $raiz->adyacente($nombre_dueno);
+        $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
         if (!$nodo_dueno) continue;
         $nodo_nivel_d = $nodo_dueno->adyacente('nivel');
         if (!$nodo_nivel_d || $nodo_nivel_d->dato() !== 'dueno') continue;
@@ -567,9 +561,8 @@ function _asignar_duenos_a_soporte(Nodo $nodo_soporte, array $nuevos_duenos): vo
  */
 function obtener_saldos_dueno(string $nombre_dueno): array {
     $defaults = ['efectivo' => '0.00', 'banco' => '0.00', 'total' => '0.00'];
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return $defaults;
-    $nodo = $raiz->adyacente($nombre_dueno);
+    // Fase B3.1: ID especial directo.
+    $nodo = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo) return $defaults;
 
     $ef = $nodo->adyacente('efectivo');
@@ -635,24 +628,17 @@ function agregar_usuario(array $datos): array {
         return ['exito' => false, 'error' => 'Banco y cuenta son obligatorios para terminales'];
     }
 
+    // Fase B3.1: la raíz `usuarios` la crea `index.php` al
+    // arrancar. Acá no la autocreamos. El chequeo de duplicado
+    // se hace por ID especial, sin depender de la raíz.
     $raiz = Nodo::nodo_por_id('usuarios');
     if (!$raiz) {
-        if (!Nodo::nodo_por_id('usuarios')) Nodo::crear_con_id('usuarios');
-        if (!Nodo::nodo_por_id('sesiones')) Nodo::crear_con_id('sesiones');
-        $raiz = Nodo::nodo_por_id('usuarios');
+        return ['exito' => false, 'error' => 'No existe la raíz `usuarios`.'];
     }
 
-    if ($raiz->adyacente($nombre_usuario)) {
-        return ['exito' => false, 'error' => 'El nombre de usuario ya existe'];
-    }
-
-    // Fase A (v76k): el nodo usuario se crea con ID especial
-    // us_<nombre>. El enlace desde `usuarios` sigue llamándose
-    // <nombre> (nombre visible), así todos los accesos por
-    // adyacente() siguen funcionando sin cambios.
     $id_especial = 'us_' . $nombre_usuario;
     if (Nodo::existe($id_especial)) {
-        return ['exito' => false, 'error' => 'El ID especial del usuario ya existe'];
+        return ['exito' => false, 'error' => 'El nombre de usuario ya existe'];
     }
     $nodo_usuario = Nodo::crear_con_dato_e_id($nombre_usuario, $id_especial);
     if (!$nodo_usuario) {
@@ -671,7 +657,8 @@ function agregar_usuario(array $datos): array {
         $nodo_banco->_adyacente_en(Nodo::crear_con_dato($banco_cuenta), 'cuenta');
         $nodo_usuario->_adyacente_en($nodo_banco, 'banco');
 
-        $nodo_dueno = $raiz->adyacente($dueno);
+        // Fase B3.1: ID especial directo.
+        $nodo_dueno = Nodo::nodo_por_id('us_' . $dueno);
         if (!$nodo_dueno) return ['exito' => false, 'error' => 'El dueño especificado no existe'];
         $nodo_nivel_dueno = $nodo_dueno->adyacente('nivel');
         if (!$nodo_nivel_dueno || $nodo_nivel_dueno->dato() !== 'dueno') return ['exito' => false, 'error' => 'El usuario indicado no es un dueño'];
@@ -761,10 +748,8 @@ function actualizar_usuario(array $datos): array {
         return ['exito' => false, 'error' => 'Nombre de usuario no proporcionado'];
     }
 
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-
-    $nodo_usuario = $raiz->adyacente($nombre_usuario);
+    // Fase B3.1: ID especial directo.
+    $nodo_usuario = Nodo::nodo_por_id('us_' . $nombre_usuario);
     if (!$nodo_usuario) return ['exito' => false, 'error' => 'Usuario no encontrado'];
 
     $nivel_actual = $nodo_usuario->adyacente('nivel');
@@ -896,7 +881,8 @@ function actualizar_usuario(array $datos): array {
         if ($nivel === 'terminal') {
             $dueno = trim($datos['dueno'] ?? '');
             if (empty($dueno)) return ['exito' => false, 'error' => 'Debe seleccionar un dueño'];
-            $nodo_dueno = $raiz->adyacente($dueno);
+            // Fase B3.1: ID especial directo.
+            $nodo_dueno = Nodo::nodo_por_id('us_' . $dueno);
             if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no existe'];
             $nodo_nivel_dueno = $nodo_dueno->adyacente('nivel');
             if (!$nodo_nivel_dueno || $nodo_nivel_dueno->dato() !== 'dueno') return ['exito' => false, 'error' => 'El usuario indicado no es un dueño'];
@@ -1004,10 +990,8 @@ function eliminar_usuario(string $nombre_usuario): array {
         return ['exito' => false, 'error' => 'No se puede eliminar al administrador principal'];
     }
 
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-
-    $nodo_usuario = $raiz->adyacente($nombre_usuario);
+    // Fase B3.1: ID especial directo.
+    $nodo_usuario = Nodo::nodo_por_id('us_' . $nombre_usuario);
     if (!$nodo_usuario) return ['exito' => false, 'error' => 'Usuario no encontrado'];
 
     $nodo_terminales = $nodo_usuario->adyacente('terminales');
@@ -1021,7 +1005,8 @@ function eliminar_usuario(string $nombre_usuario): array {
     $nodo_dueno = $nodo_usuario->adyacente('dueno');
     if ($nodo_dueno) {
         $dueno_nombre = $nodo_dueno->dato();
-        $nodo_dueno_real = $raiz->adyacente($dueno_nombre);
+        // Fase B3.1: ID especial directo.
+        $nodo_dueno_real = Nodo::nodo_por_id('us_' . $dueno_nombre);
         if ($nodo_dueno_real) {
             $nodo_contenedor_terminales = $nodo_dueno_real->adyacente('terminales');
             if ($nodo_contenedor_terminales) {
@@ -1047,7 +1032,8 @@ function eliminar_usuario(string $nombre_usuario): array {
         $nodo_soporte_del = $nodo_usuario->adyacente('soporte');
         if ($nodo_soporte_del) {
             $nombre_soporte_del = $nodo_soporte_del->dato();
-            $nodo_soporte_real = $raiz->adyacente($nombre_soporte_del);
+            // Fase B3.1: ID especial directo.
+            $nodo_soporte_real = Nodo::nodo_por_id('us_' . $nombre_soporte_del);
             if ($nodo_soporte_real) {
                 $nodo_duenos_sop = $nodo_soporte_real->adyacente('duenos');
                 if ($nodo_duenos_sop) {
@@ -1086,7 +1072,14 @@ function eliminar_usuario(string $nombre_usuario): array {
     _destruir_campos_simples($nodo_usuario);
 
     // === 6. Desenlazar del contenedor raíz y destruir el usuario ===
-    $raiz->eliminar_adyacente($nombre_usuario);
+    // Fase B3.1: aunque el nodo se resuelve por ID especial,
+    // el enlace desde `usuarios` sigue existiendo y hay que
+    // sacarlo antes de destruir el nodo (si no, queda huérfano
+    // colgado de la raíz). Se resuelve la raíz solo acá.
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    if ($raiz_usuarios) {
+        $raiz_usuarios->eliminar_adyacente($nombre_usuario);
+    }
     Nodo::eliminar($nodo_usuario);
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
@@ -1116,10 +1109,8 @@ function eliminar_usuario(string $nombre_usuario): array {
  * @return array Lista de terminales con sus datos.
  */
 function listar_terminales_de_dueno(string $nombre_dueno): array {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return [];
-
-    $nodo_dueno = $raiz->adyacente($nombre_dueno);
+    // Fase B3.1: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return [];
 
     $nodo_nivel = $nodo_dueno->adyacente('nivel');
@@ -1197,10 +1188,8 @@ function actualizar_terminal(array $datos, string $nombre_dueno_actual): array {
         return ['exito' => false, 'error' => 'Nombre de usuario no proporcionado'];
     }
 
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-
-    $nodo_terminal = $raiz->adyacente($nombre_usuario);
+    // Fase B3.1: ID especial directo.
+    $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre_usuario);
     if (!$nodo_terminal) return ['exito' => false, 'error' => 'Terminal no encontrada'];
 
     $nodo_dueno = $nodo_terminal->adyacente('dueno');
@@ -1223,10 +1212,8 @@ function actualizar_terminal(array $datos, string $nombre_dueno_actual): array {
  * @return array Resultado.
  */
 function eliminar_terminal(string $nombre_usuario, string $nombre_dueno_actual): array {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-
-    $nodo_terminal = $raiz->adyacente($nombre_usuario);
+    // Fase B3.1: ID especial directo.
+    $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre_usuario);
     if (!$nodo_terminal) return ['exito' => false, 'error' => 'Terminal no encontrada'];
 
     $nodo_dueno = $nodo_terminal->adyacente('dueno');
@@ -1249,9 +1236,8 @@ function eliminar_terminal(string $nombre_usuario, string $nombre_dueno_actual):
  * @return array|null Datos del perfil, o null si no existe.
  */
 function obtener_perfil_usuario(string $nombre_usuario): ?array {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return null;
-    $nodo_usuario = $raiz->adyacente($nombre_usuario);
+    // Fase B3.1: ID especial directo.
+    $nodo_usuario = Nodo::nodo_por_id('us_' . $nombre_usuario);
     if (!$nodo_usuario) return null;
 
     // Mapa de usuarios con código (desde credenciales).

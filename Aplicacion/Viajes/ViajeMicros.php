@@ -98,10 +98,8 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
     if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios'];
-
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.1: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_empresas = $nodo_dueno->adyacente('empresas');
