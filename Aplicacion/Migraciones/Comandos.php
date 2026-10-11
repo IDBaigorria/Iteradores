@@ -12,7 +12,7 @@
  * (autoreferencia) indica que la migración fue aplicada.
  *
  * @since 1.5piloto.76n
- * @version 1.5piloto.77k
+ * @version 1.5piloto.77y
  */
 
 use Iteradores\Nodos\Nodo;
@@ -339,8 +339,8 @@ function registrar_comandos_migraciones(): void {
                 }
 
                 // Llenar terminales: solo el propio.
-                $raiz = Nodo::nodo_por_id('usuarios');
-                $nodo_term = $raiz ? $raiz->adyacente($nombre_terminal) : null;
+                // Fase B3.3e: ID especial directo.
+                $nodo_term = Nodo::nodo_por_id('us_' . $nombre_terminal);
                 if ($nodo_term) {
                     $c_terminales->_adyacente_en($nodo_term, $nombre_terminal);
                 }

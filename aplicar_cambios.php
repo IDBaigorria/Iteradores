@@ -1,8 +1,12 @@
 <?php
 /**
- * Aplicador de cambios — Proyecto iteradores.
+ * Aplicador de cambios — Proyecto iteradores (PHP).
  *
- * Tanda V1.5piloto.77x (fix de viajes-micros.js tras B3.3d).
+ * Tanda V1.5piloto.77y (Fase B3.3e).
+ *   - Migraciones/Funciones.php: detectar_usuarios_especiales y
+ *     detectar_niveles_usuario reescritos con por_cada_nodo_ejecutar.
+ *   - Migraciones/Comandos.php: app:crear_compartidos_terminal usa
+ *     us_<nombre_terminal>.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -13,127 +17,194 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ============================================================
-    // 1. viajes-micros.js — fix del POST vehiculos/listar
+    // Funciones.php — detectar_usuarios_especiales
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/viajes-micros.js',
-        'descripcion' => 'viajes-micros: manda nombre_dueno en vehiculos/listar',
+        'archivo' => 'Aplicacion/Migraciones/Funciones.php',
+        'descripcion' => 'Funciones: detectar_usuarios_especiales con por_cada_nodo',
         'buscar' => [
-            '            const respV = await fetch("index.php", {',
-            '                method: "POST",',
-            '                headers: { "Content-Type": "application/x-www-form-urlencoded" },',
-            '                body: new URLSearchParams({ accion: "vehiculos/listar", nombre_empresa: selectEmpresa.value })',
-            '            });',
+            'function detectar_usuarios_especiales(string $token): bool {',
+            '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
+            '    if (!$raiz) return true; // sin usuarios: trivialmente aplicada',
+            '    $adyacentes = $raiz->adyacentes();',
+            '    if (!$adyacentes) return true;',
+            '    foreach ($adyacentes as $nombre => $nodo) {',
+            '        $id = (string)$nodo->id();',
+            '        if (strpos($id, \'us_\') !== 0) return false;',
+            '    }',
+            '    return true;',
+            '}',
         ],
         'reemplazar' => [
-            '            const respV = await fetch("index.php", {',
-            '                method: "POST",',
-            '                headers: { "Content-Type": "application/x-www-form-urlencoded" },',
-            '                // Fase B3.3d: el endpoint vehiculos/listar ahora',
-            '                // requiere nombre_dueno (resuelve la empresa por',
-            '                // us_<nombre> en lugar de iterar sobre todos los',
-            '                // usuarios).',
-            '                body: new URLSearchParams({ accion: "vehiculos/listar", nombre_empresa: selectEmpresa.value, nombre_dueno })',
-            '            });',
+            'function detectar_usuarios_especiales(string $token): bool {',
+            '    // Fase B3.3e: reescrito con por_cada_nodo_ejecutar,',
+            '    // alineado con los demás detectores del archivo. Un',
+            '    // "usuario" es cualquier nodo con adyacente `nivel` (o',
+            '    // `publico.nivel`). Si algún usuario no tiene prefijo',
+            '    // `us_` en su id, la migración no está aplicada.',
+            '    $falta_alguno = false;',
+            '    Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$falta_alguno) {',
+            '        if ($falta_alguno) return null;',
+            '        $id = (string)$nodo->id();',
+            '        if (strpos($id, \'us_\') === 0) return null; // ya está OK',
+            '        // No tiene prefijo: ¿es un usuario?',
+            '        $nivel = $nodo->adyacente(\'nivel\');',
+            '        if (!$nivel) {',
+            '            $publico = $nodo->adyacente(\'publico\');',
+            '            if ($publico) $nivel = $publico->adyacente(\'nivel\');',
+            '        }',
+            '        if ($nivel) $falta_alguno = true;',
+            '        return null;',
+            '    }, null);',
+            '    return !$falta_alguno;',
+            '}',
         ],
     ],
 
     // ============================================================
-    // 2. viajes-micros.js — bump @version
+    // Funciones.php — detectar_niveles_usuario
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/viajes-micros.js',
-        'descripcion' => 'viajes-micros: bump a 1.5piloto.77x',
+        'archivo' => 'Aplicacion/Migraciones/Funciones.php',
+        'descripcion' => 'Funciones: detectar_niveles_usuario con por_cada_nodo',
         'buscar' => [
-            ' * @version 1.5piloto.74k',
+            'function detectar_niveles_usuario(string $token): bool {',
+            '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
+            '    if (!$raiz) return true;',
+            '    $adyacentes = $raiz->adyacentes();',
+            '    if (!$adyacentes) return true;',
+            '    foreach ($adyacentes as $nombre => $nodo) {',
+            '        if (!$nodo->adyacente(\'publico\')) return false;',
+            '    }',
+            '    return true;',
+            '}',
         ],
         'reemplazar' => [
-            ' * @version 1.5piloto.77x',
+            'function detectar_niveles_usuario(string $token): bool {',
+            '    // Fase B3.3e: reescrito con por_cada_nodo_ejecutar,',
+            '    // alineado con los demás detectores. Si algún nodo con',
+            '    // prefijo `us_` no tiene contenedor `publico`, la',
+            '    // migración no está aplicada.',
+            '    $falta_alguno = false;',
+            '    Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$falta_alguno) {',
+            '        if ($falta_alguno) return null;',
+            '        $id = (string)$nodo->id();',
+            '        if (strpos($id, \'us_\') !== 0) return null; // no es usuario',
+            '        if (!$nodo->adyacente(\'publico\')) $falta_alguno = true;',
+            '        return null;',
+            '    }, null);',
+            '    return !$falta_alguno;',
+            '}',
         ],
     ],
 
     // ============================================================
-    // 3. aplicacion_GET.html — bump ?v= de viajes-micros.js
+    // Comandos.php — app:crear_compartidos_terminal
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'HTML: bump ?v= de viajes-micros.js',
+        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
+        'descripcion' => 'Comandos: crear_compartidos_terminal usa us_',
         'buscar' => [
-            '<script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.74k"></script>',
+            '                // Llenar terminales: solo el propio.',
+            '                $raiz = Nodo::nodo_por_id(\'usuarios\');',
+            '                $nodo_term = $raiz ? $raiz->adyacente($nombre_terminal) : null;',
+            '                if ($nodo_term) {',
+            '                    $c_terminales->_adyacente_en($nodo_term, $nombre_terminal);',
+            '                }',
         ],
         'reemplazar' => [
-            '<script src="Aplicacion/Viajes/viajes-micros.js?v=1.5piloto.77x"></script>',
+            '                // Llenar terminales: solo el propio.',
+            '                // Fase B3.3e: ID especial directo.',
+            '                $nodo_term = Nodo::nodo_por_id(\'us_\' . $nombre_terminal);',
+            '                if ($nodo_term) {',
+            '                    $c_terminales->_adyacente_en($nodo_term, $nombre_terminal);',
+            '                }',
         ],
     ],
 
     // ============================================================
-    // 4. plan_actual.md — tanda actual a v77x
+    // Comandos.php — bump @version
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
+        'descripcion' => 'Comandos: bump a 1.5piloto.77y',
+        'buscar' => [
+            ' * @since 1.5piloto.76n',
+            ' * @version 1.5piloto.77k',
+        ],
+        'reemplazar' => [
+            ' * @since 1.5piloto.76n',
+            ' * @version 1.5piloto.77y',
+        ],
+    ],
+
+    // ============================================================
+    // plan_actual.md — tanda actual a v77y
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: tanda actual a v77x',
+        'descripcion' => 'plan_actual: tanda actual a v77y',
         'buscar' => [
-            '**Tanda actual:** v77w (fix de `subir_foto_vehiculo`).',
+            '**Tanda actual:** v77x (fix de `viajes-micros.js` tras B3.3d).',
         ],
         'reemplazar' => [
-            '**Tanda actual:** v77x (fix de `viajes-micros.js` tras B3.3d).',
+            '**Tanda actual:** v77y (B3.3e).',
             '',
-            '**Fix v77x.** El modal "Agregar micro" del viaje llama a',
-            '`vehiculos/listar` sin `nombre_dueno`. Como ese parámetro',
-            'pasó a ser requerido en B3.3d, el endpoint devolvía',
-            '`"Dueño no especificado"` y el select de vehículos quedaba',
-            'vacío. Fix de una línea en `viajes-micros.js`.',
+            '**B3.3e (v77y).** `Migraciones/Funciones.php`:',
+            '`detectar_usuarios_especiales` y `detectar_niveles_usuario`',
+            'reescritos con `Nodo::por_cada_nodo_ejecutar`, alineados',
+            'con los otros detectores del archivo. `Migraciones/Comandos.php`:',
+            '`app:crear_compartidos_terminal` resuelve el terminal por',
+            '`us_<nombre>` en lugar de `usuarios`.',
             '',
-            '**B3.3d (v77v).** `Vehiculo.php`: las 6 funciones reciben',
-            '`$nombre_dueno` y resuelven por `us_<nombre>` en lugar de',
-            'iterar sobre todos los dueños. `Enrutador.php`: las 6',
-            'acciones de `vehiculos/*` pasan el dueño. `micros.js`:',
-            'nuevo helper `_obtener_nombre_dueno_micros()` y las 5',
-            'llamadas mandan `nombre_dueno`.',
-            '',
-            '**B3.3e y B3.3c siguen pendientes.** B3.3e: alinear',
-            '`Migraciones/*` con `por_cada_nodo_ejecutar`. B3.3c:',
-            'helpers que iteran sobre todos los dueños buscando por',
-            'id (requieren rediseño).',
+            '**B3.3c sigue pendiente.** Los helpers que iteran sobre',
+            'todos los dueños buscando por id requieren rediseño:',
+            '`Venta.php` (`_buscar_venta_por_id` sin filtro,',
+            '`obtener_cancelacion_por_id`), `Impresion.php` (2),',
+            '`Liquidacion.php` (`obtener_liquidacion_por_id`),',
+            '`Rendicion.php` (`aceptar_ajuste_rendicion`,',
+            '`obtener_rendicion_por_id`), `Pasajero.php`',
+            '(`obtener_pasajero_por_dni`).',
         ],
     ],
 
     // ============================================================
-    // 5. prompt_piloto.md — agregar v77x
+    // prompt_piloto.md — agregar v77y
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt_piloto: agregar v77x',
+        'descripcion' => 'prompt_piloto: agregar v77y',
         'buscar' => [
-            '- **v77w**: fix del `continue` huérfano en',
+            '- **v77x**: fix de `viajes-micros.js`. El POST a',
         ],
         'reemplazar' => [
+            '- **v77y** (Fase B3.3e): `Migraciones/Funciones.php`',
+            '  alinea `detectar_usuarios_especiales` y',
+            '  `detectar_niveles_usuario` con `por_cada_nodo_ejecutar`.',
+            '  `Migraciones/Comandos.php` usa `us_<nombre>` en',
+            '  `app:crear_compartidos_terminal`.',
             '- **v77x**: fix de `viajes-micros.js`. El POST a',
-            '  `vehiculos/listar` desde el modal "Agregar micro" no',
-            '  mandaba `nombre_dueno`, que pasó a ser requerido en',
-            '  B3.3d. El select de vehículos quedaba vacío con error',
-            '  `"Dueño no especificado"`. Fix de una línea.',
-            '- **v77w**: fix del `continue` huérfano en',
         ],
     ],
 
     // ============================================================
-    // 6. index.php — bump
+    // index.php — bump
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'index.php',
-        'descripcion' => 'index.php: bump a 1.5piloto.77x',
+        'descripcion' => 'index.php: bump a 1.5piloto.77y',
         'buscar' => [
-            ' * @version   1.5piloto.77w',
+            ' * @version   1.5piloto.77x',
         ],
         'reemplazar' => [
-            ' * @version   1.5piloto.77x',
+            ' * @version   1.5piloto.77y',
         ],
     ],
 

@@ -877,6 +877,11 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v77y** (Fase B3.3e): `Migraciones/Funciones.php`
+  alinea `detectar_usuarios_especiales` y
+  `detectar_niveles_usuario` con `por_cada_nodo_ejecutar`.
+  `Migraciones/Comandos.php` usa `us_<nombre>` en
+  `app:crear_compartidos_terminal`.
 - **v77x**: fix de `viajes-micros.js`. El POST a
   `vehiculos/listar` desde el modal "Agregar micro" no
   mandaba `nombre_dueno`, que pasó a ser requerido en

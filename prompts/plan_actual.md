@@ -121,7 +121,23 @@ detectó la auditoría), empezando por B2.4.2 + B2.4.5.
   desincroniza de los compartidos del dueño. `aplicacion_POST.php`
   actualizado al modelo topológico.
 
-**Tanda actual:** v77x (fix de `viajes-micros.js` tras B3.3d).
+**Tanda actual:** v77y (B3.3e).
+
+**B3.3e (v77y).** `Migraciones/Funciones.php`:
+`detectar_usuarios_especiales` y `detectar_niveles_usuario`
+reescritos con `Nodo::por_cada_nodo_ejecutar`, alineados
+con los otros detectores del archivo. `Migraciones/Comandos.php`:
+`app:crear_compartidos_terminal` resuelve el terminal por
+`us_<nombre>` en lugar de `usuarios`.
+
+**B3.3c sigue pendiente.** Los helpers que iteran sobre
+todos los dueños buscando por id requieren rediseño:
+`Venta.php` (`_buscar_venta_por_id` sin filtro,
+`obtener_cancelacion_por_id`), `Impresion.php` (2),
+`Liquidacion.php` (`obtener_liquidacion_por_id`),
+`Rendicion.php` (`aceptar_ajuste_rendicion`,
+`obtener_rendicion_por_id`), `Pasajero.php`
+(`obtener_pasajero_por_dni`).
 
 **Fix v77x.** El modal "Agregar micro" del viaje llama a
 `vehiculos/listar` sin `nombre_dueno`. Como ese parámetro
