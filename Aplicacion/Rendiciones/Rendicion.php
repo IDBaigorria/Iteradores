@@ -13,7 +13,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.50
- * @version   1.5piloto.70
+ * @version   1.5piloto.77t
  */
 
 use Iteradores\Nodos\Nodo;
@@ -29,9 +29,8 @@ include_once("./Aplicacion/Ventas/Venta.php");
  * Obtiene el contenedor de rendiciones de un dueño, creándolo si no existe.
  */
 function obtener_contenedor_rendiciones_dueno(string $nombre_dueno): ?Nodo {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return null;
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.3a: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return null;
     $nodo_rendiciones = $nodo_dueno->adyacente('rendiciones');
     if (!$nodo_rendiciones) {
@@ -210,9 +209,8 @@ function _recolectar_ventas_para_rendicion(string $nombre_dueno, array $filtros)
  * @return array
  */
 function previsualizar_rendicion(string $nombre_dueno, array $filtros): array {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.3a: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $ventas = _recolectar_ventas_para_rendicion($nombre_dueno, $filtros);
@@ -473,13 +471,13 @@ function confirmar_rendicion(string $nombre_dueno, array $ventas_seleccionadas, 
     // Mover el dinero: se descuenta del saldo de cada terminal y se
     // suma a las cuentas del dueño. Al descontar de la terminal se usa
     // max(0, ...) para no dejar saldos negativos si algo quedó desfasado.
-    $raiz_usuarios_mov = Nodo::nodo_por_id('usuarios');
-    $nodo_dueno_mov = $raiz_usuarios_mov ? $raiz_usuarios_mov->adyacente($nombre_dueno) : null;
+    // Fase B3.3a: IDs especiales directos.
+    $nodo_dueno_mov = Nodo::nodo_por_id('us_' . $nombre_dueno);
 
     if ($nodo_dueno_mov) {
         // Descontar de cada terminal involucrada.
         foreach (array_values($por_terminal) as $t) {
-            $nodo_term = $raiz_usuarios_mov->adyacente($t['terminal']);
+            $nodo_term = Nodo::nodo_por_id('us_' . $t['terminal']);
             if (!$nodo_term) continue;
 
             if ($t['efectivo'] > 0.001) {

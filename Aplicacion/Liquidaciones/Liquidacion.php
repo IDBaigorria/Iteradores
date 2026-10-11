@@ -8,7 +8,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.54
- * @version   1.5piloto.70
+ * @version   1.5piloto.77t
  */
 
 use Iteradores\Nodos\Nodo;
@@ -24,9 +24,8 @@ include_once("./Aplicacion/Usuarios/Usuario.php");
  * Obtiene el contenedor de liquidaciones de un dueño, creándolo si no existe.
  */
 function obtener_contenedor_liquidaciones_dueno(string $nombre_dueno): ?Nodo {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return null;
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.3a: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return null;
     $nodo_liquidaciones = $nodo_dueno->adyacente('liquidaciones');
     if (!$nodo_liquidaciones) {
@@ -44,9 +43,8 @@ function obtener_contenedor_liquidaciones_dueno(string $nombre_dueno): ?Nodo {
  * @return array
  */
 function previsualizar_liquidacion(string $nombre_dueno): array {
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.3a: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     return [
@@ -94,9 +92,8 @@ function confirmar_liquidacion(string $nombre_dueno, string $monto_efectivo_str,
         return ['exito' => false, 'error' => 'Debe extraerse al menos un monto mayor a cero'];
     }
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return ['exito' => false, 'error' => 'No hay usuarios registrados'];
-    $nodo_dueno = $raiz_usuarios->adyacente($nombre_dueno);
+    // Fase B3.3a: ID especial directo.
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_ef = $nodo_dueno->adyacente('efectivo');

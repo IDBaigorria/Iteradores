@@ -877,6 +877,11 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v77t** (Fase B3.3a): `Liquidacion.php` y `Rendicion.php`
+  pasan a `us_<nombre>` en las 7 resoluciones de dueño/terminal
+  que reciben el nombre por parámetro. Quedan sin tocar los
+  3 helpers que iteran sobre todos los dueños buscando por
+  id (B3.3c).
 - **v77s**: fix del `$raiz` residual en `eliminar_usuario`
   (Usuario.php). Al cambiar el bloque por ID especial en
   v77r se borró la declaración, pero quedó un

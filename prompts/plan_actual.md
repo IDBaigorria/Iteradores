@@ -121,7 +121,15 @@ detectó la auditoría), empezando por B2.4.2 + B2.4.5.
   desincroniza de los compartidos del dueño. `aplicacion_POST.php`
   actualizado al modelo topológico.
 
-**Tanda actual:** v77s (fix del `$raiz` en eliminar_usuario).
+**Tanda actual:** v77t (B3.3a).
+
+**B3.3a (v77t).** `Liquidacion.php` y `Rendicion.php`:
+3 y 4 resoluciones de dueño/terminal pasadas a
+`us_<nombre>`. Quedan sin tocar los 3 helpers que iteran
+sobre todos los dueños buscando por id
+(`obtener_liquidacion_por_id`, `aceptar_ajuste_rendicion`,
+`obtener_rendicion_por_id`); requieren diseño y son
+B3.3c.
 
 **B3.1 (v77r + v77s).** Reemplazo de
 `Nodo::nodo_por_id('usuarios')` por
