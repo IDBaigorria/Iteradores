@@ -1,6 +1,6 @@
 /**
  * Micros y terminales dentro de viajes.
- * @version 1.5piloto.74k
+ * @version 1.5piloto.77x
  */
 
 function renderizar_micros_viaje(micros) {
@@ -277,7 +277,11 @@ async function abrir_formulario_agregar_micro() {
             const respV = await fetch("index.php", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({ accion: "vehiculos/listar", nombre_empresa: selectEmpresa.value })
+                // Fase B3.3d: el endpoint vehiculos/listar ahora
+                // requiere nombre_dueno (resuelve la empresa por
+                // us_<nombre> en lugar de iterar sobre todos los
+                // usuarios).
+                body: new URLSearchParams({ accion: "vehiculos/listar", nombre_empresa: selectEmpresa.value, nombre_dueno })
             });
             const datosV = await respV.json();
             if (datosV.exito) {

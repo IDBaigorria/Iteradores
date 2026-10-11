@@ -121,7 +121,25 @@ detectó la auditoría), empezando por B2.4.2 + B2.4.5.
   desincroniza de los compartidos del dueño. `aplicacion_POST.php`
   actualizado al modelo topológico.
 
-**Tanda actual:** v77w (fix de `subir_foto_vehiculo`).
+**Tanda actual:** v77x (fix de `viajes-micros.js` tras B3.3d).
+
+**Fix v77x.** El modal "Agregar micro" del viaje llama a
+`vehiculos/listar` sin `nombre_dueno`. Como ese parámetro
+pasó a ser requerido en B3.3d, el endpoint devolvía
+`"Dueño no especificado"` y el select de vehículos quedaba
+vacío. Fix de una línea en `viajes-micros.js`.
+
+**B3.3d (v77v).** `Vehiculo.php`: las 6 funciones reciben
+`$nombre_dueno` y resuelven por `us_<nombre>` en lugar de
+iterar sobre todos los dueños. `Enrutador.php`: las 6
+acciones de `vehiculos/*` pasan el dueño. `micros.js`:
+nuevo helper `_obtener_nombre_dueno_micros()` y las 5
+llamadas mandan `nombre_dueno`.
+
+**B3.3e y B3.3c siguen pendientes.** B3.3e: alinear
+`Migraciones/*` con `por_cada_nodo_ejecutar`. B3.3c:
+helpers que iteran sobre todos los dueños buscando por
+id (requieren rediseño).
 
 **Fix v77w.** En v77v, el reemplazo del bloque de
 `subir_foto_vehiculo` dejó un `continue` huérfano (fuera

@@ -877,6 +877,11 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v77x**: fix de `viajes-micros.js`. El POST a
+  `vehiculos/listar` desde el modal "Agregar micro" no
+  mandaba `nombre_dueno`, que pasó a ser requerido en
+  B3.3d. El select de vehículos quedaba vacío con error
+  `"Dueño no especificado"`. Fix de una línea.
 - **v77w**: fix del `continue` huérfano en
   `subir_foto_vehiculo` (Vehiculo.php) introducido por
   v77v. El reemplazo del bucle dejó un `continue` fuera
