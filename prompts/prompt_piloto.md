@@ -877,6 +877,11 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v77w**: fix del `continue` huérfano en
+  `subir_foto_vehiculo` (Vehiculo.php) introducido por
+  v77v. El reemplazo del bucle dejó un `continue` fuera
+  de contexto, lo que rompía el parseo del archivo entero.
+  Se reescribió el bloque con returns tempranos.
 - **v77v** (Fase B3.3d): `Vehiculo.php` pasa a `us_<nombre>`
   en sus 6 funciones. Cambio de firma: `$nombre_dueno`
   como parámetro requerido. `Enrutador.php` pasa el dueño

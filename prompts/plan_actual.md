@@ -121,7 +121,17 @@ detectó la auditoría), empezando por B2.4.2 + B2.4.5.
   desincroniza de los compartidos del dueño. `aplicacion_POST.php`
   actualizado al modelo topológico.
 
-**Tanda actual:** v77v (B3.3d).
+**Tanda actual:** v77w (fix de `subir_foto_vehiculo`).
+
+**Fix v77w.** En v77v, el reemplazo del bloque de
+`subir_foto_vehiculo` dejó un `continue` huérfano (fuera
+de loop/switch) porque solo se reemplazó la primera mitad
+del bucle. Eso rompía el parseo de `Vehiculo.php` y
+tiraba error fatal en todas las requests. Fix:
+reescritura completa del bloque de búsqueda de empresa +
+vehículo, con returns tempranos en lugar de `continue`.
+También se chequea `$nodo_empresas` y `$nodo_vehiculos`
+antes de usarlos.
 
 **B3.3d (v77v).** `Vehiculo.php`: las 6 funciones reciben
 `$nombre_dueno` y resuelven por `us_<nombre>` en lugar de

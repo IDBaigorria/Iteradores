@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.77v
+ * @version   1.5piloto.77w
  */
 
 use Iteradores\Nodos\Nodo;
@@ -433,61 +433,72 @@ function subir_foto_vehiculo(string $nombre_empresa, string $nombre_vehiculo, st
     // Ruta relativa desde la raíz del proyecto (index.php)
     $ruta_relativa = 'uploads/vehiculos/' . $nombre_archivo;
 
-    // Buscar vehículo y guardar enlace (insensible a mayúsculas/minúsculas)
+    // Buscar vehículo y guardar enlace (insensible a mayúsculas/minúsculas).
     // Fase B3.3d: ID especial directo.
     $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) {
         unlink($ruta_destino);
         return ['exito' => false, 'error' => 'Dueño no encontrado'];
     }
+
     $nodo_empresas = $nodo_dueno->adyacente('empresas');
-    if ($nodo_empresas) {
-        // Buscar empresa comparando sin mayúsculas
-        $empresa_encontrada = null;
-        foreach ($nodo_empresas->adyacentes() as $nombre_empresa_actual => $nodo_empresa_actual) {
-            if (strcasecmp($nombre_empresa_actual, $nombre_empresa) === 0) {
-                $empresa_encontrada = $nodo_empresa_actual;
-                $nombre_empresa = $nombre_empresa_actual; // usar el original
-                break;
-            }
-        }
-
-        $nodo_vehiculos = $empresa_encontrada ? $empresa_encontrada->adyacente('vehiculos') : null;
-
-        // Buscar vehículo comparando sin mayúsculas
-        $vehiculo_encontrado = null;
-        foreach ($nodo_vehiculos->adyacentes() as $nombre_vehiculo_actual => $nodo_vehiculo_actual) {
-            if (strcasecmp($nombre_vehiculo_actual, $nombre_vehiculo) === 0) {
-                $vehiculo_encontrado = $nodo_vehiculo_actual;
-                $nombre_vehiculo = $nombre_vehiculo_actual; // usar el original
-                break;
-            }
-        }
-        if (!$vehiculo_encontrado) continue;
-
-        // Eliminar foto anterior si existe
-        $foto_anterior = $vehiculo_encontrado->adyacente('foto');
-        if ($foto_anterior) {
-            $ruta_anterior = __DIR__ . '/../../' . $foto_anterior->dato();
-            if (file_exists($ruta_anterior)) {
-                unlink($ruta_anterior);
-            }
-            // Fase 2, v75a: destruir la hoja `foto` en lugar
-            // de solo desenlazarla.
-            $vehiculo_encontrado->eliminar_adyacente('foto');
-            Nodo::eliminar($foto_anterior);
-        }
-
-        // Crear enlace foto
-        $vehiculo_encontrado->_adyacente_en(Nodo::crear_con_dato($ruta_relativa), 'foto');
-
-        // Guardar persistencia
-        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
-
-        return ['exito' => true, 'foto' => $ruta_relativa];
+    if (!$nodo_empresas) {
+        unlink($ruta_destino);
+        return ['exito' => false, 'error' => 'El dueño no tiene empresas'];
     }
 
-    // Si no encontró vehículo, eliminar archivo
-    unlink($ruta_destino);
-    return ['exito' => false, 'error' => 'Vehículo no encontrado'];
+    // Buscar empresa comparando sin mayúsculas.
+    $empresa_encontrada = null;
+    foreach ($nodo_empresas->adyacentes() as $nombre_empresa_actual => $nodo_empresa_actual) {
+        if (strcasecmp($nombre_empresa_actual, $nombre_empresa) === 0) {
+            $empresa_encontrada = $nodo_empresa_actual;
+            $nombre_empresa = $nombre_empresa_actual; // usar el original
+            break;
+        }
+    }
+    if (!$empresa_encontrada) {
+        unlink($ruta_destino);
+        return ['exito' => false, 'error' => 'Empresa no encontrada'];
+    }
+
+    $nodo_vehiculos = $empresa_encontrada->adyacente('vehiculos');
+    if (!$nodo_vehiculos) {
+        unlink($ruta_destino);
+        return ['exito' => false, 'error' => 'La empresa no tiene vehículos'];
+    }
+
+    // Buscar vehículo comparando sin mayúsculas.
+    $vehiculo_encontrado = null;
+    foreach ($nodo_vehiculos->adyacentes() as $nombre_vehiculo_actual => $nodo_vehiculo_actual) {
+        if (strcasecmp($nombre_vehiculo_actual, $nombre_vehiculo) === 0) {
+            $vehiculo_encontrado = $nodo_vehiculo_actual;
+            $nombre_vehiculo = $nombre_vehiculo_actual; // usar el original
+            break;
+        }
+    }
+    if (!$vehiculo_encontrado) {
+        unlink($ruta_destino);
+        return ['exito' => false, 'error' => 'Vehículo no encontrado'];
+    }
+
+    // Eliminar foto anterior si existe
+    $foto_anterior = $vehiculo_encontrado->adyacente('foto');
+    if ($foto_anterior) {
+        $ruta_anterior = __DIR__ . '/../../' . $foto_anterior->dato();
+        if (file_exists($ruta_anterior)) {
+            unlink($ruta_anterior);
+        }
+        // Fase 2, v75a: destruir la hoja `foto` en lugar
+        // de solo desenlazarla.
+        $vehiculo_encontrado->eliminar_adyacente('foto');
+        Nodo::eliminar($foto_anterior);
+    }
+
+    // Crear enlace foto
+    $vehiculo_encontrado->_adyacente_en(Nodo::crear_con_dato($ruta_relativa), 'foto');
+
+    // Guardar persistencia
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+
+    return ['exito' => true, 'foto' => $ruta_relativa];
 }
