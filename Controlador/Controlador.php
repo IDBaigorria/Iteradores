@@ -57,6 +57,7 @@ require_once("interfaces/Dominios.php");
  * @implements VectorGravitacional
  * @implements Dominios
  * @since V1.2.0
+ * @version 1.5i.7m
  */
 class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor, Dominios {
 
@@ -1629,10 +1630,16 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
 
             $adyacentes = [];
             foreach ($nodo->adyacentes() as $enlace => $ady) {
+                // Fase B2.3.5c.1 (1.5i.7m): marcar si el destino es
+                // un contenedor compartido. El chequeo es O(1)
+                // porque el nodo destino ya está en memoria (el
+                // grafo está cargado).
+                $destino_es_compartido = $ady->adyacente('_es_compartido') !== null;
                 $adyacentes[] = [
                     'enlace' => (string)$enlace,
                     'id_destino' => $ady->id(),
                     'dato_destino' => mb_substr((string)$ady->dato(), 0, 80),
+                    'destino_es_compartido' => $destino_es_compartido,
                 ];
             }
 

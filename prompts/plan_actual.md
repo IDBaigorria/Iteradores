@@ -112,7 +112,43 @@ Detalle en §2.3.)
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
 
-**Tanda actual:** v77j (fix de zona horaria).
+**Tanda actual:** v77k (Fase B2.3.5c.1: `grafo:nodo` con
+`destino_es_compartido`).
+
+**Bug detectado al correr las pruebas del plugin (v77k).**
+
+Dos problemas independientes:
+
+1. **Bug real del flujo de alta de terminal.** El comando
+   `app:repuntar_terminales_compartido` (v77f) iteraba sobre
+   los compartidos ya existentes del dueño, no sobre los
+   terminales. Un terminal creado **después** del repuntado
+   quedaba sin compartido y sin repuntar: su enlace `dueno`
+   apuntaba al nodo del dueño real, rompiendo el aislamiento
+   topológico silenciosamente. `agregar_usuario` tampoco
+   crea el compartido al crear un terminal nuevo. Fix
+   pendiente en B2.3.5c.2 + c.3.
+
+2. **Test mal diseñado.** Los IDs numéricos del grafo no son
+   estables entre cargas: cada POST a `grafo/nodo` recarga
+   el grafo y regenera los IDs. La tabla de equivalencias
+   del framework solo vive dentro de una carga. La prueba
+   57 seguía un ID numérico entre dos consultas, y por eso
+   fallaba. Fix: exponer en `grafo:nodo` un campo
+   `destino_es_compartido` para verificar la topología con
+   una sola consulta.
+
+**v77k — Fase B2.3.5c.1.**
+
+`grafo:nodo` (framework PHP, 1.5i.7m) agrega el campo
+`destino_es_compartido` a cada adyacente. El chequeo es
+O(1) porque el nodo destino ya está en memoria. No cambia
+el comportamiento observable de la app.
+
+**Pendiente: B2.3.5c.2 + c.3.** Fix real del flujo de alta:
+crear el compartido al dar de alta un terminal, y reescribir
+`app:repuntar_terminales_compartido` para que itere sobre
+los terminales del dueño (no sobre los compartidos).
 
 **v77j — Fix de zona horaria.** El servidor no tenía
 `date_default_timezone_set`, así que PHP usaba UTC por

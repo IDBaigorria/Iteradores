@@ -2,15 +2,10 @@
 /**
  * Aplicador de cambios — Proyecto iteradores (PHP).
  *
- * Tanda V1.5piloto.77j (fix de zona horaria).
- *   - index.php: fijar date_default_timezone_set a
- *     America/Argentina/Buenos_Aires justo después de
- *     session_start(). Sin esto, PHP usa UTC (default) y
- *     date('Y-m-d') puede quedar un día adelantado respecto del
- *     navegador del usuario entre las 21 y las 24 hora argentina.
- *     Eso rompía el cálculo de "Fecha de actualizacion invalida"
- *     en el autocompletado de pasajeros.
- *   - Bump.
+ * Tanda V1.5i.7m (Fase B2.3.5c.1 del modelo topológico).
+ *   - Controlador.php: `grafo:nodo` agrega el campo
+ *     `destino_es_compartido` a cada adyacente.
+ *   - index.php: bump.
  *   - prompts/plan_actual.md: registro.
  *
  * Uso: php aplicar_cambios.php
@@ -22,48 +17,80 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ============================================================
-    // index.php — bump + fix zona horaria
+    // Controlador.php — bump @version (el docblock no tenía
+    // @version, se agrega después de @since V1.2.0)
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Controlador/Controlador.php',
+        'descripcion' => 'Controlador.php: agregar @version 1.5i.7m',
+        'buscar' => [
+            ' * @implements Dominios',
+            ' * @since V1.2.0',
+            ' */',
+            'class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor, Dominios {',
+        ],
+        'reemplazar' => [
+            ' * @implements Dominios',
+            ' * @since V1.2.0',
+            ' * @version 1.5i.7m',
+            ' */',
+            'class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor, Dominios {',
+        ],
+    ],
+
+    // ============================================================
+    // Controlador.php — grafo:nodo con destino_es_compartido
+    // ============================================================
+
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Controlador/Controlador.php',
+        'descripcion' => 'grafo:nodo: agregar destino_es_compartido',
+        'buscar' => [
+            '            $adyacentes = [];',
+            '            foreach ($nodo->adyacentes() as $enlace => $ady) {',
+            '                $adyacentes[] = [',
+            '                    \'enlace\' => (string)$enlace,',
+            '                    \'id_destino\' => $ady->id(),',
+            '                    \'dato_destino\' => mb_substr((string)$ady->dato(), 0, 80),',
+            '                ];',
+            '            }',
+        ],
+        'reemplazar' => [
+            '            $adyacentes = [];',
+            '            foreach ($nodo->adyacentes() as $enlace => $ady) {',
+            '                // Fase B2.3.5c.1 (1.5i.7m): marcar si el destino es',
+            '                // un contenedor compartido. El chequeo es O(1)',
+            '                // porque el nodo destino ya está en memoria (el',
+            '                // grafo está cargado).',
+            '                $destino_es_compartido = $ady->adyacente(\'_es_compartido\') !== null;',
+            '                $adyacentes[] = [',
+            '                    \'enlace\' => (string)$enlace,',
+            '                    \'id_destino\' => $ady->id(),',
+            '                    \'dato_destino\' => mb_substr((string)$ady->dato(), 0, 80),',
+            '                    \'destino_es_compartido\' => $destino_es_compartido,',
+            '                ];',
+            '            }',
+        ],
+    ],
+
+    // ============================================================
+    // index.php — bump
     // ============================================================
 
     [
         'tipo' => 'reemplazar',
         'archivo' => 'index.php',
-        'descripcion' => 'index.php: bump @version a 1.5piloto.77j',
+        'descripcion' => 'index.php: bump @version a 1.5piloto.77k',
         'buscar' => [
-            ' * @since     1.0.0',
-            ' * @version   1.5piloto.77i',
-        ],
-        'reemplazar' => [
             ' * @since     1.0.0',
             ' * @version   1.5piloto.77j',
         ],
-    ],
-
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'index.php',
-        'descripcion' => 'index.php: fijar zona horaria',
-        'buscar' => [
-            '<?php',
-            'session_start();',
-            'header("Cache-control: no-cache, must-revalidate");',
-            '',
-            'use Iteradores\\Controlador\\Controlador;',
-        ],
         'reemplazar' => [
-            '<?php',
-            '// Zona horaria del servidor. Sin esto, PHP usa UTC por',
-            '// defecto y date(\'Y-m-d\') puede quedar un día adelantado',
-            '// respecto del navegador del usuario entre las 21 y las',
-            '// 24 hora argentina. Eso rompía el cálculo de antigüedad',
-            '// de los datos del pasajero en el autocompletado por DNI',
-            '// (avisaba "Fecha de actualizacion invalida").',
-            'date_default_timezone_set(\'America/Argentina/Buenos_Aires\');',
-            '',
-            'session_start();',
-            'header("Cache-control: no-cache, must-revalidate");',
-            '',
-            'use Iteradores\\Controlador\\Controlador;',
+            ' * @since     1.0.0',
+            ' * @version   1.5piloto.77k',
         ],
     ],
 
@@ -74,25 +101,48 @@ $cambios = [
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: tanda actual a v77j',
+        'descripcion' => 'plan_actual: tanda actual a v77k',
         'buscar' => [
-            '**Tanda actual:** v77i (Fase B2.3.5b.3: contexto en',
-            'empresas, vehículos y pasajeros).',
+            '**Tanda actual:** v77j (fix de zona horaria).',
         ],
         'reemplazar' => [
-            '**Tanda actual:** v77j (fix de zona horaria).',
+            '**Tanda actual:** v77k (Fase B2.3.5c.1: `grafo:nodo` con',
+            '`destino_es_compartido`).',
             '',
-            '**v77j — Fix de zona horaria.** El servidor no tenía',
-            '`date_default_timezone_set`, así que PHP usaba UTC por',
-            'defecto. Entre las 21 y las 24 hora argentina,',
-            '`date(\'Y-m-d\')` devolvía la fecha del día siguiente',
-            'respecto del navegador. El cálculo de antigüedad del',
-            'autocompletado de pasajeros (`_calcular_antiguedad_datos`',
-            'en `aplicacion.js`) comparaba la fecha del servidor con la',
-            'del navegador y daba `diff_dias < 0`, mostrando "Fecha de',
-            'actualizacion invalida". Fix: `date_default_timezone_set(',
-            '\'America/Argentina/Buenos_Aires\')` al inicio de `index.php`.',
-            'Bug latente desde que existe el autocompletado (v58).',
+            '**Bug detectado al correr las pruebas del plugin (v77k).**',
+            '',
+            'Dos problemas independientes:',
+            '',
+            '1. **Bug real del flujo de alta de terminal.** El comando',
+            '   `app:repuntar_terminales_compartido` (v77f) iteraba sobre',
+            '   los compartidos ya existentes del dueño, no sobre los',
+            '   terminales. Un terminal creado **después** del repuntado',
+            '   quedaba sin compartido y sin repuntar: su enlace `dueno`',
+            '   apuntaba al nodo del dueño real, rompiendo el aislamiento',
+            '   topológico silenciosamente. `agregar_usuario` tampoco',
+            '   crea el compartido al crear un terminal nuevo. Fix',
+            '   pendiente en B2.3.5c.2 + c.3.',
+            '',
+            '2. **Test mal diseñado.** Los IDs numéricos del grafo no son',
+            '   estables entre cargas: cada POST a `grafo/nodo` recarga',
+            '   el grafo y regenera los IDs. La tabla de equivalencias',
+            '   del framework solo vive dentro de una carga. La prueba',
+            '   57 seguía un ID numérico entre dos consultas, y por eso',
+            '   fallaba. Fix: exponer en `grafo:nodo` un campo',
+            '   `destino_es_compartido` para verificar la topología con',
+            '   una sola consulta.',
+            '',
+            '**v77k — Fase B2.3.5c.1.**',
+            '',
+            '`grafo:nodo` (framework PHP, 1.5i.7m) agrega el campo',
+            '`destino_es_compartido` a cada adyacente. El chequeo es',
+            'O(1) porque el nodo destino ya está en memoria. No cambia',
+            'el comportamiento observable de la app.',
+            '',
+            '**Pendiente: B2.3.5c.2 + c.3.** Fix real del flujo de alta:',
+            'crear el compartido al dar de alta un terminal, y reescribir',
+            '`app:repuntar_terminales_compartido` para que itere sobre',
+            'los terminales del dueño (no sobre los compartidos).',
         ],
     ],
 
