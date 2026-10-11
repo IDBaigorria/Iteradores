@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.76k
+ * @version   1.5piloto.77k
  */
 
 use Iteradores\Nodos\Nodo;
@@ -14,6 +14,7 @@ include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./Aplicacion/FuncionesAuxiliares.php");
+include_once("./miscelaneas/Arbol.php");
 
 /**
  * Busca un usuario por su código de acceso.
@@ -682,6 +683,13 @@ function agregar_usuario(array $datos): array {
             $nodo_dueno->_adyacente_en($nodo_terminales, 'terminales');
         }
         $nodo_terminales->_adyacente_en($nodo_usuario, $nombre_usuario);
+
+        // Fase B2.3.5c.2: asegurar el compartido del nuevo terminal
+        // en el dueño y repuntar el enlace `dueno`. Sin esto, un
+        // terminal creado después del repuntado queda apuntando
+        // al nodo del dueño real y rompe el aislamiento topológico
+        // en silencio.
+        _asegurar_compartido_y_repuntar($nodo_dueno, $nodo_usuario, $dueno, $nombre_usuario);
     }
 
     if ($nivel === 'dueno') {
@@ -895,6 +903,13 @@ function actualizar_usuario(array $datos): array {
 
             $nodo_usuario->eliminar_adyacente('dueno');
             $nodo_usuario->_adyacente_en($nodo_dueno, 'dueno');
+
+            // Fase B2.3.5c.2: si el dueño cambió, asegurar el
+            // compartido del terminal en el dueño nuevo y
+            // repuntar el enlace. El compartido del dueño viejo
+            // queda huérfano hasta la próxima limpieza de
+            // huérfanos (grafo:eliminar_huerfanos).
+            _asegurar_compartido_y_repuntar($nodo_dueno, $nodo_usuario, $dueno, $nombre_usuario);
         }
     }
 
@@ -1251,4 +1266,210 @@ function obtener_perfil_usuario(string $nombre_usuario): ?array {
     });
 
     return _formatear_usuario_para_admin($nombre_usuario, $nodo_usuario, $con_codigo);
+}
+
+// ============================================================
+// Fase B2.3.5c.2: aseguramiento del compartido de un terminal
+//
+// Cuando se crea un terminal (o se cambia su dueño), hay que
+// crear el contenedor `compartido_con_<terminal>` en el dueño
+// y repuntar el enlace `dueno` del terminal hacia él. Sin eso,
+// el terminal queda apuntando al nodo del dueño real y rompe
+// el aislamiento topológico en silencio.
+//
+// Antes esto solo lo hacía el comando `app:crear_compartidos_terminal`
+// + `app:construir_arboles_compartidos` + `app:repuntar_terminales_compartido`
+// corridos a mano. Ahora se hace al vuelo al crear/editar.
+// ============================================================
+
+/**
+ * Asegura que exista el compartido de un terminal en su dueño,
+ * con su marcador `_es_compartido` y su `dato`, y que tenga
+ * los sub-contenedores y árboles que corresponden. Idempotente.
+ *
+ * No repunta el enlace `dueno` del terminal: de eso se encarga
+ * `_asegurar_compartido_y_repuntar`, que es el que se llama
+ * desde los flujos públicos.
+ *
+ * @param Nodo   $nodo_dueno
+ * @param string $nombre_dueno
+ * @param string $nombre_terminal
+ * @return Nodo|null El compartido, o null si no se pudo crear.
+ */
+function _asegurar_compartido_terminal(Nodo $nodo_dueno, string $nombre_dueno, string $nombre_terminal): ?Nodo {
+    $enlace = 'compartido_con_' . $nombre_terminal;
+    $compartido = $nodo_dueno->adyacente($enlace);
+    if (!$compartido) {
+        $compartido = Nodo::crear_con_dato($nombre_dueno);
+        if (!$compartido) return null;
+        $nodo_dueno->_adyacente_en($compartido, $enlace);
+    }
+
+    // Dato (opción A).
+    if ($compartido->dato() !== $nombre_dueno) {
+        $compartido->_dato($nombre_dueno);
+    }
+
+    // Marcador `_es_compartido`.
+    if (!$compartido->adyacente('_es_compartido')) {
+        $compartido->_adyacente_en(Nodo::crear_con_dato('1'), '_es_compartido');
+    }
+
+    // Sub-contenedores.
+    foreach (['viajes', 'empresas', 'ventas', 'cancelaciones', 'terminales'] as $sub) {
+        if (!$compartido->adyacente($sub)) {
+            $c = Nodo::crear_con_dato('');
+            $compartido->_adyacente_en($c, $sub);
+        }
+    }
+
+    // Alias al contenedor de pasajeros del dueño.
+    if (!$compartido->adyacente('pasajeros')) {
+        $cont_pas = $nodo_dueno->adyacente('pasajeros');
+        if (!$cont_pas) {
+            $priv = $nodo_dueno->adyacente('privado');
+            if ($priv) $cont_pas = $priv->adyacente('pasajeros');
+        }
+        if ($cont_pas) {
+            $compartido->_adyacente_en($cont_pas, 'pasajeros');
+        }
+    }
+
+    // Viajes autorizados + empresas referenciadas.
+    $cont_viajes = $nodo_dueno->adyacente('viajes');
+    if (!$cont_viajes) {
+        $priv = $nodo_dueno->adyacente('privado');
+        if ($priv) $cont_viajes = $priv->adyacente('viajes');
+    }
+    $c_viajes = $compartido->adyacente('viajes');
+    $c_empresas = $compartido->adyacente('empresas');
+    if ($cont_viajes && $c_viajes && $c_empresas) {
+        $empresas_ref = [];
+        foreach ((array)$cont_viajes->adyacentes() as $nombre_v => $nodo_v) {
+            $nombre_v = (string)$nombre_v;
+            $tas = $nodo_v->adyacente('terminales_autorizadas');
+            if (!$tas || !$tas->adyacente($nombre_terminal)) continue;
+            if (!$c_viajes->adyacente($nombre_v)) {
+                $c_viajes->_adyacente_en($nodo_v, $nombre_v);
+            }
+            $micros = $nodo_v->adyacente('micros');
+            if ($micros) {
+                foreach ((array)$micros->adyacentes() as $nodo_micro) {
+                    $emp = $nodo_micro->adyacente('empresa');
+                    if ($emp) $empresas_ref[(string)$emp->dato()] = $emp;
+                }
+            }
+        }
+        foreach ($empresas_ref as $ne => $nodo_e) {
+            if (!$c_empresas->adyacente((string)$ne)) {
+                $c_empresas->_adyacente_en($nodo_e, (string)$ne);
+            }
+        }
+    }
+
+    // Terminales: solo el propio.
+    $c_term = $compartido->adyacente('terminales');
+    if ($c_term && !$c_term->adyacente($nombre_terminal)) {
+        $nodo_term = Nodo::nodo_por_id('us_' . $nombre_terminal);
+        if ($nodo_term) {
+            $c_term->_adyacente_en($nodo_term, $nombre_terminal);
+        }
+    }
+
+    return $compartido;
+}
+
+/**
+ * Asegura que el árbol de un sub-contenedor (ventas o
+ * cancelaciones) tenga todos los nodos del terminal. Inserta
+ * los que falten en el árbol del compartido con nombres
+ * parametrizados (`hmi_<term>`, `hd_<term>`, `p_<term>`).
+ * Idempotente.
+ *
+ * @param Nodo   $nodo_dueno
+ * @param string $sub             'ventas' o 'cancelaciones'.
+ * @param string $enlace_filtro   'terminal' (todos los nodos venta
+ *                                y cancelación tienen este enlace).
+ * @param string $valor_filtro    Nombre del terminal.
+ * @param Nodo   $compartido
+ * @param array  $nombres         Nombres parametrizados del árbol.
+ * @return void
+ */
+function _asegurar_arbol_compartido(Nodo $nodo_dueno, string $sub, string $enlace_filtro, string $valor_filtro, Nodo $compartido, array $nombres): void {
+    $cont_privado = $nodo_dueno->adyacente($sub);
+    if (!$cont_privado) {
+        $priv = $nodo_dueno->adyacente('privado');
+        if ($priv) $cont_privado = $priv->adyacente($sub);
+    }
+    if (!$cont_privado) return;
+
+    $c_compartido = $compartido->adyacente($sub);
+    if (!$c_compartido) return;
+
+    // Recolectar del árbol del dueño los nodos que matchean el filtro.
+    $filtrados = [];
+    $actual = hmi($cont_privado);
+    $seg = 0;
+    while ($actual && $seg < 3000) {
+        $nodo_f = $actual->adyacente($enlace_filtro);
+        if ($nodo_f && $nodo_f->dato() === $valor_filtro) {
+            $filtrados[] = $actual;
+        }
+        $actual = hd($actual);
+        $seg++;
+    }
+
+    // Para cada uno, insertar en el árbol del compartido si no está.
+    foreach ($filtrados as $nodo) {
+        $ya = false;
+        $c_actual = hmi($c_compartido, $nombres);
+        $c_seg = 0;
+        while ($c_actual && $c_seg < 3000) {
+            if ($c_actual->id() === $nodo->id()) {
+                $ya = true;
+                break;
+            }
+            $c_actual = hd($c_actual, $nombres);
+            $c_seg++;
+        }
+        if (!$ya) {
+            _hmi($c_compartido, $nodo, $nombres);
+        }
+    }
+}
+
+/**
+ * Orquestador: asegura el compartido del terminal en el dueño
+ * (incluyendo árboles de ventas y cancelaciones) y repunta el
+ * enlace `dueno` del terminal al compartido. Idempotente.
+ *
+ * Se llama desde `agregar_usuario` (al crear un terminal) y
+ * desde `actualizar_usuario` (al cambiar el dueño de un
+ * terminal).
+ *
+ * @param Nodo   $nodo_dueno
+ * @param Nodo   $nodo_terminal
+ * @param string $nombre_dueno
+ * @param string $nombre_terminal
+ * @return void
+ */
+function _asegurar_compartido_y_repuntar(Nodo $nodo_dueno, Nodo $nodo_terminal, string $nombre_dueno, string $nombre_terminal): void {
+    // 1. Asegurar el compartido.
+    $compartido = _asegurar_compartido_terminal($nodo_dueno, $nombre_dueno, $nombre_terminal);
+    if (!$compartido) return;
+
+    // 2. Llenar los árboles de ventas y cancelaciones.
+    $nombres = [
+        'p'   => 'p_'   . $nombre_terminal,
+        'hd'  => 'hd_'  . $nombre_terminal,
+        'hmi' => 'hmi_' . $nombre_terminal,
+    ];
+    _asegurar_arbol_compartido($nodo_dueno, 'ventas',       'terminal', $nombre_terminal, $compartido, $nombres);
+    _asegurar_arbol_compartido($nodo_dueno, 'cancelaciones', 'terminal', $nombre_terminal, $compartido, $nombres);
+
+    // 3. Repuntar el enlace `dueno` del terminal al compartido.
+    $nodo_dueno_actual = $nodo_terminal->adyacente('dueno');
+    if (!$nodo_dueno_actual || $nodo_dueno_actual->id() !== $compartido->id()) {
+        $nodo_terminal->_adyacente_en($compartido, 'dueno', true);
+    }
 }

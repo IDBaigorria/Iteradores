@@ -112,8 +112,41 @@ Detalle en §2.3.)
   asiento. `abrir_modal_cambiar_asiento` acepta un callback
   `on_exito`.
 
-**Tanda actual:** v77k (Fase B2.3.5c.1: `grafo:nodo` con
-`destino_es_compartido`).
+**Tanda actual:** v77l (Fase B2.3.5c.2 + c.3: fix del
+flujo de alta de terminal).
+
+**v77l — Fase B2.3.5c.2 + c.3.**
+
+Fix del bug detectado en v77k: los terminales creados
+después del repuntado quedaban apuntando al nodo del dueño
+real (rompían el aislamiento topológico en silencio).
+
+- `Usuario.php`:
+  - Nuevo helper `_asegurar_compartido_y_repuntar` (más
+    auxiliares `_asegurar_compartido_terminal` y
+    `_asegurar_arbol_compartido`). Crea el compartido del
+    terminal si no existe, con sub-contenedores y árboles
+    de ventas/cancelaciones parametrizados, y repunta el
+    enlace `dueno` del terminal al compartido. Idempotente.
+  - `agregar_usuario`: al crear un terminal, llama al helper.
+  - `actualizar_usuario`: al cambiar el dueño de un terminal,
+    llama al helper con el dueño nuevo.
+  - Include de `miscelaneas/Arbol.php` (para `hmi`/`hd`).
+- `Comandos.php`: `app:repuntar_terminales_compartido`
+  reescrito para iterar sobre los terminales del dueño, no
+  sobre los compartidos existentes. Usa el helper.
+  Idempotente. Correr `?repuntar_terminales_compartido=1`
+  ahora arregla también los terminales creados después del
+  repuntado (por ejemplo los `termprueba...` del plugin).
+
+**Nota de deuda técnica:** los helpers viven en `Usuario.php`
+por proximidad de uso. Podrían moverse a un archivo
+`Aplicacion/Compartidos.php` cuando haya más flujos que los
+usen (empresas, vehículos, etc.).
+
+**Nota:** cuando un terminal cambia de dueño, el compartido
+del dueño viejo queda huérfano hasta la próxima limpieza de
+huérfanos (`grafo:eliminar_huerfanos`). Aceptable por ahora.
 
 **Bug detectado al correr las pruebas del plugin (v77k).**
 

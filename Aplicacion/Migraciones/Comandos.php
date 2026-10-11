@@ -12,6 +12,7 @@
  * (autoreferencia) indica que la migración fue aplicada.
  *
  * @since 1.5piloto.76n
+ * @version 1.5piloto.77k
  */
 
 use Iteradores\Nodos\Nodo;
@@ -354,20 +355,21 @@ function registrar_comandos_migraciones(): void {
 
     // ─── app:repuntar_terminales_compartido ─────────────
     //
-    // Fase B2.3.5a del modelo topológico (v77f).
+    // Fase B2.3.5a (v77f) + Fase B2.3.5c.3 (v77k).
     //
-    // Para cada dueño y cada uno de sus compartidos
-    // `compartido_con_us_termX`:
-    //   1. Marca el compartido con `dato = nombre_dueno` (opción A).
-    //   2. Repunta el enlace `dueno` del terminal `us_termX` para
-    //      que apunte al compartido en vez del nodo del dueño real.
+    // Recorre TODOS los terminales de cada dueño y se asegura
+    // de que:
+    //   1. Tengan su compartido `compartido_con_<terminal>`
+    //      (lo crea si falta, con sub-contenedores y árboles).
+    //   2. El compartido tenga `_es_compartido` y `dato`.
+    //   3. El enlace `dueno` del terminal apunte al compartido.
     //
-    // Después del repuntado, el terminal navega SOLO por el
-    // subgrafo compartido. La app sigue funcionando igual porque
-    // el código ya está preparado (B2.2 + B2.3.4).
+    // Antes (v77f) iteraba sobre los compartidos ya existentes
+    // del dueño. Un terminal creado después del repuntado no
+    // tenía compartido, así que el comando no lo veía. Ahora
+    // itera sobre los terminales, y crea el compartido si falta.
     //
-    // Idempotente: si el terminal ya apunta al compartido, se
-    // saltea. Si el compartido ya tiene el dato correcto, también.
+    // Idempotente.
     //
     // Args: ['dueno' => nombre | 'todos',
     //        'terminal' => nombre | 'todos']
@@ -381,11 +383,18 @@ function registrar_comandos_migraciones(): void {
         $ya_repuntados = 0;
         $errores = [];
 
+        if (!function_exists('_asegurar_compartido_y_repuntar')) {
+            return [
+                'repuntados' => 0,
+                'ya_repuntados' => 0,
+                'errores' => ['Helper _asegurar_compartido_y_repuntar no disponible. ¿Usuario.php cargado?'],
+            ];
+        }
+
         Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$repuntados, &$ya_repuntados, &$errores, $dueno_filtro, $terminal_filtro) {
             $id = (string)$nodo->id();
             if (strpos($id, 'us_') !== 0) return null;
 
-            // Nivel del usuario.
             $nivel_nodo = $nodo->adyacente('nivel');
             if (!$nivel_nodo) {
                 $publico = $nodo->adyacente('publico');
@@ -397,46 +406,39 @@ function registrar_comandos_migraciones(): void {
             $nombre_dueno = (string)$nodo->dato();
             if ($dueno_filtro !== 'todos' && $nombre_dueno !== $dueno_filtro) return null;
 
-            // Recorrer los compartidos del dueño.
-            $ady = (array)$nodo->adyacentes();
-            foreach ($ady as $enlace => $compartido) {
-                $enlace = (string)$enlace;
-                if (strpos($enlace, 'compartido_con_') !== 0) continue;
+            // Contenedor `terminales` del dueño.
+            $cont_terminales = $nodo->adyacente('terminales');
+            if (!$cont_terminales) {
+                $priv = $nodo->adyacente('privado');
+                if ($priv) $cont_terminales = $priv->adyacente('terminales');
+            }
+            if (!$cont_terminales) return null;
 
-                $nombre_terminal = substr($enlace, strlen('compartido_con_'));
+            foreach ((array)$cont_terminales->adyacentes() as $nombre_terminal => $nodo_terminal) {
+                $nombre_terminal = (string)$nombre_terminal;
                 if ($nombre_terminal === '') continue;
                 if ($terminal_filtro !== 'todos' && $nombre_terminal !== $terminal_filtro) continue;
 
-                // Debe estar marcado como compartido (por B2.3.3).
-                if (!$compartido->adyacente('_es_compartido')) {
-                    $errores[] = "Compartido $enlace no tiene _es_compartido. Correr B2.3.3 primero.";
-                    continue;
-                }
-
-                // Encontrar el nodo del terminal.
-                $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre_terminal);
-                if (!$nodo_terminal) {
-                    $errores[] = "Terminal us_$nombre_terminal no encontrada para compartido $enlace.";
-                    continue;
-                }
-
-                // Verificar si ya está repuntado.
+                // Verificar el estado del enlace `dueno` actual.
                 $nodo_dueno_actual = $nodo_terminal->adyacente('dueno');
-                if ($nodo_dueno_actual && $nodo_dueno_actual->id() === $compartido->id()) {
-                    // Ya repuntado. Pero por las dudas chequear el dato.
-                    if ($compartido->dato() !== $nombre_dueno) {
-                        $compartido->_dato($nombre_dueno);
-                    }
+                if (!$nodo_dueno_actual) {
+                    $errores[] = "Terminal $nombre_terminal sin enlace `dueno`.";
+                    continue;
+                }
+
+                // Si ya apunta a un compartido, contar y saltear.
+                if ($nodo_dueno_actual->adyacente('_es_compartido')) {
                     $ya_repuntados++;
                     continue;
                 }
 
-                // 1. Marcar el compartido con el dato del dueño (opción A).
-                $compartido->_dato($nombre_dueno);
+                // Si apunta a algo que no es este dueño, saltear
+                // (por si el enlace `terminales` quedó desactualizado).
+                if ($nodo_dueno_actual->id() !== $nodo->id()) {
+                    continue;
+                }
 
-                // 2. Repuntar el enlace `dueno` del terminal al compartido.
-                $nodo_terminal->_adyacente_en($compartido, 'dueno', true);
-
+                _asegurar_compartido_y_repuntar($nodo, $nodo_terminal, $nombre_dueno, $nombre_terminal);
                 $repuntados++;
             }
             return null;
