@@ -6,7 +6,7 @@
  * comando que las invoca). Devuelven estructuras simples.
  *
  * @since 1.5piloto.76n
- * @version 1.5piloto.78d
+ * @version 1.5piloto.78o
  */
 
 use Iteradores\Nodos\Nodo;
@@ -23,14 +23,6 @@ use Iteradores\Controlador\Controlador;
  * @return bool
  */
 function detectar_usuarios_especiales(string $token): bool {
-    // Chequeo defensivo: el detector necesita la raíz `usuarios`
-    // completa. En carga parcial no se puede decidir; se devuelve
-    // true (aplicada) para no ofrecer una migración que no se
-    // puede correr, y se registra el error.
-    if (Controlador::es_grafo_parcial()) {
-        Controlador::_error("detectar_usuarios_especiales: el grafo en memoria es parcial; no se puede evaluar la migración.");
-        return true;
-    }
     // Solo mira los hijos del contenedor `usuarios`. Es uno
     // de los usos legítimos de la raíz: listar TODOS los
     // usuarios del sistema. No se puede reemplazar por
@@ -55,11 +47,6 @@ function detectar_usuarios_especiales(string $token): bool {
  * @return bool
  */
 function detectar_niveles_usuario(string $token): bool {
-    // Chequeo defensivo: idem detectar_usuarios_especiales.
-    if (Controlador::es_grafo_parcial()) {
-        Controlador::_error("detectar_niveles_usuario: el grafo en memoria es parcial; no se puede evaluar la migración.");
-        return true;
-    }
     // Mismo criterio que detectar_usuarios_especiales: solo
     // mira los hijos directos de `usuarios`.
     $raiz = Nodo::nodo_por_id('usuarios');

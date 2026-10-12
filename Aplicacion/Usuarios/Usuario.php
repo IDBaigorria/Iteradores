@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78f
+ * @version   1.5piloto.78o
  */
 
 use Iteradores\Nodos\Nodo;
@@ -23,12 +23,6 @@ include_once("./miscelaneas/Arbol.php");
  * @return array|null Datos del usuario o null si no existe.
  */
 function buscar_usuario_por_codigo(string $codigo): ?array {
-    // Chequeo defensivo: esta función necesita la raíz `usuarios`
-    // completa (itera sobre todos). En carga parcial no se puede.
-    if (Controlador::es_grafo_parcial()) {
-        Controlador::_error("buscar_usuario_por_codigo: el grafo en memoria es parcial; no se pueden listar todos los usuarios.");
-        return null;
-    }
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     if (!$raiz_usuarios) return null;
 
@@ -53,12 +47,6 @@ function buscar_usuario_por_codigo(string $codigo): ?array {
  * @return array Lista de usuarios.
  */
 function listar_usuarios(): array {
-    // Chequeo defensivo: listar todos los usuarios requiere la
-    // raíz `usuarios` completa. En carga parcial no se puede.
-    if (Controlador::es_grafo_parcial()) {
-        Controlador::_error("listar_usuarios: el grafo en memoria es parcial; no se pueden listar todos los usuarios.");
-        return [];
-    }
     $raiz = Nodo::nodo_por_id('usuarios');
     if (!$raiz) return [];
 
@@ -150,13 +138,33 @@ function listar_usuarios(): array {
  * @return array Lista de dueños con nombre de usuario y nombre real.
  */
 function listar_duenos(string $nombre_solicitante = ''): array {
-    // Chequeo defensivo: listar todos los dueños requiere la
-    // raíz `usuarios` completa (aunque listar_usuarios también
-    // lo chequea, el mensaje específico es más claro).
-    if (Controlador::es_grafo_parcial()) {
-        Controlador::_error("listar_duenos: el grafo en memoria es parcial; no se pueden listar todos los dueños.");
-        return [];
+    // Fase 1c.2: si el solicitante es soporte, navegar directo por
+    // `us_<soporte> → duenos`. Con carga parcial, `usuarios` no
+    // está en memoria (solo el admin tiene el enlace) y
+    // `listar_usuarios` devolvería vacío.
+    if ($nombre_solicitante !== '' && $nombre_solicitante !== ConfiguracionApli::NOMBRE_ADMIN) {
+        $nodo_sol = Nodo::nodo_por_id('us_' . $nombre_solicitante);
+        if ($nodo_sol) {
+            $nodo_nivel_sol = $nodo_sol->adyacente('nivel');
+            $nivel_sol = $nodo_nivel_sol ? $nodo_nivel_sol->dato() : '';
+            if ($nivel_sol === 'soporte') {
+                $nodo_duenos_sol = $nodo_sol->adyacente('duenos');
+                $duenos = [];
+                if ($nodo_duenos_sol) {
+                    foreach ($nodo_duenos_sol->adyacentes() as $nombre_d => $nodo_d) {
+                        $nodo_nombre_real = $nodo_d->adyacente('nombre_real');
+                        $duenos[] = [
+                            'nombre_usuario' => (string)$nombre_d,
+                            'nombre_real' => $nodo_nombre_real ? $nodo_nombre_real->dato() : '',
+                        ];
+                    }
+                }
+                return $duenos;
+            }
+        }
     }
+
+    // Admin (o cualquier otro caso): listar todos los dueños.
     $todos = listar_usuarios();
     $duenos = [];
     foreach ($todos as $usuario) {
@@ -165,30 +173,6 @@ function listar_duenos(string $nombre_solicitante = ''): array {
                 'nombre_usuario' => $usuario['nombre_usuario'],
                 'nombre_real' => $usuario['nombre_real'],
             ];
-        }
-    }
-
-    // Si el solicitante es soporte, filtrar a sus dueños asignados.
-    if ($nombre_solicitante !== '' && $nombre_solicitante !== ConfiguracionApli::NOMBRE_ADMIN) {
-        $raiz = Nodo::nodo_por_id('usuarios');
-        if ($raiz) {
-            $nodo_sol = $raiz->adyacente($nombre_solicitante);
-            if ($nodo_sol) {
-                $nodo_nivel_sol = $nodo_sol->adyacente('nivel');
-                $nivel_sol = $nodo_nivel_sol ? $nodo_nivel_sol->dato() : '';
-                if ($nivel_sol === 'soporte') {
-                    $nodo_duenos_sol = $nodo_sol->adyacente('duenos');
-                    $permitidos = [];
-                    if ($nodo_duenos_sol) {
-                        foreach ($nodo_duenos_sol->adyacentes() as $nombre_d => $nodo_d) {
-                            $permitidos[(string)$nombre_d] = true;
-                        }
-                    }
-                    $duenos = array_values(array_filter($duenos, function($d) use ($permitidos) {
-                        return isset($permitidos[(string)$d['nombre_usuario']]);
-                    }));
-                }
-            }
         }
     }
 
@@ -203,12 +187,6 @@ function listar_duenos(string $nombre_solicitante = ''): array {
  * @return array Lista de soportes.
  */
 function listar_soportes(): array {
-    // Chequeo defensivo: listar todos los soportes requiere la
-    // raíz `usuarios` completa. En carga parcial no se puede.
-    if (Controlador::es_grafo_parcial()) {
-        Controlador::_error("listar_soportes: el grafo en memoria es parcial; no se pueden listar todos los soportes.");
-        return [];
-    }
     $raiz = Nodo::nodo_por_id('usuarios');
     if (!$raiz) return [];
 
@@ -662,13 +640,6 @@ function agregar_usuario(array $datos): array {
         return ['exito' => false, 'error' => 'Banco y cuenta son obligatorios para terminales'];
     }
 
-    // Chequeo defensivo: agregar un usuario requiere colgarlo
-    // de la raíz `usuarios` completa. En carga parcial no se
-    // puede.
-    if (Controlador::es_grafo_parcial()) {
-        return ['exito' => false, 'error' => 'agregar_usuario: el grafo en memoria es parcial; hace falta la carga completa.'];
-    }
-
     // Fase B3.1: la raíz `usuarios` la crea `index.php` al
     // arrancar. Acá no la autocreamos. El chequeo de duplicado
     // se hace por ID especial, sin depender de la raíz.
@@ -1037,13 +1008,6 @@ function eliminar_usuario(string $nombre_usuario): array {
 
     if ($nombre_usuario === ConfiguracionApli::NOMBRE_ADMIN) {
         return ['exito' => false, 'error' => 'No se puede eliminar al administrador principal'];
-    }
-
-    // Chequeo defensivo: eliminar un usuario requiere desenlazarlo
-    // de la raíz `usuarios` completa. En carga parcial no se
-    // puede (el nodo quedaría huérfano en la raíz).
-    if (Controlador::es_grafo_parcial()) {
-        return ['exito' => false, 'error' => 'eliminar_usuario: el grafo en memoria es parcial; hace falta la carga completa.'];
     }
 
     // Fase B3.1: ID especial directo.
