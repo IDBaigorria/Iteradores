@@ -884,6 +884,89 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   `publico`/`privado`, y el detector de la migración
   `niveles_usuario` daba `false` cada vez que se creaba un
   usuario. Idempotente, no elimina los enlaces viejos.
+- **v78b** (Etapa 0 carga parcial): `delegar_con_args` en el
+  Controlador (variante con args extra). `guardar_parcial`
+  con chequeos (grafo parcial + nodos desocupados). Docblock
+  del flag `$grafo_parcial`. `_contextos_para_operacion`
+  (stub) en el Enrutador. `index.php`: comentario que
+  documenta el cambio de la Etapa 1.
+- **v78c** (Tanda 1b): `validar_token_sesion` y
+  `_construir_respuesta_login` usan `Nodo::nodo_por_id('us_'
+  . $nombre)` directo. `Controlador::$contextos_cargados`
+  + getter `contextos_cargados()`. `guardar_ambos` consulta
+  los contextos cargados y usa `guardar_parcial` si
+  corresponde.
+- **v78d**: chequeos defensivos de grafo parcial en
+  `Usuario.php` (buscar_usuario_por_codigo, listar_usuarios,
+  listar_duenos, listar_soportes, agregar_usuario,
+  eliminar_usuario) y `Migraciones/Funciones.php` (2
+  detectores).
+- **v78e** (Tanda 1c.1a): `SQL64` como método de
+  persistencia. Bloque `?migrar_a_sql64=1` (migra app +
+  credenciales). Corrección de la secuencia de migración
+  (el bloque se movió antes de la carga normal y hace su
+  propia carga desde SQL).
+- **v78f** (Tanda 1c.1b): migración topológica.
+  `miscelaneas/migrar_topologia.php` (nuevo):
+  `migrar_topologia_admin` (crea `us_Administrador →
+  usuarios`) y `migrar_topologia_soporte` (asegura `publico`
+  en cada soporte y repunta el enlace `dueno → soporte` al
+  `publico`, no al nodo del soporte). Cambio en
+  `_asignar_duenos_a_soporte`. Bloque
+  `?migrar_topologia=1`.
+- **v78g** (Tanda 1c.2): carga parcial activa. `index.php`
+  decide entre `cargar`/`cargar_parcial` según los contextos
+  devueltos por `_contextos_para_operacion`. Bootstrap
+  (nodo `aplicacion` + admin) solo en carga total.
+  `_contextos_para_operacion` implementado. `Enrutador.php`
+  con la regla simple: hay solicitante → `['us_<sol>']`;
+  no → carga total. `GrafoCredenciales.php` captura y
+  restaura contextos al ir/vover a credenciales.
+- **v78h** (Tanda 1c.2a): contexto del solicitante en
+  `ViajeMicros.php`. Las 4 funciones (agregar_micro,
+  eliminar_micro, actualizar_monto, obtener_micro) +
+  `actualizar_contadores_viaje` aceptan `?Nodo $nodo_contexto`.
+  Enrutador: 4 acciones de `viajes/*_micro` pasan
+  `_contexto_solicitante`.
+- **v78i** (Tanda 1c.2b): contexto en `ViajeOpciones.php`
+  (`obtener_opciones_avanzadas_viaje` y
+  `guardar_opciones_avanzadas_viaje`). Enrutador: 2
+  acciones.
+- **v78j** (Tanda 1c.2c): contexto en `Viaje.php`.
+  `formatear_viaje` acepta `?Nodo $nodo_contexto` y lo
+  propaga a `viaje_tiene_ventas` (que lo acepta),
+  `_calcular_vendidos_por_micro_de_viaje` (que lo acepta),
+  al pre-cargado de `empresas`, y a
+  `obtener_opciones_avanzadas_viaje`.
+  `listar_viajes_de_terminal` pasa el compartido a
+  `formatear_viaje`. `obtener_opciones_terminal_viaje` y
+  `obtener_declaracion_jurada` aceptan contexto. Enrutador:
+  2 acciones.
+- **v78k** (Tanda 1c.2d): contexto en `Venta.php`.
+  `_dni_asignado_en_viaje_venta`, `obtener_o_crear_pasajero`,
+  `_calcular_cobertura_dueno`, `_crear_nodo_cancelacion` y
+  `listar_cancelaciones_de_dueno` aceptan
+  `?Nodo $nodo_contexto`. `confirmar_venta_actual` propaga
+  el compartido. `cancelar_venta` y `obtener_info_cancelacion`
+  derivan contexto. Enrutador: `cancelaciones/listar`.
+- **v78l** (Tanda 1c.2e): contexto en `Pasajero.php`
+  (9 funciones). Las 3 que iteran el árbol de ventas
+  (`pasajero_tiene_pasajes`, `pasajero_tiene_pasajes_activos`,
+  `pasajero_tiene_ventas_activas`) usan los nombres
+  parametrizados (`hmi_<term>`/`hd_<term>`) cuando el
+  contexto es un compartido. Enrutador: 3 acciones.
+- **v78m** (Tanda 1c.2f): contexto en `Impresion.php`.
+  `_nombre_real_usuario` y `_recolectar_ventas_para_informe`
+  usan `us_<nombre>` directo. `generar_impresion` acepta
+  `?string $nombre_dueno` y lo pasa a
+  `obtener_venta_por_id`. En `Venta.php`,
+  `obtener_venta_por_id` y `_buscar_venta_por_id` aceptan
+  `?string $nombre_dueno` (búsqueda directa en su contexto).
+  `index.php` pasa `$_GET['dueno']`.
+  `_contextos_para_operacion` carga total para
+  `informe_cancelacion`/`informe_liquidacion`/
+  `informe_rendicion` (usan B3.3c). Con esto la línea de
+  carga parcial queda aplicada en los módulos principales.
 - **v77z**: fix de B3.3e. Los dos detectores reescritos en
   v77y se revierten a la lógica original basada en
   `usuarios->adyacentes()`. La reescritura con

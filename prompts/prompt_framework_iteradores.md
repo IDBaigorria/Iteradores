@@ -935,6 +935,24 @@ huérfanos).
   Fases 1 y 2 marcadas como completadas. Nueva §11.5
   con la idea de iteradores como raíces de contexto
   (IDs especiales + ocupante).
+- **1.5i.7o**: `PerdurarSuperestructuraStringSQL64::guardar_parcial`
+  implementado. `guardar` pasa a ser wrapper de
+  `_guardar_con_filtro($nombre, 0)`. Nuevo privado
+  `_guardar_con_filtro($nombre, int $mascara_filtro)`.
+  `_crear_chunks_insertar_nodos_con_mascara` y
+  `_crear_chunks_insertar_adyacentes_contexto` aceptan el
+  filtro. Regla de borrado: con filtro, se borran las
+  aristas salientes de los nodos del filtro (idnodo in
+  filtro) y los nodos del filtro. El DELETE de
+  adyacente_contexto va antes del de nodo_contexto (la
+  subquery consulta nodo_contexto). Espejo JS en
+  `PerdurarSuperestructuraStringIndexedDB64` (V1.5i.7o).
+- **1.5i.7p**: `Controlador::$contextos_cargados` (array)
+  + getter público `contextos_cargados()`. Se resetea en
+  `cargar()`, se setea en `cargar_parcial()` con los
+  contextos pasados. Lo consulta `guardar_ambos` del
+  piloto para decidir entre `guardar` y `guardar_parcial`.
+  No cambia el comportamiento del framework por sí solo.
 - **1.5i.7l**: comando `grafo:raices` agregado al framework
   PHP (tanda 76n) y espejado en JS. Lista los nodos raíz
   del grafo (IDs especiales) con sus adyacentes directos.

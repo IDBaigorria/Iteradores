@@ -17,19 +17,29 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 ### 1.1 Última actualización
 
-**Última actualización de este archivo:** v1.5piloto.78a
-(cierre de la Fase B3.3 + fix v78a).
-La línea B del modelo topológico quedó cerrada salvo
-B3.3c: B2.4 (Tanda A, v77q) y B3 (B3.1 v77r; B3.3a v77t;
-B3.3b v77u; B3.3d v77v; B3.3e v77y + revert v77z). El fix
-v78a cierra el agujero de niveles al crear usuario (mismo
-patrón que v77l para compartidos). Queda pendiente B3.3c
-(los 6 helpers que iteran sobre todos los dueños),
-postergada hasta que el framework implemente iteradores
-con ID especial + carga parcial. Próximo paso: **tanda de
-documentación (esta)** y después **Etapa 0 del plan de
-carga parcial** (infraestructura en el Controlador +
-`_contextos_para_operacion` en el Enrutador).
+**Última actualización de este archivo:** v1.5piloto.78m
+(cierre de la línea de carga parcial — todos los módulos
+principales adaptados al contexto del solicitante).
+La línea B del modelo topológico quedó cerrada. La Etapa 1
+de carga parcial (1a, 1b, 1c.1a/b, 1c.2a/b/c/d/e/f) está
+aplicada:
+  - SQL64 como método de persistencia (con las 3 tablas
+    nuevas: nodo_contexto, adyacente_contexto, contexto).
+  - `guardar_parcial` real en SQL64 (PHP) e
+    IndexedDB64 (JS).
+  - `Controlador::contextos_cargados()` y `$grafo_parcial`.
+  - `us_Administrador → usuarios` (migración v78f).
+  - `dueno → soporte → publico` (evita fuga cruzada).
+  - `_contextos_para_operacion` en el Enrutador decide entre
+    carga parcial (`[us_<sol>]`) y carga total.
+  - `guardar_ambos` usa `guardar_parcial` si el grafo es
+    parcial.
+Queda pendiente B3.3c (los 6 helpers que iteran sobre
+todos los dueños) y la adaptación de contexto en
+`Liquidacion.php`, `Rendicion.php`, `Empresa.php` y
+`Vehiculo.php`. Próximo paso: pruebas exhaustivas del
+piloto y, según aparezcan, resolver los pendientes en
+sub-tandas cortas.
 
 ### 1.2 Estado de la conversación
 
@@ -150,8 +160,50 @@ carga parcial** (infraestructura en el Controlador +
   `Usuario.php`, llamado desde `agregar_usuario`. Cierra el
   agujero de niveles al crear usuario (mismo patrón que v77l
   para compartidos).
+- **v78b** (Etapa 0 carga parcial): `delegar_con_args` en el
+  Controlador; `guardar_parcial` con chequeos; docblock del
+  flag. `_contextos_para_operacion` (stub) en el Enrutador.
+- **v78c** (Tanda 1b): `validar_token_sesion` y
+  `_construir_respuesta_login` usan `us_<nombre>` directo.
+  `Controlador::$contextos_cargados` + getter.
+  `guardar_ambos` consulta los contextos cargados.
+- **v78d**: chequeos defensivos de grafo parcial en
+  `Usuario.php` (6 funciones) y `Migraciones/Funciones.php`
+  (2 detectores).
+- **v78e** (Tanda 1c.1a): `SQL64` como método de persistencia.
+  Bloque `?migrar_a_sql64=1` (migra app + credenciales).
+- **v78f** (Tanda 1c.1b): migración topológica.
+  `us_Administrador → usuarios`, `dueno → soporte → publico`.
+  Cambio en `_asignar_duenos_a_soporte`.
+- **v78g** (Tanda 1c.2): carga parcial activa.
+  `_contextos_para_operacion` implementado. `index.php`
+  reorganizado. Bootstrap solo en carga total.
+  `GrafoCredenciales.php` preserva y restaura contextos.
+- **v78h** (Tanda 1c.2a): contexto del solicitante en
+  `ViajeMicros.php` (5 funciones). Enrutador: 4 acciones de
+  `viajes/*_micro`.
+- **v78i** (Tanda 1c.2b): contexto en `ViajeOpciones.php`
+  (2 funciones). Enrutador: 2 acciones de
+  `viajes/*_opciones_avanzadas`.
+- **v78j** (Tanda 1c.2c): contexto en `Viaje.php`.
+  `formatear_viaje`, `viaje_tiene_ventas`,
+  `_calcular_vendidos_por_micro_de_viaje`,
+  `obtener_opciones_terminal_viaje`,
+  `obtener_declaracion_jurada`. Enrutador: 2 acciones.
+- **v78k** (Tanda 1c.2d): contexto en `Venta.php`.
+  `_dni_asignado_en_viaje_venta`, `obtener_o_crear_pasajero`,
+  `_calcular_cobertura_dueno`, `_crear_nodo_cancelacion`,
+  `listar_cancelaciones_de_dueno`. `confirmar_venta_actual`
+  y `cancelar_venta` propagan contexto.
+- **v78l** (Tanda 1c.2e): contexto en `Pasajero.php`
+  (9 funciones). Enrutador: 3 acciones.
+- **v78m** (Tanda 1c.2f): contexto en `Impresion.php`
+  (2 helpers + `generar_impresion`).
+  `obtener_venta_por_id` y `_buscar_venta_por_id` aceptan
+  dueño. `_contextos_para_operacion` con excepciones para
+  informes que usan B3.3c.
 
-**Tanda actual:** v78a.
+**Tanda actual:** v78m (documentación de cierre).
 
 **v78a.** Mismo cierre de agujero que v77l hizo para
 compartidos: los usuarios creados después de la migración
@@ -984,7 +1036,7 @@ navegación de contexto.
   - `detectar_usuarios_especiales`.
   - `detectar_niveles_usuario`.
 
-**Plan de limpieza (estado a v78a):**
+**Plan de limpieza (estado a v78m):**
 
 - **B2.3.4 (cerrada en v77e):** reemplazo por `us_<nombre>`
   en `confirmar_venta_actual`, `cancelar_venta`,
@@ -996,15 +1048,29 @@ navegación de contexto.
   (rama sin contexto), ViajeAsientos, Vehiculo, Enrutador
   (parcial) y Migraciones (con revert de v77z para los
   detectores).
-- **B3.3c (pendiente, postergada):** los 6 helpers que
-  iteran sobre todos los dueños buscando por id. Se
-  resuelven cuando el framework implemente iteradores con
-  ID especial + carga parcial (ver §1.10). Si aparece
-  dolor real antes, se evalúa rediseño.
+- **Carga parcial (Etapa 1, aplicada en v78b-v78m):**
+  contexto del solicitante en los módulos principales
+  (Viajes, Venta, Pasajeros, Impresión). SQL64 +
+  `guardar_parcial` + `_contextos_para_operacion` activos.
+- **B3.3c (pendiente, postergada):** los helpers que iteran
+  sobre todos los dueños buscando por id. En el grep actual
+  quedan ~7 puntos:
+    - `Venta.php` L1092 (`_buscar_venta_por_id` fallback sin
+      contexto), L2648 (`obtener_cancelacion_por_id`).
+    - `Liquidacion.php` L241 (`obtener_liquidacion_por_id`).
+    - `Rendicion.php` L736 (`aceptar_ajuste_rendicion`),
+      L857 (`obtener_rendicion_por_id`).
+    - `Pasajero.php` L172 (`obtener_pasajero_por_dni` — rama
+      del historial de ventas).
+  Se resuelven cuando aparezca dolor real o cuando
+  implementemos iteradores con ID especial (ver §1.10/§1.11).
+- **Contexto en módulos menores (pendiente, sub-tandas
+  cortas):** `Liquidacion.php`, `Rendicion.php`,
+  `Empresa.php`, `Vehiculo.php`. Mismo patrón que los
+  módulos ya adaptados. Se hacen a medida que aparezcan
+  errores en las pruebas.
 - **B3.2 (eliminar los fallbacks "sin contexto"):** se
-  resuelve junto con la carga parcial, porque el fallback
-  "sin contexto" es justamente el que no se puede usar
-  cuando hay contextos activos.
+  resuelve junto con la adaptación de los módulos menores.
 
 **Contenedores raíz de árboles paralelos.** Cada árbol tiene su
 propio contenedor raíz. `privado/ventas` es un nodo, y
@@ -1234,12 +1300,16 @@ estructura del grafo, no de chequeos de código.
    parametrizados en `Arbol.php`. **Completada** (v76v-v77o).
 6. **Fase B2.4** — Mantener los compartidos vivos. **Completada**
    (Tanda A, v77q).
-7. **Fase B3** — Eliminar los accesos viejos. **Cerrada salvo
-   B3.3c** (postergada hasta la carga parcial; ver §1.10).
-8. **Fase C** (opcional) — Tipos como IDs especiales, ortogonal.
+7. **Fase B3** — Eliminar los accesos viejos. **Cerrada
+   salvo B3.3c** (los 7 helpers que iteran sobre todos los
+   dueños; ver §1.7).
+8. **Carga parcial** (ex Fase D) — Carga y guardado parciales
+   por contexto. **Etapa 1 completa** (v78b-v78m): SQL64 +
+   `guardar_parcial` + `_contextos_para_operacion` +
+   adaptación del contexto en módulos principales.
+   Pendiente: módulos menores y B3.3c.
+9. **Fase C** (opcional) — Tipos como IDs especiales, ortogonal.
    **Pendiente.**
-9. **Carga parcial** (ex Fase D) — Pasar a carga y guardado
-   parciales por contexto. **En preparación** (plan en §1.10).
 
 ### 2.3 Detalle de la Fase B2.3 (en curso)
 

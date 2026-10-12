@@ -96,7 +96,12 @@
  * | `venta_actual`  | Enlace a un nodo venta actual (solo para `terminal`). Si no existe venta activa, el enlace no existe. |
  * | `duenos`        | Nodo contenedor con dato vacío (solo para `soporte`).                                  |
  * |                 | └─ Enlaces salientes con nombre de cada dueño asignado apuntando a su nodo usuario.    |
- * | `soporte`       | Enlace directo al nodo usuario soporte (solo para `dueno`, opcional).                  |
+ * | `soporte`       | Enlace directo al contenedor `publico` del soporte (solo para `dueno`,
+ * |                 | opcional). El `publico` solo expone `nivel`, `nombre_real`, `email`.
+ * |                 | A partir de v1.5piloto.78f el enlace apunta al `publico` (no al nodo
+ * |                 | del soporte) para evitar fuga cruzada entre dueños que comparten un
+ * |                 | mismo soporte: si apuntara al nodo real, el BFS desde un dueño
+ * |                 | llegaría al soporte y desde ahí a los otros dueños del soporte.        |
  *
  * **Observaciones:**
  * - Los enlaces `dueno` y `venta_actual` solo existen en nodos de nivel `terminal`.
@@ -694,14 +699,27 @@
  * - Panel de administración usa `listar_usuarios()`, `listar_sesiones()` y
  *   `listar_duenos()` para mostrar y gestionar datos.
  *
- * ## Modelo topológico: contenedores por nivel de exposición (v1.5piloto.77q)
+ * ## Modelo topológico: contenedores por nivel de exposición (v1.5piloto.78m)
  * 
- * **Estado:** implementado. Fases B1 (contenedores `publico`/`privado`),
- * B2.1 (compartidos por terminal), B2.2 (contexto opcional en las
- * funciones del piloto) y B2.3 (árboles paralelos parametrizados +
- * repuntado de terminales al compartido) aplicadas. Próximo paso:
- * Fase B2.4 (mantener vivos los compartidos en cada operación de
- * escritura; ver `prompts/plan_actual.md` §1.9).
+ * **Estado:** implementado y con carga parcial activa. Fases B1
+ * (contenedores `publico`/`privado`), B2.1 (compartidos por terminal),
+ * B2.2 (contexto opcional), B2.3 (árboles paralelos + repuntado), B2.4
+ * (sincronización al vuelo) y B3 (aislación de usuarios) aplicadas.
+ * La carga parcial (Etapa 1c del plan) está activa: cada operación del
+ * terminal carga solo su compartido; el dueño su propio subgrafo; el
+ * admin todo (gracias al enlace `us_Administrador → usuarios`).
+ * 
+ * **Cambios de la v78f/v78m:**
+ * - `us_Administrador → usuarios`: enlace creado en v78f para que el
+ *   admin cargue todos los usuarios desde su propio contexto.
+ * - `dueno → soporte → publico`: el enlace `soporte` del dueño apunta
+ *   al `publico` del soporte (no al nodo real), para evitar fuga cruzada.
+ * - Carga parcial: index.php decide entre `cargar`/`cargar_parcial`
+ *   según los contextos devueltos por `_contextos_para_operacion`
+ *   (Enrutador). `guardar_ambos` detecta grafo parcial y llama a
+ *   `guardar_parcial` con los contextos cargados.
+ * - Persistencia en SQL64 (bitmask de contextos, 3 tablas nuevas:
+ *   nodo_contexto, adyacente_contexto, contexto).
  * 
  * ### Idea general
  * 
@@ -854,7 +872,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.77q
+ * @version   1.5piloto.78m
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

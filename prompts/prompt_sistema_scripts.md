@@ -653,6 +653,30 @@ costó un fallo real del runner y una iteración extra.
     llamaba a `vehiculos/listar` sin `nombre_dueno` y
     el select quedó vacío. Se detectó tarde porque el
     grep por función no alcanzaba.
+20. **Bloques con anidación profunda de llaves: usar
+    firma de la función siguiente como ancla.** Cuando
+    el `buscar` termina con varias `}` de cierre en
+    distintos niveles de indentación (while dentro de
+    if dentro de if, etc.), es fácil errarle a los
+    espacios. Caso v78l: el bloque
+    `pasajero_tiene_ventas_activas` falló porque las
+    llaves de cierre tenían 20 espacios en el archivo
+    y yo puse 16. Regla: incluir en el `buscar` y el
+    `reemplazar` la firma o el comentario que viene
+    justo después del bloque (por ejemplo, el `/**`
+    del docblock siguiente). Así el ancla es única y
+    no depende de contar espacios.
+21. **Verificar el `@version` real antes de proponer un
+    bump.** Si una tanda anterior (incluso en la misma
+    sesión) ya bumpeó el archivo, el `buscar` del bump
+    falla con "bloque no encontrado". Caso v78b: el
+    bloque de bump del Controlador buscaba `1.5i.7o`
+    pero el archivo estaba en `1.5i.7n`. Regla: cuando
+    el archivo no fue tocado en la tanda inmediatamente
+    anterior, pedir la versión actual antes de proponer
+    el bump, o usar un `buscar` que no dependa del
+    número de versión (por ejemplo, solo el `@author`
+    y el `class`, que sí son estables).
 
 ---
 
@@ -673,13 +697,14 @@ costó un fallo real del runner y una iteración extra.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.78a.
-Se agregan dos aprendizajes (18-19): reemplazos al final
-de una función deben incluir el `}` de cierre (caso v77w),
-y grep cruzado por nombre de acción POST al cambiar
-firmas (caso v77x). El resto del sistema sigue igual.
-Recordatorio: los prompts del proyecto PHP (framework,
-piloto, sistema de scripts, plan actual) y del plugin
+**Última actualización de este prompt:** v1.5piloto.78m.
+Se agregan dos aprendizajes (20-21): usar la firma de la
+función siguiente como ancla única en bloques con
+anidación profunda de llaves (caso v78l), y verificar el
+`@version` real antes de proponer un bump (caso v78b).
+El resto del sistema sigue igual. Recordatorio: los
+prompts del proyecto PHP (framework, piloto, sistema de
+scripts, plan actual) y del plugin
 (`iteradoresJS/prompts/`) se actualizan en la misma
 tanda que el código.
 Antes: v1.5piloto.74q. Se
