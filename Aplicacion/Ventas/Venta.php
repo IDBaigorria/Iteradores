@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.77m
+ * @version   1.5piloto.78k
  */
 
 
@@ -48,11 +48,14 @@ function obtener_contenedor_ventas_dueno(string $nombre_dueno, ?Nodo $nodo_conte
 /**
  * Crea un nodo pasajero si no existe, basado en DNI.
  */
-function obtener_o_crear_pasajero(string $nombre_dueno, string $dni, array $datos_pasajero): ?Nodo {
+function obtener_o_crear_pasajero(string $nombre_dueno, string $dni, array $datos_pasajero, ?Nodo $nodo_contexto = null): ?Nodo {
     $dni = trim($dni);
     if (empty($dni)) return null;
 
-    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí. El compartido tiene un alias al
+    // contenedor de pasajeros del dueño.
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return null;
 
     $nodo_pasajero = $contenedor->adyacente($dni);
@@ -104,11 +107,13 @@ function obtener_o_crear_pasajero(string $nombre_dueno, string $dni, array $dato
  * @param string $dni
  * @return bool
  */
-function _dni_asignado_en_viaje_venta(string $nombre_dueno, string $nombre_viaje, string $dni): bool {
+function _dni_asignado_en_viaje_venta(string $nombre_dueno, string $nombre_viaje, string $dni, ?Nodo $nodo_contexto = null): bool {
     $dni_norm = normalizar_dni($dni);
     if ($dni_norm === '') return false;
 
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return false;
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -212,15 +217,17 @@ function confirmar_venta_actual(
     $nodo_micro = $nodo_micros->adyacente($nombre_micro);
     if (!$nodo_micro) return ['exito' => false, 'error' => 'Micro no encontrado'];
 
-    // Obtener opciones avanzadas del viaje
-    $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
+    // Obtener opciones avanzadas del viaje.
+    // Fase 1c.2: pasar el contexto (compartido) para que el
+    // terminal vea las opciones del viaje desde su subgrafo.
+    $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $nodo_dueno);
     $restriccion_edad = $opciones['restriccion_edad'] === '1';
     $edad_min = (int)$opciones['edad_minima'];
     $edad_max = (int)$opciones['edad_maxima'];
 
     // Resolver configuración de pago: override del TerminalViaje > viaje > defaults.
-    $opciones_viaje_pago = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);
-    $opciones_terminal_pago = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal);
+    $opciones_viaje_pago = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $nodo_dueno);
+    $opciones_terminal_pago = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal, $nodo_dueno);
 
     $resolver = function(string $campo, string $default) use ($opciones_terminal_pago, $opciones_viaje_pago) {
         // Override del terminal: si está seteado (no vacío), gana.
@@ -399,7 +406,7 @@ function confirmar_venta_actual(
         'celular' => $comprador_celular,
     ];
     if (!empty($comprador_dni)) {
-        $nodo_comprador = obtener_o_crear_pasajero($nombre_dueno, $comprador_dni, $comprador_datos);
+        $nodo_comprador = obtener_o_crear_pasajero($nombre_dueno, $comprador_dni, $comprador_datos, $nodo_dueno);
         if ($nodo_comprador) $nodo_venta->_adyacente_en($nodo_comprador, 'comprador');
     }
 
@@ -488,7 +495,7 @@ function confirmar_venta_actual(
 
             // Verificar que el DNI no este ya asignado a otro asiento
             // del mismo viaje (vendido o reservado en otro micro).
-            if (_dni_asignado_en_viaje_venta($nombre_dueno, $nombre_viaje, $dni_pasajero)) {
+            if (_dni_asignado_en_viaje_venta($nombre_dueno, $nombre_viaje, $dni_pasajero, $nodo_dueno)) {
                 return [
                     'exito' => false,
                     'error' => "El DNI $dni_norm_actual ya esta asignado a otro asiento de este viaje"
@@ -523,7 +530,7 @@ function confirmar_venta_actual(
             }
         }
 
-        $nodo_pasajero = obtener_o_crear_pasajero($nombre_dueno, $dni_pasajero, $datos_pasajero);
+        $nodo_pasajero = obtener_o_crear_pasajero($nombre_dueno, $dni_pasajero, $datos_pasajero, $nodo_dueno);
         if (!$nodo_pasajero) {
             return ['exito' => false, 'error' => 'No se pudo crear el pasajero para el asiento ' . ($indice_asiento + 1)];
         }
@@ -1188,6 +1195,12 @@ function obtener_info_cancelacion(string $id_venta, ?string $nombre_terminal = n
     [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta, $nombre_terminal);
     if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
 
+    // Fase 1c.2: derivar el contexto desde el terminal solicitante.
+    $nodo_contexto = null;
+    if ($nombre_terminal !== null && $nombre_terminal !== '') {
+        $nodo_contexto = _contexto_terminal($nombre_terminal);
+    }
+
     // Datos de viaje y micro.
     $nodo_viaje = $nodo_venta->adyacente('viaje');
     $viaje_visible = '';
@@ -1228,7 +1241,8 @@ function obtener_info_cancelacion(string $id_venta, ?string $nombre_terminal = n
     $cubierto_info = _calcular_cobertura_dueno(
         $nombre_dueno,
         $desglose_info['rendido_efectivo'],
-        $desglose_info['rendido_banco']
+        $desglose_info['rendido_banco'],
+        $nodo_contexto
     );
     $cupones_rendidos = $desglose_info['cantidad_cupones_rendidos'];
 
@@ -1397,6 +1411,12 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
     [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta, $nombre_terminal);
     if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
 
+    // Fase 1c.2: derivar el contexto desde el terminal solicitante.
+    $nodo_contexto = null;
+    if ($nombre_terminal !== null && $nombre_terminal !== '') {
+        $nodo_contexto = _contexto_terminal($nombre_terminal);
+    }
+
     // Desglose: parte en terminal vs parte ya rendida.
     $desglose = _calcular_devolucion_desglosada($nodo_venta);
 
@@ -1404,7 +1424,8 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
     $cubierto = _calcular_cobertura_dueno(
         $nombre_dueno,
         $desglose['rendido_efectivo'],
-        $desglose['rendido_banco']
+        $desglose['rendido_banco'],
+        $nodo_contexto
     );
 
     // 1. Revertir montos de la terminal (parte no rendida).
@@ -1509,7 +1530,8 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
         $nodo_venta,
         $desglose,
         $cubierto,
-        $asientos_liberados
+        $asientos_liberados,
+        $nodo_contexto
     );
 
     // 4. Agregar un ajuste a cada rendición afectada.
@@ -2411,9 +2433,15 @@ function _calcular_devolucion_desglosada(Nodo $nodo_venta): array {
  * @param float  $monto_ba
  * @return array{cubierto_ef: float, cubierto_ba: float, no_cubierto_ef: float, no_cubierto_ba: float}
  */
-function _calcular_cobertura_dueno(string $nombre_dueno, float $monto_ef, float $monto_ba): array {
-    // Fase B2.3.4: ID especial.
-    $nodo = Nodo::nodo_por_id('us_' . $nombre_dueno);
+function _calcular_cobertura_dueno(string $nombre_dueno, float $monto_ef, float $monto_ba, ?Nodo $nodo_contexto = null): array {
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí. Nota: el compartido no tiene los
+    // nodos `efectivo`/`banco` (viven en el `privado` del
+    // dueño real), así que en carga parcial desde terminal
+    // la cobertura devuelve 0. Es un comportamiento conocido:
+    // la cancelación desde terminal con cupones rendidos no
+    // cubre la parte del dueño. Ver nota en plan_actual.md.
+    $nodo = $nodo_contexto ?: Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo) return ['cubierto_ef' => 0.0, 'cubierto_ba' => 0.0, 'no_cubierto_ef' => $monto_ef, 'no_cubierto_ba' => $monto_ba];
 
     $nodo_ef = $nodo->adyacente('efectivo');
@@ -2458,9 +2486,14 @@ function _existe_cancelacion(Nodo $contenedor, string $id): bool {
  * @param int    $asientos_liberados
  * @return string
  */
-function _crear_nodo_cancelacion(string $nombre_dueno, string $id_venta, string $motivo, Nodo $nodo_venta, array $desglose, array $cubierto, int $asientos_liberados): string {
-    // Fase B2.3.4: ID especial.
-    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+function _crear_nodo_cancelacion(string $nombre_dueno, string $id_venta, string $motivo, Nodo $nodo_venta, array $desglose, array $cubierto, int $asientos_liberados, ?Nodo $nodo_contexto = null): string {
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // agregar la cancelación en el contenedor `cancelaciones`
+    // del compartido. Si no, en el del dueño real.
+    // Nota: en producción convendría insertar en AMBOS árboles
+    // (paralelos) cuando la cancelación la hace un terminal.
+    // Se anota para una tanda futura.
+    $nodo_dueno = $nodo_contexto ?: Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return '';
 
     $contenedor = $nodo_dueno->adyacente('cancelaciones');
@@ -2699,9 +2732,10 @@ function _marcar_rendiciones_afectadas(Nodo $nodo_venta, string $id_venta): void
  * @param array  $filtros { terminal?: string }
  * @return array
  */
-function listar_cancelaciones_de_dueno(string $nombre_dueno, array $filtros = []): array {
-    // Fase B3.1: ID especial directo.
-    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+function listar_cancelaciones_de_dueno(string $nombre_dueno, array $filtros = [], ?Nodo $nodo_contexto = null): array {
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí.
+    $nodo_dueno = $nodo_contexto ?: Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return [];
     $cont = $nodo_dueno->adyacente('cancelaciones');
     if (!$cont) return [];

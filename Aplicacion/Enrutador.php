@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78j
+ * @version   1.5piloto.78k
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1298,7 +1298,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $filtros = [
                         'terminal' => $post['terminal'] ?? '',
                     ];
-                    $cancelaciones = listar_cancelaciones_de_dueno($nombre_dueno, $filtros);
+                    // Fase 1c.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $cancelaciones = listar_cancelaciones_de_dueno($nombre_dueno, $filtros, $nodo_contexto);
                     responder_json(['exito' => true, 'cancelaciones' => $cancelaciones]);
                     break;
 
