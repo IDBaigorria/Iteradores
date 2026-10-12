@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.78m
+ * @version   1.5piloto.78n
  */
 
 // --- Utilidades base ----------------------------------
@@ -383,6 +383,43 @@ if (isset($_GET['migrar_usuarios_especiales'])) {
         echo "\n";
     }
     echo "Listo.\n";
+    exit;
+}
+
+// ==== Reparación topológica (v78n) ====
+// 1. Reparar enlaces `dueño → compartido_con_<terminal>` faltantes.
+// 2. Reparar viajes faltantes en el contenedor `viajes` del dueño.
+// Idempotente. Solo agrega enlaces, nunca borra.
+// Uso: index.php?reparar_topologia=1
+if (isset($_GET['reparar_topologia'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    require_once __DIR__ . '/miscelaneas/migrar_topologia.php';
+
+    $r_comp = reparar_compartidos_dueno();
+    $r_viajes = reparar_viajes_dueno();
+
+    echo "Reparación topológica\n";
+    echo "====================\n\n";
+
+    echo "-- Enlaces dueño → compartido_con_* --\n";
+    echo "   dueños procesados: " . $r_comp['duenos'] . "\n";
+    echo "   enlaces agregados: " . $r_comp['reparados'] . "\n";
+    foreach ($r_comp['detalles'] as $d) {
+        echo "     " . $d['dueno'] . ": " . implode(', ', $d['enlaces']) . "\n";
+    }
+
+    echo "\n-- Viajes faltantes en el contenedor del dueño --\n";
+    echo "   dueños procesados: " . $r_viajes['duenos'] . "\n";
+    echo "   viajes agregados:  " . $r_viajes['reparados'] . "\n";
+    foreach ($r_viajes['detalles'] as $d) {
+        echo "     " . $d['dueno'] . ": " . implode(', ', $d['viajes']) . "\n";
+    }
+
+    if ($r_comp['reparados'] > 0 || $r_viajes['reparados'] > 0) {
+        guardar_ambos($nombre_app);
+        echo "\nGuardado.\n";
+    }
+    echo "\nListo.\n";
     exit;
 }
 

@@ -26,6 +26,7 @@
  *
  * @author Ignacio David Baigorria
  * @since 1.5piloto.78f
+ * @version 1.5piloto.78n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -119,6 +120,129 @@ function migrar_topologia_soporte(string $nombre_app): array {
             $nodo_dueno->_adyacente_en($publico, 'soporte');
             $res['repuntados']++;
         }
+    }
+    return $res;
+}
+
+/**
+ * Repara enlaces `dueño → compartido_con_<terminal>` faltantes.
+ *
+ * Recorre los terminales del dueño, sigue el enlace `dueno` de
+ * cada uno, y si el destino tiene `_es_compartido` verifica que
+ * el dueño tenga un enlace `compartido_con_<nombre_terminal>`
+ * apuntando a ese nodo. Si falta, lo agrega. Idempotente.
+ *
+ * Contexto: por algún flujo previo, el enlace del dueño al
+ * compartido puede haberse perdido. El compartido sigue vivo
+ * y el terminal lo sigue alcanzando (`terminal → dueno`), pero
+ * el dueño no lo tiene en su lista. Eso hace que el dueño no
+ * vea los recursos que viven en el compartido.
+ *
+ * @return array{duenos: int, reparados: int, detalles: array}
+ */
+function reparar_compartidos_dueno(): array {
+    $res = ['duenos' => 0, 'reparados' => 0, 'detalles' => []];
+
+    $nodo_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$nodo_usuarios) return $res;
+
+    foreach ($nodo_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nivel = $nodo_dueno->adyacente('nivel');
+        if (!$nivel || $nivel->dato() !== 'dueno') continue;
+        $res['duenos']++;
+
+        $cont_terminales = $nodo_dueno->adyacente('terminales');
+        if (!$cont_terminales) continue;
+
+        $arreglados = [];
+        foreach ((array)$cont_terminales->adyacentes() as $nombre_term => $nodo_term) {
+            $nombre_term = (string)$nombre_term;
+            $compartido = $nodo_term->adyacente('dueno');
+            if (!$compartido) continue;
+            if (!$compartido->adyacente('_es_compartido')) continue;
+            $enlace = 'compartido_con_' . $nombre_term;
+            if ($nodo_dueno->adyacente($enlace)) continue;
+            $nodo_dueno->_adyacente_en($compartido, $enlace);
+            $arreglados[] = $enlace;
+        }
+
+        if (!empty($arreglados)) {
+            $res['reparados'] += count($arreglados);
+            $res['detalles'][] = ['dueno' => (string)$nombre_dueno, 'enlaces' => $arreglados];
+        }
+    }
+    return $res;
+}
+
+/**
+ * Repara viajes que están en algún compartido del dueño pero
+ * no en `us_dueno/viajes`. Recolecta los compartidos por dos
+ * vías: el enlace directo `compartido_con_*` del dueño y el
+ * enlace `dueno` de cada terminal. Idempotente.
+ *
+ * @return array{duenos: int, reparados: int, detalles: array}
+ */
+function reparar_viajes_dueno(): array {
+    $res = ['duenos' => 0, 'reparados' => 0, 'detalles' => []];
+
+    $nodo_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$nodo_usuarios) return $res;
+
+    foreach ($nodo_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nivel = $nodo_dueno->adyacente('nivel');
+        if (!$nivel || $nivel->dato() !== 'dueno') continue;
+        $res['duenos']++;
+
+        $cont_dueno = $nodo_dueno->adyacente('viajes');
+        if (!$cont_dueno) {
+            $cont_dueno = Nodo::crear_con_dato('');
+            $nodo_dueno->_adyacente_en($cont_dueno, 'viajes');
+        }
+
+        $ya_presentes = [];
+        foreach ((array)$cont_dueno->adyacentes() as $n => $_) {
+            $ya_presentes[(string)$n] = true;
+        }
+
+        // Recolectar compartidos por dos vías.
+        $compartidos = [];
+        foreach ((array)$nodo_dueno->adyacentes() as $enlace => $hijo) {
+            $enlace = (string)$enlace;
+            if (strpos($enlace, 'compartido_con_') === 0) {
+                $compartidos[$hijo->id()] = $hijo;
+            }
+        }
+        $cont_term = $nodo_dueno->adyacente('terminales');
+        if ($cont_term) {
+            foreach ((array)$cont_term->adyacentes() as $nodo_term) {
+                $comp = $nodo_term->adyacente('dueno');
+                if ($comp && $comp->adyacente('_es_compartido')) {
+                    $compartidos[$comp->id()] = $comp;
+                }
+            }
+        }
+
+        // Recolectar viajes de cada compartido.
+        $faltantes = [];
+        foreach ($compartidos as $comp) {
+            $c_viajes = $comp->adyacente('viajes');
+            if (!$c_viajes) continue;
+            foreach ((array)$c_viajes->adyacentes() as $nombre_v => $nodo_v) {
+                $nombre_v = (string)$nombre_v;
+                if (isset($ya_presentes[$nombre_v])) continue;
+                $faltantes[$nombre_v] = $nodo_v;
+            }
+        }
+
+        if (empty($faltantes)) continue;
+
+        $agregados = [];
+        foreach ($faltantes as $nombre_v => $nodo_v) {
+            $cont_dueno->_adyacente_en($nodo_v, $nombre_v);
+            $agregados[] = $nombre_v;
+        }
+        $res['reparados'] += count($agregados);
+        $res['detalles'][] = ['dueno' => (string)$nombre_dueno, 'viajes' => $agregados];
     }
     return $res;
 }
