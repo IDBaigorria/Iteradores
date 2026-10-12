@@ -2,23 +2,16 @@
 /**
  * Aplicador de cambios automáticos — Proyecto PHP.
  *
- * Tanda 1c.1a (v2): corrección de la secuencia de migración a SQL64.
- *
- * El script anterior dejó el bloque ?migrar_a_sql64=1 después de
- * la carga normal, y la carga normal con SQL64 fallaba (SQL64
- * vacío → else → guardar vacío). El bloque nunca llegaba a migrar.
- *
- * Corrección:
- *  - El bloque ?migrar_a_sql64=1 se mueve ANTES de la carga
- *    normal y hace su propia carga desde SQL.
- *  - Se elimina el bloque viejo.
+ * Tanda 1c.1a (v3): migración a SQL64 también del grafo de
+ * credenciales. El bloque anterior solo migraba la app; el
+ * login usa en_grafo_credenciales(), que carga el grafo de
+ * credenciales, y con SQL64 activo ese grafo no existía.
  *
  * Uso:
  *   php aplicar_cambios.php
  *
- * IMPORTANTE: no abras la app hasta correr
- *   index.php?migrar_a_sql64=1
- * una vez después de aplicar este script.
+ * Después de correrlo: visitar index.php?migrar_a_sql64=1
+ * (migra los dos grafos) y probar login con un usuario no-admin.
  */
 
 // ============================================================
@@ -34,35 +27,11 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
 
-// ------------------------------------------------------------
-// index.php — insertar bloque nuevo antes de la carga
-// ------------------------------------------------------------
-
 [
     'tipo' => 'reemplazar',
     'archivo' => 'index.php',
-    'descripcion' => 'index.php: insertar bloque ?migrar_a_sql64=1 antes de la carga',
+    'descripcion' => 'index.php: bloque ?migrar_a_sql64 migra los dos grafos',
     'buscar' => [
-        'Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);',
-        '',
-        '// Inicialización de la persistencia.',
-    ],
-    'reemplazar' => [
-        'Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);',
-        '',
-        '// ==== Migración a SQL64 (v1.5piloto.78e) ====',
-        '// Pasa el grafo del formato SQL (tablas nodo/adyacente) al',
-        '// formato SQL64 (tablas nodo_contexto/adyacente_contexto/',
-        '// contexto). SQL64 es el que soporta la carga parcial por',
-        '// contextos. Hace su propia carga desde SQL, así no depende',
-        '// de que el grafo ya esté en memoria. Idempotente: correrlo',
-        '// dos veces no rompe nada (la segunda corrida reescribe las',
-        '// mismas tablas con el mismo contenido).',
-        '//',
-        '// Este bloque va ANTES de la carga normal porque la carga',
-        '// normal usa SQL64: si SQL64 todavía no tiene datos, la app',
-        '// no puede arrancar.',
-        '//',
         '// Uso: index.php?migrar_a_sql64=1',
         'if (isset($_GET[\'migrar_a_sql64\'])) {',
         '    header(\'Content-Type: text/plain; charset=utf-8\');',
@@ -106,58 +75,51 @@ $cambios = [
         '    echo "\\nListo.\\n";',
         '    exit;',
         '}',
-        '',
-        '// Inicialización de la persistencia.',
     ],
-],
-
-// ------------------------------------------------------------
-// index.php — eliminar bloque viejo
-// ------------------------------------------------------------
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'index.php',
-    'descripcion' => 'index.php: eliminar bloque ?migrar_a_sql64=1 viejo',
-    'buscar' => [
-        '// ==== Migración a SQL64 (v1.5piloto.78e) ====',
-        '// Pasa el grafo del formato SQL (tablas nodo/adyacente) al',
-        '// formato SQL64 (tablas nodo_contexto/adyacente_contexto/',
-        '// contexto). SQL64 es el que soporta la carga parcial por',
-        '// contextos. El grafo está cargado en memoria con SQL;',
-        '// cambiamos el método al vuelo y guardamos. Idempotente:',
-        '// correrlo dos veces no rompe nada (la segunda corrida',
-        '// reescribe las mismas tablas con el mismo contenido).',
-        '//',
+    'reemplazar' => [
         '// Uso: index.php?migrar_a_sql64=1',
         'if (isset($_GET[\'migrar_a_sql64\'])) {',
         '    header(\'Content-Type: text/plain; charset=utf-8\');',
-        '    if (!Nodo::hay_nodos_en_superestructura()) {',
-        '        echo "ERROR: no hay nodos en memoria. Nada que migrar.\\n";',
-        '        exit;',
-        '    }',
-        '    Controlador::establecer_metodo(\'SQL64\');',
-        '    if (!Controlador::guardar($nombre_app)) {',
-        '        echo "ERROR: no se pudo guardar el grafo en SQL64.\\n";',
-        '        echo "Ver logs de errores del Controlador.\\n";',
-        '        exit;',
-        '    }',
+        '    $grafos_migrar = [',
+        '        \'app\'          => ConfiguracionApli::NOMBRE_APP,',
+        '        \'credenciales\' => ConfiguracionApli::NOMBRE_APP_CREDENCIALES,',
+        '    ];',
         '    echo "Migración a SQL64\\n";',
         '    echo "=================\\n\\n";',
-        '    echo "Grafo \\"$nombre_app\\" guardado en formato SQL64.\\n\\n";',
-        '    $ctx = Controlador::listar_contextos($nombre_app);',
-        '    if (is_array($ctx)) {',
-        '        echo "Contextos registrados (" . count($ctx) . "):\\n";',
-        '        foreach ($ctx as $c) echo "  - $c\\n";',
-        '    } else {',
-        '        echo "No se pudieron listar los contextos.\\n";',
+        '    foreach ($grafos_migrar as $etiqueta => $nombre_mig) {',
+        '        echo "-- $etiqueta ($nombre_mig) --\\n";',
+        '',
+        '        Controlador::establecer_metodo(\'SQL\');',
+        '        if (!Controlador::existe($nombre_mig)) {',
+        '            echo "   no existe en SQL. Se saltea.\\n";',
+        '            continue;',
+        '        }',
+        '        if (!Controlador::cargar($nombre_mig)) {',
+        '            echo "   ERROR: no se pudo cargar desde SQL. Se saltea.\\n";',
+        '            continue;',
+        '        }',
+        '        if (!Nodo::hay_nodos_en_superestructura()) {',
+        '            echo "   el grafo en SQL está vacío. Se saltea.\\n";',
+        '            continue;',
+        '        }',
+        '',
+        '        Controlador::establecer_metodo(\'SQL64\');',
+        '        if (!Controlador::guardar($nombre_mig)) {',
+        '            echo "   ERROR: no se pudo guardar en SQL64.\\n";',
+        '            echo "   Ver logs de errores del Controlador.\\n";',
+        '            exit;',
+        '        }',
+        '',
+        '        $ctx = Controlador::listar_contextos($nombre_mig);',
+        '        $n_ctx = is_array($ctx) ? count($ctx) : 0;',
+        '        echo "   migrado. Contextos: $n_ctx\\n";',
+        '        if (is_array($ctx) && $n_ctx > 0) {',
+        '            foreach ($ctx as $c) echo "     - $c\\n";',
+        '        }',
         '    }',
         '    echo "\\nListo.\\n";',
         '    exit;',
         '}',
-    ],
-    'reemplazar' => [
-        '// (bloque ?migrar_a_sql64 movido antes de la carga normal, v78e v2)',
     ],
 ],
 

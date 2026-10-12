@@ -124,42 +124,42 @@ Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);
 // Uso: index.php?migrar_a_sql64=1
 if (isset($_GET['migrar_a_sql64'])) {
     header('Content-Type: text/plain; charset=utf-8');
-    $nombre_app_mig = ConfiguracionApli::NOMBRE_APP;
-
-    // 1. Cargar el grafo original desde SQL.
-    Controlador::establecer_metodo('SQL');
-    if (!Controlador::existe($nombre_app_mig)) {
-        echo "ERROR: no existe el grafo \"$nombre_app_mig\" en SQL. Nada que migrar.\n";
-        exit;
-    }
-    if (!Controlador::cargar($nombre_app_mig)) {
-        echo "ERROR: no se pudo cargar el grafo desde SQL.\n";
-        echo "Ver logs de errores del Controlador.\n";
-        exit;
-    }
-    if (!Nodo::hay_nodos_en_superestructura()) {
-        echo "ERROR: el grafo en SQL está vacío. Nada que migrar.\n";
-        exit;
-    }
-
-    // 2. Cambiar a SQL64 y guardar.
-    Controlador::establecer_metodo('SQL64');
-    if (!Controlador::guardar($nombre_app_mig)) {
-        echo "ERROR: no se pudo guardar el grafo en SQL64.\n";
-        echo "Ver logs de errores del Controlador.\n";
-        exit;
-    }
-
-    // 3. Reportar.
+    $grafos_migrar = [
+        'app'          => ConfiguracionApli::NOMBRE_APP,
+        'credenciales' => ConfiguracionApli::NOMBRE_APP_CREDENCIALES,
+    ];
     echo "Migración a SQL64\n";
     echo "=================\n\n";
-    echo "Grafo \"$nombre_app_mig\" migrado de SQL a SQL64.\n\n";
-    $ctx = Controlador::listar_contextos($nombre_app_mig);
-    if (is_array($ctx)) {
-        echo "Contextos registrados (" . count($ctx) . "):\n";
-        foreach ($ctx as $c) echo "  - $c\n";
-    } else {
-        echo "No se pudieron listar los contextos.\n";
+    foreach ($grafos_migrar as $etiqueta => $nombre_mig) {
+        echo "-- $etiqueta ($nombre_mig) --\n";
+
+        Controlador::establecer_metodo('SQL');
+        if (!Controlador::existe($nombre_mig)) {
+            echo "   no existe en SQL. Se saltea.\n";
+            continue;
+        }
+        if (!Controlador::cargar($nombre_mig)) {
+            echo "   ERROR: no se pudo cargar desde SQL. Se saltea.\n";
+            continue;
+        }
+        if (!Nodo::hay_nodos_en_superestructura()) {
+            echo "   el grafo en SQL está vacío. Se saltea.\n";
+            continue;
+        }
+
+        Controlador::establecer_metodo('SQL64');
+        if (!Controlador::guardar($nombre_mig)) {
+            echo "   ERROR: no se pudo guardar en SQL64.\n";
+            echo "   Ver logs de errores del Controlador.\n";
+            exit;
+        }
+
+        $ctx = Controlador::listar_contextos($nombre_mig);
+        $n_ctx = is_array($ctx) ? count($ctx) : 0;
+        echo "   migrado. Contextos: $n_ctx\n";
+        if (is_array($ctx) && $n_ctx > 0) {
+            foreach ($ctx as $c) echo "     - $c\n";
+        }
     }
     echo "\nListo.\n";
     exit;
