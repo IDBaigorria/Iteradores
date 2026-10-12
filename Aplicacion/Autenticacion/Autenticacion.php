@@ -10,7 +10,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.76e
+ * @version   1.5piloto.78c
  */
 
 use Iteradores\Configuracion\Conf;
@@ -146,10 +146,10 @@ function validar_token_sesion(string $token): ?array {
 
     if ($nombre_usuario === null) return null;
 
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return null;
-
-    $nodo_usuario_real = $raiz_usuarios->adyacente($nombre_usuario);
+    // Fase B3.1: el nodo del usuario vive en us_<nombre> (ID
+    // especial). No se usa la raíz `usuarios` porque en carga
+    // parcial puede no estar cargada.
+    $nodo_usuario_real = Nodo::nodo_por_id('us_' . $nombre_usuario);
     if (!$nodo_usuario_real) return null;
 
     return [
@@ -280,9 +280,9 @@ function _registrar_login_exitoso(Nodo $nodo_usuario, string $ip_cliente, string
  * @return array|null Datos del usuario autenticado o null.
  */
 function _construir_respuesta_login(string $nombre_usuario): ?array {
-    $raiz_app = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_app) return null;
-    $nodo_app = $raiz_app->adyacente($nombre_usuario);
+    // Fase B3.1: ID especial directo. La raíz `usuarios` puede
+    // no estar cargada en modo de carga parcial.
+    $nodo_app = Nodo::nodo_por_id('us_' . $nombre_usuario);
     if (!$nodo_app) return null;
 
     $nodo_nivel = $nodo_app->adyacente('nivel');

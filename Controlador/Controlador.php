@@ -57,7 +57,7 @@ require_once("interfaces/Dominios.php");
  * @implements VectorGravitacional
  * @implements Dominios
  * @since V1.2.0
- * @version 1.5i.7n
+ * @version 1.5i.7p
  */
 class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor, Dominios {
 
@@ -235,6 +235,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     public static function cargar($nombre): bool|null {
         Nodo::vaciar_superestructura(static::$token);
         static::$grafo_parcial = false;
+        static::$contextos_cargados = [];
         return static::delegar('cargar', $nombre);
     }
 
@@ -269,6 +270,19 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     protected static bool $grafo_parcial = false;
 
     /**
+     * Contextos que se usaron en la última carga parcial.
+     *
+     * Vacío si la última carga fue completa (`cargar()`).
+     * Lo consulta `guardar_ambos` para decidir entre
+     * `guardar()` (total) y `guardar_parcial()`
+     * (restringido a estos contextos).
+     *
+     * @var string[]
+     * @since 1.5i.7p
+     */
+    protected static array $contextos_cargados = [];
+
+    /**
      * Devuelve true si la superestructura en memoria fue
      * cargada de forma parcial.
      *
@@ -277,6 +291,18 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      */
     public static function es_grafo_parcial(): bool {
         return static::$grafo_parcial;
+    }
+
+    /**
+     * Devuelve los contextos que se usaron en la última
+     * carga parcial. Array vacío si la última carga fue
+     * completa.
+     *
+     * @return string[]
+     * @since 1.5i.7p
+     */
+    public static function contextos_cargados(): array {
+        return static::$contextos_cargados;
     }
 
     /**
@@ -292,9 +318,11 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     public static function cargar_parcial($nombre, array $contextos): bool|null {
         Nodo::vaciar_superestructura(static::$token);
         static::$grafo_parcial = false;
+        static::$contextos_cargados = [];
         $res = static::delegar_con_args('cargar_parcial', $nombre, [$contextos]);
         if ($res === true) {
             static::$grafo_parcial = true;
+            static::$contextos_cargados = $contextos;
         }
         return $res;
     }

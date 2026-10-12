@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.37
- * @version   1.5piloto.74y
+ * @version   1.5piloto.78c
  */
 
 use Iteradores\Controlador\Controlador;
@@ -344,6 +344,15 @@ function guardar_ambos($nombre): bool {
     if (!Nodo::hay_nodos_en_superestructura()) {
         Controlador::_error("guardar_ambos: superestructura vacia para \"$nombre\". Se aborta para no pisar el grafo.");
         return false;
+    }
+
+    // Fase de carga parcial (v1.5piloto.78c): si el grafo en
+    // memoria se cargó de forma parcial, guardar solo los
+    // contextos cargados. Si la carga fue completa, guardar
+    // todo (comportamiento actual).
+    $contextos_cargados = Controlador::contextos_cargados();
+    if (!empty($contextos_cargados)) {
+        return Controlador::guardar_parcial($nombre, $contextos_cargados);
     }
 
     // Guardar en SQL (única fuente de verdad).
