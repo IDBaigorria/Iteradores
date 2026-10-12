@@ -22,26 +22,21 @@ use Iteradores\Controlador\Controlador;
  * @return bool
  */
 function detectar_usuarios_especiales(string $token): bool {
-    // Fase B3.3e: reescrito con por_cada_nodo_ejecutar,
-    // alineado con los demás detectores del archivo. Un
-    // "usuario" es cualquier nodo con adyacente `nivel` (o
-    // `publico.nivel`). Si algún usuario no tiene prefijo
-    // `us_` en su id, la migración no está aplicada.
-    $falta_alguno = false;
-    Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$falta_alguno) {
-        if ($falta_alguno) return null;
+    // Solo mira los hijos del contenedor `usuarios`. Es uno
+    // de los usos legítimos de la raíz: listar TODOS los
+    // usuarios del sistema. No se puede reemplazar por
+    // `por_cada_nodo_ejecutar`: el recorrido completo del
+    // grafo encuentra otros nodos con adyacente `nivel` que
+    // no son usuarios, y el detector da `false` siempre.
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return true; // sin usuarios: trivialmente aplicada
+    $adyacentes = $raiz->adyacentes();
+    if (!$adyacentes) return true;
+    foreach ($adyacentes as $nombre => $nodo) {
         $id = (string)$nodo->id();
-        if (strpos($id, 'us_') === 0) return null; // ya está OK
-        // No tiene prefijo: ¿es un usuario?
-        $nivel = $nodo->adyacente('nivel');
-        if (!$nivel) {
-            $publico = $nodo->adyacente('publico');
-            if ($publico) $nivel = $publico->adyacente('nivel');
-        }
-        if ($nivel) $falta_alguno = true;
-        return null;
-    }, null);
-    return !$falta_alguno;
+        if (strpos($id, 'us_') !== 0) return false;
+    }
+    return true;
 }
 
 /**
@@ -51,19 +46,16 @@ function detectar_usuarios_especiales(string $token): bool {
  * @return bool
  */
 function detectar_niveles_usuario(string $token): bool {
-    // Fase B3.3e: reescrito con por_cada_nodo_ejecutar,
-    // alineado con los demás detectores. Si algún nodo con
-    // prefijo `us_` no tiene contenedor `publico`, la
-    // migración no está aplicada.
-    $falta_alguno = false;
-    Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$falta_alguno) {
-        if ($falta_alguno) return null;
-        $id = (string)$nodo->id();
-        if (strpos($id, 'us_') !== 0) return null; // no es usuario
-        if (!$nodo->adyacente('publico')) $falta_alguno = true;
-        return null;
-    }, null);
-    return !$falta_alguno;
+    // Mismo criterio que detectar_usuarios_especiales: solo
+    // mira los hijos directos de `usuarios`.
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) return true;
+    $adyacentes = $raiz->adyacentes();
+    if (!$adyacentes) return true;
+    foreach ($adyacentes as $nombre => $nodo) {
+        if (!$nodo->adyacente('publico')) return false;
+    }
+    return true;
 }
 
 // ============================================================

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.77s
+ * @version   1.5piloto.78a
  */
 
 use Iteradores\Nodos\Nodo;
@@ -704,6 +704,14 @@ function agregar_usuario(array $datos): array {
         _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);
     }
 
+    // Fase B1: asegurar los contenedores `publico` y
+    // `privado`. Mismo cierre de agujero que v77l hizo
+    // para compartidos: sin esto, un usuario creado
+    // después de la migración B1 queda sin contenedores,
+    // y la detección de la migración da `false`
+    // permanentemente.
+    _asegurar_niveles_usuario($nodo_usuario);
+
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
     // Escribir credenciales en su grafo aparte.
@@ -1252,6 +1260,75 @@ function obtener_perfil_usuario(string $nombre_usuario): ?array {
     });
 
     return _formatear_usuario_para_admin($nombre_usuario, $nodo_usuario, $con_codigo);
+}
+
+// ============================================================
+// Fase B1: aseguramiento de los contenedores `publico` y
+// `privado`. Se llaman desde `agregar_usuario` para que
+// todo usuario nuevo salga con la estructura completa.
+// Idempotente. No elimina los enlaces viejos (viven en
+// la raíz del usuario, en paralelo a los contenedores).
+// ============================================================
+
+/**
+ * Asegura que un nodo usuario tenga los contenedores
+ * `publico` y `privado`, con los alias a los nodos ya
+ * existentes. Idempotente.
+ *
+ * Distribución:
+ *  - `publico` (dato = nombre_usuario): `nivel`,
+ *    `nombre_real`, `email`.
+ *  - `privado` (dato = ``): `efectivo`, `banco`,
+ *    `terminales`, `empresas`, `viajes`, `pasajeros`,
+ *    `ventas`, `rendiciones`, `liquidaciones`,
+ *    `cancelaciones`.
+ *  - Enlaces "de permiso" (`dueno`, `soporte`, `duenos`)
+ *    quedan en la raíz, no se mueven.
+ *
+ * Los enlaces viejos en la raíz NO se eliminan: el
+ * contenedor es un alias, apunta a los mismos nodos
+ * físicos. Todo el código actual sigue funcionando.
+ *
+ * @param Nodo $nodo_usuario
+ * @return void
+ */
+function _asegurar_niveles_usuario(Nodo $nodo_usuario): void {
+    if (!$nodo_usuario) return;
+
+    $nombre = (string)$nodo_usuario->dato();
+
+    // === publico ===
+    $publico = $nodo_usuario->adyacente('publico');
+    if (!$publico) {
+        $publico = Nodo::crear_con_dato($nombre);
+        $nodo_usuario->_adyacente_en($publico, 'publico');
+    } elseif ((string)$publico->dato() !== $nombre) {
+        $publico->_dato($nombre);
+    }
+    foreach (['nivel', 'nombre_real', 'email'] as $campo) {
+        $nodo_campo = $nodo_usuario->adyacente($campo);
+        if ($nodo_campo && !$publico->adyacente($campo)) {
+            $publico->_adyacente_en($nodo_campo, $campo);
+        }
+    }
+
+    // === privado ===
+    $privado = $nodo_usuario->adyacente('privado');
+    if (!$privado) {
+        $privado = Nodo::crear_con_dato('');
+        $nodo_usuario->_adyacente_en($privado, 'privado');
+    }
+    $campos_privados = [
+        'efectivo', 'banco', 'terminales', 'empresas',
+        'viajes', 'pasajeros', 'ventas', 'rendiciones',
+        'liquidaciones', 'cancelaciones',
+    ];
+    foreach ($campos_privados as $campo) {
+        $nodo_campo = $nodo_usuario->adyacente($campo);
+        if ($nodo_campo && !$privado->adyacente($campo)) {
+            $privado->_adyacente_en($nodo_campo, $campo);
+        }
+    }
 }
 
 // ============================================================

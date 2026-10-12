@@ -121,7 +121,42 @@ detectó la auditoría), empezando por B2.4.2 + B2.4.5.
   desincroniza de los compartidos del dueño. `aplicacion_POST.php`
   actualizado al modelo topológico.
 
-**Tanda actual:** v77y (B3.3e).
+**Tanda actual:** v78a (asegurar niveles al crear usuario).
+
+**v78a.** Mismo cierre de agujero que v77l hizo para
+compartidos: los usuarios creados después de la migración
+B1 (v76m) quedaban sin contenedores `publico`/`privado`.
+Resultado: el detector de la migración `niveles_usuario`
+daba `false` cada vez que se creaba un usuario nuevo, y
+había que volver a correr `grafo:crear_niveles_usuario` a
+mano. Fix: nuevo helper `_asegurar_niveles_usuario` en
+`Usuario.php`, llamado desde `agregar_usuario`. Idempotente.
+
+**Fix v77z.** Los dos detectores reescritos en v77y
+(`detectar_usuarios_especiales` y `detectar_niveles_usuario`)
+se revierten a la lógica original basada en
+`usuarios->adyacentes()`.
+
+**B3.3c sigue pendiente.** Los helpers que iteran sobre
+todos los dueños buscando por id requieren rediseño.
+
+**Fix v77z.** Los dos detectores reescritos en v77y
+(`detectar_usuarios_especiales` y `detectar_niveles_usuario`)
+se revierten a la lógica original basada en
+`usuarios->adyacentes()`. La reescritura con
+`por_cada_nodo_ejecutar` estaba mal: el recorrido completo
+del grafo encuentra otros nodos con adyacente `nivel` que no
+son usuarios (nodos huérfanos viejos, etc.), y por eso los
+detectores daban `false` siempre. El contenedor `usuarios`
+es uno de los usos legítimos de la raíz: listar TODOS los
+usuarios del sistema.
+
+**B3.3e (v77y).** Solo queda en pie el fix de
+`Migraciones/Comandos.php`: `app:crear_compartidos_terminal`
+resuelve el terminal por `us_<nombre>`.
+
+**B3.3c sigue pendiente.** Los helpers que iteran sobre
+todos los dueños buscando por id requieren rediseño.
 
 **B3.3e (v77y).** `Migraciones/Funciones.php`:
 `detectar_usuarios_especiales` y `detectar_niveles_usuario`

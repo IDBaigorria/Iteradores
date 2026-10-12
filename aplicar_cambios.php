@@ -2,11 +2,11 @@
 /**
  * Aplicador de cambios — Proyecto iteradores (PHP).
  *
- * Tanda V1.5piloto.77y (Fase B3.3e).
- *   - Migraciones/Funciones.php: detectar_usuarios_especiales y
- *     detectar_niveles_usuario reescritos con por_cada_nodo_ejecutar.
- *   - Migraciones/Comandos.php: app:crear_compartidos_terminal usa
- *     us_<nombre_terminal>.
+ * Tanda V1.5piloto.78a.
+ *   - Usuario.php: nuevo helper _asegurar_niveles_usuario y
+ *     llamada desde agregar_usuario. Cierra el mismo agujero que
+ *     v77l cerró para compartidos: los usuarios creados después
+ *     de la migración B1 quedaban sin `publico`/`privado`.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -17,194 +17,207 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
     // ============================================================
-    // Funciones.php — detectar_usuarios_especiales
+    // 1. Usuario.php — llamada al helper en agregar_usuario
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Migraciones/Funciones.php',
-        'descripcion' => 'Funciones: detectar_usuarios_especiales con por_cada_nodo',
+        'archivo' => 'Aplicacion/Usuarios/Usuario.php',
+        'descripcion' => 'Usuario: llamada a _asegurar_niveles_usuario',
         'buscar' => [
-            'function detectar_usuarios_especiales(string $token): bool {',
-            '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz) return true; // sin usuarios: trivialmente aplicada',
-            '    $adyacentes = $raiz->adyacentes();',
-            '    if (!$adyacentes) return true;',
-            '    foreach ($adyacentes as $nombre => $nodo) {',
-            '        $id = (string)$nodo->id();',
-            '        if (strpos($id, \'us_\') !== 0) return false;',
+            '    // Si es soporte, asignar dueños.',
+            '    if ($nivel === \'soporte\' && !empty($duenos_asignados)) {',
+            '        _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);',
             '    }',
-            '    return true;',
-            '}',
+            '',
+            '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
         ],
         'reemplazar' => [
-            'function detectar_usuarios_especiales(string $token): bool {',
-            '    // Fase B3.3e: reescrito con por_cada_nodo_ejecutar,',
-            '    // alineado con los demás detectores del archivo. Un',
-            '    // "usuario" es cualquier nodo con adyacente `nivel` (o',
-            '    // `publico.nivel`). Si algún usuario no tiene prefijo',
-            '    // `us_` en su id, la migración no está aplicada.',
-            '    $falta_alguno = false;',
-            '    Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$falta_alguno) {',
-            '        if ($falta_alguno) return null;',
-            '        $id = (string)$nodo->id();',
-            '        if (strpos($id, \'us_\') === 0) return null; // ya está OK',
-            '        // No tiene prefijo: ¿es un usuario?',
-            '        $nivel = $nodo->adyacente(\'nivel\');',
-            '        if (!$nivel) {',
-            '            $publico = $nodo->adyacente(\'publico\');',
-            '            if ($publico) $nivel = $publico->adyacente(\'nivel\');',
+            '    // Si es soporte, asignar dueños.',
+            '    if ($nivel === \'soporte\' && !empty($duenos_asignados)) {',
+            '        _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);',
+            '    }',
+            '',
+            '    // Fase B1: asegurar los contenedores `publico` y',
+            '    // `privado`. Mismo cierre de agujero que v77l hizo',
+            '    // para compartidos: sin esto, un usuario creado',
+            '    // después de la migración B1 queda sin contenedores,',
+            '    // y la detección de la migración da `false`',
+            '    // permanentemente.',
+            '    _asegurar_niveles_usuario($nodo_usuario);',
+            '',
+            '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        ],
+    ],
+
+    // ============================================================
+    // 2. Usuario.php — nuevo helper al final del archivo
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Usuarios/Usuario.php',
+        'descripcion' => 'Usuario: agregar helper _asegurar_niveles_usuario',
+        'buscar' => [
+            '// ============================================================',
+            '// Fase B2.3.5c.2: aseguramiento del compartido de un terminal',
+        ],
+        'reemplazar' => [
+            '// ============================================================',
+            '// Fase B1: aseguramiento de los contenedores `publico` y',
+            '// `privado`. Se llaman desde `agregar_usuario` para que',
+            '// todo usuario nuevo salga con la estructura completa.',
+            '// Idempotente. No elimina los enlaces viejos (viven en',
+            '// la raíz del usuario, en paralelo a los contenedores).',
+            '// ============================================================',
+            '',
+            '/**',
+            ' * Asegura que un nodo usuario tenga los contenedores',
+            ' * `publico` y `privado`, con los alias a los nodos ya',
+            ' * existentes. Idempotente.',
+            ' *',
+            ' * Distribución:',
+            ' *  - `publico` (dato = nombre_usuario): `nivel`,',
+            ' *    `nombre_real`, `email`.',
+            ' *  - `privado` (dato = ``): `efectivo`, `banco`,',
+            ' *    `terminales`, `empresas`, `viajes`, `pasajeros`,',
+            ' *    `ventas`, `rendiciones`, `liquidaciones`,',
+            ' *    `cancelaciones`.',
+            ' *  - Enlaces "de permiso" (`dueno`, `soporte`, `duenos`)',
+            ' *    quedan en la raíz, no se mueven.',
+            ' *',
+            ' * Los enlaces viejos en la raíz NO se eliminan: el',
+            ' * contenedor es un alias, apunta a los mismos nodos',
+            ' * físicos. Todo el código actual sigue funcionando.',
+            ' *',
+            ' * @param Nodo $nodo_usuario',
+            ' * @return void',
+            ' */',
+            'function _asegurar_niveles_usuario(Nodo $nodo_usuario): void {',
+            '    if (!$nodo_usuario) return;',
+            '',
+            '    $nombre = (string)$nodo_usuario->dato();',
+            '',
+            '    // === publico ===',
+            '    $publico = $nodo_usuario->adyacente(\'publico\');',
+            '    if (!$publico) {',
+            '        $publico = Nodo::crear_con_dato($nombre);',
+            '        $nodo_usuario->_adyacente_en($publico, \'publico\');',
+            '    } elseif ((string)$publico->dato() !== $nombre) {',
+            '        $publico->_dato($nombre);',
+            '    }',
+            '    foreach ([\'nivel\', \'nombre_real\', \'email\'] as $campo) {',
+            '        $nodo_campo = $nodo_usuario->adyacente($campo);',
+            '        if ($nodo_campo && !$publico->adyacente($campo)) {',
+            '            $publico->_adyacente_en($nodo_campo, $campo);',
             '        }',
-            '        if ($nivel) $falta_alguno = true;',
-            '        return null;',
-            '    }, null);',
-            '    return !$falta_alguno;',
-            '}',
-        ],
-    ],
-
-    // ============================================================
-    // Funciones.php — detectar_niveles_usuario
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Migraciones/Funciones.php',
-        'descripcion' => 'Funciones: detectar_niveles_usuario con por_cada_nodo',
-        'buscar' => [
-            'function detectar_niveles_usuario(string $token): bool {',
-            '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz) return true;',
-            '    $adyacentes = $raiz->adyacentes();',
-            '    if (!$adyacentes) return true;',
-            '    foreach ($adyacentes as $nombre => $nodo) {',
-            '        if (!$nodo->adyacente(\'publico\')) return false;',
             '    }',
-            '    return true;',
+            '',
+            '    // === privado ===',
+            '    $privado = $nodo_usuario->adyacente(\'privado\');',
+            '    if (!$privado) {',
+            '        $privado = Nodo::crear_con_dato(\'\');',
+            '        $nodo_usuario->_adyacente_en($privado, \'privado\');',
+            '    }',
+            '    $campos_privados = [',
+            '        \'efectivo\', \'banco\', \'terminales\', \'empresas\',',
+            '        \'viajes\', \'pasajeros\', \'ventas\', \'rendiciones\',',
+            '        \'liquidaciones\', \'cancelaciones\',',
+            '    ];',
+            '    foreach ($campos_privados as $campo) {',
+            '        $nodo_campo = $nodo_usuario->adyacente($campo);',
+            '        if ($nodo_campo && !$privado->adyacente($campo)) {',
+            '            $privado->_adyacente_en($nodo_campo, $campo);',
+            '        }',
+            '    }',
             '}',
-        ],
-        'reemplazar' => [
-            'function detectar_niveles_usuario(string $token): bool {',
-            '    // Fase B3.3e: reescrito con por_cada_nodo_ejecutar,',
-            '    // alineado con los demás detectores. Si algún nodo con',
-            '    // prefijo `us_` no tiene contenedor `publico`, la',
-            '    // migración no está aplicada.',
-            '    $falta_alguno = false;',
-            '    Nodo::por_cada_nodo_ejecutar($token, function($nodo) use (&$falta_alguno) {',
-            '        if ($falta_alguno) return null;',
-            '        $id = (string)$nodo->id();',
-            '        if (strpos($id, \'us_\') !== 0) return null; // no es usuario',
-            '        if (!$nodo->adyacente(\'publico\')) $falta_alguno = true;',
-            '        return null;',
-            '    }, null);',
-            '    return !$falta_alguno;',
-            '}',
+            '',
+            '// ============================================================',
+            '// Fase B2.3.5c.2: aseguramiento del compartido de un terminal',
         ],
     ],
 
     // ============================================================
-    // Comandos.php — app:crear_compartidos_terminal
+    // 3. Usuario.php — bump @version
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
-        'descripcion' => 'Comandos: crear_compartidos_terminal usa us_',
+        'archivo' => 'Aplicacion/Usuarios/Usuario.php',
+        'descripcion' => 'Usuario: bump a 1.5piloto.78a',
         'buscar' => [
-            '                // Llenar terminales: solo el propio.',
-            '                $raiz = Nodo::nodo_por_id(\'usuarios\');',
-            '                $nodo_term = $raiz ? $raiz->adyacente($nombre_terminal) : null;',
-            '                if ($nodo_term) {',
-            '                    $c_terminales->_adyacente_en($nodo_term, $nombre_terminal);',
-            '                }',
+            ' * @since     1.5piloto.1',
+            ' * @version   1.5piloto.77s',
         ],
         'reemplazar' => [
-            '                // Llenar terminales: solo el propio.',
-            '                // Fase B3.3e: ID especial directo.',
-            '                $nodo_term = Nodo::nodo_por_id(\'us_\' . $nombre_terminal);',
-            '                if ($nodo_term) {',
-            '                    $c_terminales->_adyacente_en($nodo_term, $nombre_terminal);',
-            '                }',
+            ' * @since     1.5piloto.1',
+            ' * @version   1.5piloto.78a',
         ],
     ],
 
     // ============================================================
-    // Comandos.php — bump @version
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
-        'descripcion' => 'Comandos: bump a 1.5piloto.77y',
-        'buscar' => [
-            ' * @since 1.5piloto.76n',
-            ' * @version 1.5piloto.77k',
-        ],
-        'reemplazar' => [
-            ' * @since 1.5piloto.76n',
-            ' * @version 1.5piloto.77y',
-        ],
-    ],
-
-    // ============================================================
-    // plan_actual.md — tanda actual a v77y
+    // 4. plan_actual.md — tanda actual a v78a
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: tanda actual a v77y',
+        'descripcion' => 'plan_actual: tanda actual a v78a',
         'buscar' => [
-            '**Tanda actual:** v77x (fix de `viajes-micros.js` tras B3.3d).',
+            '**Tanda actual:** v77z (fix de B3.3e).',
         ],
         'reemplazar' => [
-            '**Tanda actual:** v77y (B3.3e).',
+            '**Tanda actual:** v78a (asegurar niveles al crear usuario).',
             '',
-            '**B3.3e (v77y).** `Migraciones/Funciones.php`:',
-            '`detectar_usuarios_especiales` y `detectar_niveles_usuario`',
-            'reescritos con `Nodo::por_cada_nodo_ejecutar`, alineados',
-            'con los otros detectores del archivo. `Migraciones/Comandos.php`:',
-            '`app:crear_compartidos_terminal` resuelve el terminal por',
-            '`us_<nombre>` en lugar de `usuarios`.',
+            '**v78a.** Mismo cierre de agujero que v77l hizo para',
+            'compartidos: los usuarios creados después de la migración',
+            'B1 (v76m) quedaban sin contenedores `publico`/`privado`.',
+            'Resultado: el detector de la migración `niveles_usuario`',
+            'daba `false` cada vez que se creaba un usuario nuevo, y',
+            'había que volver a correr `grafo:crear_niveles_usuario` a',
+            'mano. Fix: nuevo helper `_asegurar_niveles_usuario` en',
+            '`Usuario.php`, llamado desde `agregar_usuario`. Idempotente.',
+            '',
+            '**Fix v77z.** Los dos detectores reescritos en v77y',
+            '(`detectar_usuarios_especiales` y `detectar_niveles_usuario`)',
+            'se revierten a la lógica original basada en',
+            '`usuarios->adyacentes()`.',
             '',
             '**B3.3c sigue pendiente.** Los helpers que iteran sobre',
-            'todos los dueños buscando por id requieren rediseño:',
-            '`Venta.php` (`_buscar_venta_por_id` sin filtro,',
-            '`obtener_cancelacion_por_id`), `Impresion.php` (2),',
-            '`Liquidacion.php` (`obtener_liquidacion_por_id`),',
-            '`Rendicion.php` (`aceptar_ajuste_rendicion`,',
-            '`obtener_rendicion_por_id`), `Pasajero.php`',
-            '(`obtener_pasajero_por_dni`).',
+            'todos los dueños buscando por id requieren rediseño.',
         ],
     ],
 
     // ============================================================
-    // prompt_piloto.md — agregar v77y
+    // 5. prompt_piloto.md — agregar v78a
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt_piloto: agregar v77y',
+        'descripcion' => 'prompt_piloto: agregar v78a',
         'buscar' => [
-            '- **v77x**: fix de `viajes-micros.js`. El POST a',
+            '- **v77z**: fix de B3.3e. Los dos detectores reescritos en',
         ],
         'reemplazar' => [
-            '- **v77y** (Fase B3.3e): `Migraciones/Funciones.php`',
-            '  alinea `detectar_usuarios_especiales` y',
-            '  `detectar_niveles_usuario` con `por_cada_nodo_ejecutar`.',
-            '  `Migraciones/Comandos.php` usa `us_<nombre>` en',
-            '  `app:crear_compartidos_terminal`.',
-            '- **v77x**: fix de `viajes-micros.js`. El POST a',
+            '- **v78a**: helper `_asegurar_niveles_usuario` en',
+            '  `Usuario.php` + llamada desde `agregar_usuario`. Cierra',
+            '  el mismo agujero que v77l para compartidos: los usuarios',
+            '  creados después de la migración B1 (v76m) quedaban sin',
+            '  `publico`/`privado`, y el detector de la migración',
+            '  `niveles_usuario` daba `false` cada vez que se creaba un',
+            '  usuario. Idempotente, no elimina los enlaces viejos.',
+            '- **v77z**: fix de B3.3e. Los dos detectores reescritos en',
         ],
     ],
 
     // ============================================================
-    // index.php — bump
+    // 6. index.php — bump
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'index.php',
-        'descripcion' => 'index.php: bump a 1.5piloto.77y',
+        'descripcion' => 'index.php: bump a 1.5piloto.78a',
         'buscar' => [
-            ' * @version   1.5piloto.77x',
+            ' * @version   1.5piloto.77z',
         ],
         'reemplazar' => [
-            ' * @version   1.5piloto.77y',
+            ' * @version   1.5piloto.78a',
         ],
     ],
 

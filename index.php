@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.77y
+ * @version   1.5piloto.78a
  */
 
 // --- Utilidades base ----------------------------------

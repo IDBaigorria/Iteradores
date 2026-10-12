@@ -877,6 +877,21 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   destruye las hojas al limpiar un campo. Helpers
   nuevos: `_destruir_declaracion_jurada_pasajero`,
   `_destruir_pasajero_completo`.
+- **v78a**: helper `_asegurar_niveles_usuario` en
+  `Usuario.php` + llamada desde `agregar_usuario`. Cierra
+  el mismo agujero que v77l para compartidos: los usuarios
+  creados después de la migración B1 (v76m) quedaban sin
+  `publico`/`privado`, y el detector de la migración
+  `niveles_usuario` daba `false` cada vez que se creaba un
+  usuario. Idempotente, no elimina los enlaces viejos.
+- **v77z**: fix de B3.3e. Los dos detectores reescritos en
+  v77y se revierten a la lógica original basada en
+  `usuarios->adyacentes()`. La reescritura con
+  `por_cada_nodo_ejecutar` estaba mal: el recorrido completo
+  del grafo encuentra otros nodos con adyacente `nivel` que
+  no son usuarios, y los detectores daban `false` siempre.
+  Los listados de todos los usuarios son un uso legítimo de
+  la raíz `usuarios`; no hay que reescribirlos.
 - **v77y** (Fase B3.3e): `Migraciones/Funciones.php`
   alinea `detectar_usuarios_especiales` y
   `detectar_niveles_usuario` con `por_cada_nodo_ejecutar`.
