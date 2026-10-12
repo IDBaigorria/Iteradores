@@ -115,6 +115,24 @@ function _contextos_para_operacion(string $accion, string $nombre_solicitante, a
     // Si no hay solicitante, carga total (fallback).
     if ($accion !== '') {
         if ($nombre_solicitante === '') return null;
+
+        // Fase 1c.2: acciones que crean/editan/eliminan usuarios
+        // necesitan la raíz `usuarios` en memoria (para colgar o
+        // descolgar el usuario nuevo y que `listar_usuarios` lo
+        // vea). Con carga parcial del dueño, `usuarios` no está.
+        // Carga total para estas acciones puntuales.
+        $acciones_carga_total = [
+            'dueno/agregar_terminal',
+            'dueno/actualizar_terminal',
+            'dueno/eliminar_terminal',
+            'administrador/agregar_usuario',
+            'administrador/actualizar_usuario',
+            'administrador/eliminar_usuario',
+        ];
+        if (in_array($accion, $acciones_carga_total, true)) {
+            return null;
+        }
+
         return ['us_' . $nombre_solicitante];
     }
 
