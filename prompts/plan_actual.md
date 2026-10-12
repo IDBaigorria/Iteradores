@@ -17,17 +17,19 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 ### 1.1 Última actualización
 
-**Última actualización de este archivo:** v1.5piloto.77o
-(cierre de la fase B2.3.5: pruebas del plugin + fixes).
-La Fase B2.3 quedó cerrada completa (B2.3.1 a B2.3.5). El
-repuntado de terminales al compartido está aplicado en
-producción, los terminales nuevos se repuntan al vuelo
-(`_asegurar_compartido_y_repuntar`, v77l), y las 3 pruebas
-del plugin (57, 58, 59) están verdes. La auditoría completa
-de B2.4 ("mantener vivos los compartidos") y B3 ("eliminar
-los usos de `Nodo::nodo_por_id('usuarios')`") está en §1.9.
-Próximo paso: **Fase B2.4** (los 5 bugs funcionales que
-detectó la auditoría), empezando por B2.4.2 + B2.4.5.
+**Última actualización de este archivo:** v1.5piloto.78a
+(cierre de la Fase B3.3 + fix v78a).
+La línea B del modelo topológico quedó cerrada salvo
+B3.3c: B2.4 (Tanda A, v77q) y B3 (B3.1 v77r; B3.3a v77t;
+B3.3b v77u; B3.3d v77v; B3.3e v77y + revert v77z). El fix
+v78a cierra el agujero de niveles al crear usuario (mismo
+patrón que v77l para compartidos). Queda pendiente B3.3c
+(los 6 helpers que iteran sobre todos los dueños),
+postergada hasta que el framework implemente iteradores
+con ID especial + carga parcial. Próximo paso: **tanda de
+documentación (esta)** y después **Etapa 0 del plan de
+carga parcial** (infraestructura en el Controlador +
+`_contextos_para_operacion` en el Enrutador).
 
 ### 1.2 Estado de la conversación
 
@@ -120,8 +122,36 @@ detectó la auditoría), empezando por B2.4.2 + B2.4.5.
   al `empresas` de cada compartido. `eliminar_empresa`
   desincroniza de los compartidos del dueño. `aplicacion_POST.php`
   actualizado al modelo topológico.
+- **v77r** (Fase B3.1): aislación de usuarios con
+  `us_<nombre>` en Venta, Viaje, Enrutador, Usuario, Empresa,
+  ViajeMicros, Pasajero e index.php. `agregar_usuario` ya no
+  autocrea la raíz `usuarios`.
+- **v77s**: fix del `$raiz` residual en `eliminar_usuario`.
+- **v77t** (Fase B3.3a): `Liquidacion.php` y `Rendicion.php`
+  a `us_<nombre>` en las 7 resoluciones con nombre por
+  parámetro.
+- **v77u** (Fase B3.3b): `Pasajero.php` rama sin contexto +
+  `ViajeAsientos.php` (3 resoluciones).
+- **v77v** (Fase B3.3d): `Vehiculo.php` a `us_<nombre>` con
+  `$nombre_dueno` requerido. `Enrutador.php` pasa el dueño en
+  las 6 acciones. `micros.js` manda `nombre_dueno`.
+- **v77w**: fix del `continue` huérfano en
+  `subir_foto_vehiculo` (rompía el parseo de `Vehiculo.php`).
+- **v77x**: fix de `viajes-micros.js`. El modal "Agregar
+  micro" no mandaba `nombre_dueno` a `vehiculos/listar`.
+- **v77y** (Fase B3.3e): `Migraciones/Funciones.php` y
+  `Migraciones/Comandos.php` reescritos con
+  `por_cada_nodo_ejecutar` y `us_<nombre>`.
+- **v77z**: revert parcial de v77y. Los detectores vuelven a
+  `usuarios->adyacentes()` (el recorrido completo del grafo
+  encuentra otros nodos con adyacente `nivel`). Se mantiene
+  el fix de `Migraciones/Comandos.php`.
+- **v78a**: helper `_asegurar_niveles_usuario` en
+  `Usuario.php`, llamado desde `agregar_usuario`. Cierra el
+  agujero de niveles al crear usuario (mismo patrón que v77l
+  para compartidos).
 
-**Tanda actual:** v78a (asegurar niveles al crear usuario).
+**Tanda actual:** v78a.
 
 **v78a.** Mismo cierre de agujero que v77l hizo para
 compartidos: los usuarios creados después de la migración
@@ -954,20 +984,27 @@ navegación de contexto.
   - `detectar_usuarios_especiales`.
   - `detectar_niveles_usuario`.
 
-**Plan de limpieza:**
+**Plan de limpieza (estado a v78a):**
 
-- **B2.3.4 (en curso):** reemplazar los usos que están dentro
-  del flujo de ventas y de contexto del terminal
-  (`confirmar_venta_actual`, `cancelar_venta`,
+- **B2.3.4 (cerrada en v77e):** reemplazo por `us_<nombre>`
+  en `confirmar_venta_actual`, `cancelar_venta`,
   `_calcular_cobertura_dueno`, `_crear_nodo_cancelacion` y
-  `_contexto_terminal`). Se reemplazan por
-  `Nodo::nodo_por_id('us_' . $nombre)`. Sin cambio visible
-  (funciona igual hoy con el grafo completo).
-- **B3 (limpieza final):** reemplazar el resto. Los 6 del
-  enrutador son los más delicados: requieren que el enrutador
-  empiece a pasar contexto (repuntado de B2.3.5). Los fallbacks
-  "sin contexto" de las funciones contenedoras se eliminan en
-  B3.
+  `_contexto_terminal`.
+- **B3.1 (cerrada en v77r):** aislación de usuarios con
+  `us_<nombre>` en los flujos que ya tenían el nombre a mano.
+- **B3.3a-e (cerradas):** Liquidacion, Rendicion, Pasajero
+  (rama sin contexto), ViajeAsientos, Vehiculo, Enrutador
+  (parcial) y Migraciones (con revert de v77z para los
+  detectores).
+- **B3.3c (pendiente, postergada):** los 6 helpers que
+  iteran sobre todos los dueños buscando por id. Se
+  resuelven cuando el framework implemente iteradores con
+  ID especial + carga parcial (ver §1.10). Si aparece
+  dolor real antes, se evalúa rediseño.
+- **B3.2 (eliminar los fallbacks "sin contexto"):** se
+  resuelve junto con la carga parcial, porque el fallback
+  "sin contexto" es justamente el que no se puede usar
+  cuando hay contextos activos.
 
 **Contenedores raíz de árboles paralelos.** Cada árbol tiene su
 propio contenedor raíz. `privado/ventas` es un nodo, y
@@ -986,6 +1023,190 @@ después del repuntado (B2.3.5). **NO** se agrega un enlace
 `dueno` en el compartido apuntando al nodo del dueño real:
 eso rompería la privacidad topológica (el terminal podría
 llegar al dueño por el enlace y desde ahí a todo el grafo).
+
+### 1.10 Plan de carga parcial (línea siguiente)
+
+Plan consensuado en v78a. No implementado todavía. La
+línea B del modelo topológico dejó el grafo preparado
+(usuarios como IDs especiales, contenedores por nivel,
+compartidos por terminal, contextos opcionales en todas
+las funciones de contenedor). El framework PHP ya tiene
+`PerdurarSuperestructuraStringSQL64` (bitmask de
+contextos, 3 tablas nuevas, `cargar_parcial`), y el espejo
+JS tiene `PerdurarSuperestructuraStringIndexedDB64`.
+Falta usarlos.
+
+**Política.**
+
+- **Contexto por defecto: siempre parcial**, con el
+  contexto del usuario solicitante. Admin y soporte son
+  la excepción explícita: necesitan ver todo.
+- **Contexto por operación: caso por caso.** La mayoría
+  de las operaciones del piloto alcanzan con el propio
+  `us_<solicitante>`. Algunas necesitan sumar el del
+  dueño (por ejemplo, un terminal que necesita ver su
+  compartido y el dueño). Otras, contexto total (login,
+  módulo grafo, módulo administrador).
+- **Guardar delta como objetivo.** El framework tiene
+  una única superestructura estática en `Nodo`, así que
+  el grafo parcial y el total no coexisten en memoria.
+  La única vía es delta: al cargar parcial se marca qué
+  nodos vinieron del contexto; al guardar se persisten
+  solo los que cambiaron. La opción "merge en memoria"
+  que figuraba en §11.4 del prompt del framework queda
+  descartada por ese motivo.
+- **`_contextos_para_operacion` vive en el Enrutador.**
+  No en un archivo nuevo. El Enrutador ya conoce la
+  `accion` y el nombre del solicitante. Devuelve el
+  array de contextos a cargar.
+
+**Etapas.**
+
+- **Etapa 0 — Preparación.** Sin cambio de
+  comportamiento. Se agrega `_contextos_para_operacion`
+  en el Enrutador. Se decide cómo el Controlador sabe
+  que debe cargar parcial (probablemente un flag
+  `Controlador::establecer_modo_carga('parcial'|'total')`
+  más el uso directo de `cargar_parcial`). No se activa
+  todavía.
+- **Etapa 1 — Carga parcial activa + guardar delta.**
+  El Enrutador pide la carga con los contextos
+  correspondientes. La persistencia implementa
+  `guardar_parcial` con delta real (marcar nodos sucios
+  al cargar, persistir solo los cambiados). Fallback a
+  carga total cuando la operación toca uno de los 6
+  helpers de B3.3c.
+- **Etapa 2 — Optimización.** Bajar el costo de
+  `guardar` en el caso general (sin contexto). Revisar
+  iteradores persistentes (§11.3 del framework).
+- **Etapa 3 — Espejo JS.** `PerdurarSuperestructuraStringIndexedDB64.js`
+  recibe el mismo tratamiento. `Controlador.js` decide
+  modo de carga. El plugin prueba desde el navegador.
+
+**Decisiones pendientes antes de Etapa 0:**
+
+- Tabla concreta de `_contextos_para_operacion` para
+  cada acción del enrutador. Se arma caso por caso.
+- Lista exacta de operaciones que caen al fallback
+  (las que tocan los 6 helpers de B3.3c).
+- Forma de "marcar nodos sucios" en la carga parcial.
+  Puede ser un flag en el Nodo (contradice la deuda de
+  §11.4 del framework de "dejar el Nodo limpio"), o
+  una estructura auxiliar del Controlador. A consensuar.
+
+### 1.11 Idea para el framework: iteradores con ID especial
+
+Anotada en v78a. No es parte del plan inmediato. Se
+retoma después de la Etapa 3 de la carga parcial, o
+antes si la carga parcial por sí sola no alcanza para
+los casos que quedaron postergados (B3.3c).
+
+**Idea.** Los iteradores del framework tienen hoy un
+nombre (string) y una posición en el grafo. La
+propuesta es darles también un ID especial persistente
+(`it_<nombre>` o similar), convirtiéndolos en raíces de
+subgrafo — igual que los IDs especiales que hoy usa el
+sistema de contextos (`us_*`, `sesiones`, `aplicacion`).
+
+**Dos consecuencias.**
+
+1. **Un iterador cargado trae su subgrafo alcanzable,**
+   no solo el nodo apuntado. Cargar `it_viajes_carmen1`
+   carga todo lo alcanzable desde su posición actual.
+2. **Un iterador tiene un usuario que lo "ocupa".** El
+   ocupante impide que dos usuarios lo muevan a la vez
+   y da un criterio claro de "quién es dueño de qué
+   subgrafo".
+
+**Especialización por tipo.** Varios iteradores, cada
+uno especializado en un tipo (`it_empresas_<dueno>`,
+`it_viajes_<dueno>`, `it_micros_<dueno>`,
+`it_pasajeros_<dueno>`, `it_asientos_<dueno>`,
+`it_cupones_<dueno>`, `it_liquidaciones_<dueno>`,
+`it_rendiciones_<dueno>`, `it_cancelaciones_<dueno>`,
+`it_usuarios_<dueno>`). Un iterador por tipo por
+usuario.
+
+**Beneficio.** El backend decide "qué iteradores cargar"
+según la operación y el usuario. En vez de "cargar todo
+el grafo" o "cargar todos los contextos del usuario",
+carga "los iteradores que el usuario ocupa, filtrados
+por tipo". Combinado con el bitmask de contextos, cada
+iterador es un bit de contexto más.
+
+**Diferencia con contextos actuales.** Un contexto es
+un conjunto de nodos alcanzables desde un ID especial
+estático. Un iterador con ID especial es lo mismo, pero
+con posición mutable y un ocupante. La diferencia es
+semántica, no estructural: en el bitmask, un `it_*` es
+un contexto igual que un `us_*`.
+
+**Interacción con la destrucción de nodos.** Hay que
+revisar los flujos de destrucción: si un nodo vive
+dentro del subgrafo de un iterador, y el iterador se
+mueve, hay que decidir si el nodo se destruye o queda
+huérfano. Conecta con §11.2 del prompt del framework
+(fuga de nodos huérfanos).
+
+La idea está también anotada en §11.5 del
+`prompt_framework_iteradores.md`.
+
+### 1.12 Lecciones de la sesión v77q-v78a
+
+**Sobre los reemplazos automáticos.**
+
+1. **Los reemplazos al final de una función deben
+   incluir el `}` de cierre.** Si se reemplaza solo
+   la primera mitad de un bloque (por ejemplo, un
+   bucle), quedan fragmentos huérfanos (`continue`,
+   `break`, `return`) que rompen el parseo del
+   archivo entero. Caso v77w: un `continue` fuera
+   de contexto en `subir_foto_vehiculo` rompió
+   `Vehiculo.php`.
+2. **Grep cruzado por nombre de acción POST al
+   cambiar firmas.** Cuando se cambia la firma de
+   una función PHP que responde a una acción POST
+   (por ejemplo, agregar `$nombre_dueno` a una
+   función de `Vehiculo.php`), hay que buscar no
+   solo por el nombre de la función, sino también
+   por el nombre de la acción (`vehiculos/listar`,
+   `vehiculos/agregar`, etc.) para encontrar todos
+   los lugares del frontend que la llaman. Caso
+   v77x: el modal "Agregar micro" llamaba a
+   `vehiculos/listar` sin `nombre_dueno` y el
+   select quedó vacío.
+
+**Sobre el framework y los IDs.**
+
+3. **Los detectores basados en `por_cada_nodo_ejecutar`
+   sobre el grafo completo son frágiles.** El
+   recorrido encuentra otros nodos con adyacentes
+   que imitan la forma buscada (nodos huérfanos
+   viejos, etc.) y da falsos negativos. Los
+   detectores que necesitan "listar todos los
+   usuarios" deben usar `usuarios->adyacentes()`
+   (revert v77z).
+4. **Los agujeros de mantenimiento topológico se
+   cierran al vuelo.** El fix v78a es el mismo
+   patrón que v77l: cada flujo de alta debe crear
+   los contenedores que le corresponden para que
+   las migraciones de detección no den `false`
+   cada vez que se crea un elemento nuevo.
+
+**Sobre el diseño de la carga parcial.**
+
+5. **El grafo parcial y el total no coexisten en
+   memoria.** El framework tiene una única
+   superestructura estática en `Nodo`. Cargar
+   parcial reemplaza todo. La única vía para
+   guardar es delta (marcar nodos sucios al
+   cargar y persistir solo los cambiados).
+6. **La función que decide los contextos vive en el
+   Enrutador.** No en un archivo nuevo, no en el
+   Controlador. El Enrutador ya conoce la acción y
+   el solicitante. El Controlador solo expone
+   `cargar_parcial`, `guardar_parcial` y un flag
+   de modo.
 
 ---
 
@@ -1007,23 +1228,18 @@ estructura del grafo, no de chequeos de código.
    (v76m).
 3. **Fase B2.1** — Compartidos por terminal (`compartido_con_us_termX`)
    creados con referencias filtradas. **Completada** (v76q).
-4. **Fase B2.2.1** — Contexto opcional en `obtener_contenedor_viajes_dueno`.
-   **Completada** (v76r).
-5. **Fase B2.2.2** — Contexto y filtro en Venta.php.
-   **Completada** (v76s).
-6. **Fase B2.2.3** — Contexto en ViajeAsientos.php.
-   **Completada** (v76t).
-7. **Fase B2.2.4** — Contexto en Empresa.php.
-   **Completada** (v76u).
-8. **Fase B2.3** — Árboles paralelos con nombres parametrizados
-   en `Arbol.php`. **En curso.** Detalle en §2.3.
-9. **Fase B2.4** — Mantener los compartidos vivos (cada operación
-   que modifique el contenido del compartido lo actualiza).
+4. **Fase B2.2** — Contexto opcional en Viaje, Venta,
+   ViajeAsientos y Empresa. **Completada** (v76r-v76u).
+5. **Fase B2.3** — Árboles paralelos con nombres
+   parametrizados en `Arbol.php`. **Completada** (v76v-v77o).
+6. **Fase B2.4** — Mantener los compartidos vivos. **Completada**
+   (Tanda A, v77q).
+7. **Fase B3** — Eliminar los accesos viejos. **Cerrada salvo
+   B3.3c** (postergada hasta la carga parcial; ver §1.10).
+8. **Fase C** (opcional) — Tipos como IDs especiales, ortogonal.
    **Pendiente.**
-10. **Fase B3** — Eliminar los accesos viejos. **Pendiente.**
-11. **Fase C** (opcional) — Tipos como IDs especiales, ortogonal.
-12. **Fase D** — Aprovechar la carga parcial como optimización.
-    **Pendiente.**
+9. **Carga parcial** (ex Fase D) — Pasar a carga y guardado
+   parciales por contexto. **En preparación** (plan en §1.10).
 
 ### 2.3 Detalle de la Fase B2.3 (en curso)
 

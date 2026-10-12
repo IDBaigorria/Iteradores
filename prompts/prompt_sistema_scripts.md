@@ -631,6 +631,28 @@ costó un fallo real del runner y una iteración extra.
     lentas y frágiles. Paliativo: limpieza periódica +
     timeouts holgados. Solución real: independencia de estado
     entre pruebas o setup por prueba.
+18. **Reemplazos al final de una función deben incluir
+    el `}` de cierre.** Si se reemplaza solo la primera
+    mitad de un bloque (por ejemplo, un bucle), quedan
+    fragmentos huérfanos (`continue`, `break`, `return`)
+    que rompen el parseo del archivo entero. Caso v77w:
+    un `continue` fuera de contexto en
+    `subir_foto_vehiculo` rompió `Vehiculo.php`. Regla:
+    si se reemplaza un bloque de control de flujo,
+    incluir el `}` de cierre tanto en `buscar` como en
+    `reemplazar`.
+19. **Grep cruzado por nombre de acción POST al cambiar
+    firmas.** Cuando se cambia la firma de una función
+    PHP que responde a una acción POST (por ejemplo,
+    agregar `$nombre_dueno` a una función de
+    `Vehiculo.php`), hay que buscar no solo por el
+    nombre de la función, sino también por el nombre
+    de la acción (`vehiculos/listar`, `vehiculos/agregar`,
+    etc.) para encontrar todos los lugares del frontend
+    que la llaman. Caso v77x: el modal "Agregar micro"
+    llamaba a `vehiculos/listar` sin `nombre_dueno` y
+    el select quedó vacío. Se detectó tarde porque el
+    grep por función no alcanzaba.
 
 ---
 
@@ -651,11 +673,15 @@ costó un fallo real del runner y una iteración extra.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.77o.
-Se confirma que el sistema de scripts sigue igual. Recordatorio:
-los prompts del proyecto PHP (framework, piloto, sistema de
-scripts, plan actual) y del plugin (`iteradoresJS/prompts/`)
-se actualizan en la misma tanda que el código.
+**Última actualización de este prompt:** v1.5piloto.78a.
+Se agregan dos aprendizajes (18-19): reemplazos al final
+de una función deben incluir el `}` de cierre (caso v77w),
+y grep cruzado por nombre de acción POST al cambiar
+firmas (caso v77x). El resto del sistema sigue igual.
+Recordatorio: los prompts del proyecto PHP (framework,
+piloto, sistema de scripts, plan actual) y del plugin
+(`iteradoresJS/prompts/`) se actualizan en la misma
+tanda que el código.
 Antes: v1.5piloto.74q. Se
 agregan tres aprendizajes a la fuerza (15-17): verificar
 `git diff --stat` antes de commitear (caso del `Vehiculo.php`

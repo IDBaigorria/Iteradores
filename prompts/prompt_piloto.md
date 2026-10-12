@@ -2144,34 +2144,37 @@ asignados.
 2. **Fase B1** (completada en v76m): contenedores
    `publico` y `privado` creados como alias de los
    nodos existentes. Los enlaces viejos quedan vivos.
-3. **Fase B2.1** (completada en v76q): crear los
-   contenedores `compartido_con_us_termX` en cada dueño,
-   con referencias filtradas a los viajes, empresas,
-   ventas y cancelaciones del terminal. Alias al
-   contenedor de pasajeros del dueño. **No repunta
-   nada**: los compartidos coexisten con la estructura
-   actual. La migración es idempotente.
-4. **Fase B2.2** (pendiente): cambiar el código para que
-   el terminal navegue por su compartido. Se agrega un
-   parámetro opcional `?Nodo $nodo_contexto` a
-   `obtener_contenedor_viajes_dueno`,
-   `obtener_contenedor_ventas_dueno` y
-   `obtener_contenedor_pasajeros_dueno`. Si el llamador
-   pasa el compartido, la función navega desde ahí. Si
-   no, navega desde la raíz `usuarios` como hoy.
-5. **Fase B2.3** (pendiente): repuntar `us_termX → dueno`
-   al contenedor `compartido_con_us_termX`. A partir de
-   acá, el acceso del terminal al grafo del dueño pasa
-   por la topología.
-6. **Fase B2.4** (pendiente): mantener vivos los
-   compartidos. Cada operación que modifica viajes
-   autorizados, micros, empresas o ventas del terminal
-   actualiza el compartido correspondiente.
-7. **Fase B3** (pendiente): eliminar los accesos viejos.
+3. **Fase B2.1** (completada en v76q): contenedores
+   `compartido_con_us_termX` creados como contenedores
+   filtrados. Alias al contenedor de pasajeros del
+   dueño. Sin repuntar.
+4. **Fase B2.2** (completada en v76r-v76u): contexto
+   opcional en Viaje, Venta, ViajeAsientos y Empresa.
+   Refactor sin cambio de comportamiento.
+5. **Fase B2.3** (completada en v76v-v77o): árboles
+   paralelos con nombres parametrizados; migración de
+   compartidos; repuntado de terminales al compartido;
+   pruebas del plugin. La Fase B2.3.5 dejó el
+   aislamiento activo en producción.
+6. **Fase B2.4** (completada en v77q, Tanda A): mantener
+   vivos los compartidos en cada operación de escritura
+   (`eliminar_viaje`, `agregar_terminal_autorizada`,
+   `eliminar_terminal_autorizada`, `agregar_micro_a_viaje`,
+   `eliminar_empresa`). Nuevo archivo
+   `Aplicacion/Compartidos.php`.
+7. **Fase B3** (B3.1 v77r, B3.3a-e v77t-v78a; B3.3c
+   postergada): eliminar los accesos viejos a la raíz
+   `usuarios`. Quedan pendientes los 6 helpers que
+   iteran sobre todos los dueños buscando por id
+   (B3.3c). Se resuelven cuando el framework
+   implemente iteradores con ID especial + carga
+   parcial (ver `plan_actual.md` §1.10 y
+   `prompt_framework_iteradores.md` §11.5).
 8. **Fase C** (opcional): tipos como IDs especiales,
    ortogonal.
-9. **Fase D** (pendiente): aprovechar la carga parcial
-   como optimización.
+9. **Carga parcial** (ex Fase D, en preparación):
+   pasar a carga y guardado parciales por contexto.
+   Plan detallado en `plan_actual.md` §1.10.
 
 **Comandos asociados.**
 
@@ -3322,8 +3325,11 @@ podés retomar el trabajo.
   estructura de nodos).
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.76u (framework 1.5i.7l).
-Todo funcional. Fixes de v74k a v74o acumulados. Fix de
+**Estado del proyecto al cierre:** v1.5piloto.78a
+(framework 1.5i.7n). Todo funcional. La línea B del
+modelo topológico quedó cerrada salvo B3.3c
+(postergada hasta la carga parcial). Próximo: Etapa 0
+del plan de carga parcial (`plan_actual.md` §1.10). Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
 (Fase 2, primer flujo). v74s: `eliminar_micro_de_viaje`

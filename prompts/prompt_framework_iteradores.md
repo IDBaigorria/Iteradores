@@ -635,7 +635,7 @@ contextos alcanzantes; el conjunto se convierte a
 bitmask. Al cargar, el bitmask se asigna al nodo en
 memoria.
 
-**Método `SQL64` (fase 1, a implementar).** Misma base
+**Método `SQL64` (implementado, fase 1).** Misma base
 de datos que `SQL`, pero usa **tres tablas nuevas**
 (las tablas `nodo` y `adyacente` de SQL quedan
 intactas, así los dos métodos coexisten sin pisarse):
@@ -689,7 +689,8 @@ funcionando.
 
 **Fases.**
 
-- **Fase 1**: `PerdurarSuperestructuraStringSQL64` (PHP).
+- **Fase 1 (completada, framework 1.5i.7k)**:
+  `PerdurarSuperestructuraStringSQL64` (PHP).
   Comportamiento: `guardar` calcula y persiste el
   bitmask; `cargar` lee todo; `cargar_parcial` filtra
   con `WHERE contexto_mask & $mask != 0`. Los enlaces a
@@ -698,17 +699,25 @@ funcionando.
   El `Controlador` marca la superestructura como parcial
   y `guardar` falla si se intenta guardar un grafo
   parcial sin usar `guardar_parcial`.
-- **Fase 2**: `PerdurarSuperestructuraStringIndexedDB64.js`
-  (JS). Espejo de fase 1.
-- **Fase 3**: `PerdurarSuperestructuraStringJSON64.php` y
-  `PerdurarSuperestructuraStringXML64.php`. Estos
+- **Fase 2 (completada, framework 1.5i.7k)**:
+  `PerdurarSuperestructuraStringIndexedDB64.js` (JS).
+  Espejo de fase 1.
+- **Fase 3** (pendiente): `PerdurarSuperestructuraStringJSON64.php`
+  y `PerdurarSuperestructuraStringXML64.php`. Estos
   formatos agregan `guardar_parcial` escribiendo a un
   archivo separado. Regla: solo se puede cargar un
   subconjunto que fue guardado previamente.
-- **Fase 4** (opcional): implementar `guardar_parcial`
-  real en SQL64 e IndexedDB64. Requiere merge del
-  subgrafo en memoria con el persistido sin pisar
-  contextos fuera de la operación.
+- **Fase 4** (pendiente): implementar `guardar_parcial`
+  real en SQL64 e IndexedDB64. **No es merge en
+  memoria.** El framework tiene una única
+  superestructura estática en `Nodo`, así que un
+  grafo parcial y el total no coexisten en memoria:
+  la única vía es **delta**. Al cargar parcial se
+  marca qué nodos vinieron del contexto (o se
+  mantiene una lista de nodos sucios desde la carga);
+  al guardar se persisten solo los cambios. Esto da
+  la ganancia real de performance y evita el problema
+  de "leer el total desde la DB para mergear".
 - **Fase 5** (si hace falta): extender a 256 contextos
   (bitmask de `BINARY(32)`) o al producto de primos
   (ver discusión en §11.1).
@@ -753,6 +762,64 @@ nunca lo ve). Es una tanda aparte, con espejo PHP + JS.
 **Momento:** antes de la fase 5 (256 contextos) o antes
 de cualquier otro método de indexación. En la fase 1-2
 actual el campo en el nodo funciona; no bloquea nada.
+
+### 11.5 Dirección futura: iteradores como raíces de contexto
+
+Idea anotada en v1.5piloto.78a. No implementada. Se
+retoma después de la Fase 4 de §11.4, o antes si la
+carga parcial por sí sola no alcanza para los casos
+que quedaron postergados en el piloto (los 6 helpers
+que iteran sobre todos los dueños).
+
+**Propuesta.** Los iteradores actuales tienen un
+nombre (string) y una posición en el grafo. La idea
+es que también tengan un ID especial persistente
+(`it_<nombre>` o similar). Eso los convierte en
+raíces de subgrafo, igual que los IDs especiales que
+hoy usa el sistema de contextos (`us_*`, `sesiones`,
+`aplicacion`).
+
+**Dos consecuencias.**
+
+1. **Un iterador cargado trae su subgrafo alcanzable,**
+   no solo el nodo apuntado. Cargar el iterador
+   `it_viajes_carmen1` carga todo lo alcanzable desde
+   su posición actual.
+2. **Un iterador tiene un usuario que lo "ocupa".**
+   El ocupante impide que dos usuarios lo muevan a la
+   vez, y da un criterio claro de "quién es dueño de
+   qué subgrafo".
+
+**Especialización por tipo.** Varios iteradores, cada
+uno especializado en un tipo (`it_empresas_<dueno>`,
+`it_viajes_<dueno>`, `it_micros_<dueno>`,
+`it_pasajeros_<dueno>`, `it_asientos_<dueno>`,
+`it_cupones_<dueno>`, `it_liquidaciones_<dueno>`,
+`it_rendiciones_<dueno>`, `it_cancelaciones_<dueno>`,
+`it_usuarios_<dueno>`). Un iterador por tipo por
+usuario.
+
+**Beneficio.** El backend decide "qué iteradores
+cargar" según la operación y el usuario. En vez de
+"cargar todo el grafo" o "cargar todos los contextos
+del usuario", carga "los iteradores que el usuario
+ocupa, filtrados por tipo". Combinado con el bitmask
+de contextos, cada iterador es un bit de contexto
+más.
+
+**Diferencia con contextos actuales.** Un contexto es
+un conjunto de nodos alcanzables desde un ID especial
+estático. Un iterador con ID especial es lo mismo,
+pero con posición mutable y un ocupante. La
+diferencia es semántica, no estructural: en el
+bitmask, un `it_*` es un contexto igual que un `us_*`.
+
+**Interacción con la destrucción de nodos.** Hay que
+revisar los flujos de destrucción: si un nodo vive
+dentro del subgrafo de un iterador, y el iterador se
+mueve, hay que decidir si el nodo se destruye o
+queda huérfano. Conecta con §11.2 (fuga de nodos
+huérfanos).
 
 ---
 
@@ -860,6 +927,14 @@ actual el campo en el nodo funciona; no bloquea nada.
   "el enlace `dueno` del terminal apunta al compartido")
   con una sola consulta, sin seguir IDs numéricos (que
   no son estables entre cargas).
+- **1.5i.7n**: sin cambios funcionales al framework.
+  Documentación de §11.4 reescrita: la Fase 4 del
+  plan de contextos ahora es explícitamente "delta",
+  no merge en memoria (el framework no puede tener
+  grafo parcial y total al mismo tiempo; ver §11.4).
+  Fases 1 y 2 marcadas como completadas. Nueva §11.5
+  con la idea de iteradores como raíces de contexto
+  (IDs especiales + ocupante).
 - **1.5i.7l**: comando `grafo:raices` agregado al framework
   PHP (tanda 76n) y espejado en JS. Lista los nodos raíz
   del grafo (IDs especiales) con sus adyacentes directos.
