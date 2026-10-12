@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.76h
+ * @version   1.5piloto.78m
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -16,8 +16,10 @@ include_once("./miscelaneas/Arbol.php");
 include_once("./Aplicacion/Ventas/Venta.php");
 include_once("./Aplicacion/Rendiciones/Rendicion.php");
 include_once("./Aplicacion/Liquidaciones/Liquidacion.php");
-function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = '', string $numero_cupon = ''): void {
-    $venta = obtener_venta_por_id($id_venta);
+function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = '', string $numero_cupon = '', ?string $nombre_dueno = null): void {
+    // Fase 1c.2: pasar el dueño si viene, para buscar la venta en
+    // su contexto (carga parcial desde el flujo de impresión).
+    $venta = obtener_venta_por_id($id_venta, null, $nombre_dueno);
     if (!$venta) {
         echo "Venta no encontrada";
         return;
@@ -723,9 +725,8 @@ function imprimir_cupon(array $venta, string $numero_cupon = ''): void {
  * @return string
  */
 function _nombre_real_usuario(string $nombre_usuario): string {
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return $nombre_usuario;
-    $nodo = $raiz->adyacente($nombre_usuario);
+    // Fase 1c.2: ID especial directo (sin la raíz `usuarios`).
+    $nodo = Nodo::nodo_por_id('us_' . $nombre_usuario);
     if (!$nodo) return $nombre_usuario;
     if ($nodo->adyacente('nombre_real')) {
         return $nodo->adyacente('nombre_real')->dato();
@@ -745,11 +746,10 @@ function _nombre_real_usuario(string $nombre_usuario): string {
  */
 function _recolectar_ventas_para_informe(string $tipo, string $nombre): array {
     $ventas = [];
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_usuarios) return [];
 
     if ($tipo === 'terminal') {
-        $nodo_terminal = $raiz_usuarios->adyacente($nombre);
+        // Fase 1c.2: ID especial directo (sin la raíz `usuarios`).
+        $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre);
         if (!$nodo_terminal) return [];
         $nodo_dueno = $nodo_terminal->adyacente('dueno');
         if (!$nodo_dueno) return [];

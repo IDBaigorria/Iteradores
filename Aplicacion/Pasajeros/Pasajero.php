@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.77u
+ * @version   1.5piloto.78l
  */
 
 use Iteradores\Nodos\Nodo;
@@ -84,9 +84,9 @@ function listar_pasajeros(string $nombre_dueno, ?Nodo $nodo_contexto = null): ar
     $pasajeros = [];
     foreach ($adyacentes as $dni => $nodo_pasajero) {
         $datos = formatear_pasajero($dni, $nodo_pasajero);
-        $datos['tiene_pasajes'] = pasajero_tiene_pasajes($nombre_dueno, $dni);
-        $datos['tiene_ventas_activas'] = pasajero_tiene_ventas_activas($nombre_dueno, $dni);
-        $datos['tiene_reservas_activas'] = pasajero_tiene_reservas_activas($nombre_dueno, $dni);
+        $datos['tiene_pasajes'] = pasajero_tiene_pasajes($nombre_dueno, $dni, $nodo_contexto);
+        $datos['tiene_ventas_activas'] = pasajero_tiene_ventas_activas($nombre_dueno, $dni, $nodo_contexto);
+        $datos['tiene_reservas_activas'] = pasajero_tiene_reservas_activas($nombre_dueno, $dni, $nodo_contexto);
         $pasajeros[] = $datos;
     }
     return $pasajeros;
@@ -281,7 +281,7 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos, ?N
 
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
-    $activos = pasajero_tiene_pasajes_activos($nombre_dueno, $dni);
+    $activos = pasajero_tiene_pasajes_activos($nombre_dueno, $dni, $nodo_contexto);
     return [
         'exito' => true,
         'tiene_pasajes_activos' => $activos['tiene_activos'],
@@ -356,15 +356,17 @@ function crear_pasajero(string $nombre_dueno, array $datos, ?Nodo $nodo_contexto
 /**
  * Verifica si un pasajero tiene pasajes comprados en los viajes de un dueño.
  */
-function pasajero_tiene_pasajes(string $nombre_dueno, string $dni): bool {
-    // Fase B3.1: ID especial directo.
-    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+function pasajero_tiene_pasajes(string $nombre_dueno, string $dni, ?Nodo $nodo_contexto = null): bool {
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí con los nombres parametrizados.
+    $nodo_dueno = $nodo_contexto ?: Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return false;
 
     $contenedor_ventas = $nodo_dueno->adyacente('ventas');
     if (!$contenedor_ventas) return false;
 
-    $actual = hmi($contenedor_ventas);
+    $nombres = _nombres_arbol_para_contexto($nodo_contexto, '');
+    $actual = hmi($contenedor_ventas, $nombres);
     while ($actual) {
         $comprador = $actual->adyacente('comprador');
         if ($comprador && $comprador->dato() === $dni) {
@@ -385,7 +387,7 @@ function pasajero_tiene_pasajes(string $nombre_dueno, string $dni): bool {
             }
         }
 
-        $actual = hd($actual);
+        $actual = hd($actual, $nombres);
     }
 
     return false;
@@ -567,14 +569,14 @@ function _destruir_pasajero_completo(Nodo $nodo_pasajero): void {
  * @param string $dni
  * @return array
  */
-function eliminar_pasajero(string $nombre_dueno, string $dni): array {
-    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+function eliminar_pasajero(string $nombre_dueno, string $dni, ?Nodo $nodo_contexto = null): array {
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_pasajero = $contenedor->adyacente($dni);
     if (!$nodo_pasajero) return ['exito' => false, 'error' => 'Pasajero no encontrado'];
 
-    if (pasajero_tiene_pasajes($nombre_dueno, $dni)) {
+    if (pasajero_tiene_pasajes($nombre_dueno, $dni, $nodo_contexto)) {
         return ['exito' => false, 'error' => 'No se puede eliminar: el pasajero tiene pasajes comprados.'];
     }
 
@@ -753,16 +755,19 @@ function _fecha_viaje_es_activa(string $fecha_viaje): bool {
  * @param string $dni
  * @return array{tiene_activos: bool, ventas: array<int, array{id_venta: string, fecha_viaje: string, nombre_viaje: string}>}
  */
-function pasajero_tiene_pasajes_activos(string $nombre_dueno, string $dni): array {
+function pasajero_tiene_pasajes_activos(string $nombre_dueno, string $dni, ?Nodo $nodo_contexto = null): array {
     $resultado = ['tiene_activos' => false, 'ventas' => []];
 
     $dni_norm = normalizar_dni($dni);
     if ($dni_norm === '') return $resultado;
 
-    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí con nombres parametrizados.
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor_ventas) return $resultado;
 
-    $actual = hmi($contenedor_ventas);
+    $nombres = _nombres_arbol_para_contexto($nodo_contexto, '');
+    $actual = hmi($contenedor_ventas, $nombres);
     while ($actual) {
         // ¿El DNI es pasajero en algún asiento de esta venta?
         $es_pasajero = false;
@@ -796,7 +801,7 @@ function pasajero_tiene_pasajes_activos(string $nombre_dueno, string $dni): arra
             }
         }
 
-        $actual = hd($actual);
+        $actual = hd($actual, $nombres);
     }
 
     return $resultado;
@@ -813,8 +818,10 @@ function pasajero_tiene_pasajes_activos(string $nombre_dueno, string $dni): arra
  * @param callable $callback
  * @return void
  */
-function _recorrer_reservas_de_pasajero(string $nombre_dueno, string $dni_normalizado, callable $callback): void {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function _recorrer_reservas_de_pasajero(string $nombre_dueno, string $dni_normalizado, callable $callback, ?Nodo $nodo_contexto = null): void {
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return;
 
     $adyacentes_viajes = (array) $nodo_viajes->adyacentes();
@@ -871,14 +878,17 @@ function _recorrer_reservas_de_pasajero(string $nombre_dueno, string $dni_normal
  * @param string $dni
  * @return bool
  */
-function pasajero_tiene_ventas_activas(string $nombre_dueno, string $dni): bool {
+function pasajero_tiene_ventas_activas(string $nombre_dueno, string $dni, ?Nodo $nodo_contexto = null): bool {
     $dni_norm = normalizar_dni($dni);
     if ($dni_norm === '') return false;
 
-    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí con nombres parametrizados.
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor_ventas) return false;
 
-    $actual = hmi($contenedor_ventas);
+    $nombres = _nombres_arbol_para_contexto($nodo_contexto, '');
+    $actual = hmi($contenedor_ventas, $nombres);
     while ($actual) {
         $nodo_viaje = $actual->adyacente('viaje');
         $fecha_viaje = ($nodo_viaje && $nodo_viaje->adyacente('fecha'))
@@ -903,7 +913,7 @@ function pasajero_tiene_ventas_activas(string $nombre_dueno, string $dni): bool 
                 }
             }
         }
-        $actual = hd($actual);
+        $actual = hd($actual, $nombres);
     }
 
     return false;
@@ -919,14 +929,14 @@ function pasajero_tiene_ventas_activas(string $nombre_dueno, string $dni): bool 
  * @param string $dni
  * @return bool
  */
-function pasajero_tiene_reservas_activas(string $nombre_dueno, string $dni): bool {
+function pasajero_tiene_reservas_activas(string $nombre_dueno, string $dni, ?Nodo $nodo_contexto = null): bool {
     $dni_norm = normalizar_dni($dni);
     if ($dni_norm === '') return false;
 
     $encontrado = false;
     _recorrer_reservas_de_pasajero($nombre_dueno, $dni_norm, function() use (&$encontrado) {
         $encontrado = true;
-    });
+    }, $nodo_contexto);
     return $encontrado;
 }
 
@@ -946,7 +956,7 @@ function pasajero_tiene_reservas_activas(string $nombre_dueno, string $dni): boo
  * @param string $dni
  * @return array
  */
-function obtener_reservas_de_pasajero(string $nombre_dueno, string $dni): array {
+function obtener_reservas_de_pasajero(string $nombre_dueno, string $dni, ?Nodo $nodo_contexto = null): array {
     $dni_norm = normalizar_dni($dni);
     if ($dni_norm === '') return [];
 
@@ -1022,7 +1032,7 @@ function obtener_reservas_de_pasajero(string $nombre_dueno, string $dni): array 
             'hora_subida_bajada' => $nodo_hora_sb ? $nodo_hora_sb->dato() : null,
             'reservado_por' => $reservado_por,
         ];
-    });
+    }, $nodo_contexto);
 
     return $reservas;
 }
@@ -1040,11 +1050,13 @@ function obtener_reservas_de_pasajero(string $nombre_dueno, string $dni): array 
  * @param array  $archivo  Entrada de $_FILES
  * @return array
  */
-function subir_declaracion_jurada_pasajero(string $nombre_dueno, string $dni, array $archivo): array {
+function subir_declaracion_jurada_pasajero(string $nombre_dueno, string $dni, array $archivo, ?Nodo $nodo_contexto = null): array {
     $dni_norm = normalizar_dni($dni);
     if ($dni_norm === '') return ['exito' => false, 'error' => 'DNI inválido'];
 
-    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí.
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_pasajero = $contenedor->adyacente($dni_norm);
@@ -1131,11 +1143,13 @@ function subir_declaracion_jurada_pasajero(string $nombre_dueno, string $dni, ar
  * @param string $dni
  * @return array
  */
-function eliminar_declaracion_jurada_pasajero(string $nombre_dueno, string $dni): array {
+function eliminar_declaracion_jurada_pasajero(string $nombre_dueno, string $dni, ?Nodo $nodo_contexto = null): array {
     $dni_norm = normalizar_dni($dni);
     if ($dni_norm === '') return ['exito' => false, 'error' => 'DNI inválido'];
 
-    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno);
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí.
+    $contenedor = obtener_contenedor_pasajeros_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_pasajero = $contenedor->adyacente($dni_norm);

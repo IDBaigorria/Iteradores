@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78k
+ * @version   1.5piloto.78m
  */
 
 use Iteradores\Nodos\Nodo;
@@ -126,6 +126,16 @@ function _contextos_para_operacion(string $accion, string $nombre_solicitante, a
     if (isset($get['imprimir']) && $get['imprimir'] === '1') {
         $dueno = $get['dueno'] ?? '';
         if ($dueno === '') return null;
+
+        // Fase 1c.2: los informes de cancelación, liquidación y
+        // rendición usan helpers que iteran sobre todos los dueños
+        // (B3.3c, postergado). Carga total hasta que se reescriban.
+        $tipo_imp = $get['tipo'] ?? '';
+        $tipos_con_b33c = ['informe_cancelacion', 'informe_liquidacion', 'informe_rendicion'];
+        if (in_array($tipo_imp, $tipos_con_b33c, true)) {
+            return null;
+        }
+
         return ['us_' . $dueno];
     }
 
@@ -1043,7 +1053,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (!isset($_FILES['archivo'])) {
                         responder_json(['exito' => false, 'error' => 'Archivo no enviado']);
                     }
-                    $resultado = subir_declaracion_jurada_pasajero($nombre_dueno, $dni, $_FILES['archivo']);
+                    // Fase 1c.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = subir_declaracion_jurada_pasajero($nombre_dueno, $dni, $_FILES['archivo'], $nodo_contexto);
                     responder_json($resultado);
                     break;
 
@@ -1053,7 +1065,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_dueno) || empty($dni)) {
                         responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
                     }
-                    $resultado = eliminar_declaracion_jurada_pasajero($nombre_dueno, $dni);
+                    // Fase 1c.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = eliminar_declaracion_jurada_pasajero($nombre_dueno, $dni, $nodo_contexto);
                     responder_json($resultado);
                     break;
 
@@ -1121,7 +1135,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_dueno) || empty($dni)) {
                         responder_json(['exito' => false, 'error' => 'Dueño y DNI son obligatorios']);
                     }
-                    $resultado = eliminar_pasajero($nombre_dueno, $dni);
+                    // Fase 1c.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = eliminar_pasajero($nombre_dueno, $dni, $nodo_contexto);
                     responder_json($resultado);
                     break;
 

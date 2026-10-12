@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.78k
+ * @version   1.5piloto.78m
  */
 
 
@@ -904,11 +904,13 @@ function formatear_venta_resumida(Nodo $nodo_venta): array {
 /**
  * Obtiene el detalle completo de una venta por su ID.
  */
-function obtener_venta_por_id(string $id_venta, ?string $nombre_terminal = null): ?array {
+function obtener_venta_por_id(string $id_venta, ?string $nombre_terminal = null, ?string $nombre_dueno = null): ?array {
     // Fase B2.2.2: si se pasa el terminal, restringir la búsqueda
     // a su contexto. Si no, buscar en todos los dueños (compat
     // para admin/soporte).
-    [$nodo_venta, ] = _buscar_venta_por_id($id_venta, $nombre_terminal);
+    // Fase 1c.2: si se pasa el dueño, buscar directo en su
+    // contexto (usado por el flujo de impresión con carga parcial).
+    [$nodo_venta, ] = _buscar_venta_por_id($id_venta, $nombre_terminal, $nombre_dueno);
     if (!$nodo_venta) return null;
     return formatear_venta_completa($nodo_venta);
 }
@@ -1041,7 +1043,29 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
  * @param string $id_venta
  * @return array{0: ?Nodo, 1: string}
  */
-function _buscar_venta_por_id(string $id_venta, ?string $nombre_terminal = null): array {
+function _buscar_venta_por_id(string $id_venta, ?string $nombre_terminal = null, ?string $nombre_dueno = null): array {
+    // Fase 1c.2: si se pasa el dueño (sin terminal), buscar
+    // directo en su contexto. Se usa desde el flujo de
+    // impresión (que llega con ?dueno=X en el GET).
+    if ($nombre_terminal === null || $nombre_terminal === '') {
+        if ($nombre_dueno !== null && $nombre_dueno !== '') {
+            $nodo_dueno_d = Nodo::nodo_por_id('us_' . $nombre_dueno);
+            if (!$nodo_dueno_d) return [null, ''];
+            $cont = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno_d);
+            if (!$cont) return [null, ''];
+            $actual = hmi($cont);
+            $seg = 0;
+            while ($actual && $seg < 1000) {
+                if ($actual->dato() === $id_venta) {
+                    return [$actual, $nombre_dueno];
+                }
+                $actual = hd($actual);
+                $seg++;
+            }
+            return [null, ''];
+        }
+    }
+
     // Fase B2.2.2: si se pasa el terminal, restringir la búsqueda
     // a su contexto (hoy el nodo del dueño, tras B2.3 el
     // compartido). Acelera la búsqueda y prepara el aislamiento.
