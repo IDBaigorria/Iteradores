@@ -2,14 +2,23 @@
 /**
  * Aplicador de cambios automáticos — Proyecto PHP.
  *
- * Mini-tanda: chequeos defensivos de grafo parcial en las
- * funciones que necesitan listar TODOS los usuarios.
+ * Tanda 1c.1a (v2): corrección de la secuencia de migración a SQL64.
  *
- * Sin cambio de comportamiento (el flag está en false
- * hasta que se active la carga parcial en la Tanda 1c).
+ * El script anterior dejó el bloque ?migrar_a_sql64=1 después de
+ * la carga normal, y la carga normal con SQL64 fallaba (SQL64
+ * vacío → else → guardar vacío). El bloque nunca llegaba a migrar.
+ *
+ * Corrección:
+ *  - El bloque ?migrar_a_sql64=1 se mueve ANTES de la carga
+ *    normal y hace su propia carga desde SQL.
+ *  - Se elimina el bloque viejo.
  *
  * Uso:
  *   php aplicar_cambios.php
+ *
+ * IMPORTANTE: no abras la app hasta correr
+ *   index.php?migrar_a_sql64=1
+ * una vez después de aplicar este script.
  */
 
 // ============================================================
@@ -26,233 +35,129 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
 // ------------------------------------------------------------
-// Usuario.php
+// index.php — insertar bloque nuevo antes de la carga
 // ------------------------------------------------------------
 
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-    'descripcion' => 'Usuario: bump @version a 1.5piloto.78d',
+    'archivo' => 'index.php',
+    'descripcion' => 'index.php: insertar bloque ?migrar_a_sql64=1 antes de la carga',
     'buscar' => [
-        ' * @package   Iteradores',
-        ' * @since     1.5piloto.1',
-        ' * @version   1.5piloto.78a',
-        ' */',
+        'Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);',
+        '',
+        '// Inicialización de la persistencia.',
     ],
     'reemplazar' => [
-        ' * @package   Iteradores',
-        ' * @since     1.5piloto.1',
-        ' * @version   1.5piloto.78d',
-        ' */',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-    'descripcion' => 'Usuario: chequeo defensivo en buscar_usuario_por_codigo',
-    'buscar' => [
-        'function buscar_usuario_por_codigo(string $codigo): ?array {',
-        '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-        '    if (!$raiz_usuarios) return null;',
-    ],
-    'reemplazar' => [
-        'function buscar_usuario_por_codigo(string $codigo): ?array {',
-        '    // Chequeo defensivo: esta función necesita la raíz `usuarios`',
-        '    // completa (itera sobre todos). En carga parcial no se puede.',
-        '    if (Controlador::es_grafo_parcial()) {',
-        '        Controlador::_error("buscar_usuario_por_codigo: el grafo en memoria es parcial; no se pueden listar todos los usuarios.");',
-        '        return null;',
+        'Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);',
+        '',
+        '// ==== Migración a SQL64 (v1.5piloto.78e) ====',
+        '// Pasa el grafo del formato SQL (tablas nodo/adyacente) al',
+        '// formato SQL64 (tablas nodo_contexto/adyacente_contexto/',
+        '// contexto). SQL64 es el que soporta la carga parcial por',
+        '// contextos. Hace su propia carga desde SQL, así no depende',
+        '// de que el grafo ya esté en memoria. Idempotente: correrlo',
+        '// dos veces no rompe nada (la segunda corrida reescribe las',
+        '// mismas tablas con el mismo contenido).',
+        '//',
+        '// Este bloque va ANTES de la carga normal porque la carga',
+        '// normal usa SQL64: si SQL64 todavía no tiene datos, la app',
+        '// no puede arrancar.',
+        '//',
+        '// Uso: index.php?migrar_a_sql64=1',
+        'if (isset($_GET[\'migrar_a_sql64\'])) {',
+        '    header(\'Content-Type: text/plain; charset=utf-8\');',
+        '    $nombre_app_mig = ConfiguracionApli::NOMBRE_APP;',
+        '',
+        '    // 1. Cargar el grafo original desde SQL.',
+        '    Controlador::establecer_metodo(\'SQL\');',
+        '    if (!Controlador::existe($nombre_app_mig)) {',
+        '        echo "ERROR: no existe el grafo \\"$nombre_app_mig\\" en SQL. Nada que migrar.\\n";',
+        '        exit;',
         '    }',
-        '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-        '    if (!$raiz_usuarios) return null;',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-    'descripcion' => 'Usuario: chequeo defensivo en listar_usuarios',
-    'buscar' => [
-        'function listar_usuarios(): array {',
-        '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
-        '    if (!$raiz) return [];',
-    ],
-    'reemplazar' => [
-        'function listar_usuarios(): array {',
-        '    // Chequeo defensivo: listar todos los usuarios requiere la',
-        '    // raíz `usuarios` completa. En carga parcial no se puede.',
-        '    if (Controlador::es_grafo_parcial()) {',
-        '        Controlador::_error("listar_usuarios: el grafo en memoria es parcial; no se pueden listar todos los usuarios.");',
-        '        return [];',
+        '    if (!Controlador::cargar($nombre_app_mig)) {',
+        '        echo "ERROR: no se pudo cargar el grafo desde SQL.\\n";',
+        '        echo "Ver logs de errores del Controlador.\\n";',
+        '        exit;',
         '    }',
-        '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
-        '    if (!$raiz) return [];',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-    'descripcion' => 'Usuario: chequeo defensivo en listar_duenos',
-    'buscar' => [
-        'function listar_duenos(string $nombre_solicitante = \'\'): array {',
-        '    $todos = listar_usuarios();',
-    ],
-    'reemplazar' => [
-        'function listar_duenos(string $nombre_solicitante = \'\'): array {',
-        '    // Chequeo defensivo: listar todos los dueños requiere la',
-        '    // raíz `usuarios` completa (aunque listar_usuarios también',
-        '    // lo chequea, el mensaje específico es más claro).',
-        '    if (Controlador::es_grafo_parcial()) {',
-        '        Controlador::_error("listar_duenos: el grafo en memoria es parcial; no se pueden listar todos los dueños.");',
-        '        return [];',
-        '    }',
-        '    $todos = listar_usuarios();',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-    'descripcion' => 'Usuario: chequeo defensivo en listar_soportes',
-    'buscar' => [
-        'function listar_soportes(): array {',
-        '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
-        '    if (!$raiz) return [];',
-    ],
-    'reemplazar' => [
-        'function listar_soportes(): array {',
-        '    // Chequeo defensivo: listar todos los soportes requiere la',
-        '    // raíz `usuarios` completa. En carga parcial no se puede.',
-        '    if (Controlador::es_grafo_parcial()) {',
-        '        Controlador::_error("listar_soportes: el grafo en memoria es parcial; no se pueden listar todos los soportes.");',
-        '        return [];',
-        '    }',
-        '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
-        '    if (!$raiz) return [];',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-    'descripcion' => 'Usuario: chequeo defensivo en agregar_usuario',
-    'buscar' => [
-        '    // Fase B3.1: la raíz `usuarios` la crea `index.php` al',
-        '    // arrancar. Acá no la autocreamos. El chequeo de duplicado',
-        '    // se hace por ID especial, sin depender de la raíz.',
-        '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
-        '    if (!$raiz) {',
-        '        return [\'exito\' => false, \'error\' => \'No existe la raíz `usuarios`.\'];',
-        '    }',
-    ],
-    'reemplazar' => [
-        '    // Chequeo defensivo: agregar un usuario requiere colgarlo',
-        '    // de la raíz `usuarios` completa. En carga parcial no se',
-        '    // puede.',
-        '    if (Controlador::es_grafo_parcial()) {',
-        '        return [\'exito\' => false, \'error\' => \'agregar_usuario: el grafo en memoria es parcial; hace falta la carga completa.\'];',
+        '    if (!Nodo::hay_nodos_en_superestructura()) {',
+        '        echo "ERROR: el grafo en SQL está vacío. Nada que migrar.\\n";',
+        '        exit;',
         '    }',
         '',
-        '    // Fase B3.1: la raíz `usuarios` la crea `index.php` al',
-        '    // arrancar. Acá no la autocreamos. El chequeo de duplicado',
-        '    // se hace por ID especial, sin depender de la raíz.',
-        '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
-        '    if (!$raiz) {',
-        '        return [\'exito\' => false, \'error\' => \'No existe la raíz `usuarios`.\'];',
-        '    }',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Usuarios/Usuario.php',
-    'descripcion' => 'Usuario: chequeo defensivo en eliminar_usuario',
-    'buscar' => [
-        '    if ($nombre_usuario === ConfiguracionApli::NOMBRE_ADMIN) {',
-        '        return [\'exito\' => false, \'error\' => \'No se puede eliminar al administrador principal\'];',
+        '    // 2. Cambiar a SQL64 y guardar.',
+        '    Controlador::establecer_metodo(\'SQL64\');',
+        '    if (!Controlador::guardar($nombre_app_mig)) {',
+        '        echo "ERROR: no se pudo guardar el grafo en SQL64.\\n";',
+        '        echo "Ver logs de errores del Controlador.\\n";',
+        '        exit;',
         '    }',
         '',
-        '    // Fase B3.1: ID especial directo.',
-        '    $nodo_usuario = Nodo::nodo_por_id(\'us_\' . $nombre_usuario);',
-        '    if (!$nodo_usuario) return [\'exito\' => false, \'error\' => \'Usuario no encontrado\'];',
-    ],
-    'reemplazar' => [
-        '    if ($nombre_usuario === ConfiguracionApli::NOMBRE_ADMIN) {',
-        '        return [\'exito\' => false, \'error\' => \'No se puede eliminar al administrador principal\'];',
+        '    // 3. Reportar.',
+        '    echo "Migración a SQL64\\n";',
+        '    echo "=================\\n\\n";',
+        '    echo "Grafo \\"$nombre_app_mig\\" migrado de SQL a SQL64.\\n\\n";',
+        '    $ctx = Controlador::listar_contextos($nombre_app_mig);',
+        '    if (is_array($ctx)) {',
+        '        echo "Contextos registrados (" . count($ctx) . "):\\n";',
+        '        foreach ($ctx as $c) echo "  - $c\\n";',
+        '    } else {',
+        '        echo "No se pudieron listar los contextos.\\n";',
         '    }',
+        '    echo "\\nListo.\\n";',
+        '    exit;',
+        '}',
         '',
-        '    // Chequeo defensivo: eliminar un usuario requiere desenlazarlo',
-        '    // de la raíz `usuarios` completa. En carga parcial no se',
-        '    // puede (el nodo quedaría huérfano en la raíz).',
-        '    if (Controlador::es_grafo_parcial()) {',
-        '        return [\'exito\' => false, \'error\' => \'eliminar_usuario: el grafo en memoria es parcial; hace falta la carga completa.\'];',
-        '    }',
-        '',
-        '    // Fase B3.1: ID especial directo.',
-        '    $nodo_usuario = Nodo::nodo_por_id(\'us_\' . $nombre_usuario);',
-        '    if (!$nodo_usuario) return [\'exito\' => false, \'error\' => \'Usuario no encontrado\'];',
+        '// Inicialización de la persistencia.',
     ],
 ],
 
 // ------------------------------------------------------------
-// Migraciones/Funciones.php
+// index.php — eliminar bloque viejo
 // ------------------------------------------------------------
 
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Migraciones/Funciones.php',
-    'descripcion' => 'Migraciones/Funciones: bump + @version',
+    'archivo' => 'index.php',
+    'descripcion' => 'index.php: eliminar bloque ?migrar_a_sql64=1 viejo',
     'buscar' => [
-        ' * @since 1.5piloto.76n',
-        ' */',
-    ],
-    'reemplazar' => [
-        ' * @since 1.5piloto.76n',
-        ' * @version 1.5piloto.78d',
-        ' */',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Migraciones/Funciones.php',
-    'descripcion' => 'Migraciones/Funciones: chequeo defensivo en detectar_usuarios_especiales',
-    'buscar' => [
-        'function detectar_usuarios_especiales(string $token): bool {',
-        '    // Solo mira los hijos del contenedor `usuarios`. Es uno',
-    ],
-    'reemplazar' => [
-        'function detectar_usuarios_especiales(string $token): bool {',
-        '    // Chequeo defensivo: el detector necesita la raíz `usuarios`',
-        '    // completa. En carga parcial no se puede decidir; se devuelve',
-        '    // true (aplicada) para no ofrecer una migración que no se',
-        '    // puede correr, y se registra el error.',
-        '    if (Controlador::es_grafo_parcial()) {',
-        '        Controlador::_error("detectar_usuarios_especiales: el grafo en memoria es parcial; no se puede evaluar la migración.");',
-        '        return true;',
+        '// ==== Migración a SQL64 (v1.5piloto.78e) ====',
+        '// Pasa el grafo del formato SQL (tablas nodo/adyacente) al',
+        '// formato SQL64 (tablas nodo_contexto/adyacente_contexto/',
+        '// contexto). SQL64 es el que soporta la carga parcial por',
+        '// contextos. El grafo está cargado en memoria con SQL;',
+        '// cambiamos el método al vuelo y guardamos. Idempotente:',
+        '// correrlo dos veces no rompe nada (la segunda corrida',
+        '// reescribe las mismas tablas con el mismo contenido).',
+        '//',
+        '// Uso: index.php?migrar_a_sql64=1',
+        'if (isset($_GET[\'migrar_a_sql64\'])) {',
+        '    header(\'Content-Type: text/plain; charset=utf-8\');',
+        '    if (!Nodo::hay_nodos_en_superestructura()) {',
+        '        echo "ERROR: no hay nodos en memoria. Nada que migrar.\\n";',
+        '        exit;',
         '    }',
-        '    // Solo mira los hijos del contenedor `usuarios`. Es uno',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Migraciones/Funciones.php',
-    'descripcion' => 'Migraciones/Funciones: chequeo defensivo en detectar_niveles_usuario',
-    'buscar' => [
-        'function detectar_niveles_usuario(string $token): bool {',
-        '    // Mismo criterio que detectar_usuarios_especiales: solo',
+        '    Controlador::establecer_metodo(\'SQL64\');',
+        '    if (!Controlador::guardar($nombre_app)) {',
+        '        echo "ERROR: no se pudo guardar el grafo en SQL64.\\n";',
+        '        echo "Ver logs de errores del Controlador.\\n";',
+        '        exit;',
+        '    }',
+        '    echo "Migración a SQL64\\n";',
+        '    echo "=================\\n\\n";',
+        '    echo "Grafo \\"$nombre_app\\" guardado en formato SQL64.\\n\\n";',
+        '    $ctx = Controlador::listar_contextos($nombre_app);',
+        '    if (is_array($ctx)) {',
+        '        echo "Contextos registrados (" . count($ctx) . "):\\n";',
+        '        foreach ($ctx as $c) echo "  - $c\\n";',
+        '    } else {',
+        '        echo "No se pudieron listar los contextos.\\n";',
+        '    }',
+        '    echo "\\nListo.\\n";',
+        '    exit;',
+        '}',
     ],
     'reemplazar' => [
-        'function detectar_niveles_usuario(string $token): bool {',
-        '    // Chequeo defensivo: idem detectar_usuarios_especiales.',
-        '    if (Controlador::es_grafo_parcial()) {',
-        '        Controlador::_error("detectar_niveles_usuario: el grafo en memoria es parcial; no se puede evaluar la migración.");',
-        '        return true;',
-        '    }',
-        '    // Mismo criterio que detectar_usuarios_especiales: solo',
+        '// (bloque ?migrar_a_sql64 movido antes de la carga normal, v78e v2)',
     ],
 ],
 

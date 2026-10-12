@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.78b
+ * @version   1.5piloto.78e
  */
 
 // --- Utilidades base ----------------------------------
@@ -108,22 +108,77 @@ Entorno::establecer_modo(Conf::LOCAL ? Entorno::MODO_PRUEBAS : Entorno::MODO_PRO
 // (el framework no conoce el nombre de la app).
 Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);
 
+// ==== Migración a SQL64 (v1.5piloto.78e) ====
+// Pasa el grafo del formato SQL (tablas nodo/adyacente) al
+// formato SQL64 (tablas nodo_contexto/adyacente_contexto/
+// contexto). SQL64 es el que soporta la carga parcial por
+// contextos. Hace su propia carga desde SQL, así no depende
+// de que el grafo ya esté en memoria. Idempotente: correrlo
+// dos veces no rompe nada (la segunda corrida reescribe las
+// mismas tablas con el mismo contenido).
+//
+// Este bloque va ANTES de la carga normal porque la carga
+// normal usa SQL64: si SQL64 todavía no tiene datos, la app
+// no puede arrancar.
+//
+// Uso: index.php?migrar_a_sql64=1
+if (isset($_GET['migrar_a_sql64'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    $nombre_app_mig = ConfiguracionApli::NOMBRE_APP;
+
+    // 1. Cargar el grafo original desde SQL.
+    Controlador::establecer_metodo('SQL');
+    if (!Controlador::existe($nombre_app_mig)) {
+        echo "ERROR: no existe el grafo \"$nombre_app_mig\" en SQL. Nada que migrar.\n";
+        exit;
+    }
+    if (!Controlador::cargar($nombre_app_mig)) {
+        echo "ERROR: no se pudo cargar el grafo desde SQL.\n";
+        echo "Ver logs de errores del Controlador.\n";
+        exit;
+    }
+    if (!Nodo::hay_nodos_en_superestructura()) {
+        echo "ERROR: el grafo en SQL está vacío. Nada que migrar.\n";
+        exit;
+    }
+
+    // 2. Cambiar a SQL64 y guardar.
+    Controlador::establecer_metodo('SQL64');
+    if (!Controlador::guardar($nombre_app_mig)) {
+        echo "ERROR: no se pudo guardar el grafo en SQL64.\n";
+        echo "Ver logs de errores del Controlador.\n";
+        exit;
+    }
+
+    // 3. Reportar.
+    echo "Migración a SQL64\n";
+    echo "=================\n\n";
+    echo "Grafo \"$nombre_app_mig\" migrado de SQL a SQL64.\n\n";
+    $ctx = Controlador::listar_contextos($nombre_app_mig);
+    if (is_array($ctx)) {
+        echo "Contextos registrados (" . count($ctx) . "):\n";
+        foreach ($ctx as $c) echo "  - $c\n";
+    } else {
+        echo "No se pudieron listar los contextos.\n";
+    }
+    echo "\nListo.\n";
+    exit;
+}
+
 // Inicialización de la persistencia.
 // Va después de los require_once para que `guardar_ambos` esté
 // definida (vive en FuncionesAuxiliares.php).
 //
-// NOTA (v1.5piloto.78b, Etapa 0 del plan de carga parcial):
-// Hoy se carga el grafo entero. En la Etapa 1, esta carga se
-// va a posponer: primero se resuelve el solicitante con un
-// bootstrap mínimo (cargar_parcial de ['usuarios',
-// 'sesiones', 'aplicacion']), después se llama a
-// _contextos_para_operacion($accion, $nombre_solicitante) para
-// decidir entre Controlador::cargar() (carga total) y
+// NOTA (v1.5piloto.78e, Etapa 1c.1 del plan de carga parcial):
+// El método de persistencia ya es SQL64 (soporta contextos).
+// La carga sigue siendo total (Controlador::cargar). En la
+// Etapa 1c.2 se pospone la carga: primero se resuelve el
+// solicitante con un bootstrap mínimo, después se llama a
+// _contextos_para_operacion($accion, $nombre_solicitante)
+// para decidir entre Controlador::cargar() (carga total) y
 // Controlador::cargar_parcial($nombre, $contextos).
-// El método de persistencia tiene que pasar de SQL a SQL64,
-// que es el que soporta contextos.
 // Ver `prompts/plan_actual.md` §1.10.
-Controlador::establecer_metodo('SQL');
+Controlador::establecer_metodo('SQL64');
 $nombre_app = ConfiguracionApli::NOMBRE_APP;
 if (Controlador::existe($nombre_app)) {
     if (!Controlador::cargar($nombre_app)) {
@@ -318,6 +373,8 @@ if (isset($_GET['migrar_usuarios_especiales'])) {
     echo "Listo.\n";
     exit;
 }
+
+// (bloque ?migrar_a_sql64 movido antes de la carga normal, v78e v2)
 // (bloque ?migrar_micros eliminado en v73r)
 // (bloque ?migrar_micros_patente eliminado en v73r)
 // (bloque ?migrar_terminales_autorizadas eliminado en v73r)
