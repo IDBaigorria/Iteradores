@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78g
+ * @version   1.5piloto.78h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -636,7 +636,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombre_vehiculo = $post['nombre_vehiculo'] ?? '';
                     $nombre_dueno = $post['nombre_dueno'] ?? '';
                     $monto = $post['monto'] ?? '0';
-                    $resultado = agregar_micro_a_viaje($nombre_viaje, $nombre_empresa, $nombre_vehiculo, $nombre_dueno, $monto);
+                    // Fase 1c.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = agregar_micro_a_viaje($nombre_viaje, $nombre_empresa, $nombre_vehiculo, $nombre_dueno, $monto, $nodo_contexto);
                     responder_json($resultado);
                     break;
 
@@ -647,7 +649,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = eliminar_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno);
+                    // Fase 1c.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = eliminar_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno, $nodo_contexto);
                     responder_json($resultado);
                     break;
 
@@ -680,7 +684,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = obtener_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno);
+                    // Fase 1c.2: contexto del solicitante (terminal → compartido).
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = obtener_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno, $nodo_contexto);
                     responder_json($resultado);
                     break;
 
@@ -692,7 +698,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = actualizar_monto_micro($nombre_viaje, $nombre_micro, $monto, $nombre_dueno);
+                    // Fase 1c.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = actualizar_monto_micro($nombre_viaje, $nombre_micro, $monto, $nombre_dueno, $nodo_contexto);
                     responder_json($resultado);
                     break;
 

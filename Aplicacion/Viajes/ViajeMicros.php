@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.74s
+ * @version   1.5piloto.78h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -91,18 +91,25 @@ function clonar_vehiculo($nodo_vehiculo_original) {
 /**
  * Agrega un micro a un viaje, clonando el vehículo original.
  */
-function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno, string $monto = '0'): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno, string $monto = '0', ?Nodo $nodo_contexto = null): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
     if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
 
-    // Fase B3.1: ID especial directo.
-    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
-    if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
-
-    $nodo_empresas = $nodo_dueno->adyacente('empresas');
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí. El compartido tiene un contenedor
+    // `empresas` con las empresas referenciadas por los viajes
+    // autorizados. Sin contexto (dueño, admin), navegar por la
+    // raíz `us_<dueno>` como antes.
+    if ($nodo_contexto) {
+        $nodo_empresas = $nodo_contexto->adyacente('empresas');
+    } else {
+        $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+        if (!$nodo_dueno) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+        $nodo_empresas = $nodo_dueno->adyacente('empresas');
+    }
     if (!$nodo_empresas) return ['exito' => false, 'error' => 'El dueño no tiene empresas'];
 
     $nodo_empresa = $nodo_empresas->adyacente($nombre_empresa);
@@ -237,8 +244,8 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
  * @param string $nombre_dueno
  * @return array
  */
-function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, string $nombre_dueno): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, string $nombre_dueno, ?Nodo $nodo_contexto = null): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -256,7 +263,7 @@ function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, str
     $nodo_micros->eliminar_adyacente($nombre_micro);
     _destruir_micro($nodo_micro);
 
-    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
+    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno, $nodo_contexto);
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
 }
@@ -264,8 +271,8 @@ function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, str
 /**
  * Actualiza el monto de un micro.
  */
-function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, string $monto, string $nombre_dueno): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, string $monto, string $nombre_dueno, ?Nodo $nodo_contexto = null): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -291,8 +298,8 @@ function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, stri
 /**
  * Obtiene la información completa de un micro para mostrarla en el pasaje.
  */
-function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, string $nombre_dueno): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, string $nombre_dueno, ?Nodo $nodo_contexto = null): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -358,8 +365,8 @@ function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, stri
 /**
  * Actualiza los contadores totales del viaje (ocupación, disponibles, seleccionados, vendidos, reservados).
  */
-function actualizar_contadores_viaje(string $nombre_viaje, string $nombre_dueno): void {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function actualizar_contadores_viaje(string $nombre_viaje, string $nombre_dueno, ?Nodo $nodo_contexto = null): void {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return;
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
