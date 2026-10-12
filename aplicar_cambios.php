@@ -2,13 +2,16 @@
 /**
  * Aplicador de cambios automáticos — Proyecto PHP.
  *
- * Tanda 1c.2a (Grupo 1): contexto del solicitante en ViajeMicros.
+ * Tanda 1c.2b (Grupo 2): contexto del solicitante en ViajeOpciones.
  *
- *  - ViajeMicros.php: 4 funciones aceptan ?Nodo $nodo_contexto.
- *    agregar_micro_a_viaje también resuelve `empresas` por contexto.
- *    actualizar_contadores_viaje propaga el contexto.
- *  - Enrutador.php: las 4 acciones de viajes/*_micro pasan
- *    _contexto_solicitante($nombre_solicitante).
+ *  - ViajeOpciones.php: obtener_opciones_avanzadas_viaje y
+ *    guardar_opciones_avanzadas_viaje aceptan ?Nodo $nodo_contexto.
+ *  - Enrutador.php: las 2 acciones viajes/*_opciones_avanzadas
+ *    pasan _contexto_solicitante($nombre_solicitante).
+ *
+ * Nota: las funciones obtener_opciones_terminal_viaje y
+ * guardar_opciones_terminal_viaje NO están en ViajeOpciones.php.
+ * Quedan para una sub-tanda aparte cuando se identifique el archivo.
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -28,22 +31,22 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
 // ------------------------------------------------------------
-// ViajeMicros.php
+// ViajeOpciones.php
 // ------------------------------------------------------------
 
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeMicros.php',
-    'descripcion' => 'ViajeMicros: bump @version a 1.5piloto.78h',
+    'archivo' => 'Aplicacion/Viajes/ViajeOpciones.php',
+    'descripcion' => 'ViajeOpciones: bump @version a 1.5piloto.78h',
     'buscar' => [
         ' * @package   Iteradores',
-        ' * @since     1.5piloto.8',
-        ' * @version   1.5piloto.74s',
+        ' * @since     1.5piloto.12',
+        ' * @version   1.5piloto.74',
         ' */',
     ],
     'reemplazar' => [
         ' * @package   Iteradores',
-        ' * @since     1.5piloto.8',
+        ' * @since     1.5piloto.12',
         ' * @version   1.5piloto.78h',
         ' */',
     ],
@@ -51,138 +54,47 @@ $cambios = [
 
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeMicros.php',
-    'descripcion' => 'ViajeMicros: agregar_micro_a_viaje acepta contexto',
+    'archivo' => 'Aplicacion/Viajes/ViajeOpciones.php',
+    'descripcion' => 'ViajeOpciones: obtener_opciones_avanzadas_viaje acepta contexto',
     'buscar' => [
-        'function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno, string $monto = \'0\'): array {',
+        'function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje): array {',
+    ],
+    'reemplazar' => [
+        'function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, ?Nodo $nodo_contexto = null): array {',
+    ],
+],
+
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Viajes/ViajeOpciones.php',
+    'descripcion' => 'ViajeOpciones: obtener_opciones_avanzadas_viaje usa contexto',
+    'buscar' => [
         '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);',
-        '    if (!$nodo_viajes) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
+        '    if (!$nodo_viajes) return $defaults;',
         '',
         '    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);',
-        '    if (!$nodo_viaje) return [\'exito\' => false, \'error\' => \'Viaje no encontrado\'];',
-        '',
-        '    // Fase B3.1: ID especial directo.',
-        '    $nodo_dueno = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
-        '    if (!$nodo_dueno) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-        '',
-        '    $nodo_empresas = $nodo_dueno->adyacente(\'empresas\');',
-        '    if (!$nodo_empresas) return [\'exito\' => false, \'error\' => \'El dueño no tiene empresas\'];',
+        '    if (!$nodo_viaje) return $defaults;',
     ],
     'reemplazar' => [
-        'function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, string $nombre_vehiculo, string $nombre_dueno, string $monto = \'0\', ?Nodo $nodo_contexto = null): array {',
         '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);',
-        '    if (!$nodo_viajes) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
+        '    if (!$nodo_viajes) return $defaults;',
         '',
         '    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);',
-        '    if (!$nodo_viaje) return [\'exito\' => false, \'error\' => \'Viaje no encontrado\'];',
-        '',
-        '    // Fase 1c.2: si viene contexto (terminal → compartido),',
-        '    // navegar desde ahí. El compartido tiene un contenedor',
-        '    // `empresas` con las empresas referenciadas por los viajes',
-        '    // autorizados. Sin contexto (dueño, admin), navegar por la',
-        '    // raíz `us_<dueno>` como antes.',
-        '    if ($nodo_contexto) {',
-        '        $nodo_empresas = $nodo_contexto->adyacente(\'empresas\');',
-        '    } else {',
-        '        $nodo_dueno = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
-        '        if (!$nodo_dueno) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-        '        $nodo_empresas = $nodo_dueno->adyacente(\'empresas\');',
-        '    }',
-        '    if (!$nodo_empresas) return [\'exito\' => false, \'error\' => \'El dueño no tiene empresas\'];',
+        '    if (!$nodo_viaje) return $defaults;',
     ],
 ],
 
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeMicros.php',
-    'descripcion' => 'ViajeMicros: eliminar_micro_de_viaje acepta contexto',
+    'archivo' => 'Aplicacion/Viajes/ViajeOpciones.php',
+    'descripcion' => 'ViajeOpciones: guardar_opciones_avanzadas_viaje acepta contexto',
     'buscar' => [
-        'function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, string $nombre_dueno): array {',
+        'function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, array $opciones, bool $aplicar_retroactivo = false): array {',
         '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);',
-        '    if (!$nodo_viajes) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
     ],
     'reemplazar' => [
-        'function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, string $nombre_dueno, ?Nodo $nodo_contexto = null): array {',
+        'function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, array $opciones, bool $aplicar_retroactivo = false, ?Nodo $nodo_contexto = null): array {',
         '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);',
-        '    if (!$nodo_viajes) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeMicros.php',
-    'descripcion' => 'ViajeMicros: eliminar_micro_de_viaje propaga contexto',
-    'buscar' => [
-        '    // Fase 2: destruir el micro completo. Primero desenlazar',
-        '    // del contenedor del viaje, después destruir el subárbol',
-        '    // (copia de vehículo, pisos, asientos, campos).',
-        '    $nodo_micros->eliminar_adyacente($nombre_micro);',
-        '    _destruir_micro($nodo_micro);',
-        '',
-        '    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);',
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-    'reemplazar' => [
-        '    // Fase 2: destruir el micro completo. Primero desenlazar',
-        '    // del contenedor del viaje, después destruir el subárbol',
-        '    // (copia de vehículo, pisos, asientos, campos).',
-        '    $nodo_micros->eliminar_adyacente($nombre_micro);',
-        '    _destruir_micro($nodo_micro);',
-        '',
-        '    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno, $nodo_contexto);',
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeMicros.php',
-    'descripcion' => 'ViajeMicros: actualizar_monto_micro acepta contexto',
-    'buscar' => [
-        'function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, string $monto, string $nombre_dueno): array {',
-        '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);',
-        '    if (!$nodo_viajes) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-    ],
-    'reemplazar' => [
-        'function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, string $monto, string $nombre_dueno, ?Nodo $nodo_contexto = null): array {',
-        '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);',
-        '    if (!$nodo_viajes) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeMicros.php',
-    'descripcion' => 'ViajeMicros: obtener_micro_de_viaje acepta contexto',
-    'buscar' => [
-        'function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, string $nombre_dueno): array {',
-        '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);',
-        '    if (!$nodo_viajes) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-    ],
-    'reemplazar' => [
-        'function obtener_micro_de_viaje(string $nombre_viaje, string $nombre_micro, string $nombre_dueno, ?Nodo $nodo_contexto = null): array {',
-        '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);',
-        '    if (!$nodo_viajes) return [\'exito\' => false, \'error\' => \'Dueño no encontrado\'];',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeMicros.php',
-    'descripcion' => 'ViajeMicros: actualizar_contadores_viaje acepta contexto',
-    'buscar' => [
-        'function actualizar_contadores_viaje(string $nombre_viaje, string $nombre_dueno): void {',
-        '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);',
-        '    if (!$nodo_viajes) return;',
-    ],
-    'reemplazar' => [
-        'function actualizar_contadores_viaje(string $nombre_viaje, string $nombre_dueno, ?Nodo $nodo_contexto = null): void {',
-        '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);',
-        '    if (!$nodo_viajes) return;',
     ],
 ],
 
@@ -193,79 +105,47 @@ $cambios = [
 [
     'tipo' => 'reemplazar',
     'archivo' => 'Aplicacion/Enrutador.php',
-    'descripcion' => 'Enrutador: bump @version a 1.5piloto.78h',
+    'descripcion' => 'Enrutador: bump @version a 1.5piloto.78i',
     'buscar' => [
-        ' * @package   Iteradores',
-        ' * @since     1.5piloto.1',
-        ' * @version   1.5piloto.78g',
-        ' */',
-    ],
-    'reemplazar' => [
         ' * @package   Iteradores',
         ' * @since     1.5piloto.1',
         ' * @version   1.5piloto.78h',
         ' */',
     ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Enrutador.php',
-    'descripcion' => 'Enrutador: viajes/agregar_micro pasa contexto',
-    'buscar' => [
-        '                case \'agregar_micro\':',
-        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-        '                    $nombre_empresa = $post[\'nombre_empresa\'] ?? \'\';',
-        '                    $nombre_vehiculo = $post[\'nombre_vehiculo\'] ?? \'\';',
-        '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    $monto = $post[\'monto\'] ?? \'0\';',
-        '                    $resultado = agregar_micro_a_viaje($nombre_viaje, $nombre_empresa, $nombre_vehiculo, $nombre_dueno, $monto);',
-        '                    responder_json($resultado);',
-        '                    break;',
-    ],
     'reemplazar' => [
-        '                case \'agregar_micro\':',
-        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-        '                    $nombre_empresa = $post[\'nombre_empresa\'] ?? \'\';',
-        '                    $nombre_vehiculo = $post[\'nombre_vehiculo\'] ?? \'\';',
-        '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    $monto = $post[\'monto\'] ?? \'0\';',
-        '                    // Fase 1c.2: contexto del solicitante.',
-        '                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);',
-        '                    $resultado = agregar_micro_a_viaje($nombre_viaje, $nombre_empresa, $nombre_vehiculo, $nombre_dueno, $monto, $nodo_contexto);',
-        '                    responder_json($resultado);',
-        '                    break;',
+        ' * @package   Iteradores',
+        ' * @since     1.5piloto.1',
+        ' * @version   1.5piloto.78i',
+        ' */',
     ],
 ],
 
 [
     'tipo' => 'reemplazar',
     'archivo' => 'Aplicacion/Enrutador.php',
-    'descripcion' => 'Enrutador: viajes/eliminar_micro pasa contexto',
+    'descripcion' => 'Enrutador: viajes/obtener_opciones_avanzadas pasa contexto',
     'buscar' => [
-        '                case \'eliminar_micro\':',
+        '                case \'obtener_opciones_avanzadas\':',
         '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-        '                    $nombre_micro = $post[\'nombre_micro\'] ?? \'\';',
         '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {',
+        '                    if (empty($nombre_viaje) || empty($nombre_dueno)) {',
         '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
         '                    }',
-        '                    $resultado = eliminar_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno);',
-        '                    responder_json($resultado);',
+        '                    $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);',
+        '                    responder_json([\'exito\' => true, \'opciones\' => $opciones]);',
         '                    break;',
     ],
     'reemplazar' => [
-        '                case \'eliminar_micro\':',
+        '                case \'obtener_opciones_avanzadas\':',
         '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-        '                    $nombre_micro = $post[\'nombre_micro\'] ?? \'\';',
         '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {',
+        '                    if (empty($nombre_viaje) || empty($nombre_dueno)) {',
         '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
         '                    }',
         '                    // Fase 1c.2: contexto del solicitante.',
         '                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);',
-        '                    $resultado = eliminar_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno, $nodo_contexto);',
-        '                    responder_json($resultado);',
+        '                    $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $nodo_contexto);',
+        '                    responder_json([\'exito\' => true, \'opciones\' => $opciones]);',
         '                    break;',
     ],
 ],
@@ -273,64 +153,40 @@ $cambios = [
 [
     'tipo' => 'reemplazar',
     'archivo' => 'Aplicacion/Enrutador.php',
-    'descripcion' => 'Enrutador: viajes/obtener_micro pasa contexto',
+    'descripcion' => 'Enrutador: viajes/guardar_opciones_avanzadas pasa contexto',
     'buscar' => [
-        '                case \'obtener_micro\':',
+        '                case \'guardar_opciones_avanzadas\':',
         '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-        '                    $nombre_micro = $post[\'nombre_micro\'] ?? \'\';',
         '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {',
+        '                    $opciones = [',
+        '                        \'restriccion_edad\' => $post[\'restriccion_edad\'] ?? \'0\',',
+        '                        \'edad_minima\' => $post[\'edad_minima\'] ?? \'18\',',
+        '                        \'edad_maxima\' => $post[\'edad_maxima\'] ?? \'80\',',
+        '                        \'mostrar_dj_en_terminales\' => $post[\'mostrar_dj_en_terminales\'] ?? \'0\',',
+        '                    ];',
+        '                    if (empty($nombre_viaje) || empty($nombre_dueno)) {',
         '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
         '                    }',
-        '                    $resultado = obtener_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno);',
+        '                    $resultado = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones);',
         '                    responder_json($resultado);',
         '                    break;',
     ],
     'reemplazar' => [
-        '                case \'obtener_micro\':',
+        '                case \'guardar_opciones_avanzadas\':',
         '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-        '                    $nombre_micro = $post[\'nombre_micro\'] ?? \'\';',
         '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {',
-        '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
-        '                    }',
-        '                    // Fase 1c.2: contexto del solicitante (terminal → compartido).',
-        '                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);',
-        '                    $resultado = obtener_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno, $nodo_contexto);',
-        '                    responder_json($resultado);',
-        '                    break;',
-    ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Enrutador.php',
-    'descripcion' => 'Enrutador: viajes/actualizar_monto_micro pasa contexto',
-    'buscar' => [
-        '                case \'actualizar_monto_micro\':',
-        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-        '                    $nombre_micro = $post[\'nombre_micro\'] ?? \'\';',
-        '                    $monto = $post[\'monto\'] ?? \'\';',
-        '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {',
-        '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
-        '                    }',
-        '                    $resultado = actualizar_monto_micro($nombre_viaje, $nombre_micro, $monto, $nombre_dueno);',
-        '                    responder_json($resultado);',
-        '                    break;',
-    ],
-    'reemplazar' => [
-        '                case \'actualizar_monto_micro\':',
-        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-        '                    $nombre_micro = $post[\'nombre_micro\'] ?? \'\';',
-        '                    $monto = $post[\'monto\'] ?? \'\';',
-        '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {',
+        '                    $opciones = [',
+        '                        \'restriccion_edad\' => $post[\'restriccion_edad\'] ?? \'0\',',
+        '                        \'edad_minima\' => $post[\'edad_minima\'] ?? \'18\',',
+        '                        \'edad_maxima\' => $post[\'edad_maxima\'] ?? \'80\',',
+        '                        \'mostrar_dj_en_terminales\' => $post[\'mostrar_dj_en_terminales\'] ?? \'0\',',
+        '                    ];',
+        '                    if (empty($nombre_viaje) || empty($nombre_dueno)) {',
         '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
         '                    }',
         '                    // Fase 1c.2: contexto del solicitante.',
         '                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);',
-        '                    $resultado = actualizar_monto_micro($nombre_viaje, $nombre_micro, $monto, $nombre_dueno, $nodo_contexto);',
+        '                    $resultado = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones, false, $nodo_contexto);',
         '                    responder_json($resultado);',
         '                    break;',
     ],

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.12
- * @version   1.5piloto.74
+ * @version   1.5piloto.78h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -22,7 +22,7 @@ include_once("./Controlador/Controlador.php");
  * - permite_efectivo, cuotas_efectivo_max
  * - permite_transferencia, cuotas_transferencia_max
  */
-function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje): array {
+function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, ?Nodo $nodo_contexto = null): array {
     $defaults = [
         'restriccion_edad' => '0',
         'edad_minima' => '18',
@@ -34,7 +34,7 @@ function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
         'mostrar_dj_en_terminales' => '0',
     ];
 
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return $defaults;
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -65,8 +65,8 @@ function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
 /**
  * Guarda las opciones avanzadas de un viaje.
  */
-function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, array $opciones, bool $aplicar_retroactivo = false): array {
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, array $opciones, bool $aplicar_retroactivo = false, ?Nodo $nodo_contexto = null): array {
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
