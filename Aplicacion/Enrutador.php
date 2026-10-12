@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78b
+ * @version   1.5piloto.78g
  */
 
 use Iteradores\Nodos\Nodo;
@@ -103,10 +103,38 @@ function _nombre_terminal_solicitante(string $nombre_solicitante): ?string {
  * @return string[]|null
  * @since 1.5piloto.78b
  */
-function _contextos_para_operacion(string $accion, string $nombre_solicitante): ?array {
-    // Etapa 0: sin activar. La carga parcial se activa en la
-    // Etapa 1, cuando el flujo de index.php se reorganice para
-    // decidir entre cargar() y cargar_parcial() antes de cargar.
+function _contextos_para_operacion(string $accion, string $nombre_solicitante, array $get = []): ?array {
+    // Caso 1: POST con acción. Es la operación principal.
+    // Si hay solicitante, carga parcial con su contexto. La
+    // topología decide el resto:
+    //   - Admin: tiene un enlace `usuarios` desde su propio
+    //     nodo (migración 1c.1b). Su carga parcial trae todo.
+    //   - Soporte: su carga parcial trae solo sus dueños
+    //     asignados (enlace `duenos`).
+    //   - Dueño / terminal: su propio subgrafo.
+    // Si no hay solicitante, carga total (fallback).
+    if ($accion !== '') {
+        if ($nombre_solicitante === '') return null;
+        return ['us_' . $nombre_solicitante];
+    }
+
+    // Caso 2: GET de impresión. Los flujos imprimibles pasan
+    // el dueño por query string. Si está, carga parcial de
+    // ese dueño. Si no, carga total (los 6 helpers de B3.3c
+    // que iteran sobre todos los dueños todavía no están
+    // reescritos; ver `plan_actual.md` §1.10).
+    if (isset($get['imprimir']) && $get['imprimir'] === '1') {
+        $dueno = $get['dueno'] ?? '';
+        if ($dueno === '') return null;
+        return ['us_' . $dueno];
+    }
+
+    // Caso 3: cualquier otro GET. Incluye:
+    //   - la carga del HTML de la interfaz,
+    //   - los bloques ?migrar_*=1 y ?probar_*=1 (necesitan
+    //     el grafo completo),
+    //   - cualquier diagnóstico.
+    // Todos carga total.
     return null;
 }
 

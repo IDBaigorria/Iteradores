@@ -11,7 +11,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.70
- * @version   1.5piloto.76f
+ * @version   1.5piloto.78g
  */
 
 use Iteradores\Nodos\Nodo;
@@ -45,6 +45,14 @@ function en_grafo_credenciales(callable $fn) {
         return $fn();
     }
     $GLOBALS['__en_grafo_credenciales'] = true;
+
+    // v78g: capturar los contextos activos de la app para
+    // restaurarlos al volver. Sin esto, la carga de credenciales
+    // resetea el modo de carga a total, y al recargar la app se
+    // pierde el contexto original (guardar_ambos guardaría todo
+    // en lugar de solo el contexto).
+    $contextos_app_previos = Controlador::contextos_cargados();
+
     try {
         // Guardar la app actual si tiene nodos.
         if (Nodo::hay_nodos_en_superestructura()) {
@@ -83,9 +91,14 @@ function en_grafo_credenciales(callable $fn) {
 
         return $resultado;
     } finally {
-        // Recargar la app. Si falla, es un error fatal: la superestructura
-        // quedaría vacía y el próximo guardado podría pisar el grafo.
-        $ok_carga = Controlador::cargar(ConfiguracionApli::NOMBRE_APP);
+        // Recargar la app respetando el modo previo (parcial o total).
+        // Si falla, es un error fatal: la superestructura quedaría
+        // vacía y el próximo guardado podría pisar el grafo.
+        if (!empty($contextos_app_previos)) {
+            $ok_carga = Controlador::cargar_parcial(ConfiguracionApli::NOMBRE_APP, $contextos_app_previos);
+        } else {
+            $ok_carga = Controlador::cargar(ConfiguracionApli::NOMBRE_APP);
+        }
         $GLOBALS['__en_grafo_credenciales'] = false;
         if (!$ok_carga) {
             Controlador::_error("en_grafo_credenciales: no se pudo recargar la app \"" . ConfiguracionApli::NOMBRE_APP . "\".");
@@ -119,6 +132,10 @@ function en_grafo_credenciales_solo_lectura(callable $fn) {
         return $fn();
     }
     $GLOBALS['__en_grafo_credenciales'] = true;
+
+    // v78g: idem en_grafo_credenciales. Preservar contextos.
+    $contextos_app_previos = Controlador::contextos_cargados();
+
     try {
         // Crear credenciales si no existe (raro pero posible).
         if (!Controlador::existe(ConfiguracionApli::NOMBRE_APP_CREDENCIALES)) {
@@ -142,10 +159,12 @@ function en_grafo_credenciales_solo_lectura(callable $fn) {
         }
         return $resultado;
     } finally {
-        // Recargar la app. Si falla, es un error fatal: la
-        // superestructura quedaría vacía y el próximo guardado
-        // podría pisar el grafo.
-        $ok_carga = Controlador::cargar(ConfiguracionApli::NOMBRE_APP);
+        // Recargar la app respetando el modo previo (parcial o total).
+        if (!empty($contextos_app_previos)) {
+            $ok_carga = Controlador::cargar_parcial(ConfiguracionApli::NOMBRE_APP, $contextos_app_previos);
+        } else {
+            $ok_carga = Controlador::cargar(ConfiguracionApli::NOMBRE_APP);
+        }
         $GLOBALS['__en_grafo_credenciales'] = false;
         if (!$ok_carga) {
             Controlador::_error("en_grafo_credenciales_solo_lectura: no se pudo recargar la app \"" . ConfiguracionApli::NOMBRE_APP . "\".");

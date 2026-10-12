@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.78e
+ * @version   1.5piloto.78g
  */
 
 // --- Utilidades base ----------------------------------
@@ -169,20 +169,28 @@ if (isset($_GET['migrar_a_sql64'])) {
 // Va después de los require_once para que `guardar_ambos` esté
 // definida (vive en FuncionesAuxiliares.php).
 //
-// NOTA (v1.5piloto.78e, Etapa 1c.1 del plan de carga parcial):
-// El método de persistencia ya es SQL64 (soporta contextos).
-// La carga sigue siendo total (Controlador::cargar). En la
-// Etapa 1c.2 se pospone la carga: primero se resuelve el
-// solicitante con un bootstrap mínimo, después se llama a
-// _contextos_para_operacion($accion, $nombre_solicitante)
-// para decidir entre Controlador::cargar() (carga total) y
-// Controlador::cargar_parcial($nombre, $contextos).
-// Ver `prompts/plan_actual.md` §1.10.
+// NOTA (v1.5piloto.78g, Etapa 1c.2):
+// El modo de carga (parcial o total) se decide ANTES de cargar.
+// Regla: si hay solicitante, se carga parcial con ['us_<sol>'].
+// La topología decide el resto: el admin tiene un enlace a
+// `usuarios` desde su propio nodo, así que su carga parcial
+// termina trayendo todo; el soporte, solo a sus dueños.
+// Si no hay solicitante (GET, migraciones, imprimir sin dueño),
+// se carga total. Ver `prompts/plan_actual.md` §1.10.
 Controlador::establecer_metodo('SQL64');
 $nombre_app = ConfiguracionApli::NOMBRE_APP;
+$contextos_carga = _contextos_para_operacion(
+    $_POST['accion'] ?? '',
+    $_POST['nombre_solicitante'] ?? '',
+    $_GET
+);
+$modo_parcial = ($contextos_carga !== null);
 if (Controlador::existe($nombre_app)) {
-    if (!Controlador::cargar($nombre_app)) {
-        // Existe en SQL pero no se pudo cargar. No caemos al else:
+    $ok_carga = $modo_parcial
+        ? Controlador::cargar_parcial($nombre_app, $contextos_carga)
+        : Controlador::cargar($nombre_app);
+    if (!$ok_carga) {
+        // Existe en SQL64 pero no se pudo cargar. No caemos al else:
         // guardar vacío pisaría el grafo. Morimos con mensaje claro.
         Controlador::_error("index.php: no se pudo cargar el grafo \"$nombre_app\".");
         http_response_code(500);
@@ -240,21 +248,25 @@ if (isset($_GET['probar_contextos'])) {
 
 // Crear el nodo especial `aplicacion` con su contenedor
 // `migraciones`, si no existen. Se usa para marcar las
-// migraciones aplicadas.
-if (!Nodo::nodo_por_id('aplicacion')) {
-    $nodo_app_meta = Nodo::crear_con_id('aplicacion');
-    if ($nodo_app_meta) {
-        $contenedor_mig = Nodo::crear_con_dato('');
-        $nodo_app_meta->_adyacente_en($contenedor_mig, 'migraciones');
-        guardar_ambos($nombre_app);
-    }
-} else {
-    // Existe el nodo aplicacion pero puede faltar el contenedor.
-    $nodo_app_meta = Nodo::nodo_por_id('aplicacion');
-    if ($nodo_app_meta && !$nodo_app_meta->adyacente('migraciones')) {
-        $contenedor_mig = Nodo::crear_con_dato('');
-        $nodo_app_meta->_adyacente_en($contenedor_mig, 'migraciones');
-        guardar_ambos($nombre_app);
+// migraciones aplicadas. Solo en carga total: con carga
+// parcial no se puede navegar la raíz `usuarios` ni crear
+// nodos nuevos que no pertenezcan al contexto.
+if (!$modo_parcial) {
+    if (!Nodo::nodo_por_id('aplicacion')) {
+        $nodo_app_meta = Nodo::crear_con_id('aplicacion');
+        if ($nodo_app_meta) {
+            $contenedor_mig = Nodo::crear_con_dato('');
+            $nodo_app_meta->_adyacente_en($contenedor_mig, 'migraciones');
+            guardar_ambos($nombre_app);
+        }
+    } else {
+        // Existe el nodo aplicacion pero puede faltar el contenedor.
+        $nodo_app_meta = Nodo::nodo_por_id('aplicacion');
+        if ($nodo_app_meta && !$nodo_app_meta->adyacente('migraciones')) {
+            $contenedor_mig = Nodo::crear_con_dato('');
+            $nodo_app_meta->_adyacente_en($contenedor_mig, 'migraciones');
+            guardar_ambos($nombre_app);
+        }
     }
 }
 
@@ -374,6 +386,47 @@ if (isset($_GET['migrar_usuarios_especiales'])) {
     exit;
 }
 
+// ==== Migración topológica (v78f) ====
+// 1. Crea el enlace us_Administrador → usuarios.
+// 2. Asegura publico en cada soporte.
+// 3. Repunta el enlace `dueno → soporte` al publico del
+//    soporte (evita la fuga cruzada entre dueños que
+//    comparten un mismo soporte).
+// Idempotente.
+//
+// Uso: index.php?migrar_topologia=1
+if (isset($_GET['migrar_topologia'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    require_once __DIR__ . '/miscelaneas/migrar_topologia.php';
+
+    $res_admin = migrar_topologia_admin($nombre_app);
+    $res_soporte = migrar_topologia_soporte($nombre_app);
+
+    echo "Migración topológica\n";
+    echo "====================\n\n";
+
+    echo "-- us_Administrador → usuarios --\n";
+    if (!empty($res_admin['errores'])) {
+        foreach ($res_admin['errores'] as $e) echo "  ERROR: $e\n";
+    } elseif ($res_admin['ya_existia']) {
+        echo "  ya existía\n";
+    } else {
+        echo "  creado\n";
+    }
+
+    echo "\n-- Dueño → soporte (repuntado al publico) --\n";
+    echo "  soportes procesados: " . $res_soporte['soportes'] . "\n";
+    echo "  repuntados:          " . $res_soporte['repuntados'] . "\n";
+    echo "  ya estaban OK:       " . $res_soporte['ya_ok'] . "\n";
+    if (!empty($res_soporte['errores'])) {
+        echo "  Errores:\n";
+        foreach ($res_soporte['errores'] as $e) echo "    - $e\n";
+    }
+
+    guardar_ambos($nombre_app);
+    echo "\nGuardado.\nListo.\n";
+    exit;
+}
 // (bloque ?migrar_a_sql64 movido antes de la carga normal, v78e v2)
 // (bloque ?migrar_micros eliminado en v73r)
 // (bloque ?migrar_micros_patente eliminado en v73r)
@@ -396,40 +449,44 @@ if (isset($_GET['migrar_usuarios_especiales'])) {
 
 // Crear usuario administrador si no existe (en ambos grafos).
 // Fase B3.1: el chequeo del admin se hace por ID especial.
-$raiz_usuarios = Nodo::nodo_por_id('usuarios');
-$nodo_admin_existente = Nodo::nodo_por_id('us_' . ConfiguracionApli::NOMBRE_ADMIN);
-if (!$nodo_admin_existente) {
-    if (!$raiz_usuarios) {
-        Nodo::crear_con_id('usuarios');
-        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    }
-    $id_especial_admin = 'us_' . ConfiguracionApli::NOMBRE_ADMIN;
-    $nodo_admin = Nodo::crear_con_dato_e_id(ConfiguracionApli::NOMBRE_ADMIN, $id_especial_admin);
-    if ($nodo_admin) {
-        $nodo_admin->_adyacente_en(Nodo::crear_con_dato(ConfiguracionApli::NOMBRE_ADMIN), 'nombre_real');
-        $nodo_admin->_adyacente_en(Nodo::crear_con_dato('admin'), 'nivel');
-        $raiz_usuarios->_adyacente_en($nodo_admin, ConfiguracionApli::NOMBRE_ADMIN);
-    }
-    guardar_ambos($nombre_app);
-}
-
-// Crear admin en el grafo de credenciales si no existe.
-en_grafo_credenciales(function() {
-    $raiz_cred = Nodo::nodo_por_id('usuarios');
-    if (!$raiz_cred) {
-        Nodo::crear_con_id('usuarios');
-        $raiz_cred = Nodo::nodo_por_id('usuarios');
-    }
-    // Fase B3.1: chequeo por ID especial.
-    if (!Nodo::nodo_por_id('us_' . ConfiguracionApli::NOMBRE_ADMIN)) {
-        $id_especial_admin_cred = 'us_' . ConfiguracionApli::NOMBRE_ADMIN;
-        $nodo_admin_cred = Nodo::crear_con_dato_e_id(ConfiguracionApli::NOMBRE_ADMIN, $id_especial_admin_cred);
-        if ($nodo_admin_cred) {
-            $nodo_admin_cred->_adyacente_en(Nodo::crear_con_dato(password_hash(Conf::CODIGO_ADMIN, PASSWORD_DEFAULT)), 'codigo_hash');
-            $raiz_cred->_adyacente_en($nodo_admin_cred, ConfiguracionApli::NOMBRE_ADMIN);
+// Solo en carga total: el bootstrap del admin necesita la
+// raíz `usuarios` completa, que en carga parcial no está.
+if (!$modo_parcial) {
+    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+    $nodo_admin_existente = Nodo::nodo_por_id('us_' . ConfiguracionApli::NOMBRE_ADMIN);
+    if (!$nodo_admin_existente) {
+        if (!$raiz_usuarios) {
+            Nodo::crear_con_id('usuarios');
+            $raiz_usuarios = Nodo::nodo_por_id('usuarios');
         }
+        $id_especial_admin = 'us_' . ConfiguracionApli::NOMBRE_ADMIN;
+        $nodo_admin = Nodo::crear_con_dato_e_id(ConfiguracionApli::NOMBRE_ADMIN, $id_especial_admin);
+        if ($nodo_admin) {
+            $nodo_admin->_adyacente_en(Nodo::crear_con_dato(ConfiguracionApli::NOMBRE_ADMIN), 'nombre_real');
+            $nodo_admin->_adyacente_en(Nodo::crear_con_dato('admin'), 'nivel');
+            $raiz_usuarios->_adyacente_en($nodo_admin, ConfiguracionApli::NOMBRE_ADMIN);
+        }
+        guardar_ambos($nombre_app);
     }
-});
+
+    // Crear admin en el grafo de credenciales si no existe.
+    en_grafo_credenciales(function() {
+        $raiz_cred = Nodo::nodo_por_id('usuarios');
+        if (!$raiz_cred) {
+            Nodo::crear_con_id('usuarios');
+            $raiz_cred = Nodo::nodo_por_id('usuarios');
+        }
+        // Fase B3.1: chequeo por ID especial.
+        if (!Nodo::nodo_por_id('us_' . ConfiguracionApli::NOMBRE_ADMIN)) {
+            $id_especial_admin_cred = 'us_' . ConfiguracionApli::NOMBRE_ADMIN;
+            $nodo_admin_cred = Nodo::crear_con_dato_e_id(ConfiguracionApli::NOMBRE_ADMIN, $id_especial_admin_cred);
+            if ($nodo_admin_cred) {
+                $nodo_admin_cred->_adyacente_en(Nodo::crear_con_dato(password_hash(Conf::CODIGO_ADMIN, PASSWORD_DEFAULT)), 'codigo_hash');
+                $raiz_cred->_adyacente_en($nodo_admin_cred, ConfiguracionApli::NOMBRE_ADMIN);
+            }
+        }
+    });
+}
 
 // Manejo de impresión
 if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {

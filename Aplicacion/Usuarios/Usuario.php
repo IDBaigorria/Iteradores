@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78d
+ * @version   1.5piloto.78f
  */
 
 use Iteradores\Nodos\Nodo;
@@ -570,8 +570,17 @@ function _asignar_duenos_a_soporte(Nodo $nodo_soporte, array $nuevos_duenos): vo
         if (!$nodo_nivel_d || $nodo_nivel_d->dato() !== 'dueno') continue;
 
         $nodo_duenos->_adyacente_en($nodo_dueno, $nombre_dueno);
+        // v78f: el enlace del dueño apunta al contenedor
+        // `publico` del soporte, no al nodo del soporte. Con
+        // esto, el BFS de contextos no propaga el bit del
+        // dueño al resto del subgrafo del soporte (fuga
+        // cruzada entre dueños que comparten un mismo soporte).
+        // Fallback: si el soporte no tiene `publico`, se usa
+        // el nodo del soporte como antes.
+        $publico_soporte = $nodo_soporte->adyacente('publico');
+        $destino_soporte = $publico_soporte ?: $nodo_soporte;
         $nodo_dueno->eliminar_adyacente('soporte');
-        $nodo_dueno->_adyacente_en($nodo_soporte, 'soporte');
+        $nodo_dueno->_adyacente_en($destino_soporte, 'soporte');
     }
 }
 
