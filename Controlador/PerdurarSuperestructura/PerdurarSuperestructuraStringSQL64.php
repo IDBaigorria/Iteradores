@@ -23,7 +23,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStrin
  * sus contextos alcanzantes.
  *
  * @author Ignacio David Baigorria
- * @version 1.5i.7o
+ * @version 1.5i.7q
  * @since 1.5i.7k
  */
 class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQL implements PerdurarSuperestructuraConContexto {
@@ -115,14 +115,20 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             $nombre_escapado = $sql->real_escape_string((string)$nombre);
             $mf = (int)$mascara_filtro;
 
-            // DELETE de adyacentes. Con filtro, borra las
-            // aristas cuyo origen está en el filtro. Sin
-            // filtro, borra todo.
+            // DELETE de adyacentes. Con filtro, borra solo las
+            // aristas cuyos DOS extremos están en el filtro. Las
+            // que cruzan el borde (origen o destino fuera del
+            // filtro) se conservan tal cual: si se borraran sin
+            // reinsertarlas, se perderían enlaces del dueño hacia
+            // sus propios subárboles (bug v78r). Sin filtro,
+            // borra todo (comportamiento de guardar).
             if ($mf === 0) {
                 $q_del_ady = "DELETE FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "';";
             } else {
                 $q_del_ady = "DELETE FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
                            . " AND idnodo IN (SELECT idnodo FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
+                           . " AND (contexto_mascara & " . $mf . ") != 0)"
+                           . " AND idadyacente IN (SELECT idnodo FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
                            . " AND (contexto_mascara & " . $mf . ") != 0);";
             }
             if (!$sql->query($q_del_ady)) {

@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.78n
+ * @version   1.5piloto.78r
  */
 
 // --- Utilidades base ----------------------------------
@@ -397,6 +397,8 @@ if (isset($_GET['reparar_topologia'])) {
 
     $r_comp = reparar_compartidos_dueno();
     $r_viajes = reparar_viajes_dueno();
+    $r_emp = reparar_empresas_dueno();
+    $r_pas = reparar_pasajeros_dueno();
 
     echo "Reparación topológica\n";
     echo "====================\n\n";
@@ -415,7 +417,22 @@ if (isset($_GET['reparar_topologia'])) {
         echo "     " . $d['dueno'] . ": " . implode(', ', $d['viajes']) . "\n";
     }
 
-    if ($r_comp['reparados'] > 0 || $r_viajes['reparados'] > 0) {
+    echo "\n-- Contenedor `empresas` faltante --\n";
+    echo "   dueños procesados: " . $r_emp['duenos'] . "\n";
+    echo "   reconstruidos:     " . $r_emp['reparados'] . "\n";
+    foreach ($r_emp['detalles'] as $d) {
+        echo "     " . $d['dueno'] . ": " . $d['empresas'] . " empresas\n";
+    }
+
+    echo "\n-- Contenedor `pasajeros` faltante --\n";
+    echo "   dueños procesados: " . $r_pas['duenos'] . "\n";
+    echo "   recuperados:       " . $r_pas['reparados'] . "\n";
+    foreach ($r_pas['detalles'] as $d) {
+        echo "     " . $d['dueno'] . "\n";
+    }
+
+    $total_reparados = $r_comp['reparados'] + $r_viajes['reparados'] + $r_emp['reparados'] + $r_pas['reparados'];
+    if ($total_reparados > 0) {
         guardar_ambos($nombre_app);
         echo "\nGuardado.\n";
     }

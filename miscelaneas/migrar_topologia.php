@@ -26,7 +26,7 @@
  *
  * @author Ignacio David Baigorria
  * @since 1.5piloto.78f
- * @version 1.5piloto.78n
+ * @version 1.5piloto.78r
  */
 
 use Iteradores\Nodos\Nodo;
@@ -243,6 +243,99 @@ function reparar_viajes_dueno(): array {
         }
         $res['reparados'] += count($agregados);
         $res['detalles'][] = ['dueno' => (string)$nombre_dueno, 'viajes' => $agregados];
+    }
+    return $res;
+}
+
+/**
+ * Repara el contenedor `empresas` del dueño si falta.
+ *
+ * Reconstruye el contenedor recorriendo los micros de cada
+ * viaje del dueño: cada micro tiene un enlace `empresa` al
+ * nodo empresa. Se agrupan los nodos únicos y se enlazan al
+ * contenedor `empresas` del dueño con el nombre de empresa
+ * como clave. Idempotente.
+ *
+ * @return array{duenos: int, reparados: int, detalles: array}
+ */
+function reparar_empresas_dueno(): array {
+    $res = ['duenos' => 0, 'reparados' => 0, 'detalles' => []];
+
+    $nodo_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$nodo_usuarios) return $res;
+
+    foreach ($nodo_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nivel = $nodo_dueno->adyacente('nivel');
+        if (!$nivel || $nivel->dato() !== 'dueno') continue;
+        $res['duenos']++;
+
+        if ($nodo_dueno->adyacente('empresas')) continue;
+
+        $cont_viajes = $nodo_dueno->adyacente('viajes');
+        if (!$cont_viajes) continue;
+
+        $empresas = [];
+        foreach ((array)$cont_viajes->adyacentes() as $nodo_viaje) {
+            $cont_micros = $nodo_viaje->adyacente('micros');
+            if (!$cont_micros) continue;
+            foreach ((array)$cont_micros->adyacentes() as $nodo_micro) {
+                $nodo_emp = $nodo_micro->adyacente('empresa');
+                if (!$nodo_emp) continue;
+                $empresas[$nodo_emp->id()] = $nodo_emp;
+            }
+        }
+
+        if (empty($empresas)) continue;
+
+        $cont_emp = Nodo::crear_con_dato('');
+        $nodo_dueno->_adyacente_en($cont_emp, 'empresas');
+        foreach ($empresas as $nodo_emp) {
+            $nombre_emp = (string)$nodo_emp->dato();
+            if ($nombre_emp === '') continue;
+            $cont_emp->_adyacente_en($nodo_emp, $nombre_emp);
+        }
+
+        $res['reparados']++;
+        $res['detalles'][] = ['dueno' => (string)$nombre_dueno, 'empresas' => count($empresas)];
+    }
+    return $res;
+}
+
+/**
+ * Repara el contenedor `pasajeros` del dueño si falta.
+ *
+ * Los compartidos de cada terminal apuntan al mismo nodo
+ * `pasajeros` del dueño (es un alias). Si el enlace directo
+ * del dueño se perdió, se puede recuperar desde cualquier
+ * compartido del dueño. Idempotente.
+ *
+ * @return array{duenos: int, reparados: int, detalles: array}
+ */
+function reparar_pasajeros_dueno(): array {
+    $res = ['duenos' => 0, 'reparados' => 0, 'detalles' => []];
+
+    $nodo_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$nodo_usuarios) return $res;
+
+    foreach ($nodo_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nivel = $nodo_dueno->adyacente('nivel');
+        if (!$nivel || $nivel->dato() !== 'dueno') continue;
+        $res['duenos']++;
+
+        if ($nodo_dueno->adyacente('pasajeros')) continue;
+
+        $encontrado = null;
+        foreach ((array)$nodo_dueno->adyacentes() as $enlace => $hijo) {
+            $enlace = (string)$enlace;
+            if (strpos($enlace, 'compartido_con_') !== 0) continue;
+            $cont_pas = $hijo->adyacente('pasajeros');
+            if ($cont_pas) { $encontrado = $cont_pas; break; }
+        }
+        if (!$encontrado) continue;
+
+        $nodo_dueno->_adyacente_en($encontrado, 'pasajeros');
+        $res['reparados']++;
+        $res['detalles'][] = ['dueno' => (string)$nombre_dueno];
     }
     return $res;
 }
