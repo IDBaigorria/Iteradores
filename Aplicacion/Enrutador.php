@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.77v
+ * @version   1.5piloto.78b
  */
 
 use Iteradores\Nodos\Nodo;
@@ -71,6 +71,43 @@ function _nombre_terminal_solicitante(string $nombre_solicitante): ?string {
     }
     if (!$nivel || $nivel->dato() !== 'terminal') return null;
     return $nombre_solicitante;
+}
+
+/**
+ * Devuelve los contextos que hay que cargar para una
+ * operación dada, según el solicitante.
+ *
+ * Etapa 0 del plan de carga parcial (v1.5piloto.78b):
+ * **siempre devuelve null** (carga total). No se activa
+ * todavía. La tabla concreta se arma en la Etapa 1.
+ *
+ * Contrato de retorno:
+ *   - null      → carga total. El llamador debe usar
+ *                 Controlador::cargar($nombre).
+ *   - string[]  → carga parcial. El llamador debe usar
+ *                 Controlador::cargar_parcial($nombre, $contextos).
+ *
+ * Criterio para Etapa 1 (a confirmar caso por caso):
+ *   - null                        → carga total (fallback).
+ *   - ['usuarios', 'sesiones', 'aplicacion']
+ *                                 → bootstrap mínimo (login).
+ *   - ['us_<sol>']                → operaciones del solicitante.
+ *   - ['us_<sol>', 'us_<dueno>']  → terminal que necesita ver
+ *                                   al dueño (o su compartido).
+ *   - Todos los us_*              → admin / soporte.
+ *
+ * Ver `prompts/plan_actual.md` §1.10 para el plan completo.
+ *
+ * @param string $accion
+ * @param string $nombre_solicitante
+ * @return string[]|null
+ * @since 1.5piloto.78b
+ */
+function _contextos_para_operacion(string $accion, string $nombre_solicitante): ?array {
+    // Etapa 0: sin activar. La carga parcial se activa en la
+    // Etapa 1, cuando el flujo de index.php se reorganice para
+    // decidir entre cargar() y cargar_parcial() antes de cargar.
+    return null;
 }
 
 /**

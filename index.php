@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.78a
+ * @version   1.5piloto.78b
  */
 
 // --- Utilidades base ----------------------------------
@@ -111,6 +111,18 @@ Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);
 // Inicialización de la persistencia.
 // Va después de los require_once para que `guardar_ambos` esté
 // definida (vive en FuncionesAuxiliares.php).
+//
+// NOTA (v1.5piloto.78b, Etapa 0 del plan de carga parcial):
+// Hoy se carga el grafo entero. En la Etapa 1, esta carga se
+// va a posponer: primero se resuelve el solicitante con un
+// bootstrap mínimo (cargar_parcial de ['usuarios',
+// 'sesiones', 'aplicacion']), después se llama a
+// _contextos_para_operacion($accion, $nombre_solicitante) para
+// decidir entre Controlador::cargar() (carga total) y
+// Controlador::cargar_parcial($nombre, $contextos).
+// El método de persistencia tiene que pasar de SQL a SQL64,
+// que es el que soporta contextos.
+// Ver `prompts/plan_actual.md` §1.10.
 Controlador::establecer_metodo('SQL');
 $nombre_app = ConfiguracionApli::NOMBRE_APP;
 if (Controlador::existe($nombre_app)) {

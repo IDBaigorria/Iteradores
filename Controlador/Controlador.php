@@ -57,7 +57,7 @@ require_once("interfaces/Dominios.php");
  * @implements VectorGravitacional
  * @implements Dominios
  * @since V1.2.0
- * @version 1.5i.7m
+ * @version 1.5i.7n
  */
 class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor, Dominios {
 
@@ -141,6 +141,24 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      * @return mixed|null Devuelve el resultado de la operación o `null` si no fue posible.
      */
     protected static function delegar(string $funcion, $nombre): mixed {
+        return static::delegar_con_args($funcion, $nombre, []);
+    }
+
+    /**
+     * Ejecuta una operación delegada a la clase de persistencia activa,
+     * pasando argumentos adicionales al método delegado.
+     *
+     * Es la variante con argumentos extra de {@link delegar()}. La usan
+     * las operaciones que necesitan pasar más de un parámetro a la
+     * implementación de persistencia (cargar_parcial, guardar_parcial).
+     *
+     * @param string $funcion    Nombre del método a ejecutar.
+     * @param mixed  $nombre     Parámetro principal (nombre de la superestructura).
+     * @param array  $args_extra Argumentos adicionales para el método.
+     * @return mixed|null
+     * @since 1.5i.7n
+     */
+    protected static function delegar_con_args(string $funcion, $nombre, array $args_extra = []): mixed {
         if (!is_string($nombre)){
 			static::_error("el nombre no es un string");
 			return null;
@@ -153,14 +171,13 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             static::_alerta("Clase ".static::$claseActual." de persistencia no disponible para el método actual.");
             return null;
         }
-       
 
         if (!method_exists($clase, $funcion)) {
             static::_alerta("El método '$funcion' no existe en la clase '$clase'.");
             return null;
         }
 
-        return $clase::$funcion($nombre);
+        return $clase::$funcion($nombre, ...$args_extra);
     }
     /**
      * Verifica que no haya nodos ocupados (autoenlace "ocupado") en la superestructura.
@@ -236,7 +253,18 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     // ══════════════════════════════════════════════════════
 
     /**
-     * @var bool Indica si la superestructura cargada es parcial.
+     * Indica si la superestructura cargada es parcial.
+     *
+     * Ciclo de vida:
+     *   - false por defecto.
+     *   - `cargar()` lo resetea a false.
+     *   - `cargar_parcial()` lo resetea a false antes de
+     *     delegar, y lo pone a true solo si la carga fue
+     *     exitosa.
+     *   - `guardar()` falla si el flag está en true.
+     *   - `guardar_parcial()` exige el flag en true.
+     *
+     * @var bool
      */
     protected static bool $grafo_parcial = false;
 
@@ -264,12 +292,7 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
     public static function cargar_parcial($nombre, array $contextos): bool|null {
         Nodo::vaciar_superestructura(static::$token);
         static::$grafo_parcial = false;
-        $clase = static::$claseActual;
-        if (!$clase || !method_exists($clase, 'cargar_parcial')) {
-            static::_error("El método de persistencia activo no soporta cargar_parcial.");
-            return null;
-        }
-        $res = $clase::cargar_parcial($nombre, $contextos);
+        $res = static::delegar_con_args('cargar_parcial', $nombre, [$contextos]);
         if ($res === true) {
             static::$grafo_parcial = true;
         }
@@ -286,20 +309,31 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
      * @since 1.5i.7k
      */
     public static function guardar_parcial($nombre, array $contextos): bool {
-        $clase = static::$claseActual;
-        if (!$clase || !method_exists($clase, 'guardar_parcial')) {
-            static::_error("El método de persistencia activo no soporta guardar_parcial.");
+        if (!static::$grafo_parcial) {
+            static::_error("No se puede guardar_parcial: el grafo en memoria no es parcial. Usar guardar().");
             return false;
         }
-        return (bool) $clase::guardar_parcial($nombre, $contextos);
+        if (!static::verificar_superestructura_desocupada()) {
+            return false;
+        }
+        return (bool) static::delegar_con_args('guardar_parcial', $nombre, [$contextos]);
     }
 
     /**
      * Lista los contextos registrados bajo un nombre.
      *
+     * Contrato de retorno:
+     *   - `['us_X', 'us_Y', ...]` → contextos registrados.
+     *   - `[]`                    → el nombre no existe, o no
+     *                               tiene contextos registrados.
+     *   - `null`                  → error (método no soportado
+     *                               por la persistencia activa,
+     *                               error de DB, etc.).
+     *
      * @param string $nombre
      * @return string[]|null
      * @since 1.5i.7k
+     * @version 1.5i.7n
      */
     public static function listar_contextos($nombre): ?array {
         $clase = static::$claseActual;
