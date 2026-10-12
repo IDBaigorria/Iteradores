@@ -23,7 +23,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStrin
  * sus contextos alcanzantes.
  *
  * @author Ignacio David Baigorria
- * @version 1.5i.7k
+ * @version 1.5i.7o
  * @since 1.5i.7k
  */
 class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQL implements PerdurarSuperestructuraConContexto {
@@ -67,6 +67,33 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
     }
 
     static public function guardar($nombre) {
+        return self::_guardar_con_filtro($nombre, 0);
+    }
+
+    /**
+     * Implementación común de guardar y guardar_parcial.
+     *
+     * Con $mascara_filtro === 0 reemplaza toda la
+     * superestructura (comportamiento de guardar).
+     *
+     * Con $mascara_filtro !== 0 solo toca los nodos cuyo
+     * bitmask intersecta el filtro. Regla de borrado:
+     * se borran las aristas salientes de esos nodos
+     * (idnodo in filtro) y después los nodos. Las
+     * aristas entrantes desde nodos fuera del filtro
+     * no se tocan: cada operación gestiona las
+     * salientes de sus nodos.
+     *
+     * El DELETE de adyacente_contexto va ANTES del de
+     * nodo_contexto: la subquery consulta nodo_contexto
+     * y tiene que ver las filas todavía.
+     *
+     * @param string $nombre
+     * @param int    $mascara_filtro 0 = guardar todo.
+     * @return bool
+     * @since 1.5i.7o
+     */
+    static private function _guardar_con_filtro($nombre, int $mascara_filtro) {
         if (!Nodo::hay_nodos_en_superestructura()) {
             self::_error("SQL64::guardar: no hay nodos.");
             return false;
@@ -86,21 +113,41 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         $sql->begin_transaction();
         try {
             $nombre_escapado = $sql->real_escape_string((string)$nombre);
-            if (!$sql->query("DELETE FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "';")) {
-                throw new \RuntimeException("SQL64::guardar: fallo DELETE nodo_contexto: " . $sql->error);
+            $mf = (int)$mascara_filtro;
+
+            // DELETE de adyacentes. Con filtro, borra las
+            // aristas cuyo origen está en el filtro. Sin
+            // filtro, borra todo.
+            if ($mf === 0) {
+                $q_del_ady = "DELETE FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "';";
+            } else {
+                $q_del_ady = "DELETE FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
+                           . " AND idnodo IN (SELECT idnodo FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
+                           . " AND (contexto_mascara & " . $mf . ") != 0);";
             }
-            if (!$sql->query("DELETE FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "';")) {
+            if (!$sql->query($q_del_ady)) {
                 throw new \RuntimeException("SQL64::guardar: fallo DELETE adyacente_contexto: " . $sql->error);
             }
 
-            $chunks_nodos = self::_crear_chunks_insertar_nodos_con_mascara($sql, $nombre, $mascaras);
+            // DELETE de nodos. Con filtro, solo los del filtro.
+            if ($mf === 0) {
+                $q_del_nod = "DELETE FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "';";
+            } else {
+                $q_del_nod = "DELETE FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
+                           . " AND (contexto_mascara & " . $mf . ") != 0;";
+            }
+            if (!$sql->query($q_del_nod)) {
+                throw new \RuntimeException("SQL64::guardar: fallo DELETE nodo_contexto: " . $sql->error);
+            }
+
+            $chunks_nodos = self::_crear_chunks_insertar_nodos_con_mascara($sql, $nombre, $mascaras, $mf);
             foreach ($chunks_nodos as $consulta) {
                 if (!$sql->query($consulta)) {
                     throw new \RuntimeException("SQL64::guardar: fallo INSERT nodo_contexto: " . $sql->error);
                 }
             }
 
-            $chunks_ady = self::_crear_chunks_insertar_adyacentes_contexto($sql, $nombre);
+            $chunks_ady = self::_crear_chunks_insertar_adyacentes_contexto($sql, $nombre, $mascaras, $mf);
             foreach ($chunks_ady as $consulta) {
                 if (!$sql->query($consulta)) {
                     throw new \RuntimeException("SQL64::guardar: fallo INSERT adyacente_contexto: " . $sql->error);
@@ -179,9 +226,59 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         return true;
     }
 
+    /**
+     * Guarda solo el subgrafo en memoria filtrando por
+     * contextos.
+     *
+     * Requiere que los contextos estén registrados
+     * previamente. Los registra el primer guardar (que
+     * recorre los IDs especiales del grafo y asigna bits
+     * en la tabla `contexto`).
+     *
+     * El guardado es total sobre los nodos cargados
+     * (modificados o no): el contrato es "persistir lo que
+     * tengo en memoria, restringido al filtro de
+     * contextos". No hace delta de cambios.
+     *
+     * @param string   $nombre
+     * @param string[] $contextos
+     * @return bool
+     * @since 1.5i.7o
+     */
     static public function guardar_parcial($nombre, array $contextos): bool {
-        self::_error("SQL64::guardar_parcial: aún no implementado (fase 1).");
-        return false;
+        if (!is_string($nombre)) {
+            self::_error("SQL64::guardar_parcial: el nombre no es string.");
+            return false;
+        }
+        if (empty($contextos)) {
+            self::_error("SQL64::guardar_parcial: no se especificaron contextos.");
+            return false;
+        }
+
+        $sql = self::crear_conexion_sql();
+        if (!$sql) {
+            self::_error("SQL64::guardar_parcial: no se pudo crear conexión.");
+            return false;
+        }
+        $bits_registrados = self::_cargar_contextos_registrados($sql, $nombre);
+        if ($bits_registrados === null) {
+            $sql->close();
+            return false;
+        }
+
+        $mascara_pedida = 0;
+        foreach ($contextos as $ctx) {
+            $ctx_str = (string)$ctx;
+            if (!isset($bits_registrados[$ctx_str])) {
+                self::_error("SQL64::guardar_parcial: contexto '" . $ctx_str . "' no registrado en '" . $nombre . "'.");
+                $sql->close();
+                return false;
+            }
+            $mascara_pedida |= (1 << (int)$bits_registrados[$ctx_str]);
+        }
+        $sql->close();
+
+        return self::_guardar_con_filtro($nombre, $mascara_pedida);
     }
 
     static public function listar_contextos($nombre): ?array {
@@ -335,10 +432,15 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         return $mascaras;
     }
 
-    private static function _crear_chunks_insertar_nodos_con_mascara($sql, $nombre, array $mascaras): array {
-        $datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras) {
+    private static function _crear_chunks_insertar_nodos_con_mascara($sql, $nombre, array $mascaras, int $mascara_filtro = 0): array {
+        $datos = [];
+        Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras, $mascara_filtro, &$datos) {
             $id = $nodo->id();
-            return ['dato' => $nodo->dato(), 'mascara' => $mascaras[$id] ?? 0];
+            $mascara = $mascaras[$id] ?? 0;
+            if ($mascara_filtro !== 0 && ((int)$mascara & $mascara_filtro) === 0) {
+                return;
+            }
+            $datos[$id] = ['dato' => $nodo->dato(), 'mascara' => $mascara];
         });
         if (empty($datos)) return [];
 
@@ -369,16 +471,29 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         return $chunks;
     }
 
-    private static function _crear_chunks_insertar_adyacentes_contexto($sql, $nombre): array {
-        $datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
+    private static function _crear_chunks_insertar_adyacentes_contexto($sql, $nombre, array $mascaras = [], int $mascara_filtro = 0): array {
+        $datos = [];
+        Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras, $mascara_filtro, &$datos) {
+            $id_origen = $nodo->id();
+            if ($mascara_filtro !== 0) {
+                $m_origen = (int)($mascaras[$id_origen] ?? 0);
+                if (($m_origen & $mascara_filtro) === 0) return;
+            }
             $enlaces = [];
             $ady = $nodo->adyacentes();
             if (is_array($ady)) {
                 foreach ($ady as $enlace => $adyacente) {
-                    $enlaces[$enlace] = $adyacente->id();
+                    $id_dest = $adyacente->id();
+                    if ($mascara_filtro !== 0) {
+                        $m_dest = (int)($mascaras[$id_dest] ?? 0);
+                        if (($m_dest & $mascara_filtro) === 0) continue;
+                    }
+                    $enlaces[$enlace] = $id_dest;
                 }
             }
-            return $enlaces;
+            if (!empty($enlaces)) {
+                $datos[$id_origen] = $enlaces;
+            }
         });
         if (empty($datos)) return [];
 
