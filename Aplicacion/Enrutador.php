@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78i
+ * @version   1.5piloto.78j
  */
 
 use Iteradores\Nodos\Nodo;
@@ -604,7 +604,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_dueno) || empty($nombre_viaje)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = obtener_declaracion_jurada($nombre_dueno, $nombre_viaje, $tipo_dj, $forzar_default);
+                    // Fase 1c.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = obtener_declaracion_jurada($nombre_dueno, $nombre_viaje, $tipo_dj, $forzar_default, $nodo_contexto);
                     responder_json($resultado);
                     break;
 
@@ -866,7 +868,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_viaje) || empty($nombre_terminal) || empty($nombre_dueno)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $opciones = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal);
+                    // Fase 1c.2: contexto del solicitante.
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $opciones = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal, $nodo_contexto);
                     responder_json(['exito' => true, 'opciones' => $opciones]);
                     break;
 

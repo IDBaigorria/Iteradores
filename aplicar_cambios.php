@@ -2,16 +2,7 @@
 /**
  * Aplicador de cambios automáticos — Proyecto PHP.
  *
- * Tanda 1c.2b (Grupo 2): contexto del solicitante en ViajeOpciones.
- *
- *  - ViajeOpciones.php: obtener_opciones_avanzadas_viaje y
- *    guardar_opciones_avanzadas_viaje aceptan ?Nodo $nodo_contexto.
- *  - Enrutador.php: las 2 acciones viajes/*_opciones_avanzadas
- *    pasan _contexto_solicitante($nombre_solicitante).
- *
- * Nota: las funciones obtener_opciones_terminal_viaje y
- * guardar_opciones_terminal_viaje NO están en ViajeOpciones.php.
- * Quedan para una sub-tanda aparte cuando se identifique el archivo.
+ * Tanda 1c.2c (Grupo 3): contexto del solicitante en Viaje.php.
  *
  * Uso:
  *   php aplicar_cambios.php
@@ -31,69 +22,241 @@ $raiz_proyecto = __DIR__;
 $cambios = [
 
 // ------------------------------------------------------------
-// ViajeOpciones.php
+// Viaje.php
 // ------------------------------------------------------------
 
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeOpciones.php',
-    'descripcion' => 'ViajeOpciones: bump @version a 1.5piloto.78h',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: bump @version a 1.5piloto.78j',
     'buscar' => [
         ' * @package   Iteradores',
-        ' * @since     1.5piloto.12',
-        ' * @version   1.5piloto.74',
+        ' * @since     1.5piloto.8',
+        ' * @version   1.5piloto.77e',
         ' */',
     ],
     'reemplazar' => [
         ' * @package   Iteradores',
-        ' * @since     1.5piloto.12',
-        ' * @version   1.5piloto.78h',
+        ' * @since     1.5piloto.8',
+        ' * @version   1.5piloto.78j',
         ' */',
     ],
 ],
 
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeOpciones.php',
-    'descripcion' => 'ViajeOpciones: obtener_opciones_avanzadas_viaje acepta contexto',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: formatear_viaje acepta contexto',
     'buscar' => [
-        'function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje): array {',
+        'function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_terminal = null, ?array $indice_ventas = null): array {',
     ],
     'reemplazar' => [
-        'function obtener_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, ?Nodo $nodo_contexto = null): array {',
+        'function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_terminal = null, ?array $indice_ventas = null, ?Nodo $nodo_contexto = null): array {',
     ],
 ],
 
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeOpciones.php',
-    'descripcion' => 'ViajeOpciones: obtener_opciones_avanzadas_viaje usa contexto',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: viaje_tiene_ventas acepta contexto',
     'buscar' => [
-        '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);',
-        '    if (!$nodo_viajes) return $defaults;',
+        'function viaje_tiene_ventas(string $nombre_dueno, string $nombre_viaje): bool {',
+        '    // Fase B3.1: ID especial directo.',
+        '    $nodo_dueno = Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
+        '    if (!$nodo_dueno) return false;',
         '',
-        '    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);',
-        '    if (!$nodo_viaje) return $defaults;',
+        '    $contenedor_ventas = $nodo_dueno->adyacente(\'ventas\');',
+        '    if (!$contenedor_ventas) return false;',
     ],
     'reemplazar' => [
+        'function viaje_tiene_ventas(string $nombre_dueno, string $nombre_viaje, ?Nodo $nodo_contexto = null): bool {',
+        '    // Fase 1c.2: si viene contexto (terminal → compartido),',
+        '    // navegar desde ahí. Si no, resolver us_<dueno>.',
+        '    $nodo_dueno = $nodo_contexto ?: Nodo::nodo_por_id(\'us_\' . $nombre_dueno);',
+        '    if (!$nodo_dueno) return false;',
+        '',
+        '    $contenedor_ventas = $nodo_dueno->adyacente(\'ventas\');',
+        '    if (!$contenedor_ventas) return false;',
+    ],
+],
+
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: formatear_viaje propaga contexto a viaje_tiene_ventas',
+    'buscar' => [
+        '    if ($indice_ventas !== null) {',
+        '        $tiene_ventas_bool = !empty($indice_ventas[\'tiene_ventas\'][$nombre_viaje]);',
+        '    } else {',
+        '        $tiene_ventas_bool = viaje_tiene_ventas($datos[\'dueno\'], $nombre_viaje);',
+        '    }',
+    ],
+    'reemplazar' => [
+        '    if ($indice_ventas !== null) {',
+        '        $tiene_ventas_bool = !empty($indice_ventas[\'tiene_ventas\'][$nombre_viaje]);',
+        '    } else {',
+        '        $tiene_ventas_bool = viaje_tiene_ventas($datos[\'dueno\'], $nombre_viaje, $nodo_contexto);',
+        '    }',
+    ],
+],
+
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: _calcular_vendidos_por_micro_de_viaje acepta contexto',
+    'buscar' => [
+        'function _calcular_vendidos_por_micro_de_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal): array {',
+        '    $vendidos_por_micro = [];',
+        '    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);',
+    ],
+    'reemplazar' => [
+        'function _calcular_vendidos_por_micro_de_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, ?Nodo $nodo_contexto = null): array {',
+        '    $vendidos_por_micro = [];',
+        '    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);',
+    ],
+],
+
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: formatear_viaje propaga contexto a _calcular_vendidos_por_micro_de_viaje',
+    'buscar' => [
+        '        if ($indice_ventas !== null) {',
+        '            $vendidos_por_micro = $indice_ventas[\'vendidos_por_micro\'][$nombre_viaje][$nombre_terminal] ?? [];',
+        '        } else {',
+        '            $vendidos_por_micro = _calcular_vendidos_por_micro_de_viaje($datos[\'dueno\'], $nombre_viaje, $nombre_terminal);',
+        '        }',
+    ],
+    'reemplazar' => [
+        '        if ($indice_ventas !== null) {',
+        '            $vendidos_por_micro = $indice_ventas[\'vendidos_por_micro\'][$nombre_viaje][$nombre_terminal] ?? [];',
+        '        } else {',
+        '            $vendidos_por_micro = _calcular_vendidos_por_micro_de_viaje($datos[\'dueno\'], $nombre_viaje, $nombre_terminal, $nodo_contexto);',
+        '        }',
+    ],
+],
+
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: formatear_viaje usa contexto para empresas',
+    'buscar' => [
+        '    // Pre-cargar el contenedor de empresas del dueño (para',
+        '    // resolver nombres visibles). Fase B3.1: ID especial.',
+        '    $nodo_dueno_iter = Nodo::nodo_por_id(\'us_\' . $datos[\'dueno\']);',
+        '    $nodo_empresas = $nodo_dueno_iter ? $nodo_dueno_iter->adyacente(\'empresas\') : null;',
+    ],
+    'reemplazar' => [
+        '    // Pre-cargar el contenedor de empresas del dueño (para',
+        '    // resolver nombres visibles). Fase 1c.2: si viene contexto',
+        '    // (terminal → compartido), resolver desde ahí.',
+        '    $nodo_dueno_iter = $nodo_contexto ?: Nodo::nodo_por_id(\'us_\' . $datos[\'dueno\']);',
+        '    $nodo_empresas = $nodo_dueno_iter ? $nodo_dueno_iter->adyacente(\'empresas\') : null;',
+    ],
+],
+
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: formatear_viaje usa contexto para opciones_avanzadas',
+    'buscar' => [
+        '    // Opciones avanzadas (definida en ViajeOpciones.php)',
+        '    $datos[\'opciones_avanzadas\'] = obtener_opciones_avanzadas_viaje($datos[\'dueno\'], $nombre_viaje);',
+        '    return $datos;',
+        '}',
+    ],
+    'reemplazar' => [
+        '    // Opciones avanzadas (definida en ViajeOpciones.php).',
+        '    // Fase 1c.2: pasar el contexto para que el terminal vea las',
+        '    // opciones del viaje desde su compartido.',
+        '    $datos[\'opciones_avanzadas\'] = obtener_opciones_avanzadas_viaje($datos[\'dueno\'], $nombre_viaje, $nodo_contexto);',
+        '    return $datos;',
+        '}',
+    ],
+],
+
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: listar_viajes_de_terminal pasa contexto a formatear_viaje',
+    'buscar' => [
+        '    $viajes_autorizados = [];',
+        '    $adyacentes = (array) $nodo_viajes->adyacentes();',
+        '    foreach ($adyacentes as $nombre_viaje => $nodo_viaje) {',
+        '        $viaje = formatear_viaje($nombre_viaje, $nodo_viaje, $nombre_terminal, $indice_ventas);',
+        '        if (in_array($nombre_terminal, $viaje[\'terminales_autorizadas\'])) {',
+        '            $viajes_autorizados[] = $viaje;',
+        '        }',
+        '    }',
+    ],
+    'reemplazar' => [
+        '    $viajes_autorizados = [];',
+        '    $adyacentes = (array) $nodo_viajes->adyacentes();',
+        '    foreach ($adyacentes as $nombre_viaje => $nodo_viaje) {',
+        '        // Fase 1c.2: pasar el nodo del dueño (compartido, tras',
+        '        // B2.3.5) como contexto a formatear_viaje.',
+        '        $viaje = formatear_viaje($nombre_viaje, $nodo_viaje, $nombre_terminal, $indice_ventas, $nodo_dueno);',
+        '        if (in_array($nombre_terminal, $viaje[\'terminales_autorizadas\'])) {',
+        '            $viajes_autorizados[] = $viaje;',
+        '        }',
+        '    }',
+    ],
+],
+
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: obtener_opciones_terminal_viaje acepta contexto',
+    'buscar' => [
+        'function obtener_opciones_terminal_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal): array {',
+        '    $defaults = [',
+        '        \'cambiar_punto_predeterminado\' => \'0\',',
+        '        \'punto_subida_bajada\' => \'\',',
+        '        // Condiciones de pago: vacío = sin override (usar config del viaje)',
+        '        \'permite_efectivo\' => \'\',',
+        '        \'cuotas_efectivo_max\' => \'\',',
+        '        \'permite_transferencia\' => \'\',',
+        '        \'cuotas_transferencia_max\' => \'\',',
+        '    ];',
+        '',
+        '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);',
+    ],
+    'reemplazar' => [
+        'function obtener_opciones_terminal_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, ?Nodo $nodo_contexto = null): array {',
+        '    $defaults = [',
+        '        \'cambiar_punto_predeterminado\' => \'0\',',
+        '        \'punto_subida_bajada\' => \'\',',
+        '        // Condiciones de pago: vacío = sin override (usar config del viaje)',
+        '        \'permite_efectivo\' => \'\',',
+        '        \'cuotas_efectivo_max\' => \'\',',
+        '        \'permite_transferencia\' => \'\',',
+        '        \'cuotas_transferencia_max\' => \'\',',
+        '    ];',
+        '',
+        '    // Fase 1c.2: si viene contexto (terminal → compartido),',
+        '    // navegar desde ahí.',
         '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);',
-        '    if (!$nodo_viajes) return $defaults;',
-        '',
-        '    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);',
-        '    if (!$nodo_viaje) return $defaults;',
     ],
 ],
 
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/ViajeOpciones.php',
-    'descripcion' => 'ViajeOpciones: guardar_opciones_avanzadas_viaje acepta contexto',
+    'archivo' => 'Aplicacion/Viajes/Viaje.php',
+    'descripcion' => 'Viaje: obtener_declaracion_jurada acepta contexto',
     'buscar' => [
-        'function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, array $opciones, bool $aplicar_retroactivo = false): array {',
+        'function obtener_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, string $tipo, bool $forzar_default = false): array {',
+        '    $tipo = ($tipo === \'menor\') ? \'menor\' : \'mayor\';',
+        '    $enlace = \'declaracion_jurada_\' . $tipo;',
+        '',
         '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);',
     ],
     'reemplazar' => [
-        'function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_viaje, array $opciones, bool $aplicar_retroactivo = false, ?Nodo $nodo_contexto = null): array {',
+        'function obtener_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, string $tipo, bool $forzar_default = false, ?Nodo $nodo_contexto = null): array {',
+        '    $tipo = ($tipo === \'menor\') ? \'menor\' : \'mayor\';',
+        '    $enlace = \'declaracion_jurada_\' . $tipo;',
+        '',
+        '    // Fase 1c.2: si viene contexto (terminal → compartido),',
+        '    // navegar desde ahí.',
         '    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);',
     ],
 ],
@@ -105,89 +268,83 @@ $cambios = [
 [
     'tipo' => 'reemplazar',
     'archivo' => 'Aplicacion/Enrutador.php',
-    'descripcion' => 'Enrutador: bump @version a 1.5piloto.78i',
+    'descripcion' => 'Enrutador: bump @version a 1.5piloto.78j',
     'buscar' => [
-        ' * @package   Iteradores',
-        ' * @since     1.5piloto.1',
-        ' * @version   1.5piloto.78h',
-        ' */',
-    ],
-    'reemplazar' => [
         ' * @package   Iteradores',
         ' * @since     1.5piloto.1',
         ' * @version   1.5piloto.78i',
         ' */',
     ],
-],
-
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Enrutador.php',
-    'descripcion' => 'Enrutador: viajes/obtener_opciones_avanzadas pasa contexto',
-    'buscar' => [
-        '                case \'obtener_opciones_avanzadas\':',
-        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-        '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    if (empty($nombre_viaje) || empty($nombre_dueno)) {',
-        '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
-        '                    }',
-        '                    $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje);',
-        '                    responder_json([\'exito\' => true, \'opciones\' => $opciones]);',
-        '                    break;',
-    ],
     'reemplazar' => [
-        '                case \'obtener_opciones_avanzadas\':',
-        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-        '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    if (empty($nombre_viaje) || empty($nombre_dueno)) {',
-        '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
-        '                    }',
-        '                    // Fase 1c.2: contexto del solicitante.',
-        '                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);',
-        '                    $opciones = obtener_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $nodo_contexto);',
-        '                    responder_json([\'exito\' => true, \'opciones\' => $opciones]);',
-        '                    break;',
+        ' * @package   Iteradores',
+        ' * @since     1.5piloto.1',
+        ' * @version   1.5piloto.78j',
+        ' */',
     ],
 ],
 
 [
     'tipo' => 'reemplazar',
     'archivo' => 'Aplicacion/Enrutador.php',
-    'descripcion' => 'Enrutador: viajes/guardar_opciones_avanzadas pasa contexto',
+    'descripcion' => 'Enrutador: viajes/obtener_declaracion pasa contexto',
     'buscar' => [
-        '                case \'guardar_opciones_avanzadas\':',
-        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
+        '                case \'obtener_declaracion\':',
         '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    $opciones = [',
-        '                        \'restriccion_edad\' => $post[\'restriccion_edad\'] ?? \'0\',',
-        '                        \'edad_minima\' => $post[\'edad_minima\'] ?? \'18\',',
-        '                        \'edad_maxima\' => $post[\'edad_maxima\'] ?? \'80\',',
-        '                        \'mostrar_dj_en_terminales\' => $post[\'mostrar_dj_en_terminales\'] ?? \'0\',',
-        '                    ];',
-        '                    if (empty($nombre_viaje) || empty($nombre_dueno)) {',
+        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
+        '                    $tipo_dj = $post[\'tipo_dj\'] ?? \'mayor\';',
+        '                    $forzar_default = ($post[\'forzar_default\'] ?? \'0\') === \'1\';',
+        '                    if (empty($nombre_dueno) || empty($nombre_viaje)) {',
         '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
         '                    }',
-        '                    $resultado = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones);',
+        '                    $resultado = obtener_declaracion_jurada($nombre_dueno, $nombre_viaje, $tipo_dj, $forzar_default);',
         '                    responder_json($resultado);',
         '                    break;',
     ],
     'reemplazar' => [
-        '                case \'guardar_opciones_avanzadas\':',
-        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
+        '                case \'obtener_declaracion\':',
         '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-        '                    $opciones = [',
-        '                        \'restriccion_edad\' => $post[\'restriccion_edad\'] ?? \'0\',',
-        '                        \'edad_minima\' => $post[\'edad_minima\'] ?? \'18\',',
-        '                        \'edad_maxima\' => $post[\'edad_maxima\'] ?? \'80\',',
-        '                        \'mostrar_dj_en_terminales\' => $post[\'mostrar_dj_en_terminales\'] ?? \'0\',',
-        '                    ];',
-        '                    if (empty($nombre_viaje) || empty($nombre_dueno)) {',
+        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
+        '                    $tipo_dj = $post[\'tipo_dj\'] ?? \'mayor\';',
+        '                    $forzar_default = ($post[\'forzar_default\'] ?? \'0\') === \'1\';',
+        '                    if (empty($nombre_dueno) || empty($nombre_viaje)) {',
         '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
         '                    }',
         '                    // Fase 1c.2: contexto del solicitante.',
         '                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);',
-        '                    $resultado = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones, false, $nodo_contexto);',
+        '                    $resultado = obtener_declaracion_jurada($nombre_dueno, $nombre_viaje, $tipo_dj, $forzar_default, $nodo_contexto);',
         '                    responder_json($resultado);',
+        '                    break;',
+    ],
+],
+
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Enrutador.php',
+    'descripcion' => 'Enrutador: viajes/obtener_opciones_terminal pasa contexto',
+    'buscar' => [
+        '                case \'obtener_opciones_terminal\':',
+        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
+        '                    $nombre_terminal = $post[\'nombre_terminal\'] ?? \'\';',
+        '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
+        '                    if (empty($nombre_viaje) || empty($nombre_terminal) || empty($nombre_dueno)) {',
+        '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
+        '                    }',
+        '                    $opciones = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal);',
+        '                    responder_json([\'exito\' => true, \'opciones\' => $opciones]);',
+        '                    break;',
+    ],
+    'reemplazar' => [
+        '                case \'obtener_opciones_terminal\':',
+        '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
+        '                    $nombre_terminal = $post[\'nombre_terminal\'] ?? \'\';',
+        '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
+        '                    if (empty($nombre_viaje) || empty($nombre_terminal) || empty($nombre_dueno)) {',
+        '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
+        '                    }',
+        '                    // Fase 1c.2: contexto del solicitante.',
+        '                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);',
+        '                    $opciones = obtener_opciones_terminal_viaje($nombre_dueno, $nombre_viaje, $nombre_terminal, $nodo_contexto);',
+        '                    responder_json([\'exito\' => true, \'opciones\' => $opciones]);',
         '                    break;',
     ],
 ],

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.77e
+ * @version   1.5piloto.78j
  */
 
 use Iteradores\Nodos\Nodo;
@@ -282,7 +282,9 @@ function listar_viajes_de_terminal(string $nombre_terminal): array {
     $viajes_autorizados = [];
     $adyacentes = (array) $nodo_viajes->adyacentes();
     foreach ($adyacentes as $nombre_viaje => $nodo_viaje) {
-        $viaje = formatear_viaje($nombre_viaje, $nodo_viaje, $nombre_terminal, $indice_ventas);
+        // Fase 1c.2: pasar el nodo del dueño (compartido, tras
+        // B2.3.5) como contexto a formatear_viaje.
+        $viaje = formatear_viaje($nombre_viaje, $nodo_viaje, $nombre_terminal, $indice_ventas, $nodo_dueno);
         if (in_array($nombre_terminal, $viaje['terminales_autorizadas'])) {
             $viajes_autorizados[] = $viaje;
         }
@@ -299,7 +301,7 @@ function listar_viajes_de_terminal(string $nombre_terminal): array {
  * actualizado (viajes creados antes de la v1.5piloto.27 pueden tener el nodo
  * 'reservados' en "0" o inexistente).
  */
-function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_terminal = null, ?array $indice_ventas = null): array {
+function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_terminal = null, ?array $indice_ventas = null, ?Nodo $nodo_contexto = null): array {
     $datos = [];
     $datos['nombre_viaje'] = $nombre_viaje;
     $datos['dueno'] = $nodo_viaje->adyacente('dueno') ? $nodo_viaje->adyacente('dueno')->dato() : '';
@@ -355,7 +357,7 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
     if ($indice_ventas !== null) {
         $tiene_ventas_bool = !empty($indice_ventas['tiene_ventas'][$nombre_viaje]);
     } else {
-        $tiene_ventas_bool = viaje_tiene_ventas($datos['dueno'], $nombre_viaje);
+        $tiene_ventas_bool = viaje_tiene_ventas($datos['dueno'], $nombre_viaje, $nodo_contexto);
     }
     $datos['tiene_ventas'] = $tiene_ventas_bool ? '1' : '0';
 
@@ -367,13 +369,14 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
         if ($indice_ventas !== null) {
             $vendidos_por_micro = $indice_ventas['vendidos_por_micro'][$nombre_viaje][$nombre_terminal] ?? [];
         } else {
-            $vendidos_por_micro = _calcular_vendidos_por_micro_de_viaje($datos['dueno'], $nombre_viaje, $nombre_terminal);
+            $vendidos_por_micro = _calcular_vendidos_por_micro_de_viaje($datos['dueno'], $nombre_viaje, $nombre_terminal, $nodo_contexto);
         }
     }
 
     // Pre-cargar el contenedor de empresas del dueño (para
-    // resolver nombres visibles). Fase B3.1: ID especial.
-    $nodo_dueno_iter = Nodo::nodo_por_id('us_' . $datos['dueno']);
+    // resolver nombres visibles). Fase 1c.2: si viene contexto
+    // (terminal → compartido), resolver desde ahí.
+    $nodo_dueno_iter = $nodo_contexto ?: Nodo::nodo_por_id('us_' . $datos['dueno']);
     $nodo_empresas = $nodo_dueno_iter ? $nodo_dueno_iter->adyacente('empresas') : null;
 
     // Micros
@@ -476,17 +479,20 @@ function formatear_viaje(string $nombre_viaje, $nodo_viaje, ?string $nombre_term
     }
     $datos['terminales_autorizadas'] = $terminales;
 
-    // Opciones avanzadas (definida en ViajeOpciones.php)
-    $datos['opciones_avanzadas'] = obtener_opciones_avanzadas_viaje($datos['dueno'], $nombre_viaje);
+    // Opciones avanzadas (definida en ViajeOpciones.php).
+    // Fase 1c.2: pasar el contexto para que el terminal vea las
+    // opciones del viaje desde su compartido.
+    $datos['opciones_avanzadas'] = obtener_opciones_avanzadas_viaje($datos['dueno'], $nombre_viaje, $nodo_contexto);
     return $datos;
 }
 
 /**
  * Verifica si un viaje tiene ventas registradas.
  */
-function viaje_tiene_ventas(string $nombre_dueno, string $nombre_viaje): bool {
-    // Fase B3.1: ID especial directo.
-    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+function viaje_tiene_ventas(string $nombre_dueno, string $nombre_viaje, ?Nodo $nodo_contexto = null): bool {
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí. Si no, resolver us_<dueno>.
+    $nodo_dueno = $nodo_contexto ?: Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return false;
 
     $contenedor_ventas = $nodo_dueno->adyacente('ventas');
@@ -521,9 +527,9 @@ function viaje_tiene_ventas(string $nombre_dueno, string $nombre_viaje): bool {
  * @param string $nombre_terminal
  * @return array<int|string, int> micro_id => cantidad
  */
-function _calcular_vendidos_por_micro_de_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal): array {
+function _calcular_vendidos_por_micro_de_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, ?Nodo $nodo_contexto = null): array {
     $vendidos_por_micro = [];
-    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);
     if (!$contenedor_ventas) return $vendidos_por_micro;
     $venta_iter = hmi($contenedor_ventas);
     $seg = 0;
@@ -1013,7 +1019,7 @@ function eliminar_terminal_autorizada(string $nombre_viaje, string $nombre_termi
  * @param string $nombre_terminal  Nombre de usuario de la terminal.
  * @return array
  */
-function obtener_opciones_terminal_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal): array {
+function obtener_opciones_terminal_viaje(string $nombre_dueno, string $nombre_viaje, string $nombre_terminal, ?Nodo $nodo_contexto = null): array {
     $defaults = [
         'cambiar_punto_predeterminado' => '0',
         'punto_subida_bajada' => '',
@@ -1024,7 +1030,9 @@ function obtener_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
         'cuotas_transferencia_max' => '',
     ];
 
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return $defaults;
 
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
@@ -1313,11 +1321,13 @@ function _sustituir_placeholders_dj(string $contenido, Nodo $nodo_viaje): string
  *                                aunque exista un nodo guardado.
  * @return array
  */
-function obtener_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, string $tipo, bool $forzar_default = false): array {
+function obtener_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, string $tipo, bool $forzar_default = false, ?Nodo $nodo_contexto = null): array {
     $tipo = ($tipo === 'menor') ? 'menor' : 'mayor';
     $enlace = 'declaracion_jurada_' . $tipo;
 
-    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
+    // Fase 1c.2: si viene contexto (terminal → compartido),
+    // navegar desde ahí.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
     $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
     if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
