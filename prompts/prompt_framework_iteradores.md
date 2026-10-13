@@ -953,6 +953,32 @@ huérfanos).
   contextos pasados. Lo consulta `guardar_ambos` del
   piloto para decidir entre `guardar` y `guardar_parcial`.
   No cambia el comportamiento del framework por sí solo.
+- **1.5i.7q**: `PerdurarSuperestructuraStringSQL64::_guardar_con_filtro`
+  cambia la regla de borrado de aristas. Antes: borraba
+  aristas cuyo ORIGEN estaba en el filtro, y solo reinsertaba
+  las que tenían ambos extremos dentro. Resultado: las aristas
+  que cruzaban el borde (dueño → subárbol que quedó sin bit)
+  se borraban sin reinsertarse. Ahora: borra solo aristas
+  cuyos DOS extremos están en el filtro. Las que cruzan el
+  borde se conservan tal cual. Aplicado.
+- **1.5i.7r**: mismo `_guardar_con_filtro`, con filtro != 0,
+  une las máscaras que el BFS calculó con las que el nodo
+  ya tenía en memoria. Nunca se pierde un bit preexistente.
+  Aplicado, **no alcanzó para resolver el bug del viaje
+  viejo** (ver `plan_actual.md` §1.5).
+
+**BUG PENDIENTE (framework).** El bug del viaje viejo que
+desaparece tras una operación del terminal (§1.5 del
+`plan_actual.md`) afecta a `_guardar_con_filtro` y no está
+resuelto. v78r y v78s fueron intentos que no alcanzaron.
+Próximo paso: instrumentar `_guardar_con_filtro` con logs
+de las máscaras antes/después del `unir` para identificar
+en qué punto se pierde el bit del dueño.
+
+**Espejo JS pendiente.** Los fixes v78r y v78s **no están
+en el espejo JS**. `PerdurarSuperestructuraStringIndexedDB64.js`
+tiene el bug de borrado de aristas original. Se espeja en
+una próxima tanda del plugin.
 - **1.5i.7l**: comando `grafo:raices` agregado al framework
   PHP (tanda 76n) y espejado en JS. Lista los nodos raíz
   del grafo (IDs especiales) con sus adyacentes directos.

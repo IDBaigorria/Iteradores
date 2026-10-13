@@ -677,6 +677,24 @@ costó un fallo real del runner y una iteración extra.
     el bump, o usar un `buscar` que no dependa del
     número de versión (por ejemplo, solo el `@author`
     y el `class`, que sí son estables).
+22. **Cuando un bug persiste después de un fix, anotar el
+    intento fallido antes de seguir.** Caso v78r/v78s:
+    dos intentos de fix (regla de borrado de aristas +
+    preservar bits de máscara) que no resolvieron el bug
+    del viaje viejo que desaparece. Cada intento tiene
+    que quedar en `plan_actual.md` con: qué se cambió,
+    por qué, y por qué no alcanzó. Así el próximo que
+    retome el bug no repite el mismo intento a ciegas.
+    Regla: un bug que se resiste a dos intentos de fix
+    necesita instrumentación (logs), no otro fix a ojo.
+23. **Los bugs que aparecen por interacción entre pruebas
+    del plugin son los más difíciles.** El bug §1.5 del
+    `plan_actual.md` apareció solo cuando se corre
+    "autocompletado" seguido de "alta de viaje". Cada
+    prueba en aislamiento pasaba. Regla: si un bug
+    aparece en combinación, anotar explícitamente el
+    orden de las pruebas que lo reproducen. Es el dato
+    más valioso para diagnosticarlo.
 
 ---
 
@@ -697,11 +715,11 @@ costó un fallo real del runner y una iteración extra.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.78m.
-Se agregan dos aprendizajes (20-21): usar la firma de la
-función siguiente como ancla única en bloques con
-anidación profunda de llaves (caso v78l), y verificar el
-`@version` real antes de proponer un bump (caso v78b).
+**Última actualización de este prompt:** v1.5piloto.78s.
+Se agregan dos aprendizajes (22-23): anotar intentos de
+fix fallidos antes de seguir (caso v78r/v78s) y anotar el
+orden de las pruebas cuando un bug solo aparece por
+interacción entre ellas (bug §1.5 del `plan_actual.md`).
 El resto del sistema sigue igual. Recordatorio: los
 prompts del proyecto PHP (framework, piloto, sistema de
 scripts, plan actual) y del plugin

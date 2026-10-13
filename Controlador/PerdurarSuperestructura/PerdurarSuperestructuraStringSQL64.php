@@ -23,7 +23,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStrin
  * sus contextos alcanzantes.
  *
  * @author Ignacio David Baigorria
- * @version 1.5i.7q
+ * @version 1.5i.7r
  * @since 1.5i.7k
  */
 class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQL implements PerdurarSuperestructuraConContexto {
@@ -104,10 +104,27 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             return false;
         }
 
+        $mf_parcial = (int)$mascara_filtro;
+
         $mascaras = self::_calcular_y_registrar_contextos($sql, $nombre);
         if ($mascaras === null) {
             $sql->close();
             return false;
+        }
+
+        // Con filtro (carga parcial), el BFS parte solo de los
+        // IDs especiales que están en memoria. En carga parcial
+        // del terminal, `us_<dueno>` no está: su bit no se
+        // propaga y los nodos que ya lo tenían lo pierden. Fix
+        // v78s: unir con la máscara que el nodo ya tenía en
+        // memoria. Nunca se pierde un bit preexistente.
+        if ($mf_parcial !== 0) {
+            Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use (&$mascaras) {
+                $id = $nodo->id();
+                $m_previa = (int)$nodo->contexto_mascara();
+                $m_bfs = (int)($mascaras[$id] ?? 0);
+                $mascaras[$id] = $m_previa | $m_bfs;
+            });
         }
 
         $sql->begin_transaction();

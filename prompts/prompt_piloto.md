@@ -884,6 +884,12 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   `publico`/`privado`, y el detector de la migración
   `niveles_usuario` daba `false` cada vez que se creaba un
   usuario. Idempotente, no elimina los enlaces viejos.
+- **v78b-v78s** (línea de carga parcial): ver
+  `prompts/plan_actual.md` §1.2 para la cadena completa
+  (Etapa 0, 1b, 1c.1a/b, 1c.2a-f, reparación topológica,
+  fixes del framework v78r/v78s). El prompt del piloto
+  no se actualiza por cada tanda de la línea; la fuente
+  viva es `plan_actual.md`.
 - **v78b** (Etapa 0 carga parcial): `delegar_con_args` en el
   Controlador (variante con args extra). `guardar_parcial`
   con chequeos (grafo parcial + nodos desocupados). Docblock
@@ -3408,11 +3414,24 @@ podés retomar el trabajo.
   estructura de nodos).
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.78a
-(framework 1.5i.7n). Todo funcional. La línea B del
-modelo topológico quedó cerrada salvo B3.3c
-(postergada hasta la carga parcial). Próximo: Etapa 0
-del plan de carga parcial (`plan_actual.md` §1.10). Fix de
+**Estado del proyecto al cierre:** v1.5piloto.78s
+(framework 1.5i.7r). La línea de carga parcial quedó
+aplicada en los módulos principales (Viajes, Venta,
+Pasajeros, Impresión). SQL64 activo, topología
+admin/soporte, reparación topológica disponible.
+
+**BUG PERSISTENTE.** El viaje viejo del dueño desaparece
+cuando un terminal hace una operación de guardado
+(reproducible con el plugin: autocompletado → alta de
+viaje). Los fixes v78r (regla de borrado de aristas) y
+v78s (preservar bits de máscara) no alcanzaron. Detalle
+completo, hipótesis y próximo paso de diagnóstico en
+`prompts/plan_actual.md` §1.5.
+
+Próximo paso sugerido: retomar el bug con logs de
+diagnóstico en `_guardar_con_filtro`. Después: espejar
+v78r/v78s en el framework JS y adaptar los módulos
+menores (Liquidacion, Rendicion, Empresa, Vehiculo). Fix de
 v74p: pestaña "Grafo" (Fase 1 del plan de optimización).
 v74r: `eliminar_viaje` destruye el subárbol completo
 (Fase 2, primer flujo). v74s: `eliminar_micro_de_viaje`

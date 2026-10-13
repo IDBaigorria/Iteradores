@@ -17,765 +17,99 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 ### 1.1 Última actualización
 
-**Última actualización de este archivo:** v1.5piloto.78m
-(cierre de la línea de carga parcial — todos los módulos
-principales adaptados al contexto del solicitante).
-La línea B del modelo topológico quedó cerrada. La Etapa 1
-de carga parcial (1a, 1b, 1c.1a/b, 1c.2a/b/c/d/e/f) está
-aplicada:
-  - SQL64 como método de persistencia (con las 3 tablas
-    nuevas: nodo_contexto, adyacente_contexto, contexto).
-  - `guardar_parcial` real en SQL64 (PHP) e
-    IndexedDB64 (JS).
-  - `Controlador::contextos_cargados()` y `$grafo_parcial`.
-  - `us_Administrador → usuarios` (migración v78f).
-  - `dueno → soporte → publico` (evita fuga cruzada).
-  - `_contextos_para_operacion` en el Enrutador decide entre
-    carga parcial (`[us_<sol>]`) y carga total.
-  - `guardar_ambos` usa `guardar_parcial` si el grafo es
-    parcial.
-Queda pendiente B3.3c (los 6 helpers que iteran sobre
-todos los dueños) y la adaptación de contexto en
-`Liquidacion.php`, `Rendicion.php`, `Empresa.php` y
-`Vehiculo.php`. Próximo paso: pruebas exhaustivas del
-piloto y, según aparezcan, resolver los pendientes en
-sub-tandas cortas.
+**Última actualización de este archivo:** v1.5piloto.78s.
 
-### 1.2 Estado de la conversación
+Cierre de la línea de carga parcial (v78b-v78s). Toda la
+infraestructura de contextos está aplicada: SQL64 como
+método de persistencia, `guardar_parcial` en PHP,
+`Controlador::$contextos_cargados`, `_contextos_para_operacion`
+en el Enrutador, adaptación del contexto del solicitante en
+los módulos principales (Viajes, Venta, Pasajeros,
+Impresión) y reparación topológica.
 
-**Cadena de cierres de la Fase B (modelo topológico):**
+**BUG PERSISTENTE ACTIVO (§1.5).** El bug de "el viaje viejo
+desaparece cuando el terminal hace una operación" **no está
+resuelto**. Los fixes v78r (regla de borrado de aristas) y
+v78s (preservar bits de máscara) no alcanzaron. Se sigue
+investigando. Ver §1.5 para el diagnóstico completo y las
+hipótesis descartadas.
 
-- **v76i**: solo documentación. §8.7 en el prompt del piloto con
-  el plan inicial de contextos. Sin cambios de código.
-- **v76j**: cierre de la Fase 2 del framework (SQL64 en PHP,
-  IndexedDB64 en JS, interfaz `PerdurarSuperestructuraConContexto`,
-  4 métodos en el Controlador y flag `$grafo_parcial`). Fix del
-  bug de tipos de ID en el `Map` del espejo JS. Deuda anotada:
-  dejar el Nodo limpio antes de la Fase 5.
-- **v76k**: Fase A del piloto. Usuarios como IDs especiales
-  `us_<nombre>`. Comando `grafo:reemplazar_referencias`. Script
-  `miscelaneas/migrar_usuarios_especiales.php` y bloque
-  `?migrar_usuarios_especiales=1`.
-- **v76l**: solo diseño. Modelo topológico por niveles de
-  exposición (publico, privado, compartido_con_X).
-- **v76m**: Fase B1. Contenedores `publico` y `privado` como
-  alias de los nodos existentes. Comando
-  `grafo:crear_niveles_usuario`. Script
-  `miscelaneas/migrar_niveles_usuario.php` y bloque
-  `?migrar_niveles_usuario=1`.
-- **v76n**: pestaña Grafo ampliada ("Nodos raíz", "Migraciones").
-  Nodo `aplicacion` con contenedor `migraciones`. Módulo
-  `Aplicacion/Migraciones/`. Comandos `grafo:raices` (framework)
-  y `app:migracion_*` (app, registrados directo).
-- **v76o**: solo documentación. Tres pendientes del framework
-  (espejar `grafo:reemplazar_referencias`, mover
-  `grafo:crear_niveles_usuario` al app, verificar
-  `grafo:raices` desde el SW del plugin).
-- **v76p**: solo documentación. Sistema de comandos (§4.4 del
-  framework, §5.16 del piloto). Lecciones 24-27.
-- **v76q**: Fase B2.1. Compartidos por terminal creados como
-  contenedores filtrados. Comando
-  `app:crear_compartidos_terminal`. Bloque
-  `?migrar_compartidos_terminal=1`. No repunta nada.
-- **v76r**: Fase B2.2.1. Contexto opcional en
-  `obtener_contenedor_viajes_dueno`. Helper `_contexto_terminal`.
-  `listar_viajes_de_terminal` lo usa.
-- **v76s**: Fase B2.2.2. Venta.php: contexto opcional en
-  `obtener_contenedor_ventas_dueno`, filtro opcional por
-  terminal en las búsquedas por id, contexto en
-  `listar_ventas_por_terminal` y `confirmar_venta_actual`.
-- **v76t**: Fase B2.2.3. ViajeAsientos.php: contexto opcional
-  en las funciones que navegan por el contenedor de viajes.
-- **v76u**: Fase B2.2.4. Empresa.php: contexto opcional en
-  `listar_empresas_de_dueno`. Con esto queda cerrada la
-  Fase B2.2.
-- **v76v**: reorganización de prompts (nuevo `plan_actual.md`,
-  §12 del piloto congelada, regla de actualización) +
-  parametrización de `miscelaneas/Arbol.php` (las 7 funciones
-  aceptan `?array $nombres = null`). Fase B2.3.1.
-- **v76w**: helper `_nombres_arbol_para_contexto` y ajuste
-  de las funciones del piloto para pasarle los nombres
-  parametrizados a `hmi`/`hd`. Sin cambio de comportamiento.
-  Fase B2.3.2.
-- **v76x**: migración `app:construir_arboles_compartidos`.
-  Marca cada compartido con `_es_compartido`, limpia los
-  enlaces planos que dejó B2.1 y reconstruye los árboles
-  de `ventas` y `cancelaciones` con nombres parametrizados.
-  Idempotente. Fase B2.3.3.
-- **v76y**: fix de auto-detección de migraciones. Las
-  funciones `detectar_*` ya no devuelven `true` por vacío.
-  Nuevo comando `app:migracion_limpiar_marcadores` y botón
-  "Re-detectar" en la pestaña Grafo.
-- **v76z**: fix del modal post-venta. `confirmar_venta_modal`
-  muestra el modal ANTES de los refrescos y envuelve los
-  refrescos en try/catch.
-- **v77 / v77a**: fix del Bug 1 (atadura). v77 no limpia
-  campos si hay atadura activa. v77a habilita los campos
-  no-DNI del pasajero al activar la atadura.
-- **v77b**: backend de "cambiar de asiento".
-  `formatear_venta_resumida` agrega `micro_enlace`. Nueva
-  función `cambiar_asiento_pasaje` en `ViajeAsientos.php`.
-  Subacción `viajes/cambiar_asiento` en el enrutador.
-- **v77c**: frontend de "cambiar de asiento". Botón en los
-  dos modales de detalle. Función compartida
-  `abrir_modal_cambiar_asiento`.
-- **v77d**: refresco del modal de pasajero tras cambiar de
-  asiento. `abrir_modal_cambiar_asiento` acepta un callback
-  `on_exito`.
-- **v77q** (Tanda A, B2.4.2 + B2.4.5): fixes del aislamiento
-  por topología. `Aplicacion/Compartidos.php` nuevo (5 helpers
-  para sincronizar/desincronizar viajes, terminales y
-  empresas en los compartidos). `eliminar_viaje` desincroniza
-  de los compartidos de sus terminales. `agregar_terminal_autorizada`
-  y `eliminar_terminal_autorizada` sincronizan/desincronizan
-  el compartido. `agregar_micro_a_viaje` propaga la empresa
-  al `empresas` de cada compartido. `eliminar_empresa`
-  desincroniza de los compartidos del dueño. `aplicacion_POST.php`
-  actualizado al modelo topológico.
-- **v77r** (Fase B3.1): aislación de usuarios con
-  `us_<nombre>` en Venta, Viaje, Enrutador, Usuario, Empresa,
-  ViajeMicros, Pasajero e index.php. `agregar_usuario` ya no
-  autocrea la raíz `usuarios`.
-- **v77s**: fix del `$raiz` residual en `eliminar_usuario`.
-- **v77t** (Fase B3.3a): `Liquidacion.php` y `Rendicion.php`
-  a `us_<nombre>` en las 7 resoluciones con nombre por
-  parámetro.
-- **v77u** (Fase B3.3b): `Pasajero.php` rama sin contexto +
-  `ViajeAsientos.php` (3 resoluciones).
-- **v77v** (Fase B3.3d): `Vehiculo.php` a `us_<nombre>` con
-  `$nombre_dueno` requerido. `Enrutador.php` pasa el dueño en
-  las 6 acciones. `micros.js` manda `nombre_dueno`.
-- **v77w**: fix del `continue` huérfano en
-  `subir_foto_vehiculo` (rompía el parseo de `Vehiculo.php`).
-- **v77x**: fix de `viajes-micros.js`. El modal "Agregar
-  micro" no mandaba `nombre_dueno` a `vehiculos/listar`.
-- **v77y** (Fase B3.3e): `Migraciones/Funciones.php` y
-  `Migraciones/Comandos.php` reescritos con
-  `por_cada_nodo_ejecutar` y `us_<nombre>`.
-- **v77z**: revert parcial de v77y. Los detectores vuelven a
-  `usuarios->adyacentes()` (el recorrido completo del grafo
-  encuentra otros nodos con adyacente `nivel`). Se mantiene
-  el fix de `Migraciones/Comandos.php`.
-- **v78a**: helper `_asegurar_niveles_usuario` en
-  `Usuario.php`, llamado desde `agregar_usuario`. Cierra el
-  agujero de niveles al crear usuario (mismo patrón que v77l
-  para compartidos).
+Próximo paso sugerido: retomar el bug §1.5 con logs de
+diagnóstico en el `_guardar_con_filtro` (qué máscaras tenía
+cada nodo antes y después de cada guardado parcial del
+terminal). Ver §1.5.4.
+
+### 1.2 Cadena de cierres de la sesión v78b-v78s
+
 - **v78b** (Etapa 0 carga parcial): `delegar_con_args` en el
-  Controlador; `guardar_parcial` con chequeos; docblock del
-  flag. `_contextos_para_operacion` (stub) en el Enrutador.
+  Controlador. `guardar_parcial` con chequeos (grafo parcial
+  + nodos desocupados). Docblock del flag `$grafo_parcial`.
+  `_contextos_para_operacion` (stub) en el Enrutador.
 - **v78c** (Tanda 1b): `validar_token_sesion` y
   `_construir_respuesta_login` usan `us_<nombre>` directo.
   `Controlador::$contextos_cargados` + getter.
   `guardar_ambos` consulta los contextos cargados.
 - **v78d**: chequeos defensivos de grafo parcial en
   `Usuario.php` (6 funciones) y `Migraciones/Funciones.php`
-  (2 detectores).
-- **v78e** (Tanda 1c.1a): `SQL64` como método de persistencia.
-  Bloque `?migrar_a_sql64=1` (migra app + credenciales).
+  (2 detectores). **Revertidos en v78o.**
+- **v78e** (Tanda 1c.1a): `SQL64` como método de
+  persistencia. Bloque `?migrar_a_sql64=1`. Corrección de
+  la secuencia de migración (bloque movido antes de la
+  carga normal).
 - **v78f** (Tanda 1c.1b): migración topológica.
-  `us_Administrador → usuarios`, `dueno → soporte → publico`.
-  Cambio en `_asignar_duenos_a_soporte`.
-- **v78g** (Tanda 1c.2): carga parcial activa.
-  `_contextos_para_operacion` implementado. `index.php`
-  reorganizado. Bootstrap solo en carga total.
-  `GrafoCredenciales.php` preserva y restaura contextos.
-- **v78h** (Tanda 1c.2a): contexto del solicitante en
-  `ViajeMicros.php` (5 funciones). Enrutador: 4 acciones de
-  `viajes/*_micro`.
-- **v78i** (Tanda 1c.2b): contexto en `ViajeOpciones.php`
-  (2 funciones). Enrutador: 2 acciones de
-  `viajes/*_opciones_avanzadas`.
+  `miscelaneas/migrar_topologia.php` (nuevo):
+  `migrar_topologia_admin` (crea `us_Administrador →
+  usuarios`) y `migrar_topologia_soporte` (asegura `publico`
+  en cada soporte y repunta el enlace `dueno → soporte` al
+  `publico`). Cambio en `_asignar_duenos_a_soporte`.
+- **v78g** (Tanda 1c.2): carga parcial activa. `index.php`
+  decide entre `cargar`/`cargar_parcial`. Bootstrap
+  (`aplicacion` + admin) solo en carga total.
+  `_contextos_para_operacion` implementado.
+  `GrafoCredenciales.php` captura y restaura contextos.
+- **v78h** (Tanda 1c.2a): contexto en `ViajeMicros.php`.
+  Enrutador: 4 acciones.
+- **v78i** (Tanda 1c.2b): contexto en `ViajeOpciones.php`.
+  Enrutador: 2 acciones.
 - **v78j** (Tanda 1c.2c): contexto en `Viaje.php`.
-  `formatear_viaje`, `viaje_tiene_ventas`,
-  `_calcular_vendidos_por_micro_de_viaje`,
-  `obtener_opciones_terminal_viaje`,
-  `obtener_declaracion_jurada`. Enrutador: 2 acciones.
+  Enrutador: 2 acciones.
 - **v78k** (Tanda 1c.2d): contexto en `Venta.php`.
-  `_dni_asignado_en_viaje_venta`, `obtener_o_crear_pasajero`,
-  `_calcular_cobertura_dueno`, `_crear_nodo_cancelacion`,
-  `listar_cancelaciones_de_dueno`. `confirmar_venta_actual`
-  y `cancelar_venta` propagan contexto.
+  Enrutador: `cancelaciones/listar`.
 - **v78l** (Tanda 1c.2e): contexto en `Pasajero.php`
   (9 funciones). Enrutador: 3 acciones.
-- **v78m** (Tanda 1c.2f): contexto en `Impresion.php`
-  (2 helpers + `generar_impresion`).
-  `obtener_venta_por_id` y `_buscar_venta_por_id` aceptan
-  dueño. `_contextos_para_operacion` con excepciones para
-  informes que usan B3.3c.
-
-**Tanda actual:** v78m (documentación de cierre).
-
-**v78a.** Mismo cierre de agujero que v77l hizo para
-compartidos: los usuarios creados después de la migración
-B1 (v76m) quedaban sin contenedores `publico`/`privado`.
-Resultado: el detector de la migración `niveles_usuario`
-daba `false` cada vez que se creaba un usuario nuevo, y
-había que volver a correr `grafo:crear_niveles_usuario` a
-mano. Fix: nuevo helper `_asegurar_niveles_usuario` en
-`Usuario.php`, llamado desde `agregar_usuario`. Idempotente.
-
-**Fix v77z.** Los dos detectores reescritos en v77y
-(`detectar_usuarios_especiales` y `detectar_niveles_usuario`)
-se revierten a la lógica original basada en
-`usuarios->adyacentes()`.
-
-**B3.3c sigue pendiente.** Los helpers que iteran sobre
-todos los dueños buscando por id requieren rediseño.
-
-**Fix v77z.** Los dos detectores reescritos en v77y
-(`detectar_usuarios_especiales` y `detectar_niveles_usuario`)
-se revierten a la lógica original basada en
-`usuarios->adyacentes()`. La reescritura con
-`por_cada_nodo_ejecutar` estaba mal: el recorrido completo
-del grafo encuentra otros nodos con adyacente `nivel` que no
-son usuarios (nodos huérfanos viejos, etc.), y por eso los
-detectores daban `false` siempre. El contenedor `usuarios`
-es uno de los usos legítimos de la raíz: listar TODOS los
-usuarios del sistema.
-
-**B3.3e (v77y).** Solo queda en pie el fix de
-`Migraciones/Comandos.php`: `app:crear_compartidos_terminal`
-resuelve el terminal por `us_<nombre>`.
-
-**B3.3c sigue pendiente.** Los helpers que iteran sobre
-todos los dueños buscando por id requieren rediseño.
-
-**B3.3e (v77y).** `Migraciones/Funciones.php`:
-`detectar_usuarios_especiales` y `detectar_niveles_usuario`
-reescritos con `Nodo::por_cada_nodo_ejecutar`, alineados
-con los otros detectores del archivo. `Migraciones/Comandos.php`:
-`app:crear_compartidos_terminal` resuelve el terminal por
-`us_<nombre>` en lugar de `usuarios`.
-
-**B3.3c sigue pendiente.** Los helpers que iteran sobre
-todos los dueños buscando por id requieren rediseño:
-`Venta.php` (`_buscar_venta_por_id` sin filtro,
-`obtener_cancelacion_por_id`), `Impresion.php` (2),
-`Liquidacion.php` (`obtener_liquidacion_por_id`),
-`Rendicion.php` (`aceptar_ajuste_rendicion`,
-`obtener_rendicion_por_id`), `Pasajero.php`
-(`obtener_pasajero_por_dni`).
-
-**Fix v77x.** El modal "Agregar micro" del viaje llama a
-`vehiculos/listar` sin `nombre_dueno`. Como ese parámetro
-pasó a ser requerido en B3.3d, el endpoint devolvía
-`"Dueño no especificado"` y el select de vehículos quedaba
-vacío. Fix de una línea en `viajes-micros.js`.
-
-**B3.3d (v77v).** `Vehiculo.php`: las 6 funciones reciben
-`$nombre_dueno` y resuelven por `us_<nombre>` en lugar de
-iterar sobre todos los dueños. `Enrutador.php`: las 6
-acciones de `vehiculos/*` pasan el dueño. `micros.js`:
-nuevo helper `_obtener_nombre_dueno_micros()` y las 5
-llamadas mandan `nombre_dueno`.
-
-**B3.3e y B3.3c siguen pendientes.** B3.3e: alinear
-`Migraciones/*` con `por_cada_nodo_ejecutar`. B3.3c:
-helpers que iteran sobre todos los dueños buscando por
-id (requieren rediseño).
-
-**Fix v77w.** En v77v, el reemplazo del bloque de
-`subir_foto_vehiculo` dejó un `continue` huérfano (fuera
-de loop/switch) porque solo se reemplazó la primera mitad
-del bucle. Eso rompía el parseo de `Vehiculo.php` y
-tiraba error fatal en todas las requests. Fix:
-reescritura completa del bloque de búsqueda de empresa +
-vehículo, con returns tempranos en lugar de `continue`.
-También se chequea `$nodo_empresas` y `$nodo_vehiculos`
-antes de usarlos.
-
-**B3.3d (v77v).** `Vehiculo.php`: las 6 funciones reciben
-`$nombre_dueno` y resuelven por `us_<nombre>` en lugar de
-iterar sobre todos los dueños. `Enrutador.php`: las 6
-acciones de `vehiculos/*` pasan el dueño. `micros.js`:
-nuevo helper `_obtener_nombre_dueno_micros()` y las 5
-llamadas mandan `nombre_dueno`. Queda pendiente B3.3c
-(helpers que iteran sobre todos los dueños buscando por
-id) y B3.3e (Migraciones).
-
-**B3.3a (v77t).** `Liquidacion.php` y `Rendicion.php`:
-3 y 4 resoluciones de dueño/terminal pasadas a
-`us_<nombre>`.
-
-**B3.3b (v77u).** `Pasajero.php`: rama sin contexto de
-`obtener_contenedor_pasajeros_dueno` → `us_<nombre>`.
-`ViajeAsientos.php`: 3 resoluciones de terminal
-(`seleccionar_asiento_micro`, `deseleccionar_asiento_micro`,
-`obtener_estados_asientos_micro`) → `us_<nombre>`.
-
-**B3.3c — pendientes de rediseño.** Los siguientes usos
-iteran sobre TODOS los dueños porque no reciben contexto.
-Requieren decisión de diseño (¿pasar contexto desde el
-enrutador? ¿crear índices auxiliares por id?). No se
-resuelven con `us_<nombre>` directo:
-
-- `Venta.php`: `_buscar_venta_por_id` (rama sin filtro)
-  y `obtener_cancelacion_por_id`.
-- `Impresion.php` (2): resuelven dueño/viaje para armar
-  la impresión.
-- `Liquidacion.php`: `obtener_liquidacion_por_id`.
-- `Rendicion.php`: `aceptar_ajuste_rendicion` y
-  `obtener_rendicion_por_id`.
-- `Pasajero.php`: `obtener_pasajero_por_dni` (arma
-  historial de ventas iterando todos los dueños).
-- `Vehiculo.php` (6): las 6 funciones buscan la empresa
-  entre todos los dueños.
-- `Migraciones/Funciones.php` (2) y `Comandos.php` (1):
-  pueden reescribirse con `Nodo::por_cada_nodo_ejecutar`
-  (B3.3e, cosmético).
-
-**B3.3d — Vehiculo.php.** El más grande. Requiere pasar
-el dueño desde el Enrutador a cada una de las 6 funciones
-(`listar_vehiculos_de_empresa`, `agregar_vehiculo`,
-`actualizar_vehiculo`, `actualizar_configuracion_vehiculo`,
-`eliminar_vehiculo`, `subir_foto_vehiculo`).
-
-**B3.1 (v77r + v77s).** Reemplazo de
-`Nodo::nodo_por_id('usuarios')` por
-`Nodo::nodo_por_id('us_<nombre>')` en los flujos que
-ya tienen el nombre a mano. Alcanza a Venta, Viaje,
-Enrutador, Usuario, Empresa, ViajeMicros, Pasajero e
-index.php. Los listados que iteran sobre todos los
-usuarios y los helpers que iteran sobre todos los dueños
-quedan como están (B3.3). `agregar_usuario` ya no
-autocrea la raíz `usuarios`: el chequeo de duplicado se
-hace por `Nodo::existe('us_<nombre>')`.
-
-**Fix v77s.** `eliminar_usuario` tenía un `$raiz` residual
-al final: se había borrado la declaración al cambiar el
-bloque por ID especial, pero quedó el
-`$raiz->eliminar_adyacente($nombre_usuario)` que desenlaza
-al usuario del contenedor `usuarios`. Se resuelve la raíz
-solo en ese punto, con comentario que explica por qué.
-
-**B3.3 — pendiente (helpers que iteran "sobre todos los
-dueños").** El inventario actualizado (post v77r) es:
-
-- `Liquidacion.php` (4): recibe `$nombre_dueno` en la firma.
-  Cambio directo a `us_<nombre>`.
-- `Rendicion.php` (5): idem, recibe `$nombre_dueno`.
-- `Pasajero.php` (2): `obtener_pasajero_por_dni` arma
-  historial iterando dueños. Requiere ver el código.
-- `ViajeAsientos.php` (3): resuelven terminal/dueño en
-  flujos sin contexto.
-- `Venta.php` (2): `_buscar_venta_por_id` sin contexto y
-  `obtener_cancelacion_por_id`.
-- `Impresion.php` (2): resuelven dueño/viaje para armar
-  la impresión.
-- `Vehiculo.php` (6): las 6 funciones buscan la empresa
-  entre todos los dueños. El más grande.
-- `Migraciones/Funciones.php` (2): `detectar_*` que pueden
-  reescribirse con `Nodo::por_cada_nodo_ejecutar`.
-- `Migraciones/Comandos.php` (1): idem.
-
-**Sub-tandas propuestas (de menor a mayor riesgo):**
-
-- **B3.3a:** `Liquidacion.php` + `Rendicion.php`. Cambio
-  directo a `us_<nombre>` en cada resolución.
-- **B3.3b:** `Pasajero.php` + `ViajeAsientos.php`. Casos
-  sueltos, requieren ver el código para saber qué
-  contexto hay disponible.
-- **B3.3c:** `Venta.php` + `Impresion.php`. Requieren
-  decisión de diseño: ¿contexto o iteración más acotada?
-- **B3.3d:** `Vehiculo.php`. El más grande. Puede requerir
-  cambios en el Enrutador para pasar el dueño.
-- **B3.3e:** `Migraciones/Funciones.php` + `Comandos.php`.
-  Reescribir con `por_cada_nodo_ejecutar`.
-
-**Usos legítimos que NO se tocan:**
-
-- `Autenticacion.php` (4): busca por `codigo_hash` en
-  credenciales, itera por todos.
-- `GrafoCredenciales.php` (2): helper del grafo de
-  credenciales.
-- `index.php` (4): crea la raíz y el admin al arrancar.
-- `Usuario.php`: `listar_usuarios`, `listar_duenos`,
-  `listar_soportes`, `buscar_usuario_por_codigo`.
-- `Controlador.php` (1): es del framework. Se aborda en
-  una tanda del framework, no acá.
-- `miscelaneas/migrar_usuarios_especiales.php` (1):
-  migración manual que recorre el grafo.
-
-**Anterior:** v77r (B3.1: aislación de usuarios, sin el fix).
-Antes: v77q (Tanda A, B2.4.2 + B2.4.5).
-
-**Estado al cierre.** La fase B2.3.5 quedó completa:
-el repuntado de terminales al compartido está aplicado en
-producción, los terminales nuevos se repuntan al vuelo, y
-las 3 pruebas del plugin (57, 58, 59) están verdes.
-
-**Cadena de cierres desde v77f hasta v77o:**
-
-- **v77f** (B2.3.5a): comando `app:repuntar_terminales_compartido`.
-  Cambia el enlace `dueno` de cada terminal para que apunte
-  a su compartido. Idempotente. Aplicado en producción.
-- **v77g** (B2.3.5b.1): el enrutador pasa contexto del
-  solicitante terminal en `estado_asientos`, `ventas/obtener`,
-  `ventas/cancelar`, `ventas/pagar_cupon`, `ventas/info_cancelacion`.
-- **v77h** (B2.3.5b.2): contexto en `cambiar_asiento_pasaje`
-  y en reservas.
-- **v77i** (B2.3.5b.3): contexto en empresas, vehículos,
-  pasajeros.
-- **v77j**: fix de zona horaria (`date_default_timezone_set(`
-  'America/Argentina/Buenos_Aires')`). Bug latente desde v58,
-  hacía que el autocompletado por DNI dijera "Fecha de
-  actualización inválida" entre las 21 y 24 hora argentina.
-- **v77k** (B2.3.5c.1, framework 1.5i.7m): `grafo:nodo`
-  agrega `destino_es_compartido` a cada adyacente. Permite
-  verificar topología con una sola consulta.
-- **v77l** (B2.3.5c.2 + c.3): fix del flujo de alta de
-  terminal. Nuevo helper `_asegurar_compartido_y_repuntar`
-  en `Usuario.php` que crea el compartido y repunta el
-  enlace `dueno` al vuelo. `app:repuntar_terminales_compartido`
-  reescrito para iterar sobre terminales (no sobre
-  compartidos existentes).
-- **v77m**: fix del `DivisionByZeroError` en
-  `_crear_lista_cupones_venta` cuando `cuotas = 1` y
-  `monto_pagado < total`. Validación temprana en
-  `confirmar_venta_actual` + defensivo en el helper.
-- **v77n**: descartado sin aplicar. Se había propuesto
-  `grafo:nodo_por_dato` para que las pruebas encontraran
-  nodos por dato. Descartado por el usuario: los datos
-  pueden repetirse, y todo recorrido debe partir de una
-  raíz.
-
-**Pruebas del plugin (B2.3.5b.4):**
-
-- **Prueba 57** (`enlace_dueno_apunta_al_compartido`):
-  verifica que el enlace `dueno` del terminal apunta a
-  un compartido. Usa `grafo:nodo` con el campo
-  `destino_es_compartido`.
-- **Prueba 58** (`venta_terminal_arbol_dual`): verifica
-  que una venta hecha por un terminal aparece en los
-  dos listados (`ventas/listar` tipo=dueno y tipo=terminal),
-  que navegan por los árboles paralelos.
-- **Prueba 59** (`cambiar_asiento_desde_croquis`): flujo
-  completo de cambiar de asiento desde el croquis.
-
-**Pendientes de la línea B:**
-
-- **B2.4** (próxima): mantener vivos los compartidos en
-  cada operación de escritura. Tanda grande, transversal.
-  Se puede partir por operación: alta/edición/baja de viaje,
-  micro, empresa, confirmar venta, cancelar venta, cambiar
-  asiento, reservar/liberar reserva, asignar pasajero.
-- **B3**: eliminar los 22 usos de `Nodo::nodo_por_id('usuarios')`
-  que quedan. Los 6 del enrutador son los más delicados:
-  requieren que el enrutador empiece a pasar contexto
-  (B2.3.5. ya lo hace en las acciones del terminal, falta
-  en los chequeos de nivel).
-- **C** (opcional): tipos como IDs especiales.
-- **D**: carga parcial como optimización. Requiere Fase 4
-  del framework (`guardar_parcial` real con merge).
-
-**Bug detectado al correr la prueba 58 del plugin.**
-
-Cuando se confirma una venta con `cuotas = 1` y
-`monto_pagado < total`, el flujo de confirmar_venta_actual
-no lo valida. Calcula `cuotas_restantes = max(0, 1-1) = 0` y
-lo pasa a `_crear_lista_cupones_venta`, que en el caso B
-hace `$saldo / $cuotas_restantes` → division by zero →
-fatal error de PHP → respuesta HTML (no JSON) → el
-frontend muestra "Error de comunicación".
-
-Ningún usuario real llega a este estado: el frontend
-autocompleta `monto_pagado = total` y lo deja `disabled`
-cuando `cuotas = 1`. La prueba 58 lo forzó con
-`setear_monto_pagado(1000)` pisando el valor correcto.
-
-**Fix v77m (Venta.php):**
-
-- Validación temprana en `confirmar_venta_actual`: si
-  `cuotas === 1` y `monto_pagado < total`, devolver
-  error claro ("Con 1 sola cuota, el monto a pagar debe
-  cubrir el total").
-- Defensivo en `_crear_lista_cupones_venta`: si llega
-  con `cuotas_restantes <= 0` y saldo > 0, no dividir
-  (ni crear cupones pendientes). Cinturón y tiradores.
-
-**Pendiente (test del plugin):** reescribir la prueba 58
-para no pisar el monto pagado cuando `cuotas = 1`.
-
-**v77l — Fase B2.3.5c.2 + c.3.**
-
-Fix del bug detectado en v77k: los terminales creados
-después del repuntado quedaban apuntando al nodo del dueño
-real (rompían el aislamiento topológico en silencio).
-
-- `Usuario.php`:
-  - Nuevo helper `_asegurar_compartido_y_repuntar` (más
-    auxiliares `_asegurar_compartido_terminal` y
-    `_asegurar_arbol_compartido`). Crea el compartido del
-    terminal si no existe, con sub-contenedores y árboles
-    de ventas/cancelaciones parametrizados, y repunta el
-    enlace `dueno` del terminal al compartido. Idempotente.
-  - `agregar_usuario`: al crear un terminal, llama al helper.
-  - `actualizar_usuario`: al cambiar el dueño de un terminal,
-    llama al helper con el dueño nuevo.
-  - Include de `miscelaneas/Arbol.php` (para `hmi`/`hd`).
-- `Comandos.php`: `app:repuntar_terminales_compartido`
-  reescrito para iterar sobre los terminales del dueño, no
-  sobre los compartidos existentes. Usa el helper.
-  Idempotente. Correr `?repuntar_terminales_compartido=1`
-  ahora arregla también los terminales creados después del
-  repuntado (por ejemplo los `termprueba...` del plugin).
-
-**Nota de deuda técnica:** los helpers viven en `Usuario.php`
-por proximidad de uso. Podrían moverse a un archivo
-`Aplicacion/Compartidos.php` cuando haya más flujos que los
-usen (empresas, vehículos, etc.).
-
-**Nota:** cuando un terminal cambia de dueño, el compartido
-del dueño viejo queda huérfano hasta la próxima limpieza de
-huérfanos (`grafo:eliminar_huerfanos`). Aceptable por ahora.
-
-**Bug detectado al correr las pruebas del plugin (v77k).**
-
-Dos problemas independientes:
-
-1. **Bug real del flujo de alta de terminal.** El comando
-   `app:repuntar_terminales_compartido` (v77f) iteraba sobre
-   los compartidos ya existentes del dueño, no sobre los
-   terminales. Un terminal creado **después** del repuntado
-   quedaba sin compartido y sin repuntar: su enlace `dueno`
-   apuntaba al nodo del dueño real, rompiendo el aislamiento
-   topológico silenciosamente. `agregar_usuario` tampoco
-   crea el compartido al crear un terminal nuevo. Fix
-   pendiente en B2.3.5c.2 + c.3.
-
-2. **Test mal diseñado.** Los IDs numéricos del grafo no son
-   estables entre cargas: cada POST a `grafo/nodo` recarga
-   el grafo y regenera los IDs. La tabla de equivalencias
-   del framework solo vive dentro de una carga. La prueba
-   57 seguía un ID numérico entre dos consultas, y por eso
-   fallaba. Fix: exponer en `grafo:nodo` un campo
-   `destino_es_compartido` para verificar la topología con
-   una sola consulta.
-
-**v77k — Fase B2.3.5c.1.**
-
-`grafo:nodo` (framework PHP, 1.5i.7m) agrega el campo
-`destino_es_compartido` a cada adyacente. El chequeo es
-O(1) porque el nodo destino ya está en memoria. No cambia
-el comportamiento observable de la app.
-
-**Pendiente: B2.3.5c.2 + c.3.** Fix real del flujo de alta:
-crear el compartido al dar de alta un terminal, y reescribir
-`app:repuntar_terminales_compartido` para que itere sobre
-los terminales del dueño (no sobre los compartidos).
-
-**v77j — Fix de zona horaria.** El servidor no tenía
-`date_default_timezone_set`, así que PHP usaba UTC por
-defecto. Entre las 21 y las 24 hora argentina,
-`date('Y-m-d')` devolvía la fecha del día siguiente
-respecto del navegador. El cálculo de antigüedad del
-autocompletado de pasajeros (`_calcular_antiguedad_datos`
-en `aplicacion.js`) comparaba la fecha del servidor con la
-del navegador y daba `diff_dias < 0`, mostrando "Fecha de
-actualizacion invalida". Fix: `date_default_timezone_set(
-'America/Argentina/Buenos_Aires')` al inicio de `index.php`.
-Bug latente desde que existe el autocompletado (v58).
-
-**v77i — Fase B2.3.5b.3.**
-
-- `Pasajero.php`: contexto opcional en
-  `obtener_contenedor_pasajeros_dueno`,
-  `obtener_pasajero_nodo_por_dni`, `listar_pasajeros`,
-  `buscar_pasajeros`, `obtener_pasajero_por_dni`,
-  `crear_pasajero`, `actualizar_pasajero`.
-- `Vehiculo.php`: contexto opcional en
-  `listar_vehiculos_de_empresa`. Nuevo helper
-  `_formatear_vehiculos_de_empresa`.
-- `Enrutador.php`: `empresas/listar`, `vehiculos/listar`,
-  `pasajeros/crear`, `pasajeros/listar`, `pasajeros/buscar`,
-  `pasajeros/obtener` y `pasajeros/actualizar` pasan el
-  contexto del solicitante.
-
-Sin cambio de comportamiento hoy. Falta B2.3.5b.4 (pruebas
-del plugin).
-
-**v77h — Fase B2.3.5b.2.**
-
-- `ViajeAsientos.php`:
-  - `cambiar_asiento_pasaje` acepta `?Nodo $nodo_contexto = null`
-    y lo pasa a `obtener_contenedor_viajes_dueno`.
-  - `cambiar_asiento_pasaje` resuelve el solicitante por ID
-    especial `us_<nombre>` en vez de `nodo_por_id('usuarios')`.
-- `Enrutador.php`:
-  - `viajes/reservar_asiento`, `viajes/asignar_pasajero_reserva`,
-    `viajes/liberar_reserva_asiento` y `viajes/cambiar_asiento`
-    pasan el contexto del solicitante (o null si no es terminal).
-
-Sin cambio de comportamiento hoy. Falta B2.3.5b.3 (empresas,
-vehículos, pasajeros) y B2.3.5b.4 (pruebas del plugin).
-
-**v77g — Fase B2.3.5b.1.**
-
-Enrutador:
-
-- Nuevo helper `_contexto_solicitante($nombre_solicitante)`
-  que devuelve el nodo compartido si el solicitante es
-  terminal, o null en otros casos.
-- Nuevo helper `_nombre_terminal_solicitante($nombre_solicitante)`
-  que devuelve el nombre si es terminal, o null.
-- `viajes/estado_asientos`: pasa `$nodo_contexto` a
-  `obtener_estados_asientos_micro`.
-- `ventas/obtener`, `ventas/cancelar`, `ventas/pagar_cupon`,
-  `ventas/info_cancelacion`: pasan `$nombre_terminal_sol` como
-  filtro a la función correspondiente. Restringe la búsqueda
-  al contexto del terminal solicitante.
-
-Sin cambio de comportamiento visible hoy (los nodos son
-los mismos). Se activa cuando el framework haga carga
-parcial por contextos. Falta B2.3.5b.2 (contexto en
-`cambiar_asiento_pasaje` y reservas), B2.3.5b.3 (empresas,
-vehículos, pasajeros), B2.3.5b.4 (pruebas del plugin).
-
-**v77f — Fase B2.3.5a.**
-
-Comando `app:repuntar_terminales_compartido`. Para cada
-dueño y cada compartido `compartido_con_us_termX`:
-
-1. Marca el compartido con `dato = nombre_dueno` (opción A).
-2. Repunta el enlace `dueno` del terminal `us_termX` para
-   que apunte al compartido en vez del nodo del dueño real.
-
-Idempotente. Bloque `?repuntar_terminales_compartido=1` en
-`index.php`. **NO toca el enrutador ni el código de flujo.**
-La app sigue funcionando igual porque el código ya está
-preparado (B2.2 + B2.3.4). El enrutador empieza a pasar
-contexto en B2.3.5b.
-
-**Por qué se parte B2.3.5 en a y b.** B2.3.5a es de bajo
-riesgo: solo cambia el destino del enlace `dueno` en el
-grafo. Se puede probar end-to-end antes de tocar el
-enrutador. Si algo se rompe, se revierte manualmente
-repuntando el enlace al nodo del dueño real (o borrando el
-testigo del comando y volviendo a correrlo desde el nodo
-original). B2.3.5b es de alto riesgo: toca el enrutador, el
-corazón del flujo.
-
-**v77e — Fase B2.3.4.**
-
-- `Venta.php`:
-  - `confirmar_venta_actual` resuelve el terminal por
-    `Nodo::nodo_por_id('us_' . $nombre_terminal)`.
-  - `confirmar_venta_actual` inserta la venta en AMBOS
-    árboles paralelos si el contexto tiene `_es_compartido`:
-    primero el del dueño (default), después el del compartido
-    (parametrizado).
-  - `cancelar_venta` resuelve el dueño por ID especial.
-  - `cancelar_venta` desenlaza del compartido primero y del
-    árbol del dueño después (orden inverso al de la
-    inserción). Nuevo helper `_desenlazar_venta_de_arbol`.
-  - `cancelar_venta` limpia también los enlaces
-    parametrizados residuales.
-  - `_calcular_cobertura_dueno` y `_crear_nodo_cancelacion`
-    resuelven el dueño por ID especial.
-- `Viaje.php`: `_contexto_terminal` resuelve el terminal
-  por ID especial.
-- **Sin cambio de comportamiento hoy.** El enrutador sigue
-  pasando el nodo del dueño real como contexto, entonces
-  `_nombres_arbol_para_contexto` devuelve null y no se
-  activa la rama nueva. Se activa con B2.3.5.
-- **No toca el enrutador.** Los 6 chequeos de nivel siguen
-  usando `nodo_por_id('usuarios')`. Eso es B3.
-
-**v77d — refresco del modal de pasajero.** Al cambiar el
-asiento desde el detalle de un pasaje (pestaña Clientes), el
-modal genérico quedaba con el asiento viejo. `abrir_modal_cambiar_asiento`
-ahora acepta un 6to parámetro opcional `on_exito`, que se
-ejecuta tras confirmar el cambio. Desde `pasajeros.js` se
-pasa un callback que re-abre `ver_detalle_pasaje_individual`
-con el nuevo número de asiento. Desde el croquis no se pasa
-nada: sigue funcionando igual.
-
-**Nueva funcionalidad "Cambiar de asiento".** Desde el
-detalle de un pasaje (croquis o pestaña Clientes), botón
-para mover el pasaje a otro asiento del mismo micro.
-Reglas:
-
-- Terminal: solo puede mover asientos que él mismo vendió,
-  y solo a un asiento libre. No toca reservados.
-- Dueño/admin/soporte: puede mover vendidos y reservados,
-  a un asiento libre o reservado sin pasajero.
-- El asiento viejo vendido queda libre.
-- El asiento viejo reservado puede quedar libre o
-  reservado sin pasajero (checkbox "Dejar el asiento
-  viejo reservado", por defecto tildado).
-- El asiento nuevo reservado solo se acepta si NO tiene
-  pasajero asignado (regla confirmada por el usuario).
-- El id_venta no cambia. El asiento-en-venta persistente
-  solo cambia su enlace `asiento`.
-- El `punto_subida_bajada` del asiento-en-venta no cambia.
-- Solo se puede cambiar dentro del mismo micro.
-
-**Backend v77b:** `Venta.php` agrega `micro_enlace` a
-`formatear_venta_resumida` (el dato del micro es vacío, el
-nombre del enlace es la única referencia). Nueva función
-`cambiar_asiento_pasaje` en `ViajeAsientos.php` + helper
-`_buscar_asiento_en_venta_persistente`. Subacción
-`viajes/cambiar_asiento` en el enrutador.
-
-**Frontend v77c:** botón "Cambiar de asiento" en los dos
-modales de detalle del pasaje (`ver_pasaje_asiento` en
-`viajes-asientos.js`, `ver_detalle_pasaje_individual` en
-`pasajeros.js`). Función compartida
-`abrir_modal_cambiar_asiento` en `viajes-asientos.js`. El
-modal hace 2 fetches (estado de asientos + configuración del
-micro), arma el croquis con asientos elegibles marcados,
-checkbox "Dejar el asiento viejo reservado" (solo si el viejo
-es reservado, tildado por defecto) y confirmación por POST.
-Después del éxito: refresca el croquis si estamos ahí y
-ofrece reimprimir el pasaje (modal chico de pasajero para
-vendido, modal chico de reserva para reservado).
-
-**Con esto queda cerrada la funcionalidad "cambiar de asiento".**
-Para activarla: correr el backend (v77b) y el frontend (v77c)
-y probar desde el croquis y desde la pestaña Clientes.
-
-**Bug 1 (atadura) — diagnóstico completo (v77 + v77a):**
-El usuario carga el comprador con un DNI nuevo (no existe
-en el grafo), llena todos los datos. Después, en el form
-del pasajero, ingresa el mismo DNI. La atadura se activa
-y copia los datos del comprador al pasajero. Pero:
-  a) (fix v77) al volver el fetch, el backend responde
-     "no existe" y `_buscar_pasajero_por_dni` limpiaba los
-     campos. Ahora no limpia si hay atadura activa.
-  b) (fix v77a) los campos no-DNI del pasajero quedaban
-     `disabled` hasta que volviera el fetch. Ahora
-     `_activar_atadura` los habilita al activar. Los
-     campos comunes reciben el dato del comprador; los
-     no comunes (celular_emergencia, fecha_nacimiento,
-     direccion, localidad) quedan libres para completar.
-
-**Bug 2 (modal post venta) — diagnóstico pendiente:**
-Vuelve a no aparecer. Se está diagnosticando con logs de
-consola. Fix anterior (v76z): mostrar el modal antes de
-los refrescos, envolver refrescos en try/catch.
-
-**Bug 1 (atadura) — diagnóstico completo:**
-El usuario carga el comprador con un DNI nuevo (no existe
-en el grafo), llena todos los datos. Después, en el form
-del pasajero, ingresa el mismo DNI. La atadura se activa
-(por el fix v76z, corre antes del fetch) y copia los
-datos del comprador al pasajero. Se ve "Vinculado". Pero
-al volver el fetch, el backend responde "no existe" y
-`_buscar_pasajero_por_dni` limpiaba los campos del pasajero,
-borrando lo que la atadura acababa de copiar.
-
-**Fix v77:** si hay atadura activa apuntando a este
-formulario, no limpiar los campos. Los datos vinieron del
-otro lado y siguen siendo válidos aunque el DNI no esté
-registrado. Solo se limpia cuando no hay atadura (caso
-"corregí el DNI por uno nuevo y quiero empezar de cero").
-Mismo criterio aplicado a `_buscar_comprador_por_dni`.
-
-**Bug 2 (modal post venta) — resuelto en v76z:**
-`confirmar_venta_modal` ahora muestra el modal ANTES de
-los refrescos, y envuelve los refrescos en try/catch
-individuales. Un fallo en el refresco ya no bloquea el
-modal.
+- **v78m** (Tanda 1c.2f): contexto en `Impresion.php`.
+  `obtener_venta_por_id`/`_buscar_venta_por_id` con
+  dueño. `_contextos_para_operacion` con excepciones.
+- **v78n** (reparación topológica): `miscelaneas/migrar_topologia.php`
+  con `reparar_compartidos_dueno()` (agrega enlaces
+  `dueño → compartido_con_X` faltantes) y
+  `reparar_viajes_dueno()`. Bloque `?reparar_topologia=1`.
+- **v78o**: revertir los chequeos defensivos de v78d.
+  El admin carga parcial siempre (con `[us_Administrador]`)
+  y la topología le trae todos los usuarios por el enlace
+  `us_Administrador → usuarios`. Los chequeos bloqueaban
+  al admin sin agregar seguridad.
+- **v78p**: `listar_duenos` navega directo por
+  `us_<soporte> → duenos` cuando el solicitante es soporte.
+  Con carga parcial, `usuarios` no está en memoria y
+  `listar_usuarios` devolvía vacío.
+- **v78q**: `_contextos_para_operacion` carga total para
+  las acciones de gestión de usuarios (`dueno/agregar_terminal`,
+  `dueno/actualizar_terminal`, `dueno/eliminar_terminal`,
+  `administrador/agregar_usuario`, `administrador/actualizar_usuario`,
+  `administrador/eliminar_usuario`). Necesitan la raíz
+  `usuarios` en memoria.
+- **v78r**: (a) fix del framework: `_guardar_con_filtro`
+  ahora borra solo aristas cuyos DOS extremos están en el
+  filtro. Antes borraba aristas cuyo ORIGEN estaba en el
+  filtro y no reinsertaba las que tenían un extremo fuera,
+  perdiendo enlaces del dueño. (b) `reparar_empresas_dueno()`
+  y `reparar_pasajeros_dueno()` agregados al bloque
+  `?reparar_topologia=1`.
+- **v78s**: fix del framework: en `_guardar_con_filtro`,
+  con filtro != 0, unir las máscaras que el BFS calculó
+  con las que el nodo ya tenía en memoria. Nunca se pierde
+  un bit preexistente. **NO resuelve el bug §1.5.**
 
 ### 1.3 Decisiones de diseño en vigor
 
@@ -784,7 +118,8 @@ modal.
 - **Host y credenciales en `config_servidor.php`.** Es el único
   archivo que no se toca al desplegar.
 - **Rol `soporte`.** Ve las mismas pestañas que el admin,
-  solo sobre sus dueños asignados.
+  solo sobre sus dueños asignados. Ve el `publico` del dueño
+  (nombre, email), no su `privado`.
 - **Los prompts viven en el proyecto.** Los tres clásicos
   (framework, piloto, sistema de scripts) + este `plan_actual.md`.
 - **Comandos del framework vs de la app.** Framework → en
@@ -793,486 +128,264 @@ modal.
 - **El modelo topológico.** Seguridad por topología: un usuario
   solo alcanza lo que tiene camino desde su raíz. Admin y
   soporte siguen accediendo por código, no por topología.
+- **SQL64 como método activo (v78e).** Persiste en las 3 tablas
+  nuevas: `nodo_contexto`, `adyacente_contexto`, `contexto`.
+  Las tablas viejas (`nodo`, `adyacente`) quedan intactas como
+  respaldo de la última migración manual.
+- **Carga parcial por contexto (v78g).** Toda operación POST
+  con `nombre_solicitante` carga parcial con `[us_<sol>]`.
+  Sin solicitante, carga total. Excepciones puntuales:
+  `_contextos_para_operacion` devuelve `null` para acciones
+  que necesitan la raíz `usuarios` (gestión de usuarios) y
+  para informes que usan B3.3c.
+- **`us_Administrador → usuarios` (v78f).** El admin carga
+  parcial con `[us_Administrador]` pero la topología le trae
+  todos los usuarios.
+- **`dueno → soporte → publico` (v78f).** El enlace `soporte`
+  del dueño apunta al `publico` del soporte, no al nodo real.
+  Evita la fuga cruzada entre dueños que comparten un soporte.
 
 ### 1.4 Bugs conocidos
 
-Ninguno de prioridad alta. Los históricos (Bug 1 opciones de
-cobro, Bug 2 ligadura comprador-pasajero) están resueltos.
+**BUG PERSISTENTE (ver §1.5).** El bug del viaje viejo que
+desaparece desde el punto de vista del dueño tras una operación
+del terminal. **No resuelto.** v78r y v78s fueron intentos de
+fix que no alcanzaron.
 
-### 1.5 Aprendizajes a la fuerza
+Sin otros bugs de prioridad alta.
 
-1. **Los datos del framework viajan como strings.** Castear al
-   comparar. Ejemplo: `"2" !== 2` en JS.
-2. **PHP convierte claves de array string numéricas a int.**
-   Forzar `(string)$clave` en los foreach que iteran sobre DNI
-   o patentes.
-3. **Los IDs sin ID especial cambian entre cargas.** Si un
-   nodo debe sobrevivir a guardar/cargar y ser referenciado,
-   usar ID especial.
-4. **Nunca confiar en datos que el cliente manda** cuando hay
-   fuente de verdad del lado del servidor.
-5. **El guardado SQL debe ser transaccional y por chunks.**
-6. **El guardado nunca debe pisar el grafo con vacío.**
-7. **Los includes importan.** `guardar_ambos` disponible antes
-   de usarse.
-8. **`if ($elemento)` descarta falsy.** Usar `!== null` cuando
-   el valor puede ser falsy legítimamente.
-9. **PHP y JS van espejados.** Framework PHP ↔ espejo JS en
-   la misma tanda, dos scripts, dos commits.
-10. **En MV3, `import()` dinámico está prohibido en el
-    `ServiceWorkerGlobalScope`.** Para debug desde la consola
-    del SW, exponer `globalThis.Controlador = Controlador` en
-    el bootstrap.
+### 1.5 BUG PERSISTENTE — El viaje viejo desaparece
 
-### 1.6 Preguntas abiertas
+#### 1.5.1 Síntoma
 
-Ninguna. La conversación quedó en un punto de pausa limpio.
+Con las pruebas del plugin:
+  1. Se corre la prueba "autocompletado por DNI" (logueado
+     como terminal).
+  2. Después la prueba "alta de viaje" (logueado como dueño).
+  3. El viaje viejo (el principal, "Peregrinación a la Visita
+     del Papa León XIV a Luján") **desaparece de la lista del
+     dueño**.
+  4. El terminal lo sigue viendo (navega por su compartido).
+  5. Corriendo la prueba de nuevo, ya no falla: los viajes
+     nuevos se agregan normalmente y el viejo sigue sin
+     aparecer.
 
-### 1.8 Lecciones aprendidas en esta sesión (v77f a v77o)
+Patrón: **"primera vez falla, segunda no"**. Después de la
+primera operación del terminal, el estado del grafo queda
+"estable" (aunque roto).
 
-**Sobre el framework y los IDs.**
+#### 1.5.2 Diagnóstico
 
-1. **Los IDs numéricos son referencias de memoria.**
-   Cambian entre cada carga del grafo. Solo los IDs
-   especiales (strings no numéricos) son estables entre
-   cargas. Nunca usar un ID numérico para "seguir" un
-   enlace entre dos llamadas POST distintas.
-2. **`grafo:nodo` devuelve IDs numéricos que solo son
-   válidos dentro de una misma carga.** Cada POST a
-   `grafo/nodo` recarga el grafo y regenera todos los
-   IDs numéricos. La tabla de equivalencias del framework
-   vive solo dentro de una carga.
-3. **Buscar nodos = recorrer desde una raíz. Siempre.**
-   No buscar por dato (los datos pueden repetirse),
-   no buscar por ID numérico. La única forma robusta
-   es navegar desde una raíz dentro de una sola carga.
-4. **Un comando del estilo `nodo_por_dato` es frágil.**
-   Aunque hoy los datos sean únicos (por ejemplo, los
-   `id_venta` tienen timestamp), mañana pueden repetirse.
-   Invita a construir cosas frágiles encima. Descartado.
+Cuando el terminal hace `guardar_parcial([us_<terminal>])`,
+el framework en `_guardar_con_filtro`:
 
-**Sobre el flujo de alta y los compartidos.**
+1. Carga parcialmente `[us_<terminal>]`. En memoria **no está
+   `us_<dueno>`** (por diseño topológico: el terminal no
+   alcanza al nodo del dueño real).
+2. Ejecuta `_calcular_y_registrar_contextos`: BFS multi-fuente
+   desde los IDs especiales que están en memoria. Como
+   `us_<dueno>` no está, su bit **no se propaga**.
+3. Guarda con la máscara recalculada. El nodo viaje viejo
+   queda con máscara = solo bit del terminal (o sin bit del
+   dueño).
+4. En la próxima carga parcial del dueño (`[us_<dueno>]`), el
+   filtro `(contexto_mascara & bit_dueno) != 0` excluye al
+   viaje viejo. No aparece.
 
-5. **Las migraciones que iteran sobre "lo que ya existe"
-   no cubren los elementos creados después.**
-   `app:repuntar_terminales_compartido` (v77f) iteraba
-   sobre los compartidos ya existentes del dueño, no
-   sobre los terminales. Un terminal creado después
-   quedaba sin compartido y sin repuntar, silenciosamente.
-   Fix (v77l): iterar sobre la entidad fuente (terminales),
-   no sobre el derivado (compartidos).
-6. **Los flujos de alta deben mantener la topología al
-   vuelo.** Si la topología se mantiene solo con comandos
-   manuales, cada alta que no los corre deja el grafo
-   inconsistente. Fix (v77l): `_asegurar_compartido_y_repuntar`
-   se llama desde `agregar_usuario` y `actualizar_usuario`.
+**Por qué "primera vez falla, segunda no":** la primera
+operación del terminal es la que pisa el bit del dueño. A
+partir de ahí el viaje ya no tiene el bit, y las siguientes
+operaciones del terminal no lo tocan.
 
-**Sobre validaciones en el backend.**
+**Por qué el terminal sí lo ve:** el compartido tiene su
+propio bit del terminal, y la venta referencia al viaje por
+id. El nodo viaje está en el grafo del terminal, pero sin
+bit del dueño.
 
-7. **Los flujos sin sentido de negocio deben rechazarse
-   temprano.** El `DivisionByZeroError` en
-   `_crear_lista_cupones_venta` con `cuotas=1` y
-   `monto_pagado < total` era un caso imposible para el
-   usuario (el frontend bloquea el input), pero el
-   backend no lo chequeaba. Fix (v77m): validación
-   temprana + defensivo en el helper.
+#### 1.5.3 Fixes intentados (ninguno alcanzó)
 
-**Sobre zonas horarias.**
+- **v78r:** cambió la regla de borrado de aristas en
+  `_guardar_con_filtro`: ahora borra solo aristas cuyos DOS
+  extremos están en el filtro. Antes borraba las aristas
+  cuyo ORIGEN estaba en el filtro sin reinsertar las que
+  tenían un extremo fuera. **Aplicado, no resolvió.** El
+  bug del viaje viejo es de máscaras, no de aristas.
+- **v78s:** unir las máscaras que el BFS calculó con las que
+  el nodo ya tenía en memoria. **Aplicado, no resolvió.**
+  Hipótesis: la máscara que llega al guardado del terminal
+  no tiene el bit del dueño ni siquiera antes de calcular el
+  BFS (el nodo se carga sin ese bit). El `unir` sería con
+  un valor ya degradado.
 
-8. **El servidor y el navegador deben compartir zona
-   horaria.** Sin `date_default_timezone_set`, PHP usa
-   UTC. Entre las 21 y las 24 hora argentina, `date('Y-m-d')`
-   queda un día adelantado respecto del navegador y rompe
-   comparaciones de fechas del lado del frontend.
-   Fix (v77j): `date_default_timezone_set(`
-   'America/Argentina/Buenos_Aires')` en `index.php`.
+#### 1.5.4 Próximo paso sugerido
 
-**Sobre pruebas del plugin (JS).**
+Instrumentar `_guardar_con_filtro` para emitir un log con:
 
-9. **Verificar topología entre POSTs requiere navegación,
-   no seguimiento de IDs.** Las pruebas 57 y 58 fallaron
-   al principio porque seguían IDs numéricos entre
-   consultas. La verificación debe ser: una sola llamada
-   que navegue desde la raíz y devuelva todo lo necesario
-   para comparar.
-10. **`ventas/listar` ya navega los árboles paralelos.**
-    Con `tipo=dueno` recorre `privado/ventas` con
-    `hmi`/`hd`/`p`. Con `tipo=terminal` recorre el
-    compartido con `hmi_<term>`/`hd_<term>`/`p_<term>`.
-    Verificar pertenencia = buscar el `id_venta` en los
-    dos listados.
-11. **En modales apilados, acotar selectores a
-    `#modal_apilado_contenido`.** El croquis del modal y
-    el del viaje de atrás comparten clase `.seat`. Sin
-    acotar, `querySelector` devuelve el primero en el DOM
-    (el de atrás) y el click no hace nada útil.
-12. **Chequear efecto visual (`.seat-elegido`) antes que
-    atributo booleano `disabled`.** `getAttribute('disabled')`
-    puede devolver `[null]`, `[""]` o `["disabled"]` según
-    cómo se serialice. La presencia o ausencia de una
-    clase es más confiable.
-13. **No pisar el monto pagado con cuotas = 1.** El
-    frontend autocompleta el input con el total y lo deja
-    `disabled`. Forzarlo a un valor menor dispara el
-    rechazo del backend introducido en v77m.
-14. **Polling activo en lugar de pausas fijas.** El
-    modal de cambiar asiento hace 2 fetches en serie
-    (estado + configuración) antes de armar el croquis.
-    En un grafo grande puede tardar varios segundos.
+- El `$mf` de cada llamada.
+- Los IDs especiales en memoria (los que el BFS usa como
+  fuentes).
+- Antes del `unir` de v78s: para cada nodo con id especial
+  del viaje viejo, su máscara actual y la que el BFS calculó.
+- Después del `unir`: los mismos valores.
 
-### 1.9 Auditoría de B2.4 y B3 (v77o)
+Comparar el estado entre la última carga del dueño (que sí
+tenía el bit) y la primera operación del terminal (que lo
+pierde). La diferencia mostrará en qué punto exacto se va
+el bit.
 
-Auditoría completa del estado de la Fase B2.4 ("mantener
-vivos los compartidos") y de los usos pendientes de
-`Nodo::nodo_por_id('usuarios')` (B3). Se hizo leyendo el
-código actual de los módulos del piloto, no de memoria.
+Otra hipótesis a chequear: el `_cargar_nodos_con_mascara`
+cuando carga **parcial** filtra por máscara. Si un nodo no
+tiene el bit del terminal pero SÍ otros bits (por ejemplo,
+solo el del dueño), **no se carga** y queda fuera del grafo
+del terminal. Si ese nodo está en el camino del BFS hacia
+el viaje viejo (por ejemplo, un contenedor intermedio), la
+propagación se corta y el viaje queda sin bit. Habría que
+verificar que el BFS no se interrumpa por nodos filtrados.
 
-**B2.4 — lo que YA está cubierto:**
+#### 1.5.5 Impacto actual
 
-- `confirmar_venta_actual` inserta en ambos árboles
-  (dueño + compartido). OK desde B2.3.4.
-- `cancelar_venta` desenlaza de ambos árboles. OK desde
-  B2.3.4.
-- `_asegurar_compartido_y_repuntar` (v77l) crea el
-  compartido al vuelo cuando se crea/edita un terminal.
-  OK.
-- Micros, vehículos y empresas cuelgan de nodos compartidos
-  por transitividad (mismo nodo físico). Los flujos
-  existentes los ven sin cambios. OK.
+- El plugin de pruebas (autocompletado + alta de viaje)
+  reproducen el bug de manera consistente.
+- El dueño no ve el viaje viejo después de que un terminal
+  hace cualquier operación.
+- El terminal sí lo ve (navega por su compartido).
+- La reparación `?reparar_topologia=1` recupera el viaje
+  temporalmente, pero la próxima operación del terminal lo
+  vuelve a romper.
 
-**B2.4 — lo que FALTA (5 bugs funcionales):**
+### 1.6 Pendientes de la línea
 
-1. `eliminar_viaje` (Viaje.php) no desenlaza del compartido
-   de cada terminal autorizado. Consecuencia:
-   `Nodo::eliminar` falla en silencio y el viaje queda
-   huérfano. **Bug real: hoy no se puede eliminar un viaje
-   con terminales autorizadas.**
-2. `agregar_terminal_autorizada` (Viaje.php) no actualiza
-   el compartido del terminal autorizado. El terminal no
-   ve el viaje hasta que corre una migración manual.
-3. `eliminar_terminal_autorizada` (Viaje.php) no limpia
-   el compartido. El terminal sigue viendo el viaje aunque
-   ya no esté autorizado.
-4. `eliminar_empresa` (Empresa.php) no desenlaza del
-   `empresas` de los compartidos. Quedan enlaces a un
-   nodo destruido.
-5. `agregar_micro_a_viaje` (ViajeMicros.php) no agrega la
-   empresa al `empresas` del compartido. El terminal no
-   ve la nueva empresa en su listado.
+- **BUG §1.5.** Bloqueante funcional. Requiere logs de
+  diagnóstico.
+- **Espejo JS del fix v78r.** `PerdurarSuperestructuraStringIndexedDB64.js`
+  tiene el mismo bug de borrado de aristas. Pendiente.
+- **Espejo JS del fix v78s.** Idem: preservar bits de máscara.
+  Pendiente.
+- **B3.3c** (7 helpers que iteran sobre todos los dueños).
+  Postergado hasta que aparezca dolor real o implementemos
+  iteradores con ID especial. Ver §1.10.
+- **Módulos menores sin contexto:** `Liquidacion.php`,
+  `Rendicion.php`, `Empresa.php`, `Vehiculo.php`. Mismo
+  patrón que los módulos ya adaptados. Sub-tandas cortas
+  cuando aparezcan errores.
+- **Chequeos defensivos revertidos.** Si aparecen otros
+  casos donde el chequeo ayuda, se reintroduce selectivo.
 
-**B3 — usos pendientes de `Nodo::nodo_por_id('usuarios')`:**
+### 1.7 Plan de la línea de tandas (fases)
 
-Más de 22 usos. Agrupados por archivo:
+**Fase A** — Usuarios como IDs especiales `us_<nombre>`.
+**Completada** (v76k).
 
-- `Venta.php`: 4 (`obtener_contenedor_ventas_dueno` rama
-  sin contexto, `_buscar_venta_por_id` rama sin contexto,
-  `obtener_cancelacion_por_id`, `listar_cancelaciones_de_dueno`).
-- `Enrutador.php`: 6 (chequeos de nivel del solicitante).
-- `Viaje.php`: 5 (`obtener_contenedor_viajes_dueno` rama
-  sin contexto, `listar_viajes_de_terminal`,
-  `viaje_tiene_ventas`, `agregar_terminal_autorizada`,
-  `formatear_viaje`).
-- `Usuario.php`: muchos (prácticamente todo el archivo).
-- `Empresa.php`: 4 (rama sin contexto + alta/edición/baja).
-- `Vehiculo.php`: 6 (rama sin contexto + alta/actualizaciones/
-  baja/subir_foto).
-- `ViajeMicros.php`: 4 (incluye `agregar_micro_a_viaje`).
-- `Pasajero.php`: ~7 (`obtener_pasajero_por_dni`,
-  `pasajero_tiene_pasajes`, `obtener_reservas_de_pasajero`,
-  `_recorrer_reservas_de_pasajero`).
-- `Migraciones/Funciones.php`: 2 (`detectar_usuarios_especiales`,
-  `detectar_niveles_usuario`).
+**Fase B1** — Contenedores `publico`/`privado` en cada
+usuario. **Completada** (v76m).
 
-Estrategia de limpieza en 3 fases: B3.1 (reemplazar por
-`us_<nombre>` cuando hay nombre), B3.2 (eliminar los
-fallbacks "sin contexto"), B3.3 (repensar los helpers
-que iteran "sobre todos los dueños": requieren contexto
-o índice auxiliar).
+**Fase B2.1** — Compartidos por terminal creados con
+referencias filtradas. **Completada** (v76q).
 
-**Pruebas nuevas del plugin que hacen falta (Tanda A):**
+**Fase B2.2** — Contexto opcional en Viaje, Venta,
+ViajeAsientos, Empresa. **Completada** (v76r-v76u).
 
-- 60 `cancelar_venta_desaparece_de_ambos_arboles`:
-  simétrica de la 58.
-- 61 `eliminar_viaje_con_terminal_autorizado`.
-- 62 `autorizar_terminal_aparece_en_compartido`.
-- 63 `desautorizar_terminal_desaparece_del_compartido`.
-- 64 `agregar_micro_actualiza_empresas_compartido`.
+**Fase B2.3** — Árboles paralelos con nombres parametrizados
+en `Arbol.php`. **Completada** (v76v-v77o).
 
-### 1.7 Deuda técnica
+**Fase B2.4** — Mantener los compartidos vivos. **Completada**
+(Tanda A, v77q).
 
-**Uso de `Nodo::nodo_por_id('usuarios')`.** Es la raíz global
-del grafo y su uso impide la carga parcial por contextos: para
-resolverla hay que tener todo el grafo cargado. El objetivo de
-la Fase B es dejar de usarla, resolviendo los nodos por IDs
-especiales (`Nodo::nodo_por_id('us_<nombre>')`) o por
-navegación de contexto.
+**Fase B3** — Eliminar los accesos viejos. **Cerrada salvo
+B3.3c** (7 helpers).
 
-**Inventario actual (22 usos):**
+**Carga parcial (Etapa 1, v78b-v78s)** — Carga y guardado
+parciales por contexto. **Aplicada.**
+  1a (framework): `guardar_parcial` real + espejo JS.
+  1b (framework): `contextos_cargados` + getter.
+  1c.1 (migraciones): SQL64 + topología admin/soporte.
+  1c.2 (piloto): `_contextos_para_operacion` + adaptación
+    del contexto en Viajes, Venta, Pasajeros, Impresión.
+  Reparación topológica + fix de regla de borrado +
+  preservación de bits.
+  **Bug §1.5 sin resolver.**
 
-- **`Venta.php` (8):**
-  - `obtener_contenedor_ventas_dueno` — rama sin contexto.
-  - `confirmar_venta_actual` — resuelve el terminal.
-  - `_buscar_venta_por_id` — rama sin contexto (itera dueños).
-  - `cancelar_venta` — resuelve el dueño.
-  - `_calcular_cobertura_dueno` — resuelve el dueño.
-  - `_crear_nodo_cancelacion` — resuelve el dueño.
-  - `obtener_cancelacion_por_id` — resuelve el dueño (itera).
-  - `listar_cancelaciones_de_dueno` — resuelve el dueño.
-- **`Enrutador.php` (6):**
-  - `autenticar/verificar` — dueño de un terminal.
-  - Módulo `administrador` — nivel del solicitante.
-  - `dueno/listar_sesiones_terminales` — nivel del solicitante.
-  - `viajes/limpiar_prueba` — nivel del solicitante.
-  - `pasajeros/limpiar_prueba` — nivel del solicitante.
-  - Módulo `grafo` — nivel del solicitante.
-- **`Viaje.php` (6):**
-  - `_contexto_terminal` — terminal y su dueño.
-  - `obtener_contenedor_viajes_dueno` — rama sin contexto.
-  - `listar_viajes_de_terminal` — terminal y dueño.
-  - `viaje_tiene_ventas` — resuelve dueño.
-  - `agregar_terminal_autorizada` — resuelve terminal.
-  - `formatear_viaje` — resuelve dueño para `empresas`.
-- **`Funciones.php` (2):**
-  - `detectar_usuarios_especiales`.
-  - `detectar_niveles_usuario`.
+**Fase C** (opcional) — Tipos como IDs especiales.
+**Pendiente.**
 
-**Plan de limpieza (estado a v78m):**
+**Fase D** — Carga parcial como optimización.
+**Pendiente.**
 
-- **B2.3.4 (cerrada en v77e):** reemplazo por `us_<nombre>`
-  en `confirmar_venta_actual`, `cancelar_venta`,
-  `_calcular_cobertura_dueno`, `_crear_nodo_cancelacion` y
-  `_contexto_terminal`.
-- **B3.1 (cerrada en v77r):** aislación de usuarios con
-  `us_<nombre>` en los flujos que ya tenían el nombre a mano.
-- **B3.3a-e (cerradas):** Liquidacion, Rendicion, Pasajero
-  (rama sin contexto), ViajeAsientos, Vehiculo, Enrutador
-  (parcial) y Migraciones (con revert de v77z para los
-  detectores).
-- **Carga parcial (Etapa 1, aplicada en v78b-v78m):**
-  contexto del solicitante en los módulos principales
-  (Viajes, Venta, Pasajeros, Impresión). SQL64 +
-  `guardar_parcial` + `_contextos_para_operacion` activos.
-- **B3.3c (pendiente, postergada):** los helpers que iteran
-  sobre todos los dueños buscando por id. En el grep actual
-  quedan ~7 puntos:
-    - `Venta.php` L1092 (`_buscar_venta_por_id` fallback sin
-      contexto), L2648 (`obtener_cancelacion_por_id`).
-    - `Liquidacion.php` L241 (`obtener_liquidacion_por_id`).
-    - `Rendicion.php` L736 (`aceptar_ajuste_rendicion`),
-      L857 (`obtener_rendicion_por_id`).
-    - `Pasajero.php` L172 (`obtener_pasajero_por_dni` — rama
-      del historial de ventas).
-  Se resuelven cuando aparezca dolor real o cuando
-  implementemos iteradores con ID especial (ver §1.10/§1.11).
-- **Contexto en módulos menores (pendiente, sub-tandas
-  cortas):** `Liquidacion.php`, `Rendicion.php`,
-  `Empresa.php`, `Vehiculo.php`. Mismo patrón que los
-  módulos ya adaptados. Se hacen a medida que aparezcan
-  errores en las pruebas.
-- **B3.2 (eliminar los fallbacks "sin contexto"):** se
-  resuelve junto con la adaptación de los módulos menores.
+### 1.8 Espejo JS del framework
 
-**Contenedores raíz de árboles paralelos.** Cada árbol tiene su
-propio contenedor raíz. `privado/ventas` es un nodo, y
-`compartido_con_us_termX/ventas` es otro nodo (distinto). Los
-nodos venta son compartidos entre árboles (mismo nodo físico)
-y cada uno lleva dos juegos de enlaces (`hmi`/`hd`/`p` para el
-árbol del dueño, `hmi_<term>`/`hd_<term>`/`p_<term>` para el
-del terminal). Es la condición para que la topología aísle
-correctamente: si el contenedor fuera el mismo, el BFS desde
-el terminal alcanzaría todas las ventas del dueño.
+El framework PHP y el espejo JS deben ir en sincronía. Esta
+sesión tocó:
 
-**Dato del compartido (opción A).** El nodo
-`compartido_con_us_termX` tiene `dato = nombre_del_dueño` para
-que el código que hace `$nodo_dueno->dato()` siga funcionando
-después del repuntado (B2.3.5). **NO** se agrega un enlace
-`dueno` en el compartido apuntando al nodo del dueño real:
-eso rompería la privacidad topológica (el terminal podría
-llegar al dueño por el enlace y desde ahí a todo el grafo).
+- `PerdurarSuperestructuraStringSQL64.php` (PHP): fix
+  v78r (doble extremo en borrado de aristas) y v78s
+  (preservar bits de máscara).
+- **Pendiente:** los mismos fixes en
+  `PerdurarSuperestructuraStringIndexedDB64.js`.
 
-### 1.10 Plan de carga parcial (línea siguiente)
+Los fixes del espejo se hacen en la próxima tanda larga del
+plugin, junto con las pruebas correspondientes.
 
-Plan consensuado en v78a. No implementado todavía. La
-línea B del modelo topológico dejó el grafo preparado
-(usuarios como IDs especiales, contenedores por nivel,
-compartidos por terminal, contextos opcionales en todas
-las funciones de contenedor). El framework PHP ya tiene
-`PerdurarSuperestructuraStringSQL64` (bitmask de
-contextos, 3 tablas nuevas, `cargar_parcial`), y el espejo
-JS tiene `PerdurarSuperestructuraStringIndexedDB64`.
-Falta usarlos.
+### 1.9 Lecciones de la sesión v78b-v78s
 
-**Política.**
+**Sobre el framework y los IDs:**
 
-- **Contexto por defecto: siempre parcial**, con el
-  contexto del usuario solicitante. Admin y soporte son
-  la excepción explícita: necesitan ver todo.
-- **Contexto por operación: caso por caso.** La mayoría
-  de las operaciones del piloto alcanzan con el propio
-  `us_<solicitante>`. Algunas necesitan sumar el del
-  dueño (por ejemplo, un terminal que necesita ver su
-  compartido y el dueño). Otras, contexto total (login,
-  módulo grafo, módulo administrador).
-- **Guardar delta como objetivo.** El framework tiene
-  una única superestructura estática en `Nodo`, así que
-  el grafo parcial y el total no coexisten en memoria.
-  La única vía es delta: al cargar parcial se marca qué
-  nodos vinieron del contexto; al guardar se persisten
-  solo los que cambiaron. La opción "merge en memoria"
-  que figuraba en §11.4 del prompt del framework queda
-  descartada por ese motivo.
-- **`_contextos_para_operacion` vive en el Enrutador.**
-  No en un archivo nuevo. El Enrutador ya conoce la
-  `accion` y el nombre del solicitante. Devuelve el
-  array de contextos a cargar.
+1. **En carga parcial, no todos los IDs especiales están en
+   memoria.** El BFS de máscaras parte solo de los que hay.
+   Esto es un problema cuando el guardado pisa el estado de
+   nodos que ya tenían bits de contextos que no están en
+   memoria. Ver §1.5.
+2. **Las reparaciones topológicas son necesarias pero no
+   suficientes.** Recuperan enlaces faltantes, pero no
+   previenen que se vuelvan a perder.
 
-**Etapas.**
+**Sobre la persistencia:**
 
-- **Etapa 0 — Preparación.** Sin cambio de
-  comportamiento. Se agrega `_contextos_para_operacion`
-  en el Enrutador. Se decide cómo el Controlador sabe
-  que debe cargar parcial (probablemente un flag
-  `Controlador::establecer_modo_carga('parcial'|'total')`
-  más el uso directo de `cargar_parcial`). No se activa
-  todavía.
-- **Etapa 1 — Carga parcial activa + guardar delta.**
-  El Enrutador pide la carga con los contextos
-  correspondientes. La persistencia implementa
-  `guardar_parcial` con delta real (marcar nodos sucios
-  al cargar, persistir solo los cambiados). Fallback a
-  carga total cuando la operación toca uno de los 6
-  helpers de B3.3c.
-- **Etapa 2 — Optimización.** Bajar el costo de
-  `guardar` en el caso general (sin contexto). Revisar
-  iteradores persistentes (§11.3 del framework).
-- **Etapa 3 — Espejo JS.** `PerdurarSuperestructuraStringIndexedDB64.js`
-  recibe el mismo tratamiento. `Controlador.js` decide
-  modo de carga. El plugin prueba desde el navegador.
+3. **La regla de borrado de aristas importa.** Borrar aristas
+   cuyo extremo cruza el filtro pierde información que no se
+   puede reconstruir solo desde el subgrafo parcial.
+   Preservar aristas que cruzan el borde.
+4. **La preservación de bits de máscara es la segunda mitad
+   del problema.** No alcanza con preservar aristas; hay que
+   preservar también los bits del nodo.
 
-**Decisiones pendientes antes de Etapa 0:**
+**Sobre las migraciones:**
 
-- Tabla concreta de `_contextos_para_operacion` para
-  cada acción del enrutador. Se arma caso por caso.
-- Lista exacta de operaciones que caen al fallback
-  (las que tocan los 6 helpers de B3.3c).
-- Forma de "marcar nodos sucios" en la carga parcial.
-  Puede ser un flag en el Nodo (contradice la deuda de
-  §11.4 del framework de "dejar el Nodo limpio"), o
-  una estructura auxiliar del Controlador. A consensuar.
+5. **Recargar la base y volver a migrar es un test valioso.**
+   Detectar bugs que solo aparecen en la secuencia de
+   migración completa. Casos: v78n (compartidos faltantes),
+   v78p (listar_duenos para soporte).
+6. **Migraciones de datos que reestructuran el grafo deben
+   ser idempotentes y re-ejecutables.** El `?reparar_topologia=1`
+   cumple.
 
-### 1.11 Idea para el framework: iteradores con ID especial
+**Sobre las pruebas del plugin:**
 
-Anotada en v78a. No es parte del plan inmediato. Se
-retoma después de la Etapa 3 de la carga parcial, o
-antes si la carga parcial por sí sola no alcanza para
-los casos que quedaron postergados (B3.3c).
+7. **El orden de las pruebas importa.** Una prueba puede
+   dejar el grafo en un estado que rompe a la siguiente.
+   El bug §1.5 apareció justamente por el orden
+   autocompletado → alta de viaje.
+8. **"Primera vez falla, segunda no"** casi siempre indica
+   que un estado se pisó una vez y quedó consistente
+   (aunque roto). El diagnóstico tiene que apuntar al
+   primer guardado que modifica ese estado.
 
-**Idea.** Los iteradores del framework tienen hoy un
-nombre (string) y una posición en el grafo. La
-propuesta es darles también un ID especial persistente
-(`it_<nombre>` o similar), convirtiéndolos en raíces de
-subgrafo — igual que los IDs especiales que hoy usa el
-sistema de contextos (`us_*`, `sesiones`, `aplicacion`).
+### 1.10 Diseño futuro: iteradores con ID especial
 
-**Dos consecuencias.**
+Anotado en v78a. No implementado. Objetivo: cuando el
+framework tenga iteradores con ID especial persistente y un
+usuario que los "ocupe", los B3.3c se resuelven naturalmente.
 
-1. **Un iterador cargado trae su subgrafo alcanzable,**
-   no solo el nodo apuntado. Cargar `it_viajes_carmen1`
-   carga todo lo alcanzable desde su posición actual.
-2. **Un iterador tiene un usuario que lo "ocupa".** El
-   ocupante impide que dos usuarios lo muevan a la vez
-   y da un criterio claro de "quién es dueño de qué
-   subgrafo".
+Idea:
 
-**Especialización por tipo.** Varios iteradores, cada
-uno especializado en un tipo (`it_empresas_<dueno>`,
-`it_viajes_<dueno>`, `it_micros_<dueno>`,
-`it_pasajeros_<dueno>`, `it_asientos_<dueno>`,
-`it_cupones_<dueno>`, `it_liquidaciones_<dueno>`,
-`it_rendiciones_<dueno>`, `it_cancelaciones_<dueno>`,
-`it_usuarios_<dueno>`). Un iterador por tipo por
-usuario.
+- Iteradores con ID especial (`it_<nombre>`) como raíces de
+  subgrafo.
+- Un iterador cargado trae su subgrafo alcanzable.
+- Un iterador tiene un usuario que lo "ocupa".
+- Especialización por tipo: `it_empresas_<dueno>`,
+  `it_viajes_<dueno>`, etc.
+- El backend decide qué iteradores cargar por operación.
 
-**Beneficio.** El backend decide "qué iteradores cargar"
-según la operación y el usuario. En vez de "cargar todo
-el grafo" o "cargar todos los contextos del usuario",
-carga "los iteradores que el usuario ocupa, filtrados
-por tipo". Combinado con el bitmask de contextos, cada
-iterador es un bit de contexto más.
-
-**Diferencia con contextos actuales.** Un contexto es
-un conjunto de nodos alcanzables desde un ID especial
-estático. Un iterador con ID especial es lo mismo, pero
-con posición mutable y un ocupante. La diferencia es
-semántica, no estructural: en el bitmask, un `it_*` es
-un contexto igual que un `us_*`.
-
-**Interacción con la destrucción de nodos.** Hay que
-revisar los flujos de destrucción: si un nodo vive
-dentro del subgrafo de un iterador, y el iterador se
-mueve, hay que decidir si el nodo se destruye o queda
-huérfano. Conecta con §11.2 del prompt del framework
-(fuga de nodos huérfanos).
-
-La idea está también anotada en §11.5 del
-`prompt_framework_iteradores.md`.
-
-### 1.12 Lecciones de la sesión v77q-v78a
-
-**Sobre los reemplazos automáticos.**
-
-1. **Los reemplazos al final de una función deben
-   incluir el `}` de cierre.** Si se reemplaza solo
-   la primera mitad de un bloque (por ejemplo, un
-   bucle), quedan fragmentos huérfanos (`continue`,
-   `break`, `return`) que rompen el parseo del
-   archivo entero. Caso v77w: un `continue` fuera
-   de contexto en `subir_foto_vehiculo` rompió
-   `Vehiculo.php`.
-2. **Grep cruzado por nombre de acción POST al
-   cambiar firmas.** Cuando se cambia la firma de
-   una función PHP que responde a una acción POST
-   (por ejemplo, agregar `$nombre_dueno` a una
-   función de `Vehiculo.php`), hay que buscar no
-   solo por el nombre de la función, sino también
-   por el nombre de la acción (`vehiculos/listar`,
-   `vehiculos/agregar`, etc.) para encontrar todos
-   los lugares del frontend que la llaman. Caso
-   v77x: el modal "Agregar micro" llamaba a
-   `vehiculos/listar` sin `nombre_dueno` y el
-   select quedó vacío.
-
-**Sobre el framework y los IDs.**
-
-3. **Los detectores basados en `por_cada_nodo_ejecutar`
-   sobre el grafo completo son frágiles.** El
-   recorrido encuentra otros nodos con adyacentes
-   que imitan la forma buscada (nodos huérfanos
-   viejos, etc.) y da falsos negativos. Los
-   detectores que necesitan "listar todos los
-   usuarios" deben usar `usuarios->adyacentes()`
-   (revert v77z).
-4. **Los agujeros de mantenimiento topológico se
-   cierran al vuelo.** El fix v78a es el mismo
-   patrón que v77l: cada flujo de alta debe crear
-   los contenedores que le corresponden para que
-   las migraciones de detección no den `false`
-   cada vez que se crea un elemento nuevo.
-
-**Sobre el diseño de la carga parcial.**
-
-5. **El grafo parcial y el total no coexisten en
-   memoria.** El framework tiene una única
-   superestructura estática en `Nodo`. Cargar
-   parcial reemplaza todo. La única vía para
-   guardar es delta (marcar nodos sucios al
-   cargar y persistir solo los cambiados).
-6. **La función que decide los contextos vive en el
-   Enrutador.** No en un archivo nuevo, no en el
-   Controlador. El Enrutador ya conoce la acción y
-   el solicitante. El Controlador solo expone
-   `cargar_parcial`, `guardar_parcial` y un flag
-   de modo.
+Detalle completo en `prompt_framework_iteradores.md` §11.5.
 
 ---
 
@@ -1280,126 +393,34 @@ La idea está también anotada en §11.5 del
 
 ### 2.1 Contexto
 
-La línea en curso es la **Fase B del modelo topológico**.
-Objetivo: aislar por topología, para que cada usuario solo
-alcance lo que le corresponde. La seguridad emerge de la
-estructura del grafo, no de chequeos de código.
+La línea en curso es la **carga parcial por contexto**.
+Objetivo: que cada operación cargue solo el subgrafo que
+necesita, para bajar el costo de O(grafo completo) a O(subgrafo).
+Se apoya en el modelo topológico (Fases A, B1-B3) y en SQL64
+del framework.
 
-### 2.2 Fases
+### 2.2 Estado por fase
 
-1. **Fase A** — Usuarios como IDs especiales `us_<nombre>`.
-   **Completada** (v76k).
-2. **Fase B1** — Contenedores `publico` y `privado` en cada
-   usuario, como alias de los nodos existentes. **Completada**
-   (v76m).
-3. **Fase B2.1** — Compartidos por terminal (`compartido_con_us_termX`)
-   creados con referencias filtradas. **Completada** (v76q).
-4. **Fase B2.2** — Contexto opcional en Viaje, Venta,
-   ViajeAsientos y Empresa. **Completada** (v76r-v76u).
-5. **Fase B2.3** — Árboles paralelos con nombres
-   parametrizados en `Arbol.php`. **Completada** (v76v-v77o).
-6. **Fase B2.4** — Mantener los compartidos vivos. **Completada**
-   (Tanda A, v77q).
-7. **Fase B3** — Eliminar los accesos viejos. **Cerrada
-   salvo B3.3c** (los 7 helpers que iteran sobre todos los
-   dueños; ver §1.7).
-8. **Carga parcial** (ex Fase D) — Carga y guardado parciales
-   por contexto. **Etapa 1 completa** (v78b-v78m): SQL64 +
-   `guardar_parcial` + `_contextos_para_operacion` +
-   adaptación del contexto en módulos principales.
-   Pendiente: módulos menores y B3.3c.
-9. **Fase C** (opcional) — Tipos como IDs especiales, ortogonal.
-   **Pendiente.**
+1. **Modelo topológico (Fases A, B1-B3).** Aplicado.
+   Pendiente: B3.3c.
+2. **Framework — SQL64.** Aplicado. `guardar_parcial` real,
+   `cargar_parcial`, `listar_contextos`, `contextos_cargados`.
+   Bug §1.5 sin resolver.
+3. **Migraciones del piloto.** Aplicadas. SQL64 activo,
+   topología admin/soporte, carga parcial en módulos
+   principales.
+4. **Espejo JS.** Pendiente de los fixes v78r/v78s.
+5. **BUG §1.5.** Bloqueante.
 
-### 2.3 Detalle de la Fase B2.3 (en curso)
+### 2.3 Próximos pasos sugeridos
 
-**Cambio de enfoque respecto del plan original.** El plan
-original proponía un "compartido plano" (opción A): el
-`compartido_con_us_termX` guarda enlaces planos por id, y las
-funciones del terminal iteran con `adyacentes()`. Se descartó
-en favor de la **opción D**: árboles paralelos con nombres de
-enlace parametrizados.
-
-**Por qué.** El compartido puede usar el mismo mecanismo de
-árbol binario (`hmi`/`hd`/`p`) que el privado, solo que con
-nombres alternativos. Cada venta pertenece a UN solo terminal,
-así que solo participa en 2 árboles: el del dueño (con
-`hmi`/`hd`/`p`) y el del terminal que la vendió (con
-`hmi_<terminal>`/`hd_<terminal>`/`p_<terminal>`). No hay
-N+1 enlaces por nodo.
-
-**La raíz del árbol SÍ se duplica (una por árbol).** Cada
-terminal tiene su propio contenedor `compartido_con_us_termX/ventas`,
-distinto del contenedor del dueño (`privado/ventas`). Eso
-es fundamental para que la topología no filtre todas las
-ventas al terminal: el BFS desde el terminal llega a su
-contenedor y recorre solo SU árbol. Si compartieran el
-contenedor, el BFS alcanzaría todas las ventas del dueño
-por el `hmi`/`hd` default del árbol principal.
-
-**Los nodos hijos SÍ se comparten (mismo nodo físico).** Cada
-venta pertenece a dos contextos: el del dueño y el del
-terminal que la vendió. Vive una sola vez, pero participa en
-dos árboles paralelos: uno con `hmi`/`hd`/`p` (el del dueño),
-otro con `hmi_<terminal>`/`hd_<terminal>`/`p_<terminal>` (el
-del terminal). Cero enlaces `hd_<otro_terminal>` porque la
-venta solo la vendió un terminal.
-
-**Sub-tandas de B2.3:**
-
-- **B2.3.1** — Parametrizar `miscelaneas/Arbol.php`.
-  **Completada** (v76v).
-- **B2.3.2** — Ajustar las funciones del piloto para que el
-  terminal use los nombres parametrizados. **Completada**
-  (v76w): helper `_nombres_arbol_para_contexto`, aplicado en
-  `listar_ventas_por_terminal`, `_buscar_venta_por_id` (rama
-  con contexto), `_recorrer_ventas_del_viaje` y
-  `_recorrer_ventas_de_terminal` (Venta.php) y
-  `_construir_indice_ventas_por_viaje` (Viaje.php). Como
-  todavía no hay compartidos marcados, el helper devuelve
-  null y los nombres son default. Sin cambio de comportamiento.
-- **B2.3.3** — Migración que convierte los compartidos
-  existentes (B2.1) de enlaces planos a árboles paralelos
-  con los nombres parametrizados. **Completada** (v76x):
-  comando `app:construir_arboles_compartidos`. Marca cada
-  compartido con `_es_compartido`. Limpia el contenedor del
-  compartido (que tenía enlaces planos de B2.1) y lo
-  reconstruye como árbol con `_hmi` y nombres parametrizados.
-  Idem para `cancelaciones`. Idempotente. Bloque
-  `?construir_arboles_compartidos=1` en `index.php`.
-- **B2.3.4** — Ajustar las escrituras de venta para que
-  inserten y borren en los dos árboles paralelos. **En curso.**
-  Alcance:
-  - Reemplazar `Nodo::nodo_por_id('usuarios')->adyacente(...)`
-    por `Nodo::nodo_por_id('us_' . $nombre)` en
-    `confirmar_venta_actual`, `cancelar_venta`,
-    `_calcular_cobertura_dueno`, `_crear_nodo_cancelacion`
-    (Venta.php) y `_contexto_terminal` (Viaje.php).
-  - En `confirmar_venta_actual`: si el contexto tiene
-    `_es_compartido`, insertar la venta también en el árbol
-    parametrizado del compartido, además del árbol del dueño
-    real. Orden de inserción: dueño primero (default),
-    compartido después (parametrizado).
-  - En `cancelar_venta`: desenlazar del compartido primero,
-    después del árbol del dueño (orden inverso al de la
-    inserción).
-  - **NO toca el enrutador.** Los 6 chequeos de nivel siguen
-    usando `nodo_por_id('usuarios')`. Eso es B3.
-  - Dato del compartido: `dato = nombre_dueno` (opción A). No
-    se agrega enlace `dueno` en el compartido: apuntar al
-    nodo del dueño real rompería la privacidad topológica.
-  - Sin pruebas del plugin todavía: el aislamiento no se
-    activa hasta B2.3.5.
-- **B2.3.5** — Repuntar `us_termX → dueno` al compartido y
-  pasar el contexto desde el enrutador. Acá se activa el
-  aislamiento. Con pruebas del plugin.
-
-### 2.4 Próximas fases
-
-- **B2.4** — Mantener vivos los compartidos.
-- **B3** — Eliminar accesos viejos.
-- **C** (opcional) — Tipos como IDs especiales.
-- **D** — Carga parcial como optimización.
+1. **Retomar el bug §1.5 con logs de diagnóstico** en
+   `_guardar_con_filtro`. Ver §1.5.4.
+2. **Espejar v78r/v78s en el framework JS.**
+3. **Adaptar los 4 módulos menores** (Liquidacion, Rendicion,
+   Empresa, Vehiculo) con el mismo patrón de contexto.
+4. **B3.3c** cuando aparezca dolor real o cuando lleguen
+   los iteradores con ID especial.
 
 ---
 
