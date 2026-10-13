@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.37
- * @version   1.5piloto.78c
+ * @version   1.5piloto.78t
  */
 
 use Iteradores\Controlador\Controlador;
@@ -351,6 +351,10 @@ function guardar_ambos($nombre): bool {
     // contextos cargados. Si la carga fue completa, guardar
     // todo (comportamiento actual).
     $contextos_cargados = Controlador::contextos_cargados();
+    // [DIAG bug 1.5] Instrumentacion temporal.
+    error_log("[DIAG-GUARDAR] nombre=" . $nombre
+        . " parcial=" . (empty($contextos_cargados) ? "no" : "si")
+        . " ctx=[" . implode(",", $contextos_cargados) . "]");
     if (!empty($contextos_cargados)) {
         return Controlador::guardar_parcial($nombre, $contextos_cargados);
     }

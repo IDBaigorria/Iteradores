@@ -966,6 +966,27 @@ huérfanos).
   ya tenía en memoria. Nunca se pierde un bit preexistente.
   Aplicado, **no alcanzó para resolver el bug del viaje
   viejo** (ver `plan_actual.md` §1.5).
+- **1.5i.8a**: **fix real del bug §1.5.** Causa raíz: los
+  IDs numéricos del framework son efímeros; el guardado
+  parcial no puede mapear "ID del framework" ↔ "fila de la
+  DB" entre requests. Cambio de esquema: `nodo_contexto`
+  usa `id_fila` (AUTO_INCREMENT) como identidad estable,
+  `id_especial` (NULL para numéricos) para el ID especial
+  del framework. `adyacente_contexto` referencia ambos
+  extremos por `idnodo_fila`/`idadyacente_fila`. Nuevo
+  mapa estático `$_mapa_id_a_fila` (id_nodo_framework =>
+  id_fila) que se llena al cargar y se consulta al guardar
+  parcial. El DELETE parcial borra solo aristas cuyos DOS
+  extremos están entre las filas cargadas. Las que cruzan
+  el borde sobreviven. Falta espejo JS.
+- **1.5i.8b**: fix del guardado total. En el bloque de
+  INSERT/UPDATE, con `mf=0` los nodos que estaban en el
+  mapa previo intentaban UPDATE, pero ya habían sido
+  borrados por el DELETE ALL. Resultado: nodos borrados,
+  aristas huérfanas. Solución: siempre INSERT. Con
+  `id_fila` explícito para los que estaban en el mapa
+  (preserva identidad), auto-increment para los nuevos.
+  UPDATE no aplica nunca: siempre pisamos con DELETE primero.
 
 **BUG PENDIENTE (framework).** El bug del viaje viejo que
 desaparece tras una operación del terminal (§1.5 del

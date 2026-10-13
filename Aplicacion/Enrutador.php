@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78m
+ * @version   1.5piloto.78v
  */
 
 use Iteradores\Nodos\Nodo;
@@ -104,6 +104,13 @@ function _nombre_terminal_solicitante(string $nombre_solicitante): ?string {
  * @since 1.5piloto.78b
  */
 function _contextos_para_operacion(string $accion, string $nombre_solicitante, array $get = []): ?array {
+    // === NEUTRALIZADO v1.5piloto.78v ===
+    // La carga parcial está desactivada hasta que el fix de
+    // id_fila (Tanda A) esté probado en producción. Mientras
+    // devuelva null, todas las operaciones cargan el grafo
+    // completo: performance pobre pero correcto.
+    return null;
+
     // Caso 1: POST con acción. Es la operación principal.
     // Si hay solicitante, carga parcial con su contexto. La
     // topología decide el resto:

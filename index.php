@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.78r
+ * @version   1.5piloto.78v
  */
 
 // --- Utilidades base ----------------------------------
@@ -151,6 +151,7 @@ if (isset($_GET['migrar_a_sql64'])) {
         if (!Controlador::guardar($nombre_mig)) {
             echo "   ERROR: no se pudo guardar en SQL64.\n";
             echo "   Ver logs de errores del Controlador.\n";
+            Controlador::imprimir_errores();
             exit;
         }
 

@@ -22,33 +22,79 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStrin
  * nodo lleva un entero `contexto_mascara` con los bits de
  * sus contextos alcanzantes.
  *
+ * ## Esquema (v1.5i.8a)
+ *
+ * `nodo_contexto` identifica cada nodo por `id_fila`
+ * (auto-increment, estable entre requests). La columna
+ * `id_especial` guarda el ID especial del framework cuando
+ * el nodo lo tiene (NULL para los numéricos, que son
+ * efímeros).
+ *
+ * `adyacente_contexto` referencia sus dos extremos por
+ * `idnodo_fila` / `idadyacente_fila`, no por los IDs del
+ * framework. Así el guardado parcial puede borrar
+ * quirúrgicamente las filas del subgrafo cargado sin tocar
+ * las de otros subgrafos.
+ *
+ * ## Mapa en memoria
+ *
+ * `$_mapa_id_a_fila[$nombre][$id_nodo_framework] = $id_fila`
+ * se llena al cargar y se consulta al guardar parcial.
+ * Resuelve el problema de los IDs numéricos efímeros:
+ * aunque el framework cambie el ID de un nodo entre
+ * cargas, la fila de la DB es siempre la misma.
+ *
+ * ## Estrategia de guardado
+ *
+ * En los dos modos (total y parcial) se pisa con DELETE
+ * primero. Por eso NUNCA se hace UPDATE: siempre INSERT.
+ * Los nodos que ya tenían `id_fila` (están en el mapa) se
+ * insertan con ese `id_fila` explícito, para preservar la
+ * identidad. Los nuevos van con auto-increment.
+ *
  * @author Ignacio David Baigorria
- * @version 1.5i.7r
+ * @version 1.5i.8b
  * @since 1.5i.7k
  */
 class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQL implements PerdurarSuperestructuraConContexto {
+
+    /**
+     * Mapa [idsuperestructura => [id_nodo_framework => id_fila]].
+     *
+     * Los IDs numéricos del framework son efímeros: cambian
+     * entre cargas. Los `id_fila` de la tabla son estables.
+     * Este mapa los relaciona dentro de una misma request: se
+     * llena al cargar y se consulta al guardar parcial.
+     *
+     * @var array<string, array<string, int>>
+     * @since 1.5i.8a
+     */
+    protected static array $_mapa_id_a_fila = [];
 
     protected static function crear_tablas_sql($sql) {
         if (!parent::crear_tablas_sql($sql)) {
             return false;
         }
         if (!$sql->query("CREATE TABLE IF NOT EXISTS nodo_contexto (
+                            id_fila           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                             idsuperestructura VARCHAR(50) NOT NULL,
-                            idnodo            VARCHAR(50) NOT NULL,
+                            id_especial       VARCHAR(50) NULL,
                             dato              BLOB,
                             contexto_mascara  BIGINT UNSIGNED NOT NULL DEFAULT 0,
-                            PRIMARY KEY (idsuperestructura, idnodo),
-                            INDEX idx_nodo_contexto_super_ctx (idsuperestructura, contexto_mascara)
+                            PRIMARY KEY (id_fila),
+                            UNIQUE KEY uq_especial (idsuperestructura, id_especial),
+                            INDEX idx_super_ctx (idsuperestructura, contexto_mascara)
                         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")) {
             self::_error("SQL64: no se pudo crear la tabla nodo_contexto");
             return false;
         }
         if (!$sql->query("CREATE TABLE IF NOT EXISTS adyacente_contexto (
                             idsuperestructura VARCHAR(50) NOT NULL,
-                            idnodo            VARCHAR(50) NOT NULL,
+                            idnodo_fila       BIGINT UNSIGNED NOT NULL,
                             enlace            VARCHAR(100) NOT NULL,
-                            idadyacente       VARCHAR(50) NOT NULL,
-                            PRIMARY KEY (idsuperestructura, idnodo, enlace, idadyacente)
+                            idadyacente_fila  BIGINT UNSIGNED NOT NULL,
+                            PRIMARY KEY (idsuperestructura, idnodo_fila, enlace, idadyacente_fila),
+                            INDEX idx_ady_dest (idsuperestructura, idadyacente_fila)
                         ) DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;")) {
             self::_error("SQL64: no se pudo crear la tabla adyacente_contexto");
             return false;
@@ -76,22 +122,20 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
      * Con $mascara_filtro === 0 reemplaza toda la
      * superestructura (comportamiento de guardar).
      *
-     * Con $mascara_filtro !== 0 solo toca los nodos cuyo
-     * bitmask intersecta el filtro. Regla de borrado:
-     * se borran las aristas salientes de esos nodos
-     * (idnodo in filtro) y después los nodos. Las
-     * aristas entrantes desde nodos fuera del filtro
-     * no se tocan: cada operación gestiona las
-     * salientes de sus nodos.
-     *
-     * El DELETE de adyacente_contexto va ANTES del de
-     * nodo_contexto: la subquery consulta nodo_contexto
-     * y tiene que ver las filas todavía.
+     * Con $mascara_filtro !== 0 hace un guardado quirúrgico
+     * usando $_mapa_id_a_fila:
+     *   - DELETE de aristas: solo las que tienen sus DOS
+     *     extremos entre las filas cargadas.
+     *   - DELETE de nodos: solo las filas cargadas.
+     *   - INSERT de nodos: con id_fila explícito si estaban
+     *     en el mapa, auto si son nuevos.
+     *   - INSERT de aristas: solo entre nodos cargados.
      *
      * @param string $nombre
      * @param int    $mascara_filtro 0 = guardar todo.
      * @return bool
      * @since 1.5i.7o
+     * @version 1.5i.8b
      */
     static private function _guardar_con_filtro($nombre, int $mascara_filtro) {
         if (!Nodo::hay_nodos_en_superestructura()) {
@@ -112,12 +156,8 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             return false;
         }
 
-        // Con filtro (carga parcial), el BFS parte solo de los
-        // IDs especiales que están en memoria. En carga parcial
-        // del terminal, `us_<dueno>` no está: su bit no se
-        // propaga y los nodos que ya lo tenían lo pierden. Fix
-        // v78s: unir con la máscara que el nodo ya tenía en
-        // memoria. Nunca se pierde un bit preexistente.
+        // Con filtro, unir las máscaras del BFS con las que el
+        // nodo ya tenía en memoria (fijadas al cargar).
         if ($mf_parcial !== 0) {
             Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use (&$mascaras) {
                 $id = $nodo->id();
@@ -127,53 +167,156 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             });
         }
 
+        // Snapshot del mapa actual (IDs del framework -> id_fila).
+        // Los que están acá fueron cargados de la DB. Los que no
+        // fueron creados durante esta request.
+        $mapa_previo = self::$_mapa_id_a_fila[$nombre] ?? [];
+
+        $filas_cargadas = [];
+        if ($mf_parcial !== 0) {
+            $filas_cargadas = array_values(array_unique($mapa_previo));
+        }
+
         $sql->begin_transaction();
         try {
             $nombre_escapado = $sql->real_escape_string((string)$nombre);
             $mf = (int)$mascara_filtro;
 
-            // DELETE de adyacentes. Con filtro, borra solo las
-            // aristas cuyos DOS extremos están en el filtro. Las
-            // que cruzan el borde (origen o destino fuera del
-            // filtro) se conservan tal cual: si se borraran sin
-            // reinsertarlas, se perderían enlaces del dueño hacia
-            // sus propios subárboles (bug v78r). Sin filtro,
-            // borra todo (comportamiento de guardar).
             if ($mf === 0) {
-                $q_del_ady = "DELETE FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "';";
-            } else {
+                // Guardado total: reemplaza todo.
+                if (!$sql->query("DELETE FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "';")) {
+                    throw new \RuntimeException("SQL64::guardar: fallo DELETE adyacente_contexto: " . $sql->error);
+                }
+                if (!$sql->query("DELETE FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "';")) {
+                    throw new \RuntimeException("SQL64::guardar: fallo DELETE nodo_contexto: " . $sql->error);
+                }
+                // Los id_fila viejos ya no sirven: el próximo
+                // INSERT va a generar ids nuevos por auto-increment.
+                self::$_mapa_id_a_fila[$nombre] = [];
+                $mapa_previo = [];
+            } elseif (!empty($filas_cargadas)) {
+                // Guardado parcial: solo las filas cargadas.
+                if (!$sql->query("CREATE TEMPORARY TABLE IF NOT EXISTS _sql64_filas (id BIGINT UNSIGNED PRIMARY KEY) ENGINE=MEMORY")) {
+                    throw new \RuntimeException("SQL64::guardar: fallo CREATE TEMPORARY TABLE: " . $sql->error);
+                }
+                if (!$sql->query("DELETE FROM _sql64_filas")) {
+                    throw new \RuntimeException("SQL64::guardar: fallo limpiar TEMPORARY TABLE: " . $sql->error);
+                }
+                foreach (array_chunk($filas_cargadas, 500) as $chunk) {
+                    $values = [];
+                    foreach ($chunk as $fid) {
+                        $values[] = "(" . (int)$fid . ")";
+                    }
+                    if (!$sql->query("INSERT INTO _sql64_filas (id) VALUES " . implode(",", $values) . ";")) {
+                        throw new \RuntimeException("SQL64::guardar: fallo INSERT TEMPORARY TABLE: " . $sql->error);
+                    }
+                }
+
                 $q_del_ady = "DELETE FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
-                           . " AND idnodo IN (SELECT idnodo FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
-                           . " AND (contexto_mascara & " . $mf . ") != 0)"
-                           . " AND idadyacente IN (SELECT idnodo FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
-                           . " AND (contexto_mascara & " . $mf . ") != 0);";
-            }
-            if (!$sql->query($q_del_ady)) {
-                throw new \RuntimeException("SQL64::guardar: fallo DELETE adyacente_contexto: " . $sql->error);
-            }
-
-            // DELETE de nodos. Con filtro, solo los del filtro.
-            if ($mf === 0) {
-                $q_del_nod = "DELETE FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "';";
-            } else {
+                           . " AND idnodo_fila IN (SELECT id FROM _sql64_filas)"
+                           . " AND idadyacente_fila IN (SELECT id FROM _sql64_filas);";
+                if (!$sql->query($q_del_ady)) {
+                    throw new \RuntimeException("SQL64::guardar: fallo DELETE adyacente_contexto: " . $sql->error);
+                }
                 $q_del_nod = "DELETE FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
-                           . " AND (contexto_mascara & " . $mf . ") != 0;";
-            }
-            if (!$sql->query($q_del_nod)) {
-                throw new \RuntimeException("SQL64::guardar: fallo DELETE nodo_contexto: " . $sql->error);
+                           . " AND id_fila IN (SELECT id FROM _sql64_filas);";
+                if (!$sql->query($q_del_nod)) {
+                    throw new \RuntimeException("SQL64::guardar: fallo DELETE nodo_contexto: " . $sql->error);
+                }
+
+                $sql->query("DROP TEMPORARY TABLE IF EXISTS _sql64_filas");
             }
 
-            $chunks_nodos = self::_crear_chunks_insertar_nodos_con_mascara($sql, $nombre, $mascaras, $mf);
-            foreach ($chunks_nodos as $consulta) {
-                if (!$sql->query($consulta)) {
+            // INSERT de nodos: uno por uno, para capturar
+            // insert_id() sin ambigüedad. Si el nodo estaba en
+            // el mapa previo, se inserta con su id_fila
+            // explícito (preserva identidad). Si no, auto.
+            $ids_a_insertar = [];
+            Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras, $mf, &$ids_a_insertar) {
+                $id = $nodo->id();
+                $mascara = (int)($mascaras[$id] ?? 0);
+                if ($mf !== 0 && ($mascara & $mf) === 0) return;
+                $ids_a_insertar[] = $id;
+            });
+
+            foreach ($ids_a_insertar as $id_nodo) {
+                $nodo = Nodo::nodo_por_id($id_nodo);
+                if (!$nodo) continue;
+                $mascara = (int)($mascaras[$id_nodo] ?? 0);
+                $dato = $nodo->dato();
+                if (!is_string($dato) && !is_null($dato) && !is_int($dato)) $dato = null;
+                $dato_escapado = is_null($dato) ? "" : $sql->real_escape_string((string)$dato);
+                $id_especial = Nodo::es_id_especial($id_nodo) ? $sql->real_escape_string((string)$id_nodo) : null;
+                $id_especial_sql = is_null($id_especial) ? "NULL" : "'" . $id_especial . "'";
+
+                if (isset($mapa_previo[$id_nodo])) {
+                    // Reinsertar con el id_fila original.
+                    $id_fila = (int)$mapa_previo[$id_nodo];
+                    $q = "INSERT INTO nodo_contexto (id_fila, idsuperestructura, id_especial, dato, contexto_mascara) VALUES ("
+                       . $id_fila . ", '" . $nombre_escapado . "', " . $id_especial_sql . ", '" . $dato_escapado . "', " . $mascara . ");";
+                } else {
+                    // Nodo nuevo: auto-increment.
+                    $q = "INSERT INTO nodo_contexto (idsuperestructura, id_especial, dato, contexto_mascara) VALUES ("
+                       . "'" . $nombre_escapado . "', " . $id_especial_sql . ", '" . $dato_escapado . "', " . $mascara . ");";
+                }
+                if (!$sql->query($q)) {
                     throw new \RuntimeException("SQL64::guardar: fallo INSERT nodo_contexto: " . $sql->error);
+                }
+                if (!isset($mapa_previo[$id_nodo])) {
+                    $nuevo_id_fila = (int)$sql->insert_id;
+                    self::$_mapa_id_a_fila[$nombre][$id_nodo] = $nuevo_id_fila;
+                } else {
+                    self::$_mapa_id_a_fila[$nombre][$id_nodo] = $mapa_previo[$id_nodo];
                 }
             }
 
-            $chunks_ady = self::_crear_chunks_insertar_adyacentes_contexto($sql, $nombre, $mascaras, $mf);
-            foreach ($chunks_ady as $consulta) {
-                if (!$sql->query($consulta)) {
-                    throw new \RuntimeException("SQL64::guardar: fallo INSERT adyacente_contexto: " . $sql->error);
+            // INSERT de aristas: solo entre nodos que están en el
+            // mapa final (los cargados + los recién insertados).
+            $mapa_final = self::$_mapa_id_a_fila[$nombre] ?? [];
+            $filas_aristas = [];
+            Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras, $mf, $mapa_final, &$filas_aristas) {
+                $id_origen = $nodo->id();
+                $m_o = (int)($mascaras[$id_origen] ?? 0);
+                if ($mf !== 0 && ($m_o & $mf) === 0) return;
+                if (!isset($mapa_final[$id_origen])) return;
+                $fila_origen = (int)$mapa_final[$id_origen];
+                $ady = $nodo->adyacentes();
+                if (!is_array($ady)) return;
+                foreach ($ady as $enlace => $adyacente) {
+                    $id_dest = $adyacente->id();
+                    $m_d = (int)($mascaras[$id_dest] ?? 0);
+                    if ($mf !== 0 && ($m_d & $mf) === 0) continue;
+                    if (!isset($mapa_final[$id_dest])) continue;
+                    $fila_dest = (int)$mapa_final[$id_dest];
+                    $filas_aristas[] = [$fila_origen, (string)$enlace, $fila_dest];
+                }
+            });
+
+            if (!empty($filas_aristas)) {
+                $limite_bytes = 200 * 1024;
+                $lote = [];
+                $tamano = 0;
+                foreach ($filas_aristas as $fila_ar) {
+                    list($fo, $enl, $fd) = $fila_ar;
+                    $enl_esc = $sql->real_escape_string($enl);
+                    $fila_str = "('" . $nombre_escapado . "'," . $fo . ",'" . $enl_esc . "'," . $fd . ")";
+                    $tam = strlen($fila_str) + 2;
+                    if (!empty($lote) && ($tamano + $tam) > $limite_bytes) {
+                        $q_ins = "INSERT INTO adyacente_contexto (idsuperestructura, idnodo_fila, enlace, idadyacente_fila) VALUES " . implode(", ", $lote) . ";";
+                        if (!$sql->query($q_ins)) {
+                            throw new \RuntimeException("SQL64::guardar: fallo INSERT adyacente_contexto: " . $sql->error);
+                        }
+                        $lote = [];
+                        $tamano = 0;
+                    }
+                    $lote[] = $fila_str;
+                    $tamano += $tam;
+                }
+                if (!empty($lote)) {
+                    $q_ins = "INSERT INTO adyacente_contexto (idsuperestructura, idnodo_fila, enlace, idadyacente_fila) VALUES " . implode(", ", $lote) . ";";
+                    if (!$sql->query($q_ins)) {
+                        throw new \RuntimeException("SQL64::guardar: fallo INSERT adyacente_contexto: " . $sql->error);
+                    }
                 }
             }
 
@@ -193,6 +336,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             self::_error("SQL64::cargar: el nombre no es string.");
             return false;
         }
+        self::$_mapa_id_a_fila[$nombre] = [];
         $sql = self::crear_conexion_sql();
         if (!$sql) {
             self::_error("SQL64::cargar: no se pudo crear conexión.");
@@ -200,7 +344,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         }
         $nombre_escapado = $sql->real_escape_string((string)$nombre);
         $equivalencias = array();
-        $ok = self::_cargar_nodos_con_mascara($sql, $nombre_escapado, $equivalencias, false);
+        $ok = self::_cargar_nodos_con_mascara($sql, $nombre, $nombre_escapado, $equivalencias, false);
         if ($ok === null) { $sql->close(); return null; }
         if ($ok === false) { $sql->close(); return false; }
         $ok2 = self::_cargar_adyacentes_contexto($sql, $nombre_escapado, $equivalencias);
@@ -214,6 +358,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             self::_error("SQL64::cargar_parcial: el nombre no es string.");
             return false;
         }
+        self::$_mapa_id_a_fila[$nombre] = [];
         $sql = self::crear_conexion_sql();
         if (!$sql) {
             self::_error("SQL64::cargar_parcial: no se pudo crear conexión.");
@@ -240,7 +385,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         $q = "SELECT * FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
            . " AND (contexto_mascara & " . (int)$mascara_pedida . ") != 0;";
         $equivalencias = array();
-        $ok = self::_cargar_nodos_con_mascara($sql, $nombre_escapado, $equivalencias, true, $q);
+        $ok = self::_cargar_nodos_con_mascara($sql, $nombre, $nombre_escapado, $equivalencias, true, $q);
         if ($ok === null) { $sql->close(); return null; }
         if ($ok === false) { $sql->close(); return false; }
         $ok2 = self::_cargar_adyacentes_contexto($sql, $nombre_escapado, $equivalencias);
@@ -251,17 +396,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
 
     /**
      * Guarda solo el subgrafo en memoria filtrando por
-     * contextos.
-     *
-     * Requiere que los contextos estén registrados
-     * previamente. Los registra el primer guardar (que
-     * recorre los IDs especiales del grafo y asigna bits
-     * en la tabla `contexto`).
-     *
-     * El guardado es total sobre los nodos cargados
-     * (modificados o no): el contrato es "persistir lo que
-     * tengo en memoria, restringido al filtro de
-     * contextos". No hace delta de cambios.
+     * contextos. Ver _guardar_con_filtro para la lógica.
      *
      * @param string   $nombre
      * @param string[] $contextos
@@ -353,6 +488,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                 return null;
             }
         }
+        unset(self::$_mapa_id_a_fila[$nombre]);
         $sql->close();
         return true;
     }
@@ -455,100 +591,21 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         return $mascaras;
     }
 
-    private static function _crear_chunks_insertar_nodos_con_mascara($sql, $nombre, array $mascaras, int $mascara_filtro = 0): array {
-        $datos = [];
-        Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras, $mascara_filtro, &$datos) {
-            $id = $nodo->id();
-            $mascara = $mascaras[$id] ?? 0;
-            if ($mascara_filtro !== 0 && ((int)$mascara & $mascara_filtro) === 0) {
-                return;
-            }
-            $datos[$id] = ['dato' => $nodo->dato(), 'mascara' => $mascara];
-        });
-        if (empty($datos)) return [];
-
-        $nombre_escapado = $sql->real_escape_string((string)$nombre);
-        $limite_bytes = 200 * 1024;
-        $chunks = [];
-        $lote = [];
-        $tamano_lote = 0;
-        foreach ($datos as $id => $info) {
-            $dato = $info['dato'];
-            if (!is_string($dato) && !is_null($dato) && !is_int($dato)) $dato = null;
-            $id_escapado = $sql->real_escape_string((string)$id);
-            $dato_escapado = is_null($dato) ? '' : $sql->real_escape_string((string)$dato);
-            $mascara = (int)$info['mascara'];
-            $fila = "('" . $nombre_escapado . "','" . $id_escapado . "','" . $dato_escapado . "'," . $mascara . ")";
-            $tamano_fila = strlen($fila) + 2;
-            if (!empty($lote) && ($tamano_lote + $tamano_fila) > $limite_bytes) {
-                $chunks[] = "INSERT INTO nodo_contexto (idsuperestructura, idnodo, dato, contexto_mascara) VALUES " . implode(", ", $lote) . ";";
-                $lote = [];
-                $tamano_lote = 0;
-            }
-            $lote[] = $fila;
-            $tamano_lote += $tamano_fila;
-        }
-        if (!empty($lote)) {
-            $chunks[] = "INSERT INTO nodo_contexto (idsuperestructura, idnodo, dato, contexto_mascara) VALUES " . implode(", ", $lote) . ";";
-        }
-        return $chunks;
-    }
-
-    private static function _crear_chunks_insertar_adyacentes_contexto($sql, $nombre, array $mascaras = [], int $mascara_filtro = 0): array {
-        $datos = [];
-        Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras, $mascara_filtro, &$datos) {
-            $id_origen = $nodo->id();
-            if ($mascara_filtro !== 0) {
-                $m_origen = (int)($mascaras[$id_origen] ?? 0);
-                if (($m_origen & $mascara_filtro) === 0) return;
-            }
-            $enlaces = [];
-            $ady = $nodo->adyacentes();
-            if (is_array($ady)) {
-                foreach ($ady as $enlace => $adyacente) {
-                    $id_dest = $adyacente->id();
-                    if ($mascara_filtro !== 0) {
-                        $m_dest = (int)($mascaras[$id_dest] ?? 0);
-                        if (($m_dest & $mascara_filtro) === 0) continue;
-                    }
-                    $enlaces[$enlace] = $id_dest;
-                }
-            }
-            if (!empty($enlaces)) {
-                $datos[$id_origen] = $enlaces;
-            }
-        });
-        if (empty($datos)) return [];
-
-        $nombre_escapado = $sql->real_escape_string((string)$nombre);
-        $limite_bytes = 200 * 1024;
-        $chunks = [];
-        $lote = [];
-        $tamano_lote = 0;
-        foreach ($datos as $idnodo => $arreglo) {
-            if (!is_array($arreglo) || empty($arreglo)) continue;
-            foreach ($arreglo as $enlace => $idady) {
-                $idnodo_escapado = $sql->real_escape_string((string)$idnodo);
-                $enlace_escapado = $sql->real_escape_string((string)$enlace);
-                $idady_escapado = $sql->real_escape_string((string)$idady);
-                $fila = "('" . $nombre_escapado . "','" . $idnodo_escapado . "','" . $enlace_escapado . "','" . $idady_escapado . "')";
-                $tamano_fila = strlen($fila) + 2;
-                if (!empty($lote) && ($tamano_lote + $tamano_fila) > $limite_bytes) {
-                    $chunks[] = "INSERT INTO adyacente_contexto (idsuperestructura, idnodo, enlace, idadyacente) VALUES " . implode(", ", $lote) . ";";
-                    $lote = [];
-                    $tamano_lote = 0;
-                }
-                $lote[] = $fila;
-                $tamano_lote += $tamano_fila;
-            }
-        }
-        if (!empty($lote)) {
-            $chunks[] = "INSERT INTO adyacente_contexto (idsuperestructura, idnodo, enlace, idadyacente) VALUES " . implode(", ", $lote) . ";";
-        }
-        return $chunks;
-    }
-
-    private static function _cargar_nodos_con_mascara($sql, $nombre_escapado, &$equivalencias, bool $solo_filtrados, string $q = ''): bool|null {
+    /**
+     * Carga nodos desde nodo_contexto. Llena $_mapa_id_a_fila
+     * (id_nodo_framework => id_fila) y $equivalencias
+     * (id_fila => id_nodo_framework) para resolver aristas.
+     *
+     * @param \mysqli $sql
+     * @param string  $nombre
+     * @param string  $nombre_escapado
+     * @param array   $equivalencias  Por referencia.
+     * @param bool    $solo_filtrados
+     * @param string  $q              Query cuando $solo_filtrados.
+     * @return bool|null
+     * @version 1.5i.8a
+     */
+    private static function _cargar_nodos_con_mascara($sql, $nombre, $nombre_escapado, &$equivalencias, bool $solo_filtrados, string $q = ''): bool|null {
         if (!$solo_filtrados) {
             $q = "SELECT * FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "';";
         }
@@ -556,54 +613,70 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             self::_error("SQL64: fallo SELECT nodos: " . $sql->error);
             return null;
         }
-        $nodo = $nodos->fetch_assoc();
-        if (!$solo_filtrados && !$nodo) {
+        $nodo_fila = $nodos->fetch_assoc();
+        if (!$solo_filtrados && !$nodo_fila) {
             self::_alerta("SQL64::cargar: no existe '" . $nombre_escapado . "'.");
             return false;
         }
-        while ($nodo !== null) {
-            $id = $nodo["idnodo"];
-            $mascara = (int)$nodo["contexto_mascara"];
-            if (Nodo::es_id_especial($id)) {
-                if (!$naux = Nodo::nodo_por_id($id)) {
-                    $naux = Nodo::crear_con_dato_e_id($nodo["dato"], $id);
+        while ($nodo_fila !== null) {
+            $id_fila = (int)$nodo_fila["id_fila"];
+            $id_especial = $nodo_fila["id_especial"];
+            $mascara = (int)$nodo_fila["contexto_mascara"];
+            $dato = $nodo_fila["dato"];
+            if ($id_especial !== null && $id_especial !== '') {
+                if (!$naux = Nodo::nodo_por_id($id_especial)) {
+                    $naux = Nodo::crear_con_dato_e_id($dato, $id_especial);
                 } else {
-                    $naux->_dato($nodo["dato"]);
+                    $naux->_dato($dato);
                 }
-                if ($naux) $naux->establecer_contexto_mascara($mascara);
+                if ($naux) {
+                    $naux->establecer_contexto_mascara($mascara);
+                    self::$_mapa_id_a_fila[$nombre][$naux->id()] = $id_fila;
+                    $equivalencias[$id_fila] = $naux->id();
+                }
             } else {
-                $nuevo = Nodo::crear_con_dato($nodo["dato"]);
+                $nuevo = Nodo::crear_con_dato($dato);
                 $nuevo->establecer_contexto_mascara($mascara);
-                $equivalencias[$id] = $nuevo->id();
+                self::$_mapa_id_a_fila[$nombre][$nuevo->id()] = $id_fila;
+                $equivalencias[$id_fila] = $nuevo->id();
             }
-            $nodo = $nodos->fetch_assoc();
+            $nodo_fila = $nodos->fetch_assoc();
         }
         return true;
     }
 
+    /**
+     * Carga aristas desde adyacente_contexto. Resuelve ambos
+     * extremos por id_fila usando $equivalencias
+     * (id_fila => id_nodo_framework).
+     *
+     * @param \mysqli $sql
+     * @param string  $nombre_escapado
+     * @param array   $equivalencias
+     * @return bool|null
+     * @version 1.5i.8a
+     */
     private static function _cargar_adyacentes_contexto($sql, $nombre_escapado, $equivalencias): bool|null {
-        if (!$adyacentes = $sql->query("SELECT * FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "';")) {
+        if (!$adyacentes = $sql->query("SELECT idnodo_fila, enlace, idadyacente_fila FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "';")) {
             self::_error("SQL64: fallo SELECT adyacentes: " . $sql->error);
             return false;
         }
-        $adyacente = $adyacentes->fetch_assoc();
-        while ($adyacente !== null) {
-            $idnod = $adyacente["idnodo"];
-            if (!Nodo::es_id_especial($idnod)) {
-                if (!isset($equivalencias[$idnod])) { $adyacente = $adyacentes->fetch_assoc(); continue; }
-                $idnod = $equivalencias[$idnod];
+        $ady = $adyacentes->fetch_assoc();
+        while ($ady !== null) {
+            $fila_origen = (int)$ady["idnodo_fila"];
+            $fila_dest = (int)$ady["idadyacente_fila"];
+            if (!isset($equivalencias[$fila_origen]) || !isset($equivalencias[$fila_dest])) {
+                $ady = $adyacentes->fetch_assoc();
+                continue;
             }
-            $idady = $adyacente["idadyacente"];
-            if (!Nodo::es_id_especial($idady)) {
-                if (!isset($equivalencias[$idady])) { $adyacente = $adyacentes->fetch_assoc(); continue; }
-                $idady = $equivalencias[$idady];
-            }
-            $nodo = Nodo::nodo_por_id($idnod);
-            $nodoady = Nodo::nodo_por_id($idady);
+            $id_origen = $equivalencias[$fila_origen];
+            $id_dest = $equivalencias[$fila_dest];
+            $nodo = Nodo::nodo_por_id($id_origen);
+            $nodoady = Nodo::nodo_por_id($id_dest);
             if ($nodo && $nodoady) {
-                $nodo->_adyacente_en($nodoady, $adyacente["enlace"]);
+                $nodo->_adyacente_en($nodoady, $ady["enlace"]);
             }
-            $adyacente = $adyacentes->fetch_assoc();
+            $ady = $adyacentes->fetch_assoc();
         }
         return true;
     }

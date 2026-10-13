@@ -17,7 +17,7 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 ### 1.1 Última actualización
 
-**Última actualización de este archivo:** v1.5piloto.78s.
+**Última actualización de este archivo:** v1.5piloto.78v.
 
 Cierre de la línea de carga parcial (v78b-v78s). Toda la
 infraestructura de contextos está aplicada: SQL64 como
@@ -154,7 +154,10 @@ fix que no alcanzaron.
 
 Sin otros bugs de prioridad alta.
 
-### 1.5 BUG PERSISTENTE — El viaje viejo desaparece
+### 1.5 BUG PERSISTENTE — El viaje viejo desaparece [RESUELTO en v1.5i.8a]
+
+**RESUELTO en framework 1.5i.8a.** Ver §1.5.6 abajo.
+
 
 #### 1.5.1 Síntoma
 
@@ -241,6 +244,42 @@ del terminal. Si ese nodo está en el camino del BFS hacia
 el viaje viejo (por ejemplo, un contenedor intermedio), la
 propagación se corta y el viaje queda sin bit. Habría que
 verificar que el BFS no se interrumpa por nodos filtrados.
+
+#### 1.5.6 Causa raíz y solución (v1.5i.8a)
+
+**Causa raíz:** los IDs numéricos del framework son
+**efímeros**. Cambian entre cada carga del grafo porque
+`Objeto` los genera de forma perezosa y no los conserva
+entre requests. Todos los fixes previos (v78r, v78s,
+v78t, v78u) intentaban hacer un guardado parcial mapeando
+"ID del framework" ↔ "fila de la DB", y esa
+correspondencia se rompía en cada request. El DELETE no
+encontraba los IDs viejos, no borraba nada, e insertaba
+duplicados. El grafo creció a 99.290 nodos.
+
+**Solución (diseño acordado con el usuario):** cambiar el
+esquema para que la DB no dependa de los IDs del
+framework.
+
+- `nodo_contexto`: `id_fila` (BIGINT AUTO_INCREMENT, PK)
+  es la identidad estable. `id_especial` guarda el ID
+  especial del framework (NULL para numéricos).
+- `adyacente_contexto`: `idnodo_fila` y `idadyacente_fila`
+  referencian los extremos por `id_fila`, no por los IDs
+  efímeros.
+- `PerdurarSuperestructuraStringSQL64::$_mapa_id_a_fila`
+  relaciona ambos mundos dentro de una request. Se llena
+  al cargar y se consulta al guardar parcial.
+- El DELETE parcial borra solo aristas cuyos DOS extremos
+  están entre las filas cargadas. Las que cruzan el borde
+  sobreviven. Ese es el fix del síntoma (el enlace
+  `dueño → compartido` ya no se borra cuando el terminal
+  guarda).
+
+**Estado:** framework 1.5i.8a. Falta espejar en
+`PerdurarSuperestructuraStringIndexedDB64.js`. Mientras
+tanto, `_contextos_para_operacion` devuelve `null`
+(carga total) para no arriesgar el grafo.
 
 #### 1.5.5 Impacto actual
 
