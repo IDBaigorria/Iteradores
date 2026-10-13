@@ -721,6 +721,39 @@
  * - Persistencia en SQL64 (bitmask de contextos, 3 tablas nuevas:
  *   nodo_contexto, adyacente_contexto, contexto).
  * 
+ * **Flujo de carga parcial (v78g-v78s):**
+ * 
+ * 1. `index.php` lee `$_POST['accion']` y `$_POST['nombre_solicitante']`,
+ *    y llama a `_contextos_para_operacion($accion, $sol, $_GET)`.
+ * 2. La función devuelve:
+ *    - `null` → carga total (`Controlador::cargar`).
+ *    - `['us_<sol>']` → carga parcial (`Controlador::cargar_parcial`).
+ * 3. Excepciones que cargan total: acciones de gestión de usuarios
+ *    (`administrador/agregar_usuario`, `dueno/agregar_terminal`,
+ *    etc.) y los informes imprimibles que usan helpers de B3.3c
+ *    (`informe_cancelacion`, `informe_liquidacion`,
+ *    `informe_rendicion`).
+ * 4. `guardar_ambos` consulta `Controlador::contextos_cargados()`:
+ *    si está vacío, `guardar`; si no, `guardar_parcial`.
+ * 
+ * **BUG PERSISTENTE (no resuelto al cierre de v78s):**
+ * 
+ * Después de que un terminal hace una operación de guardado
+ * (por ejemplo, la prueba "autocompletado" del plugin), el viaje
+ * viejo del dueño desaparece de su lista. El terminal lo sigue
+ * viendo (navega por su compartido). Los fixes v78r (regla de
+ * borrado de aristas con doble extremo) y v78s (preservar bits
+ * de máscara al guardar parcial) fueron intentos que NO
+ * alcanzaron. El bug completo, el diagnóstico y el próximo paso
+ * de diagnóstico (instrumentar `_guardar_con_filtro` con logs)
+ * están en `prompts/plan_actual.md` §1.5.
+ * 
+ * **Reparación topológica (v78n, v78r):** `?reparar_topologia=1`
+ * repara enlaces faltantes en el grafo (compartidos, viajes,
+ * empresas, pasajeros). Idempotente. Solo agrega enlaces, nunca
+ * borra. Se usa para recuperar el estado después de bugs de
+ * guardado parcial.
+ * 
  * ### Idea general
  * 
  * Cada usuario (`us_<nombre>`) deja de tener sus datos
