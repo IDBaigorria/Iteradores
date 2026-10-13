@@ -667,6 +667,18 @@ CREATE TABLE contexto (
 ) DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 ```
 
+**Actualización v1.5i.8a/b.** El esquema de
+`nodo_contexto` y `adyacente_contexto` cambió.
+`nodo_contexto` ahora usa `id_fila BIGINT
+AUTO_INCREMENT` como PK y `id_especial VARCHAR(50)
+NULL` para el ID especial del framework (NULL para
+los numéricos, que son efímeros).
+`adyacente_contexto` referencia sus extremos por
+`idnodo_fila`/`idadyacente_fila`, no por los IDs del
+framework. El guardado parcial usa un mapa estático
+`$_mapa_id_a_fila` (id_nodo_framework => id_fila).
+Ver historial 1.5i.8a y 1.5i.8b.
+
 La tabla `contexto` mapea bit ↔ nombre del ID especial.
 Los bits se asignan por orden alfabético de los IDs
 especiales en el primer `guardar`; los contextos nuevos

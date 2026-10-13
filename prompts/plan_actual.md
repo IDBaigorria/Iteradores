@@ -19,25 +19,26 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 **Última actualización de este archivo:** v1.5piloto.78v.
 
-Cierre de la línea de carga parcial (v78b-v78s). Toda la
+Cierre de la línea de carga parcial (v78b-v78v). Toda la
 infraestructura de contextos está aplicada: SQL64 como
-método de persistencia, `guardar_parcial` en PHP,
-`Controlador::$contextos_cargados`, `_contextos_para_operacion`
-en el Enrutador, adaptación del contexto del solicitante en
-los módulos principales (Viajes, Venta, Pasajeros,
-Impresión) y reparación topológica.
+método de persistencia (con el esquema `id_fila` de v78v),
+`guardar_parcial` en PHP, `Controlador::$contextos_cargados`,
+`_contextos_para_operacion` en el Enrutador (neutralizado
+en v78v), adaptación del contexto del solicitante en los
+módulos principales (Viajes, Venta, Pasajeros, Impresión)
+y reparación topológica.
 
-**BUG PERSISTENTE ACTIVO (§1.5).** El bug de "el viaje viejo
-desaparece cuando el terminal hace una operación" **no está
-resuelto**. Los fixes v78r (regla de borrado de aristas) y
-v78s (preservar bits de máscara) no alcanzaron. Se sigue
-investigando. Ver §1.5 para el diagnóstico completo y las
-hipótesis descartadas.
+**BUG §1.5 RESUELTO en v78v.** El viaje viejo ya no
+desaparece tras la operación del terminal. Causa raíz:
+los IDs numéricos del framework son efímeros, y el
+guardado parcial intentaba mapear "ID del framework" ↔
+"fila de la DB" entre requests. Solución: la DB ahora
+usa `id_fila` (estable) como identidad de los nodos y un
+mapa estático resuelve la correspondencia al guardar
+parcial. Ver §1.5.6.
 
-Próximo paso sugerido: retomar el bug §1.5 con logs de
-diagnóstico en el `_guardar_con_filtro` (qué máscaras tenía
-cada nodo antes y después de cada guardado parcial del
-terminal). Ver §1.5.4.
+Próximo paso sugerido: batería completa de pruebas con el
+plugin, por rol. Ver §2.3.
 
 ### 1.2 Cadena de cierres de la sesión v78b-v78s
 
@@ -154,9 +155,12 @@ fix que no alcanzaron.
 
 Sin otros bugs de prioridad alta.
 
-### 1.5 BUG PERSISTENTE — El viaje viejo desaparece [RESUELTO en v1.5i.8a]
+### 1.5 BUG RESUELTO — El viaje viejo desaparecía [RESUELTO en v1.5i.8a]
 
-**RESUELTO en framework 1.5i.8a.** Ver §1.5.6 abajo.
+**RESUELTO en framework 1.5i.8a/b (v1.5piloto.78v).**
+Ver §1.5.6 abajo. El resto de la sección queda como
+referencia histórica: síntoma, diagnóstico y fixes que
+no alcanzaron.
 
 
 #### 1.5.1 Síntoma
@@ -294,21 +298,30 @@ tanto, `_contextos_para_operacion` devuelve `null`
 
 ### 1.6 Pendientes de la línea
 
-- **BUG §1.5.** Bloqueante funcional. Requiere logs de
-  diagnóstico.
-- **Espejo JS del fix v78r.** `PerdurarSuperestructuraStringIndexedDB64.js`
-  tiene el mismo bug de borrado de aristas. Pendiente.
-- **Espejo JS del fix v78s.** Idem: preservar bits de máscara.
-  Pendiente.
+- **Espejo JS del fix `id_fila`.** HECHO en
+  V1.5plugin.7a (framework JS V1.5i.8b).
+  `PerdurarSuperestructuraStringIndexedDB64.js`
+  reescrito con el mismo esquema y mismo mapa estático.
+- **Reactivar `_contextos_para_operacion`.** Está
+  neutralizado (devuelve `null`) desde v78v. Reactivar
+  cuando la batería completa de pruebas pase en verde.
+- **Batería completa de pruebas con el plugin, por rol.**
+  Ver la idea de las pestañas del plugin más abajo.
 - **B3.3c** (7 helpers que iteran sobre todos los dueños).
   Postergado hasta que aparezca dolor real o implementemos
   iteradores con ID especial. Ver §1.10.
 - **Módulos menores sin contexto:** `Liquidacion.php`,
   `Rendicion.php`, `Empresa.php`, `Vehiculo.php`. Mismo
   patrón que los módulos ya adaptados. Sub-tandas cortas
-  cuando aparezcan errores.
+  cuando aparezcan errores. Sin apuro: la carga parcial
+  está desactivada por ahora.
 - **Chequeos defensivos revertidos.** Si aparecen otros
   casos donde el chequeo ayuda, se reintroduce selectivo.
+- **Plugin: dividir la ventana en pestañas, una por rol.**
+  Idea anotada al cierre de v78v. Objetivo: cubrir la
+  batería completa de pruebas (base + admin + dueño +
+  terminal + soporte + multi-rol) con vistas organizadas.
+  Diseño a discutir en la próxima tanda del plugin.
 
 ### 1.7 Plan de la línea de tandas (fases)
 
@@ -352,19 +365,22 @@ parciales por contexto. **Aplicada.**
 
 ### 1.8 Espejo JS del framework
 
-El framework PHP y el espejo JS deben ir en sincronía. Esta
-sesión tocó:
+El framework PHP y el espejo JS van en sincronía.
 
-- `PerdurarSuperestructuraStringSQL64.php` (PHP): fix
-  v78r (doble extremo en borrado de aristas) y v78s
-  (preservar bits de máscara).
-- **Pendiente:** los mismos fixes en
-  `PerdurarSuperestructuraStringIndexedDB64.js`.
+- **PHP:** `PerdurarSuperestructuraStringSQL64.php`
+  en versión 1.5i.8b. Esquema con `id_fila`
+  (`AUTO_INCREMENT`, PK), `id_especial VARCHAR(50)
+  NULL`, `idnodo_fila`/`idadyacente_fila` en
+  `adyacente_contexto`. Mapa estático
+  `$_mapa_id_a_fila`. Guardado parcial por `id_fila`.
+- **JS:** `PerdurarSuperestructuraStringIndexedDB64.js`
+  espejado en V1.5plugin.7a. Mismo esquema (con
+  `autoIncrement` y `id_especial`), mismo mapa
+  estático, misma lógica de guardado parcial.
 
-Los fixes del espejo se hacen en la próxima tanda larga del
-plugin, junto con las pruebas correspondientes.
+Ambos frameworks quedan alineados al cierre de v78v.
 
-### 1.9 Lecciones de la sesión v78b-v78s
+### 1.9 Lecciones de la sesión v78b-v78v
 
 **Sobre el framework y los IDs:**
 
@@ -376,6 +392,12 @@ plugin, junto con las pruebas correspondientes.
 2. **Las reparaciones topológicas son necesarias pero no
    suficientes.** Recuperan enlaces faltantes, pero no
    previenen que se vuelvan a perder.
+3. **Los IDs numéricos del framework son efímeros.** No
+   sirven como clave de nada que cruce requests. El
+   guardado parcial tiene que basarse en una clave
+   estable de la DB (`id_fila`). Ver §1.5.6. El diseño
+   con ID persistente en el framework está postergado
+   (§1.10).
 
 **Sobre la persistencia:**
 
@@ -453,11 +475,17 @@ del framework.
 
 ### 2.3 Próximos pasos sugeridos
 
-1. **Retomar el bug §1.5 con logs de diagnóstico** en
-   `_guardar_con_filtro`. Ver §1.5.4.
-2. **Espejar v78r/v78s en el framework JS.**
-3. **Adaptar los 4 módulos menores** (Liquidacion, Rendicion,
-   Empresa, Vehiculo) con el mismo patrón de contexto.
+1. **Batería completa de pruebas con el plugin,**
+   organizadas por rol. Reorganizar la ventana del plugin
+   en pestañas (base + admin + dueño + terminal +
+   soporte + multi-rol). Idea anotada en v78v. Es el
+   próximo foco.
+2. **Reactivar `_contextos_para_operacion`** cuando la
+   batería pase en verde. Entonces la carga parcial
+   vuelve a estar activa con el fix del bug §1.5.
+3. **Adaptar los 4 módulos menores** (Liquidacion,
+   Rendicion, Empresa, Vehiculo) con el mismo patrón
+   de contexto.
 4. **B3.3c** cuando aparezca dolor real o cuando lleguen
    los iteradores con ID especial.
 

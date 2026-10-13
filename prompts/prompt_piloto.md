@@ -884,12 +884,22 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
   `publico`/`privado`, y el detector de la migración
   `niveles_usuario` daba `false` cada vez que se creaba un
   usuario. Idempotente, no elimina los enlaces viejos.
-- **v78b-v78s** (línea de carga parcial): ver
+- **v78b-v78v** (línea de carga parcial): ver
   `prompts/plan_actual.md` §1.2 para la cadena completa
   (Etapa 0, 1b, 1c.1a/b, 1c.2a-f, reparación topológica,
-  fixes del framework v78r/v78s). El prompt del piloto
-  no se actualiza por cada tanda de la línea; la fuente
-  viva es `plan_actual.md`.
+  fixes del framework v78r/v78s, fix `id_fila` v78v).
+  El prompt del piloto no se actualiza por cada tanda
+  de la línea; la fuente viva es `plan_actual.md`.
+- **v78v** (fix del bug §1.5): cambio de esquema en
+  SQL64. `nodo_contexto` usa `id_fila` AUTO_INCREMENT
+  como PK e `id_especial` para el ID especial del
+  framework. `adyacente_contexto` referencia sus
+  extremos por `idnodo_fila`/`idadyacente_fila`. Mapa
+  estático `$_mapa_id_a_fila`. Guardado parcial por
+  `id_fila`. `_contextos_para_operacion` neutralizado
+  (carga total hasta que la batería de pruebas pase).
+  Espejo JS en V1.5plugin.7a. Ver `plan_actual.md`
+  §1.5.6.
 - **v78b** (Etapa 0 carga parcial): `delegar_con_args` en el
   Controlador (variante con args extra). `guardar_parcial`
   con chequeos (grafo parcial + nodos desocupados). Docblock
