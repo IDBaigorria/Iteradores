@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.78v
+ * @version   1.5piloto.78z
  */
 
 // --- Utilidades base ----------------------------------
@@ -93,11 +93,13 @@ require_once __DIR__ . '/Aplicacion/Liquidaciones/Liquidacion.php';
 require_once __DIR__ . '/Aplicacion/Enrutador.php';
 require_once __DIR__ . '/Aplicacion/Migraciones/Registro.php';
 require_once __DIR__ . '/Aplicacion/Migraciones/Comandos.php';
+require_once __DIR__ . '/Aplicacion/Reparacion/Comandos.php';
 
-// Registrar los comandos app:migracion_* en el Controlador.
+// Registrar los comandos app:* en el Controlador.
 // El Controlador ya está inicializado (se autoinicializa al
 // final de Controlador.php, que se incluyó antes).
 registrar_comandos_migraciones();
+registrar_comandos_reparacion();
 
 // Modo de ejecución. En local se considera modo pruebas
 // (habilita los botones de limpieza del admin). En
@@ -435,6 +437,41 @@ if (isset($_GET['reparar_topologia'])) {
     $total_reparados = $r_comp['reparados'] + $r_viajes['reparados'] + $r_emp['reparados'] + $r_pas['reparados'];
     if ($total_reparados > 0) {
         guardar_ambos($nombre_app);
+        echo "\nGuardado.\n";
+    }
+    echo "\nListo.\n";
+    exit;
+}
+
+// ==== Reparación de árboles hmi/hd/p (v78z) ====
+// Ejecuta el comando app:reparar_arboles. Reconstruye
+// las aristas `hmi` de los contenedores de árbol
+// (ventas, rendiciones, liquidaciones, cancelaciones)
+// que el bug §1.5 borró. Idempotente. Sin chequeo de
+// modo pruebas (se usa en producción, como las otras
+// reparaciones manuales).
+// Uso: index.php?reparar_arboles=1
+if (isset($_GET['reparar_arboles'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = Controlador::ejecutar_comando('app:reparar_arboles');
+
+    if (!is_array($res)) {
+        echo "ERROR: el comando app:reparar_arboles no devolvió un resultado válido.\n";
+        exit;
+    }
+
+    echo "Reparación de árboles\n";
+    echo "=====================\n\n";
+    echo "Cambios aplicados: " . $res['cambios'] . "\n";
+    echo "Por categoría:\n";
+    foreach ($res['por_categoria'] as $cat => $n) {
+        echo "  $cat: $n\n";
+    }
+    echo "\nDetalles:\n";
+    foreach ($res['detalles'] as $d) {
+        echo "  - $d\n";
+    }
+    if ($res['cambios'] > 0) {
         echo "\nGuardado.\n";
     }
     echo "\nListo.\n";

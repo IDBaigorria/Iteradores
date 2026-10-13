@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.78m
+ * @version   1.5piloto.78y
  */
 
 
@@ -654,16 +654,40 @@ function confirmar_venta_actual(
 
 /**
  * Lista ventas de un dueño recorriendo el árbol de ventas.
+ *
+ * Barrido de ventas marcadas: si el terminal canceló
+ * alguna venta, la marcó con un autoenlace `cancelada`
+ * y la dejó en este árbol. Al recorrerlo, la detectamos
+ * y la destruimos (su subárbol ya fue destruido por el
+ * terminal; solo queda el nodo raíz con el marcador).
+ * Si hubo limpieza, se guarda el grafo. Ver §1.5.7
+ * del plan_actual.md.
+ *
+ * @param string $nombre_dueno
+ * @return array
+ * @version 1.5piloto.78w
  */
 function listar_ventas_por_dueno(string $nombre_dueno): array {
     $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
     if (!$contenedor) return [];
 
     $ventas = [];
+    $hubo_limpieza = false;
     $actual = hmi($contenedor);
-    while ($actual) {
-        $ventas[] = formatear_venta_resumida($actual);
-        $actual = hd($actual);
+    $seg = 0;
+    while ($actual && $seg < 2000) {
+        $seg++;
+        $siguiente = hd($actual);
+        if (_venta_esta_cancelada($actual)) {
+            _destruir_venta_marcada($contenedor, $actual);
+            $hubo_limpieza = true;
+        } else {
+            $ventas[] = formatear_venta_resumida($actual);
+        }
+        $actual = $siguiente;
+    }
+    if ($hubo_limpieza) {
+        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     }
     return $ventas;
 }
@@ -1057,6 +1081,7 @@ function _buscar_venta_por_id(string $id_venta, ?string $nombre_terminal = null,
             $seg = 0;
             while ($actual && $seg < 1000) {
                 if ($actual->dato() === $id_venta) {
+                    if (_venta_esta_cancelada($actual)) return [null, ''];
                     return [$actual, $nombre_dueno];
                 }
                 $actual = hd($actual);
@@ -1080,6 +1105,7 @@ function _buscar_venta_por_id(string $id_venta, ?string $nombre_terminal = null,
         $seg = 0;
         while ($actual && $seg < 1000) {
             if ($actual->dato() === $id_venta) {
+                if (_venta_esta_cancelada($actual)) return [null, ''];
                 return [$actual, $nombre_dueno];
             }
             $actual = hd($actual, $nombres);
@@ -1101,6 +1127,7 @@ function _buscar_venta_por_id(string $id_venta, ?string $nombre_terminal = null,
         $seg = 0;
         while ($actual && $seg < 1000) {
             if ($actual->dato() === $id_venta) {
+                if (_venta_esta_cancelada($actual)) return [null, ''];
                 return [$actual, $nombre_dueno];
             }
             $actual = hd($actual);
@@ -1215,8 +1242,8 @@ function _calcular_devolucion_venta(Nodo $nodo_venta): array {
  * @param string $id_venta
  * @return array
  */
-function obtener_info_cancelacion(string $id_venta, ?string $nombre_terminal = null): array {
-    [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta, $nombre_terminal);
+function obtener_info_cancelacion(string $id_venta, ?string $nombre_terminal = null, ?string $nombre_dueno_param = null): array {
+    [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta, $nombre_terminal, $nombre_dueno_param);
     if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
 
     // Fase 1c.2: derivar el contexto desde el terminal solicitante.
@@ -1431,8 +1458,8 @@ function _destruir_venta_actual(Nodo $nodo_venta_actual): void {
  * @param string $id_venta
  * @return array
  */
-function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_terminal = null): array {
-    [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta, $nombre_terminal);
+function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_terminal = null, ?string $nombre_dueno = null): array {
+    [$nodo_venta, $nombre_dueno] = _buscar_venta_por_id($id_venta, $nombre_terminal, $nombre_dueno);
     if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
 
     // Fase 1c.2: derivar el contexto desde el terminal solicitante.
@@ -1599,6 +1626,14 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
         actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
     }
 
+    // ¿El que cancela es un terminal o el dueño/admin?
+    // Cambia el comportamiento de los pasos 7b y 8:
+    //  - Terminal: marca la venta con `cancelada` y la deja
+    //    en el árbol del dueño. No la destruye. Ver §1.5.7.
+    //  - Dueño/admin: destruye la venta en un solo paso,
+    //    como siempre.
+    $es_terminal = ($nombre_terminal !== null && $nombre_terminal !== '');
+
     // 7. Desenlazar la venta de los árboles paralelos.
     // Fase B2.3.4: la venta puede estar en DOS árboles
     // (dueño + compartido del terminal que la vendió).
@@ -1624,36 +1659,51 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
         }
     }
 
-    // 7b. Desenlazar del árbol del dueño (default).
-    $nodo_dueno_real = Nodo::nodo_por_id('us_' . $nombre_dueno);
-    if ($nodo_dueno_real) {
-        $cont_dueno = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno_real);
-        _desenlazar_venta_de_arbol($cont_dueno, $nodo_venta, null);
+    // 7b. Desenlazar del árbol del dueño (default). Si el
+    // que cancela es un terminal, NO se desenlaza: la
+    // venta queda marcada en el árbol del dueño hasta
+    // que él la procese en el próximo listado.
+    if (!$es_terminal) {
+        $nodo_dueno_real = Nodo::nodo_por_id('us_' . $nombre_dueno);
+        if ($nodo_dueno_real) {
+            $cont_dueno = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno_real);
+            _desenlazar_venta_de_arbol($cont_dueno, $nodo_venta, null);
+        }
     }
 
-    // 8. Destruir el nodo venta entero y sus campos hoja.
-    //    Antes de Nodo::eliminar hay que desenlazar las
-    //    referencias externas (comprador, viaje, micro,
-    //    terminal) y las estructurales ya no necesarias
-    //    (hd, hmi, p por si quedaron colgando), y destruir
-    //    el sub-nodo opciones_cobro con sus 4 campos.
-    //    Fase 2, v74v.
+    // 8. Destruir el nodo venta entero y sus campos hoja,
+    //    o marcarlo según quién cancela.
+    //    - Dueño/admin: destruye como siempre (v74v).
+    //    - Terminal: destruye todo el subárbol pero deja
+    //      el nodo raíz con un autoenlace `cancelada`. El
+    //      nodo queda en el árbol del dueño. El dueño lo
+    //      destruye al recorrer su árbol. Ver §1.5.7.
     $nodo_venta->eliminar_adyacente('comprador');
     $nodo_venta->eliminar_adyacente('viaje');
     $nodo_venta->eliminar_adyacente('micro');
     $nodo_venta->eliminar_adyacente('terminal');
-    $nodo_venta->eliminar_adyacente('hmi');
-    $nodo_venta->eliminar_adyacente('hd');
-    $nodo_venta->eliminar_adyacente('p');
-    // Fase B2.3.4: también los parametrizados por si quedaron
-    // residuales (defensivo).
+
+    // Enlaces hmi/hd/p del árbol del DUEÑO. Solo se
+    // quitan si el que cancela destruye el nodo (dueño/
+    // admin). Para terminal, la venta queda marcada en
+    // el árbol del dueño y necesita su `hd` para
+    // mantener la cadena de traversal; sin él, al
+    // recorrer el árbol y destruir la primera marcada,
+    // las siguientes quedan inalcanzables. Bug §1.5.8.
+    if (!$es_terminal) {
+        $nodo_venta->eliminar_adyacente('hmi');
+        $nodo_venta->eliminar_adyacente('hd');
+        $nodo_venta->eliminar_adyacente('p');
+    }
+    // Los parametrizados del compartido sí se quitan
+    // siempre: la venta ya fue desenlazada de ese árbol
+    // en el paso 7a (con su relink correspondiente).
     if ($nombre_terminal_venta !== '') {
         $nodo_venta->eliminar_adyacente('hmi_' . $nombre_terminal_venta);
         $nodo_venta->eliminar_adyacente('hd_' . $nombre_terminal_venta);
         $nodo_venta->eliminar_adyacente('p_' . $nombre_terminal_venta);
     }
 
-    // Destruir el sub-nodo opciones_cobro (si existe).
     $nodo_opciones_cobro = $nodo_venta->adyacente('opciones_cobro');
     if ($nodo_opciones_cobro) {
         _destruir_campos_simples($nodo_opciones_cobro);
@@ -1661,12 +1711,19 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
         Nodo::eliminar($nodo_opciones_cobro);
     }
 
-    // Destruir los campos hoja restantes del propio nodo venta
-    // (fecha_hora, fecha_ultimo_pago, metodo_pago, total,
-    // cuotas, pagado, cuotas_restantes).
-    _destruir_campos_simples($nodo_venta);
-
-    Nodo::eliminar($nodo_venta);
+    if ($es_terminal) {
+        // Terminal: marcar con autoenlace y dejar en el árbol.
+        // No se limpian los campos string del nodo ni se
+        // llama a _destruir_campos_simples: conservamos la
+        // info del nodo (total, pagado, fecha_hora, etc.)
+        // para auditoría y no arriesgamos tocar los enlaces
+        // hmi/hd/p del árbol del dueño.
+        $nodo_venta->_adyacente_en($nodo_venta, 'cancelada');
+    } else {
+        // Dueño/admin: destruir como antes.
+        _destruir_campos_simples($nodo_venta);
+        Nodo::eliminar($nodo_venta);
+    }
 
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
@@ -2047,13 +2104,14 @@ function _eliminar_cupon_del_contenedor(Nodo $contenedor, Nodo $cupon): void {
  * @param string $metodo_pago
  * @return array
  */
-function pagar_cupon_venta(string $id_venta, string $numero_cupon, string $monto, string $metodo_pago, ?string $nombre_terminal = null): array {
+function pagar_cupon_venta(string $id_venta, string $numero_cupon, string $monto, string $metodo_pago, ?string $nombre_terminal = null, ?string $nombre_dueno = null): array {
     $monto_num = (float)$monto;
     if ($monto_num <= 0) return ['exito' => false, 'error' => 'Monto inválido'];
 
     // Fase B2.2.2: buscar la venta con filtro opcional por
     // terminal. Si viene, restringe la búsqueda a su contexto.
-    [$nodo_venta, $nombre_dueno_venta] = _buscar_venta_por_id($id_venta, $nombre_terminal);
+    // Fase 1c.2/v78x: filtro por dueño para dueño/admin/soporte.
+    [$nodo_venta, $nombre_dueno_venta] = _buscar_venta_por_id($id_venta, $nombre_terminal, $nombre_dueno);
     if (!$nodo_venta) return ['exito' => false, 'error' => 'Venta no encontrada'];
 
     // Resolver métodos permitidos.
@@ -2780,5 +2838,52 @@ function listar_cancelaciones_de_dueno(string $nombre_dueno, array $filtros = []
         $actual = hd($actual);
     }
     return $cancelaciones;
+}
+
+/**
+ * Devuelve true si la venta tiene el autoenlace
+ * `cancelada`. Es el marcador que deja un terminal al
+ * cancelar: la venta sigue existiendo en el árbol del
+ * dueño, pero está pendiente de destrucción definitiva.
+ *
+ * Un autoenlace es un enlace del nodo hacia sí mismo.
+ * Se usa el autoenlace (en lugar de un hijo normal)
+ * porque así el framework rechaza cualquier intento
+ * accidental de Nodo::eliminar() mientras el marcador
+ * esté puesto: el nodo tiene una referencia entrante
+ * (la del autoenlace).
+ *
+ * @param Nodo $nodo_venta
+ * @return bool
+ * @since 1.5piloto.78w
+ */
+function _venta_esta_cancelada(Nodo $nodo_venta): bool {
+    $auto = $nodo_venta->adyacente('cancelada');
+    return $auto !== null && $auto->id() === $nodo_venta->id();
+}
+
+/**
+ * Destruye definitivamente una venta marcada con
+ * `cancelada`. Se llama desde listar_ventas_por_dueno
+ * cuando el dueño recorre su árbol y encuentra una
+ * venta que un terminal canceló.
+ *
+ * Pasos:
+ *   1. Desenlazar del árbol del dueño (nombres default).
+ *   2. Quitar el autoenlace `cancelada` (si no,
+ *      Nodo::eliminar falla por referencia entrante).
+ *   3. Destruir cualquier campo hoja residual.
+ *   4. Nodo::eliminar.
+ *
+ * @param Nodo $contenedor Contenedor `ventas` del dueño.
+ * @param Nodo $nodo_venta Venta marcada.
+ * @return void
+ * @since 1.5piloto.78w
+ */
+function _destruir_venta_marcada(Nodo $contenedor, Nodo $nodo_venta): void {
+    _desenlazar_venta_de_arbol($contenedor, $nodo_venta, null);
+    $nodo_venta->eliminar_adyacente('cancelada');
+    _destruir_campos_simples($nodo_venta);
+    Nodo::eliminar($nodo_venta);
 }
 

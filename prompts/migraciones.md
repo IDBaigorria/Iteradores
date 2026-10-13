@@ -20,3 +20,6 @@ index.php?construir_arboles_compartidos=1 → árboles paralelos en compartidos.
 index.php?repuntar_terminales_compartido=1 → repunta dueno del terminal al compartido.
 index.php?migrar_topologia=1 → us_Admin → usuarios + dueno → soporte → publico.
 index.php?reparar_topologia=1 → reparación final (por si algo quedó desenlazado).
+
+## 13/1023
+index.php?reparar_arboles=1

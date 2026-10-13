@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78v
+ * @version   1.5piloto.78x
  */
 
 use Iteradores\Nodos\Nodo;
@@ -74,6 +74,46 @@ function _nombre_terminal_solicitante(string $nombre_solicitante): ?string {
 }
 
 /**
+ * Devuelve el nombre del dueño sobre el que opera el
+ * solicitante, o null si no aplica.
+ *
+ * Reglas:
+ *   - Solicitante dueño: el nombre es él mismo.
+ *   - Solicitante admin o soporte: el del POST
+ *     (`nombre_dueno`), ya validado por el chequeo
+ *     global del enrutador con _verificar_permiso_dueno.
+ *   - Solicitante terminal (o cualquier otro): null.
+ *     El terminal usa $nombre_terminal para restringir
+ *     la búsqueda por su contexto.
+ *
+ * Se usa para pasar $nombre_dueno a las funciones que
+ * buscan por id (Venta), que con carga parcial no
+ * pueden navegar desde la raíz `usuarios`.
+ *
+ * @param string $nombre_solicitante
+ * @param array  $post
+ * @return string|null
+ * @since 1.5piloto.78x
+ */
+function _nombre_dueno_solicitante(string $nombre_solicitante, array $post = []): ?string {
+    if ($nombre_solicitante === '') return null;
+    $nodo_sol = Nodo::nodo_por_id('us_' . $nombre_solicitante);
+    if (!$nodo_sol) return null;
+    $nivel = $nodo_sol->adyacente('nivel');
+    if (!$nivel) {
+        $publico = $nodo_sol->adyacente('publico');
+        if ($publico) $nivel = $publico->adyacente('nivel');
+    }
+    $nivel_str = $nivel ? $nivel->dato() : '';
+    if ($nivel_str === 'dueno') return $nombre_solicitante;
+    if ($nivel_str === 'admin' || $nivel_str === 'soporte') {
+        $nd = trim((string)($post['nombre_dueno'] ?? ''));
+        return $nd !== '' ? $nd : null;
+    }
+    return null;
+}
+
+/**
  * Devuelve los contextos que hay que cargar para una
  * operación dada, según el solicitante.
  *
@@ -104,13 +144,6 @@ function _nombre_terminal_solicitante(string $nombre_solicitante): ?string {
  * @since 1.5piloto.78b
  */
 function _contextos_para_operacion(string $accion, string $nombre_solicitante, array $get = []): ?array {
-    // === NEUTRALIZADO v1.5piloto.78v ===
-    // La carga parcial está desactivada hasta que el fix de
-    // id_fila (Tanda A) esté probado en producción. Mientras
-    // devuelva null, todas las operaciones cargan el grafo
-    // completo: performance pobre pero correcto.
-    return null;
-
     // Caso 1: POST con acción. Es la operación principal.
     // Si hay solicitante, carga parcial con su contexto. La
     // topología decide el resto:
@@ -980,8 +1013,12 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     // Fase B2.3.5b.1: si el solicitante es terminal,
                     // restringir la búsqueda a su contexto.
+                    // Fase 1c.2/v78x: si es dueño/admin/soporte,
+                    // restringir al dueño para no depender de la
+                    // raíz `usuarios`.
                     $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
-                    $venta = obtener_venta_por_id($id_venta, $nombre_terminal_sol);
+                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
+                    $venta = obtener_venta_por_id($id_venta, $nombre_terminal_sol, $nombre_dueno_sol);
                     if ($venta) {
                         responder_json(['exito' => true, 'venta' => $venta]);
                     } else {
@@ -996,8 +1033,11 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'ID de venta no especificado']);
                     }
                     // Fase B2.3.5b.1: filtro opcional por terminal.
+                    // Fase 1c.2/v78x: filtro por dueño para
+                    // dueño/admin/soporte.
                     $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
-                    $resultado = cancelar_venta($id_venta, $motivo, $nombre_terminal_sol);
+                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
+                    $resultado = cancelar_venta($id_venta, $motivo, $nombre_terminal_sol, $nombre_dueno_sol);
                     responder_json($resultado);
                     break;
                 case 'pagar_cupon':
@@ -1009,8 +1049,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
                     // Fase B2.3.5b.1: filtro opcional por terminal.
+                    // Fase 1c.2/v78x: filtro por dueño.
                     $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
-                    $resultado = pagar_cupon_venta($id_venta, $numero_cupon, $monto, $metodo_pago, $nombre_terminal_sol);
+                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
+                    $resultado = pagar_cupon_venta($id_venta, $numero_cupon, $monto, $metodo_pago, $nombre_terminal_sol, $nombre_dueno_sol);
                     responder_json($resultado);
                     break;
                 case 'info_cancelacion':
@@ -1019,8 +1061,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'ID de venta no especificado']);
                     }
                     // Fase B2.3.5b.1: filtro opcional por terminal.
+                    // Fase 1c.2/v78x: filtro por dueño.
                     $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
-                    $resultado = obtener_info_cancelacion($id_venta, $nombre_terminal_sol);
+                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
+                    $resultado = obtener_info_cancelacion($id_venta, $nombre_terminal_sol, $nombre_dueno_sol);
                     responder_json($resultado);
                     break;
                 case 'listar':
