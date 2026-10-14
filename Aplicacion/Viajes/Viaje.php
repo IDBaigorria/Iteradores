@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.79g
+ * @version   1.5piloto.79j
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1419,7 +1419,13 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
         return ['exito' => false, 'error' => 'Dueño no encontrado o sin viajes'];
     }
 
-    $prefijos = ['viajeprueba', 'viajemicro', 'viajeval', 'viajedup', 'viajecol', 'viajesin'];
+    $prefijos = [
+        'viajeprueba', 'viajemicro', 'viajeval', 'viajedup', 'viajecol', 'viajesin',
+        // Prefijos de las pruebas del plugin (agregados en v79j).
+        'viajeventgraf',    // prueba 34: cancelar venta
+        'viajedeselgraf',   // prueba 35: deseleccionar asiento
+        'viajecambiomicro', // prueba 36: cambiar micro
+    ];
     $nombre_principal = 'Peregrinación a la Visita del Papa León XIV a Luján';
 
     $adyacentes = (array) $nodo_viajes->adyacentes();
@@ -1462,6 +1468,16 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
         // antes de desenlazarlo. Antes solo se desenlazaba,
         // dejando el mismo subárbol huérfano que eliminar_viaje
         // antes de v74r (~250 nodos por micro arrastrado).
+        //
+        // Fase B2.4.2 (v79j): desincronizar el viaje de los
+        // compartidos de sus terminales autorizadas ANTES de
+        // destruirlo. Sin esto, las aristas del compartido
+        // quedan colgadas, el BFS del compartido se rompe en
+        // la próxima carga del terminal, y la terminal deja
+        // de ver sus viajes. Mismo fix que tenía eliminar_viaje
+        // desde v77q, pero faltaba acá.
+        _desincronizar_viaje_de_compartidos($nodo_viaje);
+
         _destruir_viaje_completo($nodo_viaje);
         $nodo_viajes->eliminar_adyacente($nombre_viaje);
         Nodo::eliminar($nodo_viaje);

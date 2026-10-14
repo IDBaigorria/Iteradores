@@ -1,6 +1,6 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.74o
+ * @version 1.5piloto.79j
  */
 
 function obtener_nombre_dueno_actual() {
@@ -74,6 +74,19 @@ async function cargar_viajes() {
     const lista = $("#lista_viajes");
     lista.innerHTML = '';
     ocultar_detalle_viaje();
+
+    // v79j: defensa del botón "Limpiar viajes de prueba".
+    // Aunque el HTML lo muestre, forzamos el chequeo por
+    // nivel y modo pruebas. Cubre el caso de un cambio de
+    // sesión sin recargar la página (bug de _limpiar_
+    // contenido_dinamico).
+    const btn_limpiar_viajes = document.getElementById('boton_limpiar_viajes_prueba');
+    if (btn_limpiar_viajes) {
+        const puede_limpiar = usuario_actual
+            && usuario_actual.nivel === 'admin'
+            && window.entorno_es_pruebas === true;
+        btn_limpiar_viajes.style.display = puede_limpiar ? 'inline-block' : 'none';
+    }
 
     if (es_admin_o_soporte()) {
         panel_dueno.style.display = 'block';

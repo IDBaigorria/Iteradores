@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.79f
+ * @version   1.5piloto.79j
  */
 
 // --- Utilidades base ----------------------------------
@@ -412,6 +412,11 @@ if (isset($_GET['reparar_topologia'])) {
     $r_viajes = reparar_viajes_dueno();
     $r_emp = reparar_empresas_dueno();
     $r_pas = reparar_pasajeros_dueno();
+    // v79j: recuperar compartidos tras el bug del botón
+    // "Limpiar viajes de prueba". Asegura el compartido
+    // de cada terminal del dueño y sincroniza los viajes
+    // autorizados. Idempotente.
+    $r_compartidos_viajes = reparar_compartidos_viajes_dueno();
 
     echo "Reparación topológica\n";
     echo "====================\n\n";
@@ -453,11 +458,21 @@ if (isset($_GET['reparar_topologia'])) {
         echo "     " . $d['dueno'] . "\n";
     }
 
+    echo "\n-- Compartidos por terminal (v79j) --\n";
+    echo "   dueños procesados:     " . $r_compartidos_viajes['duenos'] . "\n";
+    echo "   compartidos asegurados: " . $r_compartidos_viajes['compartidos'] . "\n";
+    echo "   viajes sincronizados:   " . $r_compartidos_viajes['viajes'] . "\n";
+    foreach ($r_compartidos_viajes['detalles'] as $d) {
+        echo "     " . $d['dueno'] . ": " . implode(', ', $d['terminales'])
+            . " (" . $d['viajes_sincronizados'] . " viajes)\n";
+    }
+
     $total_reparados = ($r_admin['creado'] ? 1 : 0)
         + $r_comp['reparados']
         + $r_viajes['reparados']
         + $r_emp['reparados']
-        + $r_pas['reparados'];
+        + $r_pas['reparados']
+        + $r_compartidos_viajes['compartidos'];
     if ($total_reparados > 0) {
         guardar_ambos($nombre_app);
         echo "\nGuardado.\n";

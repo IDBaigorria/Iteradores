@@ -26,7 +26,7 @@
  *
  * @author Ignacio David Baigorria
  * @since 1.5piloto.78f
- * @version 1.5piloto.78r
+ * @version 1.5piloto.79j
  */
 
 use Iteradores\Nodos\Nodo;
@@ -336,6 +336,75 @@ function reparar_pasajeros_dueno(): array {
         $nodo_dueno->_adyacente_en($encontrado, 'pasajeros');
         $res['reparados']++;
         $res['detalles'][] = ['dueno' => (string)$nombre_dueno];
+    }
+    return $res;
+}
+
+/**
+ * Repara los compartidos del dueño asegurando que cada uno
+ * tenga sincronizados los viajes de sus terminales autorizadas.
+ * Idempotente.
+ *
+ * Se usa desde ?reparar_topologia=1 para recuperar el estado
+ * tras el bug del botón "Limpiar viajes de prueba" (v79j):
+ * al destruir los viajes sin desincronizarlos, las aristas
+ * del compartido quedaron colgadas y el BFS del compartido
+ * se rompió. La próxima carga del terminal no encontró sus
+ * viajes.
+ *
+ * Por cada (dueño, viaje, terminal autorizada), llama a
+ * _sincronizar_terminal_en_compartido_del_viaje, que ya
+ * hace el trabajo completo: asegura el compartido (lo crea
+ * si falta), repunta el enlace `dueno` del terminal, agrega
+ * el viaje al contenedor `viajes` del compartido y agrega
+ * las empresas referenciadas por sus micros.
+ *
+ * @return array{duenos: int, compartidos: int, viajes: int, detalles: array}
+ * @since 1.5piloto.79j
+ */
+function reparar_compartidos_viajes_dueno(): array {
+    $res = ['duenos' => 0, 'compartidos' => 0, 'viajes' => 0, 'detalles' => []];
+
+    $nodo_usuarios = Nodo::nodo_por_id('usuarios');
+    if (!$nodo_usuarios) return $res;
+
+    foreach ($nodo_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+        $nivel = $nodo_dueno->adyacente('nivel');
+        if (!$nivel || $nivel->dato() !== 'dueno') continue;
+        $res['duenos']++;
+        $nombre_dueno_str = (string)$nombre_dueno;
+
+        $cont_viajes = $nodo_dueno->adyacente('viajes');
+        if (!$cont_viajes) continue;
+
+        $term_sincronizados = [];
+        $viajes_sincronizados = 0;
+        foreach ((array)$cont_viajes->adyacentes() as $nombre_v => $nodo_v) {
+            $terminales = $nodo_v->adyacente('terminales_autorizadas');
+            if (!$terminales) continue;
+            foreach ((array)$terminales->adyacentes() as $nombre_term => $nodo_tv) {
+                $nombre_term = (string)$nombre_term;
+                if ($nombre_term === '') continue;
+                // Sincronizar: crea el compartido si falta,
+                // repunta el `dueno` del terminal, agrega
+                // el viaje y sus empresas. Idempotente.
+                _sincronizar_terminal_en_compartido_del_viaje(
+                    $nodo_v, $nombre_term, $nombre_dueno_str
+                );
+                $term_sincronizados[$nombre_term] = true;
+                $viajes_sincronizados++;
+            }
+        }
+
+        if (!empty($term_sincronizados)) {
+            $res['compartidos'] += count($term_sincronizados);
+            $res['viajes'] += $viajes_sincronizados;
+            $res['detalles'][] = [
+                'dueno' => $nombre_dueno_str,
+                'terminales' => array_keys($term_sincronizados),
+                'viajes_sincronizados' => $viajes_sincronizados,
+            ];
+        }
     }
     return $res;
 }
