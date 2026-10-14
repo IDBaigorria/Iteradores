@@ -17,7 +17,7 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 ### 1.1 Última actualización
 
-**Última actualización de este archivo:** v1.5piloto.79c.
+**Última actualización de este archivo:** v1.5piloto.79d.
 
 Cierre del fix del bug §1.5 (viaje viejo) y de los bugs
 §1.5.7, §1.5.8, §1.5.10 (nodos compartidos entre contextos,
@@ -335,6 +335,47 @@ contexto, no confiar en que el llamador se lo pase.
 El patrón "`''` = no aplica" es una trampa: mezcla
 "no aplica" con "no me lo pasaron". Ver §5.12 del
 prompt de seguridad.
+
+#### 1.5.12 obtener_pasajero_por_dni con contexto (v79d)
+
+**Síntoma:** logueado como terminal, en Clientes, el
+botón "Ver pasajes" aparecía (fix v79c), pero al
+abrirlo el modal decía "Sin pasajes registrados"
+aunque el pasajero sí tuviera ventas.
+
+**Causa:** `obtener_pasajero_por_dni` iteraba sobre la
+raíz `usuarios` para buscar las ventas del pasajero.
+Con carga parcial del terminal, `usuarios` no está en
+memoria: `$raiz_usuarios` es null, el bloque no corre,
+y `$ventas` queda vacío.
+
+Es uno de los 7 helpers B3.3c (ver §1.10) que iteran
+sobre todos los dueños. La lista completa:
+
+- `Venta.php`: `_buscar_venta_por_id` (fallback),
+  `obtener_cancelacion_por_id`.
+- `Liquidacion.php`: `obtener_liquidacion_por_id`.
+- `Rendicion.php`: `aceptar_ajuste_rendicion`,
+  `obtener_rendicion_por_id`.
+- `Pasajero.php`: `obtener_pasajero_por_dni`
+  (rama del historial de ventas).
+
+**Solución parcial:** `obtener_pasajero_por_dni` ahora
+recibe `$nodo_contexto`. Si viene, navega el árbol del
+contexto (parametrizado si es compartido). Si no,
+mantiene el comportamiento actual (iterar `usuarios`).
+
+**Pendiente:** los otros 5 helpers siguen igual. Se
+resuelven cuando aparezca dolor real (por ejemplo,
+que el terminal intente cancelar desde el plugin y
+el helper no encuentre la venta), o cuando lleguen
+los iteradores con ID especial (§1.10).
+
+**Nota secundaria:** `obtener_reservas_de_pasajero`
+sigue llamándose sin contexto desde
+`obtener_pasajero_por_dni`. Con carga parcial,
+devuelve vacío para el terminal. **Es correcto**:
+el terminal no debe ver las reservas del equipo.
 
 ### 1.6 Pendientes de la línea
 

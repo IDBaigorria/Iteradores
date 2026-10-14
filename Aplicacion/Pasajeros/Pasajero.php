@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.78l
+ * @version   1.5piloto.79d
  */
 
 use Iteradores\Nodos\Nodo;
@@ -167,19 +167,26 @@ function obtener_pasajero_por_dni(string $nombre_dueno, string $dni, ?Nodo $nodo
 
     $datos = formatear_pasajero($dni, $nodo_pasajero);
 
-    // Obtener ventas relacionadas
+    // Obtener ventas relacionadas.
+    //
+    // Con contexto (terminal → compartido), navegar el
+    // árbol del contexto con nombres parametrizados.
+    // Sin contexto (dueño, admin, impresión), iterar sobre
+    // todos los dueños desde `usuarios` (comportamiento
+    // actual). Bug §1.5.12: con carga parcial del
+    // terminal, `usuarios` no está en memoria y el bloque
+    // devolvía lista vacía.
     $ventas = [];
-    $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-    if ($raiz_usuarios) {
-        foreach ((array)$raiz_usuarios->adyacentes() as $nombre_dueno_iter => $nodo_dueno) {
-            $nodo_nivel = $nodo_dueno->adyacente('nivel');
-            if (!$nodo_nivel || $nodo_nivel->dato() !== 'dueno') continue;
+    $nombres_arbol = _nombres_arbol_para_contexto($nodo_contexto, '');
 
-            $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno_iter);
-            if (!$contenedor_ventas) continue;
-
-            $actual = hmi($contenedor_ventas);
-            while ($actual) {
+    if ($nodo_contexto !== null) {
+        // Contexto: buscar solo en el árbol del contexto.
+        $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);
+        if ($contenedor_ventas) {
+            $actual = hmi($contenedor_ventas, $nombres_arbol);
+            $seg = 0;
+            while ($actual && $seg < 2000) {
+                $seg++;
                 $venta_formateada = formatear_venta_para_pasajero($actual, $dni);
                 if ($venta_formateada) {
                     if ($venta_formateada['es_comprador'] && $venta_formateada['es_pasajero']) {
@@ -191,7 +198,35 @@ function obtener_pasajero_por_dni(string $nombre_dueno, string $dni, ?Nodo $nodo
                     }
                     $ventas[] = $venta_formateada;
                 }
-                $actual = hd($actual);
+                $actual = hd($actual, $nombres_arbol);
+            }
+        }
+    } else {
+        // Sin contexto: iterar sobre todos los dueños.
+        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
+        if ($raiz_usuarios) {
+            foreach ((array)$raiz_usuarios->adyacentes() as $nombre_dueno_iter => $nodo_dueno) {
+                $nodo_nivel = $nodo_dueno->adyacente('nivel');
+                if (!$nodo_nivel || $nodo_nivel->dato() !== 'dueno') continue;
+
+                $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno_iter);
+                if (!$contenedor_ventas) continue;
+
+                $actual = hmi($contenedor_ventas);
+                while ($actual) {
+                    $venta_formateada = formatear_venta_para_pasajero($actual, $dni);
+                    if ($venta_formateada) {
+                        if ($venta_formateada['es_comprador'] && $venta_formateada['es_pasajero']) {
+                            $venta_formateada['rol'] = 'ambos';
+                        } elseif ($venta_formateada['es_comprador']) {
+                            $venta_formateada['rol'] = 'comprador';
+                        } else {
+                            $venta_formateada['rol'] = 'pasajero';
+                        }
+                        $ventas[] = $venta_formateada;
+                    }
+                    $actual = hd($actual);
+                }
             }
         }
     }
