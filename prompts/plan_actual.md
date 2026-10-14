@@ -17,7 +17,7 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 ### 1.1 Última actualización
 
-**Última actualización de este archivo:** v1.5piloto.79d.
+**Última actualización de este archivo:** v1.5piloto.79e.
 
 Cierre del fix del bug §1.5 (viaje viejo) y de los bugs
 §1.5.7, §1.5.8, §1.5.10 (nodos compartidos entre contextos,
@@ -377,6 +377,39 @@ sigue llamándose sin contexto desde
 devuelve vacío para el terminal. **Es correcto**:
 el terminal no debe ver las reservas del equipo.
 
+#### 1.5.13 Botones de impresión del micro para terminal (v79e)
+
+**Síntoma:** los botones "Imprimir Croquis",
+"Imprimir Planilla" e "Imprimir Planilla Vacía"
+aparecían para el dueño pero no para la terminal.
+
+**Causa:** condición JS en `renderizar_pasaje_micro`
+(`viajes-asientos.js`):
+
+```js
+if (usuario_actual.nivel === 'dueno' || es_admin_o_soporte())
+```
+
+La terminal quedaba afuera. Cuando se agregaron esos
+botones, el backend de impresión no estaba adaptado a
+carga parcial. Hoy sí: `_contextos_para_operacion`
+devuelve `['us_<dueno>']` para `?imprimir=1&dueno=X`
+(salvo los tipos B3.3c, que no incluyen croquis ni
+planilla).
+
+**Solución:** agregar `terminal` a la condición.
+
+**Nota:** la información que exponen croquis y
+planilla (nombre de pasajero, DNI, contacto) ya la
+ve la terminal en el modal "Ver pasaje" y en el
+propio croquis. No es una fuga nueva.
+
+**Deuda de seguridad anotada:** las URLs de impresión
+(`?imprimir=1&tipo=...`) no validan sesión ni
+permisos. Cualquiera con la URL puede ver los datos.
+Es un problema preexistente. Anotado para una tanda
+futura.
+
 ### 1.6 Pendientes de la línea
 
 **Estado del inventario de estructuras compartidas.**
@@ -414,6 +447,11 @@ regla de detección de §5.9 del prompt de seguridad.
   tandas cortas.
 - **Plugin: dividir la ventana en pestañas, una por rol.**
   Idea anotada al cierre de v78v.
+- **Deuda de seguridad en impresión.** Las URLs de
+  impresión (`?imprimir=1&tipo=...`) no validan sesión
+  ni permisos. Cualquiera con la URL ve el HTML. Se
+  anota para una tanda futura, cuando se rehaga el
+  módulo de impresión o se agregue un chequeo general.
 
 ### 1.7 Plan de la línea de tandas (fases)
 

@@ -1,15 +1,9 @@
 <?php
 /**
- * Aplicador — Fix de obtener_pasajero_por_dni con contexto.
+ * Aplicador — Mostrar botones de impresión del micro a la terminal.
  *
- * Con carga parcial del terminal, `usuarios` no está en
- * memoria. `obtener_pasajero_por_dni` iteraba sobre él para
- * buscar las ventas del pasajero, y devolvía lista vacía.
- * El modal del pasajero decía "Sin pasajes registrados".
- *
- * Fix: cuando hay contexto, navegar el árbol del contexto
- * (parametrizado si es compartido). Sin contexto, mantener
- * el comportamiento actual.
+ * La condición actual solo muestra los botones a dueño, admin y
+ * soporte. Agregar terminal. (v79e)
  *
  * Uso: php aplicar_cambios.php
  */
@@ -19,177 +13,85 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
     // ============================================================
-    // 1. Pasajero.php: fix del bloque de ventas en obtener_pasajero_por_dni
+    // 1. viajes-asientos.js: condición de visibilidad
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Pasajeros/Pasajero.php',
-        'descripcion' => 'obtener_pasajero_por_dni: navegar por contexto',
+        'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
+        'descripcion' => 'viajes-asientos.js: botones de impresión para terminal',
         'buscar' => [
-            '    // Obtener ventas relacionadas',
-            '    $ventas = [];',
-            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if ($raiz_usuarios) {',
-            '        foreach ((array)$raiz_usuarios->adyacentes() as $nombre_dueno_iter => $nodo_dueno) {',
-            '            $nodo_nivel = $nodo_dueno->adyacente(\'nivel\');',
-            '            if (!$nodo_nivel || $nodo_nivel->dato() !== \'dueno\') continue;',
-            '',
-            '            $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno_iter);',
-            '            if (!$contenedor_ventas) continue;',
-            '',
-            '            $actual = hmi($contenedor_ventas);',
-            '            while ($actual) {',
-            '                $venta_formateada = formatear_venta_para_pasajero($actual, $dni);',
-            '                if ($venta_formateada) {',
-            '                    if ($venta_formateada[\'es_comprador\'] && $venta_formateada[\'es_pasajero\']) {',
-            '                        $venta_formateada[\'rol\'] = \'ambos\';',
-            '                    } elseif ($venta_formateada[\'es_comprador\']) {',
-            '                        $venta_formateada[\'rol\'] = \'comprador\';',
-            '                    } else {',
-            '                        $venta_formateada[\'rol\'] = \'pasajero\';',
-            '                    }',
-            '                    $ventas[] = $venta_formateada;',
-            '                }',
-            '                $actual = hd($actual);',
-            '            }',
-            '        }',
-            '    }',
-            '    $datos[\'ventas\'] = $ventas;',
+            '    // Botones de impresión: solo dueño y admin.',
+            '    if (usuario_actual.nivel === \'dueno\' || es_admin_o_soporte()) {',
         ],
         'reemplazar' => [
-            '    // Obtener ventas relacionadas.',
-            '    //',
-            '    // Con contexto (terminal → compartido), navegar el',
-            '    // árbol del contexto con nombres parametrizados.',
-            '    // Sin contexto (dueño, admin, impresión), iterar sobre',
-            '    // todos los dueños desde `usuarios` (comportamiento',
-            '    // actual). Bug §1.5.12: con carga parcial del',
-            '    // terminal, `usuarios` no está en memoria y el bloque',
-            '    // devolvía lista vacía.',
-            '    $ventas = [];',
-            '    $nombres_arbol = _nombres_arbol_para_contexto($nodo_contexto, \'\');',
-            '',
-            '    if ($nodo_contexto !== null) {',
-            '        // Contexto: buscar solo en el árbol del contexto.',
-            '        $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_contexto);',
-            '        if ($contenedor_ventas) {',
-            '            $actual = hmi($contenedor_ventas, $nombres_arbol);',
-            '            $seg = 0;',
-            '            while ($actual && $seg < 2000) {',
-            '                $seg++;',
-            '                $venta_formateada = formatear_venta_para_pasajero($actual, $dni);',
-            '                if ($venta_formateada) {',
-            '                    if ($venta_formateada[\'es_comprador\'] && $venta_formateada[\'es_pasajero\']) {',
-            '                        $venta_formateada[\'rol\'] = \'ambos\';',
-            '                    } elseif ($venta_formateada[\'es_comprador\']) {',
-            '                        $venta_formateada[\'rol\'] = \'comprador\';',
-            '                    } else {',
-            '                        $venta_formateada[\'rol\'] = \'pasajero\';',
-            '                    }',
-            '                    $ventas[] = $venta_formateada;',
-            '                }',
-            '                $actual = hd($actual, $nombres_arbol);',
-            '            }',
-            '        }',
-            '    } else {',
-            '        // Sin contexto: iterar sobre todos los dueños.',
-            '        $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '        if ($raiz_usuarios) {',
-            '            foreach ((array)$raiz_usuarios->adyacentes() as $nombre_dueno_iter => $nodo_dueno) {',
-            '                $nodo_nivel = $nodo_dueno->adyacente(\'nivel\');',
-            '                if (!$nodo_nivel || $nodo_nivel->dato() !== \'dueno\') continue;',
-            '',
-            '                $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno_iter);',
-            '                if (!$contenedor_ventas) continue;',
-            '',
-            '                $actual = hmi($contenedor_ventas);',
-            '                while ($actual) {',
-            '                    $venta_formateada = formatear_venta_para_pasajero($actual, $dni);',
-            '                    if ($venta_formateada) {',
-            '                        if ($venta_formateada[\'es_comprador\'] && $venta_formateada[\'es_pasajero\']) {',
-            '                            $venta_formateada[\'rol\'] = \'ambos\';',
-            '                        } elseif ($venta_formateada[\'es_comprador\']) {',
-            '                            $venta_formateada[\'rol\'] = \'comprador\';',
-            '                        } else {',
-            '                            $venta_formateada[\'rol\'] = \'pasajero\';',
-            '                        }',
-            '                        $ventas[] = $venta_formateada;',
-            '                    }',
-            '                    $actual = hd($actual);',
-            '                }',
-            '            }',
-            '        }',
-            '    }',
-            '    $datos[\'ventas\'] = $ventas;',
+            '    // Botones de impresión: dueño, terminal, admin y soporte.',
+            '    // La terminal se agrega en v79e. Antes se la excluía porque',
+            '    // el backend no estaba adaptado a carga parcial; hoy sí lo',
+            '    // está. Los datos que exponen croquis y planilla ya los ve',
+            '    // la terminal en el modal "Ver pasaje" y en el propio croquis,',
+            '    // así que no es una fuga nueva.',
+            '    if (usuario_actual.nivel === \'dueno\' || usuario_actual.nivel === \'terminal\' || es_admin_o_soporte()) {',
         ],
     ],
 
     // ============================================================
-    // 2. Pasajero.php: bump
+    // 2. viajes-asientos.js: bump
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Pasajeros/Pasajero.php',
-        'descripcion' => 'Bump Pasajero.php',
+        'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
+        'descripcion' => 'Bump viajes-asientos.js',
         'buscar' => [
-            ' * @version   1.5piloto.78l',
+            ' * @version 1.5piloto.77d',
         ],
         'reemplazar' => [
-            ' * @version   1.5piloto.79d',
+            ' * @version 1.5piloto.79e',
         ],
     ],
 
     // ============================================================
-    // 3. plan_actual.md: agregar §1.5.12
+    // 3. plan_actual.md: agregar §1.5.13
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: agregar §1.5.12',
+        'descripcion' => 'plan_actual: agregar §1.5.13',
         'buscar' => [
             '### 1.6 Pendientes de la línea',
         ],
         'reemplazar' => [
-            '#### 1.5.12 obtener_pasajero_por_dni con contexto (v79d)',
+            '#### 1.5.13 Botones de impresión del micro para terminal (v79e)',
             '',
-            '**Síntoma:** logueado como terminal, en Clientes, el',
-            'botón "Ver pasajes" aparecía (fix v79c), pero al',
-            'abrirlo el modal decía "Sin pasajes registrados"',
-            'aunque el pasajero sí tuviera ventas.',
+            '**Síntoma:** los botones "Imprimir Croquis",',
+            '"Imprimir Planilla" e "Imprimir Planilla Vacía"',
+            'aparecían para el dueño pero no para la terminal.',
             '',
-            '**Causa:** `obtener_pasajero_por_dni` iteraba sobre la',
-            'raíz `usuarios` para buscar las ventas del pasajero.',
-            'Con carga parcial del terminal, `usuarios` no está en',
-            'memoria: `$raiz_usuarios` es null, el bloque no corre,',
-            'y `$ventas` queda vacío.',
+            '**Causa:** condición JS en `renderizar_pasaje_micro`',
+            '(`viajes-asientos.js`):',
             '',
-            'Es uno de los 7 helpers B3.3c (ver §1.10) que iteran',
-            'sobre todos los dueños. La lista completa:',
+            '```js',
+            'if (usuario_actual.nivel === \'dueno\' || es_admin_o_soporte())',
+            '```',
             '',
-            '- `Venta.php`: `_buscar_venta_por_id` (fallback),',
-            '  `obtener_cancelacion_por_id`.',
-            '- `Liquidacion.php`: `obtener_liquidacion_por_id`.',
-            '- `Rendicion.php`: `aceptar_ajuste_rendicion`,',
-            '  `obtener_rendicion_por_id`.',
-            '- `Pasajero.php`: `obtener_pasajero_por_dni`',
-            '  (rama del historial de ventas).',
+            'La terminal quedaba afuera. Cuando se agregaron esos',
+            'botones, el backend de impresión no estaba adaptado a',
+            'carga parcial. Hoy sí: `_contextos_para_operacion`',
+            'devuelve `[\'us_<dueno>\']` para `?imprimir=1&dueno=X`',
+            '(salvo los tipos B3.3c, que no incluyen croquis ni',
+            'planilla).',
             '',
-            '**Solución parcial:** `obtener_pasajero_por_dni` ahora',
-            'recibe `$nodo_contexto`. Si viene, navega el árbol del',
-            'contexto (parametrizado si es compartido). Si no,',
-            'mantiene el comportamiento actual (iterar `usuarios`).',
+            '**Solución:** agregar `terminal` a la condición.',
             '',
-            '**Pendiente:** los otros 5 helpers siguen igual. Se',
-            'resuelven cuando aparezca dolor real (por ejemplo,',
-            'que el terminal intente cancelar desde el plugin y',
-            'el helper no encuentre la venta), o cuando lleguen',
-            'los iteradores con ID especial (§1.10).',
+            '**Nota:** la información que exponen croquis y',
+            'planilla (nombre de pasajero, DNI, contacto) ya la',
+            've la terminal en el modal "Ver pasaje" y en el',
+            'propio croquis. No es una fuga nueva.',
             '',
-            '**Nota secundaria:** `obtener_reservas_de_pasajero`',
-            'sigue llamándose sin contexto desde',
-            '`obtener_pasajero_por_dni`. Con carga parcial,',
-            'devuelve vacío para el terminal. **Es correcto**:',
-            'el terminal no debe ver las reservas del equipo.',
+            '**Deuda de seguridad anotada:** las URLs de impresión',
+            '(`?imprimir=1&tipo=...`) no validan sesión ni',
+            'permisos. Cualquiera con la URL puede ver los datos.',
+            'Es un problema preexistente. Anotado para una tanda',
+            'futura.',
             '',
             '### 1.6 Pendientes de la línea',
         ],
@@ -201,12 +103,40 @@ $cambios = [
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: bump a 79d',
+        'descripcion' => 'plan_actual: bump a 79e',
         'buscar' => [
-            '**Última actualización de este archivo:** v1.5piloto.79c.',
+            '**Última actualización de este archivo:** v1.5piloto.79d.',
         ],
         'reemplazar' => [
-            '**Última actualización de este archivo:** v1.5piloto.79d.',
+            '**Última actualización de este archivo:** v1.5piloto.79e.',
+        ],
+    ],
+
+    // ============================================================
+    // 5. plan_actual.md: deuda de seguridad de impresión
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual §1.6: deuda de seguridad',
+        'buscar' => [
+            '- **Módulos menores sin contexto:** `Liquidacion.php`,',
+            '  `Rendicion.php`, `Empresa.php`, `Vehiculo.php`. Sub-',
+            '  tandas cortas.',
+            '- **Plugin: dividir la ventana en pestañas, una por rol.**',
+            '  Idea anotada al cierre de v78v.',
+        ],
+        'reemplazar' => [
+            '- **Módulos menores sin contexto:** `Liquidacion.php`,',
+            '  `Rendicion.php`, `Empresa.php`, `Vehiculo.php`. Sub-',
+            '  tandas cortas.',
+            '- **Plugin: dividir la ventana en pestañas, una por rol.**',
+            '  Idea anotada al cierre de v78v.',
+            '- **Deuda de seguridad en impresión.** Las URLs de',
+            '  impresión (`?imprimir=1&tipo=...`) no validan sesión',
+            '  ni permisos. Cualquiera con la URL ve el HTML. Se',
+            '  anota para una tanda futura, cuando se rehaga el',
+            '  módulo de impresión o se agregue un chequeo general.',
         ],
     ],
 ];
@@ -215,7 +145,7 @@ $cambios = [
 // Runner
 // ============================================================
 
-echo "=== Aplicador — Fix obtener_pasajero_por_dni ===\n\n";
+echo "=== Aplicador — Botones de impresión para terminal ===\n\n";
 
 function detectar_eol(string $c): string { return (strpos($c, "\r\n") !== false) ? "\r\n" : "\n"; }
 function normalizar_a_unix(string $c): string { return str_replace("\r\n", "\n", $c); }

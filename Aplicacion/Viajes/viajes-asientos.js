@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.77d
+ * @version 1.5piloto.79e
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -1175,8 +1175,13 @@ function renderizar_pasaje_micro(micro) {
     `;
     contenedorCroquis.insertAdjacentHTML('beforeend', leyendaHTML);
 
-    // Botones de impresión: solo dueño y admin.
-    if (usuario_actual.nivel === 'dueno' || es_admin_o_soporte()) {
+    // Botones de impresión: dueño, terminal, admin y soporte.
+    // La terminal se agrega en v79e. Antes se la excluía porque
+    // el backend no estaba adaptado a carga parcial; hoy sí lo
+    // está. Los datos que exponen croquis y planilla ya los ve
+    // la terminal en el modal "Ver pasaje" y en el propio croquis,
+    // así que no es una fuga nueva.
+    if (usuario_actual.nivel === 'dueno' || usuario_actual.nivel === 'terminal' || es_admin_o_soporte()) {
         const nombre_dueno_imp = obtener_dueno_viaje_seleccionado();
         const nombre_viaje_imp = viaje_seleccionado ? viaje_seleccionado.nombre_viaje : '';
         const nombre_micro_imp = micro.nombre_micro;
