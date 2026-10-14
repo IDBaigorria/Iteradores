@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.79h
+ * @version   1.5piloto.79i
  */
 
 use Iteradores\Nodos\Nodo;
@@ -71,6 +71,45 @@ function _nombre_terminal_solicitante(string $nombre_solicitante): ?string {
     }
     if (!$nivel || $nivel->dato() !== 'terminal') return null;
     return $nombre_solicitante;
+}
+
+/**
+ * Devuelve el nombre de terminal para usar como filtro
+ * en funciones que lo aceptan (buscar venta por id,
+ * cancelar, pagar cupón, info cancelación).
+ *
+ * Diferencias con _nombre_terminal_solicitante:
+ *   - Solicitante terminal: su propio nombre (ignora el
+ *     POST; un terminal no puede operar sobre ventas
+ *     ajenas).
+ *   - Solicitante admin o soporte: el `nombre_terminal`
+ *     del POST si viene. El admin puede operar en nombre
+ *     de cualquier terminal (mismo criterio que
+ *     confirmar_venta_actual).
+ *   - Cualquier otro caso: null.
+ *
+ * @param string $nombre_solicitante
+ * @param array  $post
+ * @return string|null
+ * @since 1.5piloto.79i
+ */
+function _nombre_terminal_para_busqueda(string $nombre_solicitante, array $post): ?string {
+    $nt = _nombre_terminal_solicitante($nombre_solicitante);
+    if ($nt !== null) return $nt;
+
+    if ($nombre_solicitante === '') return null;
+    $nodo_sol = Nodo::nodo_por_id('us_' . $nombre_solicitante);
+    if (!$nodo_sol) return null;
+    $nivel = $nodo_sol->adyacente('nivel');
+    if (!$nivel) {
+        $publico = $nodo_sol->adyacente('publico');
+        if ($publico) $nivel = $publico->adyacente('nivel');
+    }
+    $nivel_str = $nivel ? $nivel->dato() : '';
+    if ($nivel_str !== 'admin' && $nivel_str !== 'soporte') return null;
+
+    $nt_post = trim((string)($post['nombre_terminal'] ?? ''));
+    return $nt_post !== '' ? $nt_post : null;
 }
 
 /**
@@ -1029,7 +1068,10 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     // Fase 1c.2/v78x: si es dueño/admin/soporte,
                     // restringir al dueño para no depender de la
                     // raíz `usuarios`.
-                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
+                    // v79i: si es admin/soporte, respetar el
+                    // nombre_terminal del POST (mismo criterio
+                    // que confirmar_venta_actual).
+                    $nombre_terminal_sol = _nombre_terminal_para_busqueda($nombre_solicitante, $post);
                     $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
                     $venta = obtener_venta_por_id($id_venta, $nombre_terminal_sol, $nombre_dueno_sol);
                     if ($venta) {
@@ -1048,7 +1090,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     // Fase B2.3.5b.1: filtro opcional por terminal.
                     // Fase 1c.2/v78x: filtro por dueño para
                     // dueño/admin/soporte.
-                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
+                    // v79i: si es admin/soporte, respetar el
+                    // nombre_terminal del POST.
+                    $nombre_terminal_sol = _nombre_terminal_para_busqueda($nombre_solicitante, $post);
                     $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
                     $resultado = cancelar_venta($id_venta, $motivo, $nombre_terminal_sol, $nombre_dueno_sol);
                     responder_json($resultado);
@@ -1063,7 +1107,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     // Fase B2.3.5b.1: filtro opcional por terminal.
                     // Fase 1c.2/v78x: filtro por dueño.
-                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
+                    // v79i: si es admin/soporte, respetar el
+                    // nombre_terminal del POST.
+                    $nombre_terminal_sol = _nombre_terminal_para_busqueda($nombre_solicitante, $post);
                     $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
                     $resultado = pagar_cupon_venta($id_venta, $numero_cupon, $monto, $metodo_pago, $nombre_terminal_sol, $nombre_dueno_sol);
                     responder_json($resultado);
@@ -1075,7 +1121,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     // Fase B2.3.5b.1: filtro opcional por terminal.
                     // Fase 1c.2/v78x: filtro por dueño.
-                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);
+                    // v79i: si es admin/soporte, respetar el
+                    // nombre_terminal del POST.
+                    $nombre_terminal_sol = _nombre_terminal_para_busqueda($nombre_solicitante, $post);
                     $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
                     $resultado = obtener_info_cancelacion($id_venta, $nombre_terminal_sol, $nombre_dueno_sol);
                     responder_json($resultado);

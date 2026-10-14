@@ -1,10 +1,19 @@
 <?php
 /**
- * Aplicador — Endpoint reiniciar_seleccion_completa.
+ * Aplicador — Enrutador respeta nombre_terminal del POST.
  *
- * Agrega un helper que limpia la venta_actual de una terminal
- * (si quedó colgada) y libera los asientos reales que había
- * seleccionado. Nueva subacción viajes/reiniciar_seleccion_completa.
+ * Las acciones ventas/{cancelar,obtener,pagar_cupon,info_cancelacion}
+ * usan _nombre_terminal_solicitante($nombre_solicitante) para
+ * decidir el filtro. Si el solicitante es admin/soporte, esa
+ * función devuelve null y la búsqueda es sin filtro. Pero la
+ * venta vive en el árbol del compartido del terminal (post
+ * v79a), no en el árbol del dueño. Sin filtro, no la encuentra.
+ *
+ * Fix: nuevo helper _nombre_terminal_para_busqueda. Si el
+ * solicitante no es terminal pero es admin/soporte, respeta
+ * el `nombre_terminal` del POST. Mismo criterio que
+ * confirmar_venta_actual (que acepta el nombre_terminal
+ * directo).
  *
  * Uso (raíz del proyecto PHP): php aplicar_cambios.php
  */
@@ -12,191 +21,217 @@
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
 
-$nueva_funcion = [
+$helper = [
     '',
     '/**',
-    ' * Reinicia por completo la selección de asientos de una',
-    ' * terminal: libera los asientos reales que tenga en estado',
-    ' * "seleccionado" y destruye la venta_actual colgada.',
+    ' * Devuelve el nombre de terminal para usar como filtro',
+    ' * en funciones que lo aceptan (buscar venta por id,',
+    ' * cancelar, pagar cupón, info cancelación).',
     ' *',
-    ' * A diferencia de "deseleccionar todos los propios" del',
-    ' * frontend (que itera asiento por asiento con la info del',
-    ' * viaje actual), este helper limpia la venta_actual entera',
-    ' * aunque el viaje ya no esté en la lista. Sirve para casos',
-    ' * donde el usuario cerró la ventana a mitad de una venta, o',
-    ' * para las pruebas automatizadas que dejaron una venta a',
-    ' * medias de una corrida anterior fallida.',
+    ' * Diferencias con _nombre_terminal_solicitante:',
+    ' *   - Solicitante terminal: su propio nombre (ignora el',
+    ' *     POST; un terminal no puede operar sobre ventas',
+    ' *     ajenas).',
+    ' *   - Solicitante admin o soporte: el `nombre_terminal`',
+    ' *     del POST si viene. El admin puede operar en nombre',
+    ' *     de cualquier terminal (mismo criterio que',
+    ' *     confirmar_venta_actual).',
+    ' *   - Cualquier otro caso: null.',
     ' *',
-    ' * Idempotente: si no hay venta_actual, devuelve exito con',
-    ' * habia_venta = false.',
-    ' *',
-    ' * @param string $nombre_terminal',
-    ' * @return array',
-    ' * @since 1.5piloto.79h',
+    ' * @param string $nombre_solicitante',
+    ' * @param array  $post',
+    ' * @return string|null',
+    ' * @since 1.5piloto.79i',
     ' */',
-    'function reiniciar_seleccion_completa_terminal(string $nombre_terminal): array {',
-    '    if ($nombre_terminal === \'\') {',
-    '        return [\'exito\' => false, \'error\' => \'Terminal no especificada\'];',
+    'function _nombre_terminal_para_busqueda(string $nombre_solicitante, array $post): ?string {',
+    '    $nt = _nombre_terminal_solicitante($nombre_solicitante);',
+    '    if ($nt !== null) return $nt;',
+    '',
+    '    if ($nombre_solicitante === \'\') return null;',
+    '    $nodo_sol = Nodo::nodo_por_id(\'us_\' . $nombre_solicitante);',
+    '    if (!$nodo_sol) return null;',
+    '    $nivel = $nodo_sol->adyacente(\'nivel\');',
+    '    if (!$nivel) {',
+    '        $publico = $nodo_sol->adyacente(\'publico\');',
+    '        if ($publico) $nivel = $publico->adyacente(\'nivel\');',
     '    }',
+    '    $nivel_str = $nivel ? $nivel->dato() : \'\';',
+    '    if ($nivel_str !== \'admin\' && $nivel_str !== \'soporte\') return null;',
     '',
-    '    // Fase B3.3b: ID especial directo.',
-    '    $nodo_terminal = Nodo::nodo_por_id(\'us_\' . $nombre_terminal);',
-    '    if (!$nodo_terminal) {',
-    '        return [\'exito\' => false, \'error\' => \'Terminal no encontrada\'];',
-    '    }',
-    '',
-    '    $venta_actual = $nodo_terminal->adyacente(\'venta_actual\');',
-    '    if (!$venta_actual) {',
-    '        return [\'exito\' => true, \'habia_venta\' => false];',
-    '    }',
-    '',
-    '    // 1. Liberar los asientos reales referenciados. Solo se',
-    '    //    pisan los que estén en estado "seleccionado" y cuya',
-    '    //    referencia `seleccionado_por` apunte a esta terminal.',
-    '    //    Los asientos vendidos o reservados por otros flujos',
-    '    //    se respetan.',
-    '    $cabeza = $venta_actual->adyacente(\'asientos\');',
-    '    if ($cabeza) {',
-    '        $actual_av = $cabeza->adyacente(\'primer\');',
-    '        $seg_av = 0;',
-    '        while ($actual_av && $actual_av->id() !== $cabeza->id() && $seg_av < 200) {',
-    '            $nodo_asiento_real = $actual_av->adyacente(\'asiento\');',
-    '            if ($nodo_asiento_real) {',
-    '                $estado = $nodo_asiento_real->adyacente(\'estado\');',
-    '                if ($estado && $estado->dato() === \'seleccionado\') {',
-    '                    $estado->_dato(\'libre\');',
-    '                }',
-    '                $sel_por = $nodo_asiento_real->adyacente(\'seleccionado_por\');',
-    '                if ($sel_por && $sel_por->dato() === $nombre_terminal) {',
-    '                    $nodo_asiento_real->eliminar_adyacente(\'seleccionado_por\');',
-    '                }',
-    '            }',
-    '            $actual_av = $actual_av->adyacente(\'siguiente\');',
-    '            $seg_av++;',
-    '        }',
-    '    }',
-    '',
-    '    // 2. Desenlazar la venta_actual del terminal y destruirla',
-    '    //    con todo su subárbol (asientos-en-venta, cabeza).',
-    '    $nodo_terminal->eliminar_adyacente(\'venta_actual\');',
-    '    _destruir_venta_actual($venta_actual);',
-    '',
-    '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-    '    return [\'exito\' => true, \'habia_venta\' => true];',
+    '    $nt_post = trim((string)($post[\'nombre_terminal\'] ?? \'\'));',
+    '    return $nt_post !== \'\' ? $nt_post : null;',
     '}',
 ];
 
 $cambios = [
-    // 1. Helper nuevo al final de ViajeAsientos.php.
+    // 1. Insertar el helper justo después de _nombre_terminal_solicitante.
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/ViajeAsientos.php',
-        'descripcion' => 'Nuevo helper reiniciar_seleccion_completa_terminal',
+        'archivo' => 'Aplicacion/Enrutador.php',
+        'descripcion' => 'Nuevo helper _nombre_terminal_para_busqueda',
         'buscar' => [
-            'function _buscar_asiento_en_venta_persistente(Nodo $nodo_venta, Nodo $nodo_asiento) {',
-            '    $cabeza = $nodo_venta->adyacente(\'asientos\');',
-            '    if (!$cabeza) return null;',
-            '    $actual = $cabeza->adyacente(\'primer\');',
-            '    $seg = 0;',
-            '    while ($actual && $seg < 200) {',
-            '        $nodo_asiento_ref = $actual->adyacente(\'asiento\');',
-            '        if ($nodo_asiento_ref && $nodo_asiento_ref->id() === $nodo_asiento->id()) {',
-            '            return $actual;',
-            '        }',
-            '        $actual = $actual->adyacente(\'siguiente\');',
-            '        $seg++;',
+            'function _nombre_terminal_solicitante(string $nombre_solicitante): ?string {',
+            '    if ($nombre_solicitante === \'\') return null;',
+            '    $nodo_sol = Nodo::nodo_por_id(\'us_\' . $nombre_solicitante);',
+            '    if (!$nodo_sol) return null;',
+            '    $nivel = $nodo_sol->adyacente(\'nivel\');',
+            '    if (!$nivel) {',
+            '        $publico = $nodo_sol->adyacente(\'publico\');',
+            '        if ($publico) $nivel = $publico->adyacente(\'nivel\');',
             '    }',
-            '    return null;',
+            '    if (!$nivel || $nivel->dato() !== \'terminal\') return null;',
+            '    return $nombre_solicitante;',
             '}',
         ],
         'reemplazar' => array_merge(
             [
-                'function _buscar_asiento_en_venta_persistente(Nodo $nodo_venta, Nodo $nodo_asiento) {',
-                '    $cabeza = $nodo_venta->adyacente(\'asientos\');',
-                '    if (!$cabeza) return null;',
-                '    $actual = $cabeza->adyacente(\'primer\');',
-                '    $seg = 0;',
-                '    while ($actual && $seg < 200) {',
-                '        $nodo_asiento_ref = $actual->adyacente(\'asiento\');',
-                '        if ($nodo_asiento_ref && $nodo_asiento_ref->id() === $nodo_asiento->id()) {',
-                '            return $actual;',
-                '        }',
-                '        $actual = $actual->adyacente(\'siguiente\');',
-                '        $seg++;',
+                'function _nombre_terminal_solicitante(string $nombre_solicitante): ?string {',
+                '    if ($nombre_solicitante === \'\') return null;',
+                '    $nodo_sol = Nodo::nodo_por_id(\'us_\' . $nombre_solicitante);',
+                '    if (!$nodo_sol) return null;',
+                '    $nivel = $nodo_sol->adyacente(\'nivel\');',
+                '    if (!$nivel) {',
+                '        $publico = $nodo_sol->adyacente(\'publico\');',
+                '        if ($publico) $nivel = $publico->adyacente(\'nivel\');',
                 '    }',
-                '    return null;',
+                '    if (!$nivel || $nivel->dato() !== \'terminal\') return null;',
+                '    return $nombre_solicitante;',
                 '}',
             ],
-            $nueva_funcion
+            $helper
         ),
     ],
 
-    // 2. Bump ViajeAsientos.php.
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/ViajeAsientos.php',
-        'descripcion' => 'Bump ViajeAsientos.php',
-        'buscar' => [' * @version   1.5piloto.77u'],
-        'reemplazar' => [' * @version   1.5piloto.79h'],
-    ],
-
-    // 3. Subacción nueva en el Enrutador.
+    // 2. ventas/obtener
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/Enrutador.php',
-        'descripcion' => 'Nueva subacción reiniciar_seleccion_completa',
+        'descripcion' => 'ventas/obtener usa _nombre_terminal_para_busqueda',
         'buscar' => [
-            '                case \'deseleccionar_asiento\':',
-            '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-            '                    $nombre_micro = $post[\'nombre_micro\'] ?? \'\';',
-            '                    $fila = $post[\'fila\'] ?? \'\';',
-            '                    $columna = $post[\'columna\'] ?? \'\';',
-            '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-            '                    $nombre_terminal = $post[\'nombre_terminal\'] ?? \'\';',
-            '                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno) || empty($nombre_terminal)) {',
-            '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
+            '                case \'obtener\':',
+            '                    $id_venta = $post[\'id_venta\'] ?? \'\';',
+            '                    if (empty($id_venta)) {',
+            '                        responder_json([\'exito\' => false, \'error\' => \'ID de venta no especificado\']);',
             '                    }',
-            '                    $resultado = deseleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal);',
-            '                    responder_json($resultado);',
-            '                    break;',
+            '                    // Fase B2.3.5b.1: si el solicitante es terminal,',
+            '                    // restringir la búsqueda a su contexto.',
+            '                    // Fase 1c.2/v78x: si es dueño/admin/soporte,',
+            '                    // restringir al dueño para no depender de la',
+            '                    // raíz `usuarios`.',
+            '                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);',
+            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
+            '                    $venta = obtener_venta_por_id($id_venta, $nombre_terminal_sol, $nombre_dueno_sol);',
         ],
         'reemplazar' => [
-            '                case \'deseleccionar_asiento\':',
-            '                    $nombre_viaje = $post[\'nombre_viaje\'] ?? \'\';',
-            '                    $nombre_micro = $post[\'nombre_micro\'] ?? \'\';',
-            '                    $fila = $post[\'fila\'] ?? \'\';',
-            '                    $columna = $post[\'columna\'] ?? \'\';',
-            '                    $nombre_dueno = $post[\'nombre_dueno\'] ?? \'\';',
-            '                    $nombre_terminal = $post[\'nombre_terminal\'] ?? \'\';',
-            '                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno) || empty($nombre_terminal)) {',
-            '                        responder_json([\'exito\' => false, \'error\' => \'Parámetros incompletos\']);',
+            '                case \'obtener\':',
+            '                    $id_venta = $post[\'id_venta\'] ?? \'\';',
+            '                    if (empty($id_venta)) {',
+            '                        responder_json([\'exito\' => false, \'error\' => \'ID de venta no especificado\']);',
             '                    }',
-            '                    $resultado = deseleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal);',
-            '                    responder_json($resultado);',
-            '                    break;',
-            '',
-            '                case \'reiniciar_seleccion_completa\':',
-            '                    // Limpia la venta_actual de una terminal (si',
-            '                    // quedó colgada) y libera los asientos reales',
-            '                    // que tenía seleccionados. Idempotente.',
-            '                    // @since 1.5piloto.79h',
-            '                    $nombre_terminal_rsc = $post[\'nombre_terminal\'] ?? \'\';',
-            '                    if (empty($nombre_terminal_rsc)) {',
-            '                        responder_json([\'exito\' => false, \'error\' => \'Terminal no especificada\']);',
-            '                    }',
-            '                    $resultado_rsc = reiniciar_seleccion_completa_terminal($nombre_terminal_rsc);',
-            '                    responder_json($resultado_rsc);',
-            '                    break;',
+            '                    // Fase B2.3.5b.1: si el solicitante es terminal,',
+            '                    // restringir la búsqueda a su contexto.',
+            '                    // Fase 1c.2/v78x: si es dueño/admin/soporte,',
+            '                    // restringir al dueño para no depender de la',
+            '                    // raíz `usuarios`.',
+            '                    // v79i: si es admin/soporte, respetar el',
+            '                    // nombre_terminal del POST (mismo criterio',
+            '                    // que confirmar_venta_actual).',
+            '                    $nombre_terminal_sol = _nombre_terminal_para_busqueda($nombre_solicitante, $post);',
+            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
+            '                    $venta = obtener_venta_por_id($id_venta, $nombre_terminal_sol, $nombre_dueno_sol);',
         ],
     ],
 
-    // 4. Bump Enrutador.php.
+    // 3. ventas/cancelar
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Enrutador.php',
+        'descripcion' => 'ventas/cancelar usa _nombre_terminal_para_busqueda',
+        'buscar' => [
+            '                case \'cancelar\':',
+            '                    $id_venta = $post[\'id_venta\'] ?? \'\';',
+            '                    $motivo = $post[\'motivo\'] ?? \'\';',
+            '                    if (empty($id_venta)) {',
+            '                        responder_json([\'exito\' => false, \'error\' => \'ID de venta no especificado\']);',
+            '                    }',
+            '                    // Fase B2.3.5b.1: filtro opcional por terminal.',
+            '                    // Fase 1c.2/v78x: filtro por dueño para',
+            '                    // dueño/admin/soporte.',
+            '                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);',
+            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
+            '                    $resultado = cancelar_venta($id_venta, $motivo, $nombre_terminal_sol, $nombre_dueno_sol);',
+        ],
+        'reemplazar' => [
+            '                case \'cancelar\':',
+            '                    $id_venta = $post[\'id_venta\'] ?? \'\';',
+            '                    $motivo = $post[\'motivo\'] ?? \'\';',
+            '                    if (empty($id_venta)) {',
+            '                        responder_json([\'exito\' => false, \'error\' => \'ID de venta no especificado\']);',
+            '                    }',
+            '                    // Fase B2.3.5b.1: filtro opcional por terminal.',
+            '                    // Fase 1c.2/v78x: filtro por dueño para',
+            '                    // dueño/admin/soporte.',
+            '                    // v79i: si es admin/soporte, respetar el',
+            '                    // nombre_terminal del POST.',
+            '                    $nombre_terminal_sol = _nombre_terminal_para_busqueda($nombre_solicitante, $post);',
+            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
+            '                    $resultado = cancelar_venta($id_venta, $motivo, $nombre_terminal_sol, $nombre_dueno_sol);',
+        ],
+    ],
+
+    // 4. ventas/pagar_cupon
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Enrutador.php',
+        'descripcion' => 'ventas/pagar_cupon usa _nombre_terminal_para_busqueda',
+        'buscar' => [
+            '                    // Fase B2.3.5b.1: filtro opcional por terminal.',
+            '                    // Fase 1c.2/v78x: filtro por dueño.',
+            '                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);',
+            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
+            '                    $resultado = pagar_cupon_venta($id_venta, $numero_cupon, $monto, $metodo_pago, $nombre_terminal_sol, $nombre_dueno_sol);',
+        ],
+        'reemplazar' => [
+            '                    // Fase B2.3.5b.1: filtro opcional por terminal.',
+            '                    // Fase 1c.2/v78x: filtro por dueño.',
+            '                    // v79i: si es admin/soporte, respetar el',
+            '                    // nombre_terminal del POST.',
+            '                    $nombre_terminal_sol = _nombre_terminal_para_busqueda($nombre_solicitante, $post);',
+            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
+            '                    $resultado = pagar_cupon_venta($id_venta, $numero_cupon, $monto, $metodo_pago, $nombre_terminal_sol, $nombre_dueno_sol);',
+        ],
+    ],
+
+    // 5. ventas/info_cancelacion
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Enrutador.php',
+        'descripcion' => 'ventas/info_cancelacion usa _nombre_terminal_para_busqueda',
+        'buscar' => [
+            '                    // Fase B2.3.5b.1: filtro opcional por terminal.',
+            '                    // Fase 1c.2/v78x: filtro por dueño.',
+            '                    $nombre_terminal_sol = _nombre_terminal_solicitante($nombre_solicitante);',
+            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
+            '                    $resultado = obtener_info_cancelacion($id_venta, $nombre_terminal_sol, $nombre_dueno_sol);',
+        ],
+        'reemplazar' => [
+            '                    // Fase B2.3.5b.1: filtro opcional por terminal.',
+            '                    // Fase 1c.2/v78x: filtro por dueño.',
+            '                    // v79i: si es admin/soporte, respetar el',
+            '                    // nombre_terminal del POST.',
+            '                    $nombre_terminal_sol = _nombre_terminal_para_busqueda($nombre_solicitante, $post);',
+            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
+            '                    $resultado = obtener_info_cancelacion($id_venta, $nombre_terminal_sol, $nombre_dueno_sol);',
+        ],
+    ],
+
+    // 6. Bump Enrutador.php.
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/Enrutador.php',
         'descripcion' => 'Bump Enrutador.php',
-        'buscar' => [' * @version   1.5piloto.78x'],
-        'reemplazar' => [' * @version   1.5piloto.79h'],
+        'buscar' => [' * @version   1.5piloto.79h'],
+        'reemplazar' => [' * @version   1.5piloto.79i'],
     ],
 ];
 
@@ -204,7 +239,7 @@ $cambios = [
 // Runner
 // ============================================================
 
-echo "=== Aplicador — Endpoint reiniciar_seleccion_completa ===\n\n";
+echo "=== Aplicador — Enrutador respeta nombre_terminal del POST ===\n\n";
 
 function detectar_eol(string $c): string { return (strpos($c, "\r\n") !== false) ? "\r\n" : "\n"; }
 function normalizar_a_unix(string $c): string { return str_replace("\r\n", "\n", $c); }
