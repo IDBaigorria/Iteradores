@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.78y
+ * @version   1.5piloto.79b
  */
 
 
@@ -614,21 +614,22 @@ function confirmar_venta_actual(
         }
         _hmi($contenedor_ventas, $nodo_venta);
     } else {
-        // Contexto = compartido del terminal. Insertar en
-        // AMBOS árboles.
-        // (1) Árbol del dueño real, default.
-        $nodo_dueno_real = Nodo::nodo_por_id('us_' . $nombre_dueno);
-        if ($nodo_dueno_real) {
-            $contenedor_ventas_dueno = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno_real);
-            if ($contenedor_ventas_dueno) {
-                _hmi($contenedor_ventas_dueno, $nodo_venta);
-            }
-        }
-        // (2) Árbol del compartido, parametrizado.
+        // Contexto = compartido del terminal. Insertar en el
+        // árbol del compartido (parametrizado) y dejar aviso
+        // en el buzón del compartido. El dueño procesará el
+        // buzón en su próxima carga (_procesar_pendientes_del_dueno).
+        //
+        // No insertamos en el árbol del dueño real: con carga
+        // parcial, us_<dueno> no está en memoria del terminal.
+        // Antes se intentaba y fallaba silenciosamente. El
+        // bitmask del nodo venta lo propaga el framework al
+        // guardar parcial (v1.5i.8c: propagación a nodos
+        // nuevos por enlaces entrantes). Bug §1.5.10.
         $contenedor_ventas_compartido = obtener_contenedor_ventas_dueno($nombre_dueno, $nodo_dueno);
         if ($contenedor_ventas_compartido) {
             _hmi($contenedor_ventas_compartido, $nodo_venta, $nombres_arbol);
         }
+        _encolar_en_buzon($nodo_dueno, 'pendientes_ventas', $id_venta, $nodo_venta);
     }
 
     // Desenlazar la venta actual de la terminal y destruir
@@ -668,11 +669,20 @@ function confirmar_venta_actual(
  * @version 1.5piloto.78w
  */
 function listar_ventas_por_dueno(string $nombre_dueno): array {
+    // 1. Procesar buzones de los compartidos del dueño.
+    // Idempotente. Bug §1.5.10.
+    $hubo_cambios = _procesar_pendientes_del_dueno($nombre_dueno);
+
+    // 2. Barrido normal + canceladas.
     $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
-    if (!$contenedor) return [];
+    if (!$contenedor) {
+        if ($hubo_cambios) {
+            guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+        }
+        return [];
+    }
 
     $ventas = [];
-    $hubo_limpieza = false;
     $actual = hmi($contenedor);
     $seg = 0;
     while ($actual && $seg < 2000) {
@@ -680,13 +690,13 @@ function listar_ventas_por_dueno(string $nombre_dueno): array {
         $siguiente = hd($actual);
         if (_venta_esta_cancelada($actual)) {
             _destruir_venta_marcada($contenedor, $actual);
-            $hubo_limpieza = true;
+            $hubo_cambios = true;
         } else {
             $ventas[] = formatear_venta_resumida($actual);
         }
         $actual = $siguiente;
     }
-    if ($hubo_limpieza) {
+    if ($hubo_cambios) {
         guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     }
     return $ventas;
@@ -2649,6 +2659,16 @@ function _crear_nodo_cancelacion(string $nombre_dueno, string $id_venta, string 
     $nodo_canc->_adyacente_en(Nodo::crear_con_dato((string)$asientos_liberados), 'asientos_liberados');
 
     _hmi($contenedor, $nodo_canc);
+
+    // Si el contexto es un compartido (lo invocó un
+    // terminal), dejar aviso en el buzón del compartido.
+    // El dueño procesará el buzón en su próxima carga.
+    // El bitmask lo propaga el framework al guardar
+    // parcial (v1.5i.8c). Bug §1.5.10.
+    if ($nodo_contexto !== null && $nodo_contexto->adyacente('_es_compartido')) {
+        _encolar_en_buzon($nodo_contexto, 'pendientes_cancelaciones', $id_cancelacion, $nodo_canc);
+    }
+
     return $id_cancelacion;
 }
 
@@ -2819,6 +2839,17 @@ function listar_cancelaciones_de_dueno(string $nombre_dueno, array $filtros = []
     // navegar desde ahí.
     $nodo_dueno = $nodo_contexto ?: Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return [];
+
+    // Procesar buzones de los compartidos (idempotente).
+    // Solo cuando el solicitante es el dueño (sin contexto
+    // de terminal). Bug §1.5.10.
+    if ($nodo_contexto === null) {
+        $hubo_cambios = _procesar_pendientes_del_dueno($nombre_dueno);
+        if ($hubo_cambios) {
+            guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+        }
+    }
+
     $cont = $nodo_dueno->adyacente('cancelaciones');
     if (!$cont) return [];
 
@@ -2885,5 +2916,142 @@ function _destruir_venta_marcada(Nodo $contenedor, Nodo $nodo_venta): void {
     $nodo_venta->eliminar_adyacente('cancelada');
     _destruir_campos_simples($nodo_venta);
     Nodo::eliminar($nodo_venta);
+}
+
+/**
+ * Encola un nodo en un buzón del compartido. Crea el
+ * buzón si no existe.
+ *
+ * El buzón es un contenedor plano: hijos por id del
+ * nodo apuntando al mismo nodo físico. No es copia.
+ *
+ * El bitmask del buzón y del nodo encolado lo propaga
+ * el framework al guardar parcial (v1.5i.8c: propagación
+ * a nodos nuevos por enlaces entrantes). La app NO toca
+ * bits a mano.
+ *
+ * @param Nodo   $nodo_comp
+ * @param string $nombre_buzon
+ * @param string $id_nodo
+ * @param Nodo   $nodo
+ * @return void
+ * @since 1.5piloto.79a
+ */
+function _encolar_en_buzon(Nodo $nodo_comp, string $nombre_buzon, string $id_nodo, Nodo $nodo): void {
+    $buzon = $nodo_comp->adyacente($nombre_buzon);
+    if (!$buzon) {
+        $buzon = Nodo::crear_con_dato('');
+        $nodo_comp->_adyacente_en($buzon, $nombre_buzon);
+    }
+    $buzon->_adyacente_en($nodo, $id_nodo, true);
+}
+
+/**
+ * Procesa los buzones de todos los compartidos del
+ * dueño. Drena pendientes_ventas hacia el árbol de
+ * ventas y pendientes_cancelaciones hacia el árbol
+ * de cancelaciones.
+ *
+ * Idempotente. Bug §1.5.10.
+ *
+ * @param string $nombre_dueno
+ * @return bool True si hubo cambios.
+ * @since 1.5piloto.79a
+ */
+function _procesar_pendientes_del_dueno(string $nombre_dueno): bool {
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if (!$nodo_dueno) return false;
+
+    $hubo_cambios = false;
+    $ady = (array)$nodo_dueno->adyacentes();
+
+    foreach ($ady as $enlace => $nodo_comp) {
+        $enlace = (string)$enlace;
+        // Los compartidos se llaman `compartido_con_<nombre>`
+        // (con el nombre de usuario del terminal, sin prefijo
+        // `us_`). Bug de filtro detectado con la primera
+        // prueba de buzones: el `us_` de más hacía que
+        // ningún compartido matcheara y el buzón quedara
+        // sin drenar.
+        if (strpos($enlace, 'compartido_con_') !== 0) continue;
+        if (!$nodo_comp->adyacente('_es_compartido')) continue;
+
+        $c1 = _drenar_buzon($nodo_dueno, $nodo_comp, 'pendientes_ventas', 'ventas');
+        $c2 = _drenar_buzon($nodo_dueno, $nodo_comp, 'pendientes_cancelaciones', 'cancelaciones');
+        if ($c1 || $c2) $hubo_cambios = true;
+    }
+
+    return $hubo_cambios;
+}
+
+/**
+ * Drena un buzón del compartido: inserta cada nodo del
+ * buzón en el árbol correspondiente del dueño y desenlaza
+ * del buzón. Destruye el buzón si queda vacío.
+ *
+ * Idempotente: si un nodo ya está en el árbol del dueño
+ * (por id), no lo reinserta.
+ *
+ * @param Nodo   $nodo_dueno
+ * @param Nodo   $nodo_comp
+ * @param string $nombre_buzon
+ * @param string $nombre_arbol
+ * @return bool True si hubo cambios.
+ * @since 1.5piloto.79a
+ */
+function _drenar_buzon(Nodo $nodo_dueno, Nodo $nodo_comp, string $nombre_buzon, string $nombre_arbol): bool {
+    $buzon = $nodo_comp->adyacente($nombre_buzon);
+    if (!$buzon) return false;
+
+    $contenedor = $nodo_dueno->adyacente($nombre_arbol);
+    if (!$contenedor) {
+        $contenedor = Nodo::crear_con_dato('');
+        $nodo_dueno->_adyacente_en($contenedor, $nombre_arbol);
+    }
+
+    $a_procesar = [];
+    foreach ((array)$buzon->adyacentes() as $id_nodo => $nodo) {
+        $a_procesar[(string)$id_nodo] = $nodo;
+    }
+
+    $hubo_cambios = false;
+    if (!empty($a_procesar)) {
+        foreach ($a_procesar as $id_nodo => $nodo) {
+            if (!_nodo_esta_en_arbol($contenedor, $id_nodo)) {
+                _hmi($contenedor, $nodo);
+                $hubo_cambios = true;
+            }
+            $buzon->eliminar_adyacente($id_nodo);
+        }
+    }
+
+    if (empty($buzon->adyacentes())) {
+        $nodo_comp->eliminar_adyacente($nombre_buzon);
+        _destruir_campos_simples($buzon);
+        Nodo::eliminar($buzon);
+        $hubo_cambios = true;
+    }
+
+    return $hubo_cambios;
+}
+
+/**
+ * Devuelve true si un nodo con ese dato (id) ya está en el
+ * árbol (hmi/hd) del contenedor.
+ *
+ * @param Nodo   $contenedor
+ * @param string $id_nodo
+ * @return bool
+ * @since 1.5piloto.79a
+ */
+function _nodo_esta_en_arbol(Nodo $contenedor, string $id_nodo): bool {
+    $actual = hmi($contenedor);
+    $seg = 0;
+    while ($actual && $seg < 2000) {
+        if ((string)$actual->dato() === $id_nodo) return true;
+        $actual = hd($actual);
+        $seg++;
+    }
+    return false;
 }
 

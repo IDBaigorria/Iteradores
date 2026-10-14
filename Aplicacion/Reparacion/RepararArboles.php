@@ -20,7 +20,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.78z
- * @version   1.5piloto.78z
+ * @version   1.5piloto.79b
  */
 
 use Iteradores\Nodos\Nodo;
@@ -175,10 +175,15 @@ function reparar_arboles(string $token): array {
         $ady_dueno = (array)$nodo_usuario->adyacentes();
         foreach ($ady_dueno as $enlace_comp => $nodo_comp) {
             $enlace_comp = (string)$enlace_comp;
-            if (strpos($enlace_comp, 'compartido_con_us_') !== 0) continue;
+            // Los compartidos se llaman `compartido_con_<nombre>`
+            // (con el nombre de usuario del terminal, sin
+            // prefijo `us_`). Bug de filtro detectado al
+            // revisar este helper (el mismo que tenía
+            // _procesar_pendientes_del_dueno en Venta.php).
+            if (strpos($enlace_comp, 'compartido_con_') !== 0) continue;
             if (!$nodo_comp->adyacente('_es_compartido')) continue;
 
-            $nombre_terminal = substr($enlace_comp, strlen('compartido_con_us_'));
+            $nombre_terminal = substr($enlace_comp, strlen('compartido_con_'));
             if ($nombre_terminal === '') continue;
 
             $nombres_comp = [

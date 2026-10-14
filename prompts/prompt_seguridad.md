@@ -439,6 +439,169 @@ Los compartidos llevan `_es_compartido → "1"`. Sirve para:
 - El comando `grafo:nodo` del framework expone
   `destino_es_compartido` para las pruebas.
 
+### 5.8 Inserción diferida (buzones) para árboles compartidos
+
+Cuando un contexto **no puede insertar** en el árbol del
+otro (porque el contenedor raíz no está en su subgrafo),
+se usa un **buzón**: un contenedor plano dentro del
+compartido, en el que el contexto parcial deposita el
+nodo, y que el contexto completo lee y procesa en su
+próxima carga.
+
+**Formato:**
+
+- El buzón vive en el compartido:
+  `compartido_con_us_X/pendientes_<tipo>`.
+- Los hijos son los **mismos nodos físicos** (venta,
+  cancelación) referenciados por su id.
+- El contexto parcial: agrega el nodo a su propio árbol
+  (donde sí puede) y lo encola en el buzón.
+- El contexto completo: al listar, drena el buzón
+  (inserta en su árbol, idempotentemente) antes del
+  barrido normal.
+
+**Detalle crítico: el bitmask lo propaga el framework,**
+**no la app.** Cuando el terminal crea el buzón y encola
+la venta, ninguno de los dos tiene todavía el bit del
+dueño. El framework, al guardar parcial (v1.5i.8c),
+propaga máscaras a los nodos nuevos por sus enlaces
+entrantes: el buzón hereda el bitmask del compartido
+(que sí tiene el bit del dueño), y la venta hereda del
+buzón o del árbol del compartido. La app no toca bits
+a mano. Si lo hiciera, la seguridad dejaría de emerger
+de la topología y volvería a depender de que la app
+se acuerde de escribir los bits correctos.
+
+**Idempotencia:** al drenar, verificar por id si el
+nodo ya está en el árbol del dueño. Después de procesar,
+destruir el buzón si quedó vacío.
+
+### 5.9 Inventario de estructuras compartidas por patrón
+
+No todo lo compartido tiene el mismo problema. Hay tres
+tipos de estructuras:
+
+**Tipo A — Árboles que se reorganizan al insertar.**
+Cuando agregás un nodo nuevo, hay que tocar el `hmi` del
+contenedor (y el `hd` de algún otro nodo). **Estas
+tienen el problema del §5.8.**
+
+Estructuras tipo A en el piloto:
+
+| Estructura | Quién agrega | Contenedor | Estado |
+|---|---|---|---|
+| Ventas (dueño) | Terminal vía venta | Dueño + compartido | **Buzón aplicado (v79a)** |
+| Cancelaciones (dueño) | Dueño o terminal | Dueño + compartido | **Buzón aplicado (v79a)** |
+| Rendiciones (dueño) | Solo dueño | Dueño | No aplica |
+| Liquidaciones (dueño) | Solo dueño | Dueño | No aplica |
+| Cupones (dentro de venta) | Terminal vía venta | Sigue a la venta | No independiente |
+| Paradas (dentro de viaje) | Solo dueño | Dueño | No aplica |
+| Detalles de rendición | Solo dueño | Dueño | No aplica |
+| Ajustes de rendición | Solo dueño | Dueño | No aplica |
+
+**Tipo B — Contenedores planos (enlaces por nombre).**
+Agregar un nodo es solo `padre->_adyacente_en($nuevo,
+'nombre')`. Si el padre es accesible desde ambos
+contextos, se ve desde ambos. **No tienen el problema.**
+
+Estructuras tipo B en el piloto: micros, empresas,
+vehículos, terminales, terminales autorizadas, opciones
+avanzadas, sesiones, bancos, `duenos` del soporte.
+
+**Caso especial — Alias.** El contenedor `pasajeros` del
+compartido apunta al mismo nodo físico que el `pasajeros`
+del dueño. No es copia. El terminal y el dueño ven el
+mismo pasajero. No tiene el problema porque no hay dos
+nodos que sincronizar.
+
+**Caso especial — Sincronización explícita.** Los viajes
+se agregan solo desde el dueño, pero los compartidos
+necesitan reflejarlos. Ya existe `_sincronizar_*` en
+`Aplicacion/Compartidos.php`. No usa buzón porque el
+dueño es el único que agrega.
+
+**Tipo C — Listas circulares (primer/siguiente).**
+Agregar un nodo es encadenar `siguiente`. No hay
+reorganización de la cabeza. **No tienen el problema.**
+
+Estructuras tipo C en el piloto: asientos (dentro de
+cada piso), asientos-en-venta (venta actual).
+
+**Regla de detección para estructuras nuevas:**
+
+1. ¿Es un árbol (hmi/hd/p)? Si no, no.
+2. ¿El terminal puede agregar nodos nuevos a ese árbol?
+   Si no, no.
+3. ¿El contenedor raíz del árbol es alcanzable desde
+   ambos contextos (dueño y terminal)? Si sí, sí.
+
+Si las tres son "sí", necesita el patrón del buzón.
+
+### 5.10 Naming de los compartidos
+
+**Regla del nombre.** Los compartidos se llaman
+`compartido_con_<nombre_usuario>`, donde
+`<nombre_usuario>` es el **nombre de usuario** del
+terminal, **sin el prefijo `us_`**. Ejemplo:
+`compartido_con_secretaria_carmen`.
+
+Esto es consistente con la convención general del
+piloto: los nombres visibles son nombres de usuario,
+no IDs especiales. El ID especial (`us_<nombre>`) es
+para referenciar el nodo entre cargas, no para el
+nombre de enlace.
+
+**Trampa común.** Escribir
+`strpos($enlace, 'compartido_con_us_')` en un filtro
+que deba detectar compartidos. **Nunca matchea**
+porque el `us_` de más no está en el nombre real.
+El filtro falla silenciosamente: el loop recorre los
+compartidos, no encuentra ninguno, y el bug se
+manifiesta más tarde como "el dueño no ve las ventas".
+
+**Fix.** El filtro correcto es:
+`strpos($enlace, 'compartido_con_') === 0`.
+La parte del nombre de usuario se extrae con
+`substr($enlace, strlen('compartido_con_'))`.
+
+**Auditoría.** Antes de dar por cerrado cualquier
+flujo que toque compartidos, correr:
+
+```bash
+grep -rn "compartido_con_us_" Aplicacion/
+```
+
+Si devuelve algo, es un bug latente del mismo tipo.
+En la sesión v79b aparecieron dos:
+`_procesar_pendientes_del_dueno` (Venta.php) y
+`reparar_arboles.php`.
+
+### 5.11 Lecciones de método
+
+**1. El bitmask correcto no garantiza que el flujo
+funcione.** En v79b, los SQLs de diagnóstico mostraron
+que las ventas nuevas tenían la máscara 120 (con el
+bit del dueño) y que el buzón existía. Todo el
+pipeline parecía sano. El bug era un filtro de
+naming que fallaba silenciosamente antes de llegar
+al bitmask. Moraleja: cuando el estado persistido
+parece correcto pero el comportamiento no, **el bug
+está en el código que lo consume, no en los datos**.
+
+**2. Verificar por SQL el estado real antes de asumir.**
+Cuando un fix no resuelve el síntoma, antes de
+proponer otro fix, correr SQLs que muestren el
+estado real. En v79b eso evitó seguir buscando en el
+lugar equivocado (el guardado parcial) cuando el
+problema estaba en la lectura (el filtro de drenado).
+
+**3. Un bug en un helper sugiere el mismo bug en sus
+hermanos.** Cuando se detecta un patrón problemático
+(por ejemplo, un filtro mal escrito), auditar los
+demás helpers que usan el mismo patrón. En v79b, el
+fix del filtro en `Venta.php` reveló el mismo bug
+en `reparar_arboles.php`.
+
 ---
 
 ## 6. ANTI-PATRONES
@@ -549,6 +712,18 @@ clave persistente entre requests.
 intentaban mapear "ID del framework" ↔ "fila de la DB", pero
 los IDs del framework cambiaban entre cargas. El grafo creció a
 99k nodos por inserciones duplicadas.
+
+### 6.10 Filtrar compartidos con el prefijo `us_` de más
+
+Ver §5.10. Los compartidos se llaman
+`compartido_con_<nombre_usuario>`, no
+`compartido_con_us_<nombre>`. Un filtro con el `us_` de
+más nunca matchea y falla silenciosamente.
+
+**Caso real:** v79b. `_procesar_pendientes_del_dueno`
+tenía el filtro mal. El buzón de ventas nunca se
+drenaba y el dueño no veía las ventas nuevas. El
+mismo bug latente en `reparar_arboles.php`.
 
 ---
 

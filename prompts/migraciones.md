@@ -23,3 +23,4 @@ index.php?reparar_topologia=1 → reparación final (por si algo quedó desenlaz
 
 ## 13/1023
 index.php?reparar_arboles=1
+//entrar primero como dueño e ir a la pestaña vendidos

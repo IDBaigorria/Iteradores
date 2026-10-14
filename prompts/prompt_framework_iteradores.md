@@ -999,6 +999,20 @@ huérfanos).
   `id_fila` explícito para los que estaban en el mapa
   (preserva identidad), auto-increment para los nuevos.
   UPDATE no aplica nunca: siempre pisamos con DELETE primero.
+- **1.5i.8c**: propagación de máscaras a nodos nuevos.
+  En `_guardar_con_filtro` con filtro != 0, después del
+  unir v78s, detectar los nodos que no están en el mapa
+  previo (creados durante esta request). Propagarles
+  máscaras por enlaces entrantes desde nodos ya cargados
+  o ya propagados, hasta punto fijo (máx 10 iteraciones).
+  Sin esto, un nodo nuevo no tiene bits y el contexto
+  que lo vería no lo carga en su próxima carga parcial.
+  Espejo JS en V1.5i.8c.
+  **Limitación:** si un nodo nuevo se enlaza solo desde
+  nodos que están en la DB pero no en memoria del
+  guardador, no hay fuente para propagar. En la práctica
+  no pasa: el que crea un nodo tiene a su padre en
+  memoria.
 
 **BUG PENDIENTE (framework).** El bug del viaje viejo que
 desaparece tras una operación del terminal (§1.5 del

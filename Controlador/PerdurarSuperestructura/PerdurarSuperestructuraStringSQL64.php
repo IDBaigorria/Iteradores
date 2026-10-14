@@ -53,7 +53,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStrin
  * identidad. Los nuevos van con auto-increment.
  *
  * @author Ignacio David Baigorria
- * @version 1.5i.8b
+ * @version 1.5i.8c
  * @since 1.5i.7k
  */
 class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQL implements PerdurarSuperestructuraConContexto {
@@ -171,6 +171,57 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         // Los que están acá fueron cargados de la DB. Los que no
         // fueron creados durante esta request.
         $mapa_previo = self::$_mapa_id_a_fila[$nombre] ?? [];
+
+        // Propagar máscaras a nodos nuevos (los que no están en
+        // el mapa previo, o sea que no vinieron de la DB) a
+        // partir de sus enlaces entrantes desde nodos ya
+        // cargados o ya propagados.
+        //
+        // Un nodo nuevo no tiene `m_previa`, pero hereda la
+        // unión de las máscaras de sus vecinos. Iterar hasta
+        // punto fijo para propagar por cadenas de nodos nuevos.
+        // En la práctica son pocas iteraciones (profundidad del
+        // subárbol nuevo). Fix v1.5i.8c.
+        //
+        // Limitación conocida: si un nodo nuevo se enlaza solo
+        // desde nodos que están en la DB pero no en memoria
+        // del guardador, no hay fuente para propagar. En la
+        // práctica no pasa: el que crea un nodo siempre tiene
+        // a su padre en memoria.
+        if ($mf_parcial !== 0 && !empty($mapa_previo)) {
+            $nuevos = [];
+            Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use (&$nuevos, $mapa_previo) {
+                $id = $nodo->id();
+                if (!isset($mapa_previo[$id])) {
+                    $nuevos[$id] = true;
+                }
+            });
+            if (!empty($nuevos)) {
+                $cambio = true;
+                $iter = 0;
+                while ($cambio && $iter < 10) {
+                    $cambio = false;
+                    $iter++;
+                    Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use (&$mascaras, $nuevos, &$cambio) {
+                        $id_origen = $nodo->id();
+                        $m_origen = (int)($mascaras[$id_origen] ?? 0);
+                        if ($m_origen === 0) return;
+                        $ady = $nodo->adyacentes();
+                        if (!is_array($ady)) return;
+                        foreach ($ady as $destino) {
+                            $id_dest = $destino->id();
+                            if (!isset($nuevos[$id_dest])) continue;
+                            $m_dest = (int)($mascaras[$id_dest] ?? 0);
+                            $m_nueva = $m_dest | $m_origen;
+                            if ($m_nueva !== $m_dest) {
+                                $mascaras[$id_dest] = $m_nueva;
+                                $cambio = true;
+                            }
+                        }
+                    });
+                }
+            }
+        }
 
         $filas_cargadas = [];
         if ($mf_parcial !== 0) {
