@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.76b
+ * @version 1.5piloto.79j
  */
 
 // Utilidades
@@ -228,6 +228,26 @@ async function ingresar_con_usuario() {
     }
 }
 
+
+/**
+ * Aplica las clases de rol y modo al <body>. Se usa para que
+ * el CSS condicione la visibilidad de botones solo-admin
+ * (por ejemplo, "Limpiar viajes de prueba"). Las clases se
+ * limpian en _limpiar_contenido_dinamico, así que un cambio
+ * de sesión sin recargar la página las quita antes de
+ * configurar la nueva UI.
+ *
+ * Pasar usuario = null quita las dos clases.
+ *
+ * @param {object|null} usuario
+ */
+function _aplicar_clases_de_rol(usuario) {
+    const body = document.body;
+    if (!body) return;
+    body.classList.toggle('rol-admin', !!(usuario && usuario.nivel === 'admin'));
+    body.classList.toggle('modo-pruebas', window.entorno_es_pruebas === true);
+}
+
 /**
  * Aplica un login exitoso: guarda estado, muestra la app y configura pestañas.
  * Se usa tanto en login por código como por usuario.
@@ -245,6 +265,7 @@ function _aplicar_login_exitoso(usuario) {
     $("#aplicacion").classList.remove("hidden");
     $("#nombre_usuario_actual").textContent = usuario.nombre_usuario;
     $("#nivel_usuario_actual").textContent = usuario.nivel;
+    _aplicar_clases_de_rol(usuario);
     configurar_pestanas_segun_nivel(usuario.nivel);
 }
 
@@ -312,6 +333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 $("#aplicacion").classList.remove("hidden");
                 $("#nombre_usuario_actual").textContent = usuario_actual.nombre_usuario;
                 $("#nivel_usuario_actual").textContent = usuario_actual.nivel;
+                _aplicar_clases_de_rol(usuario_actual);
                 configurar_pestanas_segun_nivel(usuario_actual.nivel);
                 ocultar_detalle_viaje();
             } else {
@@ -534,6 +556,10 @@ function _limpiar_contenido_dinamico() {
     // Se llama desde salir() y desde _aplicar_login_exitoso(),
     // así que cubre tanto el logout manual como el cambio de
     // sesión sin recargar la página.
+
+    // v79j: quitar las clases de rol del body, así el CSS
+    // no muestra botones de admin en la próxima sesión.
+    _aplicar_clases_de_rol(null);
 
     // 1. Modal apilado (está encima).
     if (typeof cerrar_modal_apilado === 'function') {
