@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.79i
+ * @version   1.5piloto.80a
  */
 
 use Iteradores\Nodos\Nodo;
@@ -383,6 +383,13 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     responder_json(['exito' => true, 'duenos' => listar_duenos()]);
                     break;
 
+                case 'limpiar_usuarios_prueba':
+                    // Solo admin + modo pruebas. Sin dueño
+                    // específico: aplica global.
+                    $resultado_lup = limpiar_usuarios_de_prueba();
+                    responder_json($resultado_lup);
+                    break;
+
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de administrador no válida']);
             }
@@ -450,6 +457,24 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nombres_terminales = array_map(function($t) { return (string)$t['nombre_usuario']; }, $terminales_datos);
                     $sesiones = listar_sesiones_de_usuarios($nombres_terminales);
                     responder_json(['exito' => true, 'sesiones' => $sesiones]);
+                    break;
+
+                case 'limpiar_terminales_prueba':
+                    // Solo admin + modo pruebas (chequeo
+                    // interno de es_pruebas en la función).
+                    $nombre_sol_ltp = $post['nombre_solicitante'] ?? '';
+                    $nodo_sol_ltp = ($nombre_sol_ltp !== '') ? Nodo::nodo_por_id('us_' . $nombre_sol_ltp) : null;
+                    $nodo_nivel_ltp = $nodo_sol_ltp ? $nodo_sol_ltp->adyacente('nivel') : null;
+                    $nivel_sol_ltp = $nodo_nivel_ltp ? $nodo_nivel_ltp->dato() : '';
+                    if ($nivel_sol_ltp !== 'admin') {
+                        responder_json(['exito' => false, 'error' => 'Solo el administrador puede ejecutar esta acción']);
+                    }
+                    $nombre_dueno_ltp = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno_ltp)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado_ltp = limpiar_terminales_de_prueba($nombre_dueno_ltp);
+                    responder_json($resultado_ltp);
                     break;
 
                 default:
@@ -548,6 +573,25 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = eliminar_empresa($nombre_dueno, $nombre_empresa);
                     responder_json($resultado);
                     break;
+
+                case 'limpiar_prueba':
+                    // Solo admin + modo pruebas (chequeo
+                    // interno de es_pruebas en la función).
+                    $nombre_sol_lep = $post['nombre_solicitante'] ?? '';
+                    $nodo_sol_lep = ($nombre_sol_lep !== '') ? Nodo::nodo_por_id('us_' . $nombre_sol_lep) : null;
+                    $nodo_nivel_lep = $nodo_sol_lep ? $nodo_sol_lep->adyacente('nivel') : null;
+                    $nivel_sol_lep = $nodo_nivel_lep ? $nodo_nivel_lep->dato() : '';
+                    if ($nivel_sol_lep !== 'admin') {
+                        responder_json(['exito' => false, 'error' => 'Solo el administrador puede ejecutar esta acción']);
+                    }
+                    $nombre_dueno_lep = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno_lep)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado_lep = limpiar_empresas_vehiculos_de_prueba($nombre_dueno_lep);
+                    responder_json($resultado_lep);
+                    break;
+
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de empresas no válida']);
             }
@@ -1145,6 +1189,25 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $resultado = guardar_viaje_completo($post);
                     responder_json($resultado);
                     break;
+
+                case 'limpiar_prueba':
+                    // Solo admin + modo pruebas (chequeo
+                    // interno de es_pruebas en la función).
+                    $nombre_sol_lvp = $post['nombre_solicitante'] ?? '';
+                    $nodo_sol_lvp = ($nombre_sol_lvp !== '') ? Nodo::nodo_por_id('us_' . $nombre_sol_lvp) : null;
+                    $nodo_nivel_lvp = $nodo_sol_lvp ? $nodo_sol_lvp->adyacente('nivel') : null;
+                    $nivel_sol_lvp = $nodo_nivel_lvp ? $nodo_nivel_lvp->dato() : '';
+                    if ($nivel_sol_lvp !== 'admin') {
+                        responder_json(['exito' => false, 'error' => 'Solo el administrador puede ejecutar esta acción']);
+                    }
+                    $nombre_dueno_lvp = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno_lvp)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado_lvp = limpiar_ventas_de_prueba($nombre_dueno_lvp);
+                    responder_json($resultado_lvp);
+                    break;
+
                 default:
                     responder_json(['exito' => false, 'error' => 'Subacción de ventas no válida']);
             }
@@ -1461,6 +1524,24 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     } else {
                         responder_json(['exito' => false, 'error' => 'Cancelación no encontrada']);
                     }
+                    break;
+
+                case 'limpiar_prueba':
+                    // Solo admin + modo pruebas (chequeo
+                    // interno de es_pruebas en la función).
+                    $nombre_sol_lcp = $post['nombre_solicitante'] ?? '';
+                    $nodo_sol_lcp = ($nombre_sol_lcp !== '') ? Nodo::nodo_por_id('us_' . $nombre_sol_lcp) : null;
+                    $nodo_nivel_lcp = $nodo_sol_lcp ? $nodo_sol_lcp->adyacente('nivel') : null;
+                    $nivel_sol_lcp = $nodo_nivel_lcp ? $nodo_nivel_lcp->dato() : '';
+                    if ($nivel_sol_lcp !== 'admin') {
+                        responder_json(['exito' => false, 'error' => 'Solo el administrador puede ejecutar esta acción']);
+                    }
+                    $nombre_dueno_lcp = $post['nombre_dueno'] ?? '';
+                    if (empty($nombre_dueno_lcp)) {
+                        responder_json(['exito' => false, 'error' => 'Dueño no especificado']);
+                    }
+                    $resultado_lcp = limpiar_cancelaciones_de_prueba($nombre_dueno_lcp);
+                    responder_json($resultado_lcp);
                     break;
 
                 default:

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.77i
+ * @version   1.5piloto.80a
  */
 
 use Iteradores\Nodos\Nodo;
@@ -15,6 +15,7 @@ include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./Aplicacion/FuncionesAuxiliares.php");
 include_once("./Aplicacion/Compartidos.php");
+include_once("./Aplicacion/Vehiculos/Vehiculo.php");
 
 /**
  * Lista las empresas asociadas a un dueño.
@@ -178,4 +179,119 @@ function eliminar_empresa(string $nombre_dueno, string $nombre_empresa): array {
 
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
+}
+
+/**
+ * Elimina las empresas y vehículos "de prueba" de un dueño.
+ *
+ * Criterio por prefijo del identificador (clave del
+ * contenedor):
+ *   - Empresas: fotoauto, viajecambiomicro_emp_
+ *   - Vehículos: fotoauto, viajecambiomicro_veh_
+ *
+ * Si una empresa matchea, se destruye entera (con sus
+ * vehículos). Si no, se itera sus vehículos y se borran
+ * los que matcheen.
+ *
+ * Si un vehículo está referenciado por un micro de un
+ * viaje, eliminar_vehiculo falla y se reporta en
+ * `salteados`.
+ *
+ * Disponible solo en modo pruebas.
+ *
+ * @param string $nombre_dueno
+ * @return array
+ * @since 1.5piloto.80a
+ */
+function limpiar_empresas_vehiculos_de_prueba(string $nombre_dueno): array {
+    if (!\Iteradores\Configuracion\Entorno::es_pruebas()) {
+        return ['exito' => false, 'error' => 'Disponible solo en modo pruebas'];
+    }
+
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if (!$nodo_dueno) {
+        return ['exito' => false, 'error' => 'Dueño no encontrado'];
+    }
+
+    $nodo_empresas = $nodo_dueno->adyacente('empresas');
+    if (!$nodo_empresas) {
+        return [
+            'exito' => true,
+            'empresas_borradas' => [],
+            'vehiculos_borrados' => [],
+            'cantidad_empresas_borradas' => 0,
+            'cantidad_vehiculos_borrados' => 0,
+            'salteados' => [],
+            'cantidad_salteados' => 0,
+        ];
+    }
+
+    $prefijos_empresa = ['fotoauto', 'viajecambiomicro_emp_'];
+    $prefijos_vehiculo = ['fotoauto', 'viajecambiomicro_veh_'];
+
+    $empresas_borradas = [];
+    $vehiculos_borrados = [];
+    $salteados = [];
+
+    // Recolectar antes de modificar.
+    $empresas = (array) $nodo_empresas->adyacentes();
+
+    foreach ($empresas as $nombre_empresa => $nodo_empresa) {
+        $nombre_empresa = (string)$nombre_empresa;
+
+        $empresa_es_prueba = false;
+        foreach ($prefijos_empresa as $p) {
+            if (stripos($nombre_empresa, $p) === 0) {
+                $empresa_es_prueba = true;
+                break;
+            }
+        }
+
+        if ($empresa_es_prueba) {
+            $res = eliminar_empresa($nombre_dueno, $nombre_empresa);
+            if (is_array($res) && !empty($res['exito'])) {
+                $empresas_borradas[] = $nombre_empresa;
+            } else {
+                $motivo = (is_array($res) && isset($res['error'])) ? $res['error'] : 'Error desconocido';
+                $salteados[] = ['nombre' => $nombre_empresa, 'motivo' => $motivo];
+            }
+            continue;
+        }
+
+        // Empresa no de prueba: revisar sus vehículos.
+        $nodo_vehiculos = $nodo_empresa->adyacente('vehiculos');
+        if (!$nodo_vehiculos) continue;
+
+        $vehiculos = (array) $nodo_vehiculos->adyacentes();
+        foreach ($vehiculos as $nombre_vehiculo => $nodo_vehiculo) {
+            $nombre_vehiculo = (string)$nombre_vehiculo;
+
+            $vehiculo_es_prueba = false;
+            foreach ($prefijos_vehiculo as $p) {
+                if (stripos($nombre_vehiculo, $p) === 0) {
+                    $vehiculo_es_prueba = true;
+                    break;
+                }
+            }
+            if (!$vehiculo_es_prueba) continue;
+
+            $res = eliminar_vehiculo($nombre_empresa, $nombre_vehiculo, $nombre_dueno);
+            if (is_array($res) && !empty($res['exito'])) {
+                $vehiculos_borrados[] = $nombre_empresa . '/' . $nombre_vehiculo;
+            } else {
+                $motivo = (is_array($res) && isset($res['error'])) ? $res['error'] : 'Error desconocido';
+                $salteados[] = ['nombre' => $nombre_empresa . '/' . $nombre_vehiculo, 'motivo' => $motivo];
+            }
+        }
+    }
+
+    return [
+        'exito' => true,
+        'empresas_borradas' => $empresas_borradas,
+        'vehiculos_borrados' => $vehiculos_borrados,
+        'cantidad_empresas_borradas' => count($empresas_borradas),
+        'cantidad_vehiculos_borrados' => count($vehiculos_borrados),
+        'salteados' => $salteados,
+        'cantidad_salteados' => count($salteados),
+    ];
 }

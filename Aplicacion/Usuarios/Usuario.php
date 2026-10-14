@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78o
+ * @version   1.5piloto.80a
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1547,4 +1547,182 @@ function _asegurar_compartido_y_repuntar(Nodo $nodo_dueno, Nodo $nodo_terminal, 
     if (!$nodo_dueno_actual || $nodo_dueno_actual->id() !== $compartido->id()) {
         $nodo_terminal->_adyacente_en($compartido, 'dueno', true);
     }
+}
+
+// ============================================================
+// Limpieza de datos de prueba (Fase 1 de §3 del plan actual).
+// ============================================================
+
+/**
+ * Elimina los usuarios "de prueba".
+ *
+ * Criterio D1: nombre_usuario contiene "prueba", "test" o
+ * "temp" (case-insensitive).
+ *
+ * Saltea (con motivo en `salteados`):
+ *   - el admin principal;
+ *   - usuarios con terminales asociadas (D1b);
+ *   - usuarios con contenido propio: ventas, pasajeros,
+ *     viajes, empresas, rendiciones, liquidaciones,
+ *     cancelaciones, dueños (si es soporte), o venta
+ *     en curso (D1c).
+ *
+ * No usa listar_usuarios: navega directo por la raíz
+ * `usuarios`, sin tocar credenciales (D9).
+ *
+ * Disponible solo en modo pruebas.
+ *
+ * @return array
+ * @since 1.5piloto.80a
+ */
+function limpiar_usuarios_de_prueba(): array {
+    if (!\Iteradores\Configuracion\Entorno::es_pruebas()) {
+        return ['exito' => false, 'error' => 'Disponible solo en modo pruebas'];
+    }
+
+    $raiz = Nodo::nodo_por_id('usuarios');
+    if (!$raiz) {
+        return ['exito' => false, 'error' => 'No existe la raíz usuarios'];
+    }
+
+    $adyacentes = (array) $raiz->adyacentes();
+    $candidatos = [];
+    foreach ($adyacentes as $nombre_usuario => $nodo_usuario) {
+        $nombre_usuario = (string)$nombre_usuario;
+        $nombre_lower = strtolower($nombre_usuario);
+        $es_candidato = (
+            strpos($nombre_lower, 'prueba') !== false
+            || strpos($nombre_lower, 'test') !== false
+            || strpos($nombre_lower, 'temp') !== false
+        );
+        if ($es_candidato) {
+            $candidatos[$nombre_usuario] = $nodo_usuario;
+        }
+    }
+
+    $borrados = [];
+    $salteados = [];
+    foreach ($candidatos as $nombre_usuario => $nodo_usuario) {
+        if ($nombre_usuario === ConfiguracionApli::NOMBRE_ADMIN) {
+            $salteados[] = ['nombre' => $nombre_usuario, 'motivo' => 'Es el administrador'];
+            continue;
+        }
+
+        // D1b: ¿tiene terminales asociadas?
+        $nodo_terminales = $nodo_usuario->adyacente('terminales');
+        if ($nodo_terminales && !empty($nodo_terminales->adyacentes())) {
+            $salteados[] = ['nombre' => $nombre_usuario, 'motivo' => 'Tiene terminales asociadas'];
+            continue;
+        }
+
+        // ¿Tiene una venta en curso colgada?
+        if ($nodo_usuario->adyacente('venta_actual')) {
+            $salteados[] = ['nombre' => $nombre_usuario, 'motivo' => 'Tiene una venta en curso'];
+            continue;
+        }
+
+        // D1c: ¿tiene contenido asociado (ventas, pasajeros,
+        // viajes, empresas, rendiciones, liquidaciones,
+        // cancelaciones, o dueños asignados si es soporte)?
+        $contenedores = [
+            'ventas', 'pasajeros', 'viajes', 'empresas',
+            'rendiciones', 'liquidaciones', 'cancelaciones',
+            'duenos',
+        ];
+        $tiene_contenido = false;
+        foreach ($contenedores as $c) {
+            $nodo_c = $nodo_usuario->adyacente($c);
+            if ($nodo_c && !empty($nodo_c->adyacentes())) {
+                $tiene_contenido = true;
+                break;
+            }
+        }
+        if ($tiene_contenido) {
+            $salteados[] = ['nombre' => $nombre_usuario, 'motivo' => 'Tiene datos asociados'];
+            continue;
+        }
+
+        $res = eliminar_usuario($nombre_usuario);
+        if (is_array($res) && !empty($res['exito'])) {
+            $borrados[] = $nombre_usuario;
+        } else {
+            $motivo = (is_array($res) && isset($res['error'])) ? $res['error'] : 'Error desconocido';
+            $salteados[] = ['nombre' => $nombre_usuario, 'motivo' => $motivo];
+        }
+    }
+
+    return [
+        'exito' => true,
+        'borrados' => $borrados,
+        'cantidad_borrados' => count($borrados),
+        'salteados' => $salteados,
+        'cantidad_salteados' => count($salteados),
+    ];
+}
+
+/**
+ * Elimina las terminales "de prueba" de un dueño.
+ *
+ * Criterio D3: nombre_usuario empieza con "termprueba".
+ *
+ * Reusa eliminar_terminal, que verifica permiso y llama
+ * a eliminar_usuario (que hace todo el cleanup del nodo
+ * usuario, credencial y sesiones).
+ *
+ * Disponible solo en modo pruebas.
+ *
+ * @param string $nombre_dueno
+ * @return array
+ * @since 1.5piloto.80a
+ */
+function limpiar_terminales_de_prueba(string $nombre_dueno): array {
+    if (!\Iteradores\Configuracion\Entorno::es_pruebas()) {
+        return ['exito' => false, 'error' => 'Disponible solo en modo pruebas'];
+    }
+
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if (!$nodo_dueno) {
+        return ['exito' => false, 'error' => 'Dueño no encontrado'];
+    }
+
+    $nodo_terminales = $nodo_dueno->adyacente('terminales');
+    if (!$nodo_terminales) {
+        return [
+            'exito' => true,
+            'borrados' => [],
+            'cantidad_borrados' => 0,
+            'salteados' => [],
+            'cantidad_salteados' => 0,
+        ];
+    }
+
+    $prefijo = 'termprueba';
+    $a_borrar = [];
+    $adyacentes = (array) $nodo_terminales->adyacentes();
+    foreach ($adyacentes as $nombre_terminal => $nodo_terminal) {
+        $nombre_terminal = (string)$nombre_terminal;
+        if (stripos($nombre_terminal, $prefijo) === 0) {
+            $a_borrar[] = $nombre_terminal;
+        }
+    }
+
+    $borrados = [];
+    $salteados = [];
+    foreach ($a_borrar as $nombre_terminal) {
+        $res = eliminar_terminal($nombre_terminal, $nombre_dueno);
+        if (is_array($res) && !empty($res['exito'])) {
+            $borrados[] = $nombre_terminal;
+        } else {
+            $motivo = (is_array($res) && isset($res['error'])) ? $res['error'] : 'Error desconocido';
+            $salteados[] = ['nombre' => $nombre_terminal, 'motivo' => $motivo];
+        }
+    }
+
+    return [
+        'exito' => true,
+        'borrados' => $borrados,
+        'cantidad_borrados' => count($borrados),
+        'salteados' => $salteados,
+        'cantidad_salteados' => count($salteados),
+    ];
 }

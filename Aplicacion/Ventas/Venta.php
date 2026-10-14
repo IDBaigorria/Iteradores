@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.79b
+ * @version   1.5piloto.80a
  */
 
 
@@ -3053,5 +3053,167 @@ function _nodo_esta_en_arbol(Nodo $contenedor, string $id_nodo): bool {
         $seg++;
     }
     return false;
+}
+
+/**
+ * Limpia las ventas "de prueba" de un dueño. Criterio:
+ * el comprador tiene email terminado en @test.local.
+ *
+ * Cada venta se cancela con motivo fijo "Limpieza de
+ * pruebas automáticas", lo que crea un Nodo Cancelación
+ * (auditoría). Ver también limpiar_cancelaciones_de_prueba,
+ * que barre esos nodos.
+ *
+ * Disponible solo en modo pruebas.
+ *
+ * @param string $nombre_dueno
+ * @return array
+ * @since 1.5piloto.80a
+ */
+function limpiar_ventas_de_prueba(string $nombre_dueno): array {
+    if (!\Iteradores\Configuracion\Entorno::es_pruebas()) {
+        return ['exito' => false, 'error' => 'Disponible solo en modo pruebas'];
+    }
+
+    $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if (!$contenedor) {
+        return [
+            'exito' => true,
+            'borrados' => [],
+            'cantidad_borrados' => 0,
+            'salteados' => [],
+            'cantidad_salteados' => 0,
+        ];
+    }
+
+    // Recolectar ids de ventas de prueba (comprador con
+    // email @test.local) antes de modificar el árbol.
+    $ids_a_cancelar = [];
+    $actual = hmi($contenedor);
+    $seg = 0;
+    while ($actual && $seg < 3000) {
+        $seg++;
+        $id_venta = (string)$actual->dato();
+        $nodo_comprador = $actual->adyacente('comprador');
+        if ($nodo_comprador) {
+            $nodo_email = $nodo_comprador->adyacente('email');
+            if ($nodo_email) {
+                $email = (string)$nodo_email->dato();
+                if (substr($email, -11) === '@test.local') {
+                    $ids_a_cancelar[] = $id_venta;
+                }
+            }
+        }
+        $actual = hd($actual);
+    }
+
+    $borrados = [];
+    $salteados = [];
+    foreach ($ids_a_cancelar as $id_venta) {
+        $res = cancelar_venta(
+            $id_venta,
+            'Limpieza de pruebas automáticas',
+            null,
+            $nombre_dueno
+        );
+        if (is_array($res) && !empty($res['exito'])) {
+            $borrados[] = $id_venta;
+        } else {
+            $motivo = (is_array($res) && isset($res['error'])) ? $res['error'] : 'Error desconocido';
+            $salteados[] = ['nombre' => $id_venta, 'motivo' => $motivo];
+        }
+    }
+
+    return [
+        'exito' => true,
+        'borrados' => $borrados,
+        'cantidad_borrados' => count($borrados),
+        'salteados' => $salteados,
+        'cantidad_salteados' => count($salteados),
+    ];
+}
+
+/**
+ * Limpia las cancelaciones "de prueba" de un dueño.
+ * Criterio: el motivo del nodo Cancelación contiene
+ * "prueba" o "test" (case-insensitive).
+ *
+ * Sirve para vaciar los nodos Cancelación que dejó
+ * limpiar_ventas_de_prueba (que usa el motivo fijo
+ * "Limpieza de pruebas automáticas").
+ *
+ * Devuelve el motivo de cada cancelación borrada,
+ * para auditoría.
+ *
+ * Disponible solo en modo pruebas.
+ *
+ * @param string $nombre_dueno
+ * @return array
+ * @since 1.5piloto.80a
+ */
+function limpiar_cancelaciones_de_prueba(string $nombre_dueno): array {
+    if (!\Iteradores\Configuracion\Entorno::es_pruebas()) {
+        return ['exito' => false, 'error' => 'Disponible solo en modo pruebas'];
+    }
+
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if (!$nodo_dueno) {
+        return ['exito' => false, 'error' => 'Dueño no encontrado'];
+    }
+
+    $contenedor = $nodo_dueno->adyacente('cancelaciones');
+    if (!$contenedor) {
+        return [
+            'exito' => true,
+            'borrados' => [],
+            'cantidad_borrados' => 0,
+            'salteados' => [],
+            'cantidad_salteados' => 0,
+        ];
+    }
+
+    // Recolectar los nodos a borrar (no modificar mientras
+    // se itera). Se guarda el motivo para reportarlo.
+    $a_borrar = [];
+    $actual = hmi($contenedor);
+    $seg = 0;
+    while ($actual && $seg < 3000) {
+        $seg++;
+        $motivo = $actual->adyacente('motivo') ? $actual->adyacente('motivo')->dato() : '';
+        $es_prueba = (stripos($motivo, 'prueba') !== false || stripos($motivo, 'test') !== false);
+        if ($es_prueba) {
+            $a_borrar[] = [
+                'id' => (string)$actual->dato(),
+                'nodo' => $actual,
+                'motivo' => $motivo,
+            ];
+        }
+        $actual = hd($actual);
+    }
+
+    $borrados = [];
+    $salteados = [];
+    foreach ($a_borrar as $item) {
+        $desenlazado = _desenlazar_venta_de_arbol($contenedor, $item['nodo'], null);
+        if (!$desenlazado) {
+            $salteados[] = ['nombre' => $item['id'], 'motivo' => 'No se encontró en el árbol'];
+            continue;
+        }
+        _destruir_campos_simples($item['nodo']);
+        Nodo::eliminar($item['nodo']);
+        $borrados[] = ['id' => $item['id'], 'motivo' => $item['motivo']];
+    }
+
+    if (!empty($borrados)) {
+        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    }
+
+    return [
+        'exito' => true,
+        'borrados' => $borrados,
+        'cantidad_borrados' => count($borrados),
+        'salteados' => $salteados,
+        'cantidad_salteados' => count($salteados),
+    ];
 }
 
