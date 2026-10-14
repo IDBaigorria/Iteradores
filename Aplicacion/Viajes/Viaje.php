@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.79l
+ * @version   1.5piloto.79m
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1495,7 +1495,7 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
         'viajeprueba', 'viajemicro', 'viajeval', 'viajedup', 'viajecol', 'viajesin',
         // Prefijos de las pruebas del plugin (agregados en v79j).
         'viajeventgraf',    // prueba 34: cancelar venta
-        'viajedeselgraf',   // prueba 35: deseleccionar asiento
+        'viajedeselegraf',  // prueba 35: deseleccionar asiento
         'viajecambiomicro', // prueba 36: cambiar micro
         'viajeregres',      // prueba 43: listar viajes con índice
     ];
