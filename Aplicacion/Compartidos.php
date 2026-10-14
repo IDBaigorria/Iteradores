@@ -3,7 +3,7 @@
  * Helpers para mantener vivos los compartidos por terminal.
  *
  * Fase B2.4 del modelo topológico. Los compartidos de un dueño
- * (`compartido_con_us_termX`) tienen que reflejar en cada momento
+ * (`compartido_con_<terminal>`) tienen que reflejar en cada momento
  * qué viajes están autorizados a esa terminal, qué empresas usan
  * esos viajes, y qué ventas y cancelaciones son de esa terminal.
  *

@@ -1,12 +1,11 @@
 <?php
 /**
- * Aplicador — Cierre §1.5.10 + lecciones de naming.
+ * Aplicador — Limpieza de comentarios con el prefijo viejo.
  *
- * 1. Fix del mismo filtro `compartido_con_us_` en reparar_arboles.php
- *    (bug latente detectado al revisar el helper hermano).
- * 2. plan_actual.md: §1.5.10 con la nota del bug del filtro.
- * 3. prompt_seguridad.md: §5.10 (naming de compartidos) y
- *    §5.11 (lecciones de método).
+ * Los greps de auditoría confirman que el código está limpio
+ * (ya no quedan filtros con `compartido_con_us_`). Solo hay
+ * comentarios y descripciones que mencionan el prefijo viejo,
+ * y podrían inducir a error en el futuro. Los corregimos.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -16,254 +15,95 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
     // ============================================================
-    // 1. reparar_arboles.php: fix del filtro
+    // Comandos.php: 3 comentarios
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Reparacion/RepararArboles.php',
-        'descripcion' => 'Fix filtro compartidos en reparar_arboles.php',
+        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
+        'descripcion' => 'Comentario en Comandos.php:174',
         'buscar' => [
-            '        foreach ($ady_dueno as $enlace_comp => $nodo_comp) {',
-            '            $enlace_comp = (string)$enlace_comp;',
-            '            if (strpos($enlace_comp, \'compartido_con_us_\') !== 0) continue;',
-            '            if (!$nodo_comp->adyacente(\'_es_compartido\')) continue;',
-            '',
-            '            $nombre_terminal = substr($enlace_comp, strlen(\'compartido_con_us_\'));',
-            '            if ($nombre_terminal === \'\') continue;',
+            '    // Crea el contenedor `compartido_con_us_termX` en cada',
         ],
         'reemplazar' => [
-            '        foreach ($ady_dueno as $enlace_comp => $nodo_comp) {',
-            '            $enlace_comp = (string)$enlace_comp;',
-            '            // Los compartidos se llaman `compartido_con_<nombre>`',
-            '            // (con el nombre de usuario del terminal, sin',
-            '            // prefijo `us_`). Bug de filtro detectado al',
-            '            // revisar este helper (el mismo que tenía',
-            '            // _procesar_pendientes_del_dueno en Venta.php).',
-            '            if (strpos($enlace_comp, \'compartido_con_\') !== 0) continue;',
-            '            if (!$nodo_comp->adyacente(\'_es_compartido\')) continue;',
-            '',
-            '            $nombre_terminal = substr($enlace_comp, strlen(\'compartido_con_\'));',
-            '            if ($nombre_terminal === \'\') continue;',
+            '    // Crea el contenedor `compartido_con_<nombre_terminal>` en cada',
         ],
     ],
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Reparacion/RepararArboles.php',
-        'descripcion' => 'Bump RepararArboles 78z -> 79b',
+        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
+        'descripcion' => 'Comentario en Comandos.php:178',
         'buscar' => [
-            ' * @version   1.5piloto.78z',
+            '    //   us_duenoY/compartido_con_us_termX   (dato=nombre_dueno)',
         ],
         'reemplazar' => [
-            ' * @version   1.5piloto.79b',
+            '    //   us_duenoY/compartido_con_<terminal>   (dato=nombre_dueno)',
+        ],
+    ],
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
+        'descripcion' => 'Comentario en Comandos.php:456',
+        'buscar' => [
+            '    // parametrizados. Para cada compartido `compartido_con_us_termX`',
+        ],
+        'reemplazar' => [
+            '    // parametrizados. Para cada compartido `compartido_con_<terminal>`',
         ],
     ],
 
     // ============================================================
-    // 2. plan_actual.md: nota del bug del filtro
+    // Registro.php: 2 descripciones
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §1.5.10: nota del bug del filtro',
+        'archivo' => 'Aplicacion/Migraciones/Registro.php',
+        'descripcion' => 'Descripción en Registro.php:40',
         'buscar' => [
-            '**Verificación:**',
-            '',
-            '1. Como terminal: vender 2 ventas.',
-            '2. Como dueño: verificar que aparecen las 2.',
-            '3. Como terminal: cancelar 1.',
-            '4. Como dueño: verificar que aparece solo la otra.',
+            '            \'descripcion\' => \'Crea el contenedor compartido_con_us_termX en cada dueño con terminales autorizados.\',',
         ],
         'reemplazar' => [
-            '**Bug del filtro (v79b).** En la primera prueba, el',
-            'buzón se creaba y las ventas nuevas se guardaban con',
-            'la máscara correcta (bit del dueño), pero el dueño no',
-            'las veía. Causa: el filtro de compartidos en',
-            '`_procesar_pendientes_del_dueno` era',
-            '`strpos($enlace, \'compartido_con_us_\')`, pero los',
-            'compartidos se llaman `compartido_con_<nombre>` (con',
-            'el nombre de usuario del terminal, sin `us_`). El',
-            'filtro nunca matcheaba, el buzón nunca se drenaba, y',
-            'las ventas quedaban varadas.',
-            '',
-            'Fix: `strpos($enlace, \'compartido_con_\')`. El mismo',
-            'bug estaba latente en `reparar_arboles.php` (helper',
-            'hermano), corregido en la misma tanda. Lección:',
-            'auditar todos los filtros de compartidos con',
-            '`grep \'compartido_con_us_\'`.',
-            '',
-            '**Verificación:**',
-            '',
-            '1. Como terminal: vender 2 ventas.',
-            '2. Como dueño: verificar que aparecen las 2.',
-            '3. Como terminal: cancelar 1.',
-            '4. Como dueño: verificar que aparece solo la otra.',
-            '5. SQL: `SELECT enlace FROM adyacente_contexto WHERE',
-            '   enlace LIKE \'pendientes_%\';` debe devolver 0',
-            '   filas (buzones drenados).',
+            '            \'descripcion\' => \'Crea el contenedor compartido_con_<terminal> en cada dueño con terminales autorizados.\',',
+        ],
+    ],
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Migraciones/Registro.php',
+        'descripcion' => 'Descripción en Registro.php:52',
+        'buscar' => [
+            '            \'descripcion\' => \'Cambia el enlace `dueno` de cada terminal para que apunte al contenedor `compartido_con_us_termX` en vez del nodo del dueño real. Activa el aislamiento por topología.\',',
+        ],
+        'reemplazar' => [
+            '            \'descripcion\' => \'Cambia el enlace `dueno` de cada terminal para que apunte al contenedor `compartido_con_<terminal>` en vez del nodo del dueño real. Activa el aislamiento por topología.\',',
         ],
     ],
 
     // ============================================================
-    // 3. plan_actual.md: bump
+    // Compartidos.php: 1 comentario
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: bump a 79b',
+        'archivo' => 'Aplicacion/Compartidos.php',
+        'descripcion' => 'Comentario en Compartidos.php:6',
         'buscar' => [
-            '**Última actualización de este archivo:** v1.5piloto.79a.',
+            ' * (`compartido_con_us_termX`) tienen que reflejar en cada momento',
         ],
         'reemplazar' => [
-            '**Última actualización de este archivo:** v1.5piloto.79b.',
+            ' * (`compartido_con_<terminal>`) tienen que reflejar en cada momento',
         ],
     ],
 
     // ============================================================
-    // 4. prompt_seguridad.md: §5.10 y §5.11
+    // Bumps
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_seguridad.md',
-        'descripcion' => 'prompt_seguridad: §5.10 y §5.11',
+        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
+        'descripcion' => 'Bump Comandos.php',
         'buscar' => [
-            '**Regla de detección para estructuras nuevas:**',
-            '',
-            '1. ¿Es un árbol (hmi/hd/p)? Si no, no.',
-            '2. ¿El terminal puede agregar nodos nuevos a ese árbol?',
-            '   Si no, no.',
-            '3. ¿El contenedor raíz del árbol es alcanzable desde',
-            '   ambos contextos (dueño y terminal)? Si sí, sí.',
-            '',
-            'Si las tres son "sí", necesita el patrón del buzón.',
-            '',
-            '---',
-            '',
-            '## 6. ANTI-PATRONES',
+            ' * @version 1.5piloto.77y',
         ],
         'reemplazar' => [
-            '**Regla de detección para estructuras nuevas:**',
-            '',
-            '1. ¿Es un árbol (hmi/hd/p)? Si no, no.',
-            '2. ¿El terminal puede agregar nodos nuevos a ese árbol?',
-            '   Si no, no.',
-            '3. ¿El contenedor raíz del árbol es alcanzable desde',
-            '   ambos contextos (dueño y terminal)? Si sí, sí.',
-            '',
-            'Si las tres son "sí", necesita el patrón del buzón.',
-            '',
-            '### 5.10 Naming de los compartidos',
-            '',
-            '**Regla del nombre.** Los compartidos se llaman',
-            '`compartido_con_<nombre_usuario>`, donde',
-            '`<nombre_usuario>` es el **nombre de usuario** del',
-            'terminal, **sin el prefijo `us_`**. Ejemplo:',
-            '`compartido_con_secretaria_carmen`.',
-            '',
-            'Esto es consistente con la convención general del',
-            'piloto: los nombres visibles son nombres de usuario,',
-            'no IDs especiales. El ID especial (`us_<nombre>`) es',
-            'para referenciar el nodo entre cargas, no para el',
-            'nombre de enlace.',
-            '',
-            '**Trampa común.** Escribir',
-            '`strpos($enlace, \'compartido_con_us_\')` en un filtro',
-            'que deba detectar compartidos. **Nunca matchea**',
-            'porque el `us_` de más no está en el nombre real.',
-            'El filtro falla silenciosamente: el loop recorre los',
-            'compartidos, no encuentra ninguno, y el bug se',
-            'manifiesta más tarde como "el dueño no ve las ventas".',
-            '',
-            '**Fix.** El filtro correcto es:',
-            '`strpos($enlace, \'compartido_con_\') === 0`.',
-            'La parte del nombre de usuario se extrae con',
-            '`substr($enlace, strlen(\'compartido_con_\'))`.',
-            '',
-            '**Auditoría.** Antes de dar por cerrado cualquier',
-            'flujo que toque compartidos, correr:',
-            '',
-            '```bash',
-            'grep -rn "compartido_con_us_" Aplicacion/',
-            '```',
-            '',
-            'Si devuelve algo, es un bug latente del mismo tipo.',
-            'En la sesión v79b aparecieron dos:',
-            '`_procesar_pendientes_del_dueno` (Venta.php) y',
-            '`reparar_arboles.php`.',
-            '',
-            '### 5.11 Lecciones de método',
-            '',
-            '**1. El bitmask correcto no garantiza que el flujo',
-            'funcione.** En v79b, los SQLs de diagnóstico mostraron',
-            'que las ventas nuevas tenían la máscara 120 (con el',
-            'bit del dueño) y que el buzón existía. Todo el',
-            'pipeline parecía sano. El bug era un filtro de',
-            'naming que fallaba silenciosamente antes de llegar',
-            'al bitmask. Moraleja: cuando el estado persistido',
-            'parece correcto pero el comportamiento no, **el bug',
-            'está en el código que lo consume, no en los datos**.',
-            '',
-            '**2. Verificar por SQL el estado real antes de asumir.**',
-            'Cuando un fix no resuelve el síntoma, antes de',
-            'proponer otro fix, correr SQLs que muestren el',
-            'estado real. En v79b eso evitó seguir buscando en el',
-            'lugar equivocado (el guardado parcial) cuando el',
-            'problema estaba en la lectura (el filtro de drenado).',
-            '',
-            '**3. Un bug en un helper sugiere el mismo bug en sus',
-            'hermanos.** Cuando se detecta un patrón problemático',
-            '(por ejemplo, un filtro mal escrito), auditar los',
-            'demás helpers que usan el mismo patrón. En v79b, el',
-            'fix del filtro en `Venta.php` reveló el mismo bug',
-            'en `reparar_arboles.php`.',
-            '',
-            '---',
-            '',
-            '## 6. ANTI-PATRONES',
-        ],
-    ],
-
-    // ============================================================
-    // 5. prompt_seguridad.md: agregar anti-patrón §6.10
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_seguridad.md',
-        'descripcion' => 'prompt_seguridad: anti-patrón §6.10',
-        'buscar' => [
-            '### 6.9 Confundir el ID del framework con la fila de la DB',
-            '',
-            'Los IDs del framework (`Nodo::id()`) son efímeros. Los `id_fila`',
-            'de la DB son estables. Nunca usar el ID del framework como',
-            'clave persistente entre requests.',
-            '',
-            '**Caso real:** el bug §1.5. Los fixes v78r/v78s/v78t/v78u',
-            'intentaban mapear "ID del framework" ↔ "fila de la DB", pero',
-            'los IDs del framework cambiaban entre cargas. El grafo creció a',
-            '99k nodos por inserciones duplicadas.',
-        ],
-        'reemplazar' => [
-            '### 6.9 Confundir el ID del framework con la fila de la DB',
-            '',
-            'Los IDs del framework (`Nodo::id()`) son efímeros. Los `id_fila`',
-            'de la DB son estables. Nunca usar el ID del framework como',
-            'clave persistente entre requests.',
-            '',
-            '**Caso real:** el bug §1.5. Los fixes v78r/v78s/v78t/v78u',
-            'intentaban mapear "ID del framework" ↔ "fila de la DB", pero',
-            'los IDs del framework cambiaban entre cargas. El grafo creció a',
-            '99k nodos por inserciones duplicadas.',
-            '',
-            '### 6.10 Filtrar compartidos con el prefijo `us_` de más',
-            '',
-            'Ver §5.10. Los compartidos se llaman',
-            '`compartido_con_<nombre_usuario>`, no',
-            '`compartido_con_us_<nombre>`. Un filtro con el `us_` de',
-            'más nunca matchea y falla silenciosamente.',
-            '',
-            '**Caso real:** v79b. `_procesar_pendientes_del_dueno`',
-            'tenía el filtro mal. El buzón de ventas nunca se',
-            'drenaba y el dueño no veía las ventas nuevas. El',
-            'mismo bug latente en `reparar_arboles.php`.',
+            ' * @version 1.5piloto.79b',
         ],
     ],
 ];
@@ -272,7 +112,7 @@ $cambios = [
 // Runner
 // ============================================================
 
-echo "=== Aplicador — Cierre §1.5.10 + lecciones ===\n\n";
+echo "=== Aplicador — Limpieza de comentarios ===\n\n";
 
 function detectar_eol(string $c): string { return (strpos($c, "\r\n") !== false) ? "\r\n" : "\n"; }
 function normalizar_a_unix(string $c): string { return str_replace("\r\n", "\n", $c); }

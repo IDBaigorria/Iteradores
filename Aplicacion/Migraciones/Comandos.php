@@ -12,7 +12,7 @@
  * (autoreferencia) indica que la migración fue aplicada.
  *
  * @since 1.5piloto.76n
- * @version 1.5piloto.77y
+ * @version 1.5piloto.79b
  */
 
 use Iteradores\Nodos\Nodo;
@@ -171,11 +171,11 @@ function registrar_comandos_migraciones(): void {
     //
     // Fase B2.1 del modelo topológico (v76q).
     //
-    // Crea el contenedor `compartido_con_us_termX` en cada
+    // Crea el contenedor `compartido_con_<nombre_terminal>` en cada
     // dueño, uno por cada terminal autorizado en algún viaje
     // del dueño. Estructura del compartido:
     //
-    //   us_duenoY/compartido_con_us_termX   (dato=nombre_dueno)
+    //   us_duenoY/compartido_con_<terminal>   (dato=nombre_dueno)
     //   ├── viajes        → solo los autorizados a termX
     //   ├── empresas      → las referenciadas por esos viajes
     //   ├── pasajeros     → alias al contenedor privado del dueño
@@ -453,7 +453,7 @@ function registrar_comandos_migraciones(): void {
     //
     // Convierte los compartidos creados en B2.1 (que tenían
     // enlaces planos por id) en árboles paralelos con nombres
-    // parametrizados. Para cada compartido `compartido_con_us_termX`
+    // parametrizados. Para cada compartido `compartido_con_<terminal>`
     // de cada dueño:
     //   1. Marca el compartido con `_es_compartido` (testigo).
     //   2. Reconstruye el árbol del contenedor `ventas` con los

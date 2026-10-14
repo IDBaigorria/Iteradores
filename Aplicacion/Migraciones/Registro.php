@@ -37,7 +37,7 @@ function migraciones_registradas(): array {
         ],
         'compartidos_terminal' => [
             'nombre' => 'Compartidos por terminal',
-            'descripcion' => 'Crea el contenedor compartido_con_us_termX en cada dueño con terminales autorizados.',
+            'descripcion' => 'Crea el contenedor compartido_con_<terminal> en cada dueño con terminales autorizados.',
             'detectar' => 'detectar_compartidos_terminal',
             'aplicar' => 'aplicar_migracion_compartidos_terminal',
         ],
@@ -49,7 +49,7 @@ function migraciones_registradas(): array {
         ],
         'repuntado_compartido' => [
             'nombre' => 'Repuntado de terminales al compartido',
-            'descripcion' => 'Cambia el enlace `dueno` de cada terminal para que apunte al contenedor `compartido_con_us_termX` en vez del nodo del dueño real. Activa el aislamiento por topología.',
+            'descripcion' => 'Cambia el enlace `dueno` de cada terminal para que apunte al contenedor `compartido_con_<terminal>` en vez del nodo del dueño real. Activa el aislamiento por topología.',
             'detectar' => 'detectar_repuntado_compartido',
             'aplicar' => 'aplicar_migracion_repuntado_compartido',
         ],
