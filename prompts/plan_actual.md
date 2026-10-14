@@ -17,7 +17,7 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 ### 1.1 Última actualización
 
-**Última actualización de este archivo:** v1.5piloto.79b.
+**Última actualización de este archivo:** v1.5piloto.79c.
 
 Cierre del fix del bug §1.5 (viaje viejo) y de los bugs
 §1.5.7, §1.5.8, §1.5.10 (nodos compartidos entre contextos,
@@ -295,6 +295,46 @@ auditar todos los filtros de compartidos con
 5. SQL: `SELECT enlace FROM adyacente_contexto WHERE
    enlace LIKE 'pendientes_%';` debe devolver 0
    filas (buzones drenados).
+
+#### 1.5.11 Helper de nombres de árbol con contexto implícito (v79c)
+
+**Síntoma:** logueado como terminal, en la pestaña
+Clientes, un pasajero con pasajes no mostraba el badge
+"tiene pasajes" ni el botón "Ver pasajes" ni el aviso
+de "imprimir pasajes actualizados". Como dueño sí
+funcionaba.
+
+**Causa:** tres funciones de `Pasajero.php`
+(`pasajero_tiene_pasajes`,
+`pasajero_tiene_pasajes_activos`,
+`pasajero_tiene_ventas_activas`) llamaban
+`_nombres_arbol_para_contexto($nodo_contexto, '')`.
+Con `''` como nombre de terminal, el helper devolvía
+null (por el `if ($nombre_terminal === '')`), y las
+funciones caían a los nombres default (`hmi`/`hd`).
+Pero el contenedor de ventas del compartido usa
+nombres parametrizados (`hmi_<term>`). `hmi($cont, null)`
+buscaba `hmi`, no lo encontraba, devolvía null, y el
+while no corría.
+
+**Solución:** hacer que `_nombres_arbol_para_contexto`
+derive el nombre del terminal desde el propio
+compartido cuando no se lo pasan. El compartido tiene
+`terminales → <nombre_terminal>`, y ese nombre es el
+que se necesita para construir los enlaces
+parametrizados. Retrocompatible: si el llamador pasa el
+nombre, se usa tal cual.
+
+**Helper nuevo:** `_nombre_terminal_de_compartido`
+(`miscelaneas/Arbol.php`). Deriva el nombre del
+terminal del contenedor `terminales` del compartido.
+
+**Lección:** un helper que necesita un dato que el
+llamador no tiene por qué conocer debe derivarlo del
+contexto, no confiar en que el llamador se lo pase.
+El patrón "`''` = no aplica" es una trampa: mezcla
+"no aplica" con "no me lo pasaron". Ver §5.12 del
+prompt de seguridad.
 
 ### 1.6 Pendientes de la línea
 

@@ -576,6 +576,40 @@ En la sesión v79b aparecieron dos:
 `_procesar_pendientes_del_dueno` (Venta.php) y
 `reparar_arboles.php`.
 
+### 5.12 Helpers con contexto implícito
+
+Cuando un helper necesita información que el llamador
+no tiene por qué conocer, **derivarla del contexto en
+vez de exigir que se la pasen**. Firma robusta: el
+parámetro es opcional, y si no viene, el helper lo
+obtiene por su cuenta.
+
+**Caso real (§1.5.11).** Tres funciones de
+`Pasajero.php` llaman a
+`_nombres_arbol_para_contexto($ctx, '')`. Pasar `''`
+como nombre del terminal hacía que el helper devolviera
+null, y las funciones cayeran silenciosamente a los
+nombres default. Pero el contenedor del compartido usa
+nombres parametrizados. Resultado: el terminal nunca
+veía los badges ni los botones relacionados.
+
+**Patrón de la trampa.** El llamador no conoce el
+nombre del terminal (solo tiene el nodo compartido).
+El helper exigía el nombre. El llamador pasaba `''`
+para "no aplica". El helper interpretaba `''` como
+"no hay contexto" y devolvía null. Bug silencioso:
+sin errores, sin warnings, comportamiento incorrecto.
+
+**Fix.** El helper deriva el nombre del propio
+contexto cuando no se lo pasan. El compartido tiene
+`terminales → <nombre>`, de donde se puede leer.
+Retrocompatible: si el nombre viene, se usa tal cual.
+
+**Regla.** Antes de agregar un parámetro obligatorio a
+un helper, preguntarse: "¿el llamador realmente lo
+tiene?". Si no, el helper debe derivarlo del contexto
+o aceptar `null`/`''` como "derivalo vos".
+
 ### 5.11 Lecciones de método
 
 **1. El bitmask correcto no garantiza que el flujo
@@ -712,6 +746,20 @@ clave persistente entre requests.
 intentaban mapear "ID del framework" ↔ "fila de la DB", pero
 los IDs del framework cambiaban entre cargas. El grafo creció a
 99k nodos por inserciones duplicadas.
+
+### 6.11 Pasar `''` a `_nombres_arbol_para_contexto`
+
+Ver §5.12. Pasar cadena vacía como nombre del
+terminal cuando el contexto es un compartido hace que
+el helper devuelva null y las funciones caigan a los
+nombres default, pero el contenedor del compartido usa
+nombres parametrizados. Bug silencioso.
+
+**Caso real:** v79c. `pasajero_tiene_pasajes`,
+`pasajero_tiene_pasajes_activos` y
+`pasajero_tiene_ventas_activas` en `Pasajero.php`.
+El helper ahora deriva el nombre del propio
+compartido.
 
 ### 6.10 Filtrar compartidos con el prefijo `us_` de más
 

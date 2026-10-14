@@ -1,11 +1,18 @@
 <?php
 /**
- * Aplicador — Limpieza de comentarios con el prefijo viejo.
+ * Aplicador — Fix del helper de nombres de árbol + lecciones.
  *
- * Los greps de auditoría confirman que el código está limpio
- * (ya no quedan filtros con `compartido_con_us_`). Solo hay
- * comentarios y descripciones que mencionan el prefijo viejo,
- * y podrían inducir a error en el futuro. Los corregimos.
+ * Bug §1.5.11: tres funciones de Pasajero.php llaman
+ * `_nombres_arbol_para_contexto($ctx, '')`. Con `''` como
+ * nombre de terminal, el helper devuelve null y las
+ * funciones caen a los nombres default (`hmi`/`hd`). Pero
+ * el contenedor del compartido usa nombres parametrizados
+ * (`hmi_<term>`). Resultado: el terminal nunca ve el badge
+ * "tiene pasajes" ni los botones relacionados.
+ *
+ * Fix: hacer que `_nombres_arbol_para_contexto` derive el
+ * nombre del terminal desde el propio compartido cuando no
+ * se lo pasan. Retrocompatible.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -15,95 +22,276 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
     // ============================================================
-    // Comandos.php: 3 comentarios
+    // 1. Arbol.php: helper + fix de _nombres_arbol_para_contexto
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
-        'descripcion' => 'Comentario en Comandos.php:174',
+        'archivo' => 'miscelaneas/Arbol.php',
+        'descripcion' => 'Arbol.php: derivar nombre terminal del compartido',
         'buscar' => [
-            '    // Crea el contenedor `compartido_con_us_termX` en cada',
+            '/**',
+            ' * Devuelve el array de nombres de enlace que un terminal',
+            ' * debe usar para recorrer el árbol de un contenedor, según',
+            ' * el contexto.',
+            ' *',
+            ' * Fase B2.3.2 del modelo topológico (v76w). Reglas:',
+            ' * - Si no hay contexto (dueño o admin), devuelve null',
+            ' *   → las funciones de árbol usan los nombres default.',
+            ' * - Si el contexto tiene el marcador `_es_compartido`,',
+            ' *   devuelve los nombres parametrizados con el sufijo del',
+            ' *   terminal (p_<terminal>, hd_<terminal>, hmi_<terminal>).',
+            ' * - Si el contexto no es un compartido (todavía), null.',
+            ' *',
+            ' * Mientras no existan compartidos marcados, esta función',
+            ' * siempre devuelve null y el comportamiento es idéntico al',
+            ' * actual. Los marcadores los agrega la migración de B2.3.3.',
+            ' *',
+            ' * @param Nodo|null $nodo_contexto',
+            ' * @param string    $nombre_terminal',
+            ' * @return array|null',
+            ' */',
+            'function _nombres_arbol_para_contexto(?Nodo $nodo_contexto, string $nombre_terminal): ?array {',
+            '    if ($nodo_contexto === null || $nombre_terminal === \'\') return null;',
+            '    if (!$nodo_contexto->adyacente(\'_es_compartido\')) return null;',
+            '    return [',
+            '        \'p\'   => \'p_\'   . $nombre_terminal,',
+            '        \'hd\'  => \'hd_\'  . $nombre_terminal,',
+            '        \'hmi\' => \'hmi_\' . $nombre_terminal,',
+            '    ];',
+            '}',
         ],
         'reemplazar' => [
-            '    // Crea el contenedor `compartido_con_<nombre_terminal>` en cada',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
-        'descripcion' => 'Comentario en Comandos.php:178',
-        'buscar' => [
-            '    //   us_duenoY/compartido_con_us_termX   (dato=nombre_dueno)',
-        ],
-        'reemplazar' => [
-            '    //   us_duenoY/compartido_con_<terminal>   (dato=nombre_dueno)',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
-        'descripcion' => 'Comentario en Comandos.php:456',
-        'buscar' => [
-            '    // parametrizados. Para cada compartido `compartido_con_us_termX`',
-        ],
-        'reemplazar' => [
-            '    // parametrizados. Para cada compartido `compartido_con_<terminal>`',
+            '/**',
+            ' * Deriva el nombre del terminal desde un nodo compartido.',
+            ' *',
+            ' * El compartido tiene un contenedor `terminales` con un',
+            ' * único hijo cuyo nombre de enlace es el nombre del',
+            ' * terminal. Devuelve ese nombre, o \'\' si no se puede',
+            ' * derivar.',
+            ' *',
+            ' * Se usa desde `_nombres_arbol_para_contexto` cuando el',
+            ' * llamador no pasa el nombre explícitamente (por ejemplo,',
+            ' * funciones de Pasajero.php que solo reciben el contexto).',
+            ' * Bug §1.5.11: esas funciones antes recibían null y',
+            ' * caían a los nombres default, pero el contenedor del',
+            ' * compartido usa nombres parametrizados.',
+            ' *',
+            ' * @param Nodo $nodo_compartido',
+            ' * @return string',
+            ' * @since 1.5piloto.79c',
+            ' */',
+            'function _nombre_terminal_de_compartido(Nodo $nodo_compartido): string {',
+            '    $cont = $nodo_compartido->adyacente(\'terminales\');',
+            '    if (!$cont) return \'\';',
+            '    foreach ((array)$cont->adyacentes() as $enlace => $nodo_term) {',
+            '        return (string)$enlace;',
+            '    }',
+            '    return \'\';',
+            '}',
+            '',
+            '/**',
+            ' * Devuelve el array de nombres de enlace que un terminal',
+            ' * debe usar para recorrer el árbol de un contenedor, según',
+            ' * el contexto.',
+            ' *',
+            ' * Fase B2.3.2 del modelo topológico (v76w). Reglas:',
+            ' * - Si no hay contexto (dueño o admin), devuelve null',
+            ' *   → las funciones de árbol usan los nombres default.',
+            ' * - Si el contexto tiene el marcador `_es_compartido`,',
+            ' *   devuelve los nombres parametrizados con el sufijo del',
+            ' *   terminal (p_<terminal>, hd_<terminal>, hmi_<terminal>).',
+            ' * - Si el contexto no es un compartido (todavía), null.',
+            ' *',
+            ' * A partir de v79c (bug §1.5.11): si el llamador no pasa',
+            ' * el nombre del terminal, se deriva del propio compartido',
+            ' * (`terminales → <nombre>`). Retrocompatible: si el',
+            ' * nombre viene, se usa tal cual.',
+            ' *',
+            ' * @param Nodo|null $nodo_contexto',
+            ' * @param string    $nombre_terminal',
+            ' * @return array|null',
+            ' * @version 1.5piloto.79c',
+            ' */',
+            'function _nombres_arbol_para_contexto(?Nodo $nodo_contexto, string $nombre_terminal): ?array {',
+            '    if ($nodo_contexto === null) return null;',
+            '    if (!$nodo_contexto->adyacente(\'_es_compartido\')) return null;',
+            '',
+            '    // Si no nos pasaron el nombre del terminal, derivarlo',
+            '    // del propio compartido.',
+            '    if ($nombre_terminal === \'\') {',
+            '        $nombre_terminal = _nombre_terminal_de_compartido($nodo_contexto);',
+            '        if ($nombre_terminal === \'\') return null;',
+            '    }',
+            '',
+            '    return [',
+            '        \'p\'   => \'p_\'   . $nombre_terminal,',
+            '        \'hd\'  => \'hd_\'  . $nombre_terminal,',
+            '        \'hmi\' => \'hmi_\' . $nombre_terminal,',
+            '    ];',
+            '}',
         ],
     ],
 
     // ============================================================
-    // Registro.php: 2 descripciones
+    // 2. Arbol.php: bump
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Migraciones/Registro.php',
-        'descripcion' => 'Descripción en Registro.php:40',
+        'archivo' => 'miscelaneas/Arbol.php',
+        'descripcion' => 'Bump Arbol.php',
         'buscar' => [
-            '            \'descripcion\' => \'Crea el contenedor compartido_con_us_termX en cada dueño con terminales autorizados.\',',
+            ' * @version   1.5piloto.76v',
         ],
         'reemplazar' => [
-            '            \'descripcion\' => \'Crea el contenedor compartido_con_<terminal> en cada dueño con terminales autorizados.\',',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Migraciones/Registro.php',
-        'descripcion' => 'Descripción en Registro.php:52',
-        'buscar' => [
-            '            \'descripcion\' => \'Cambia el enlace `dueno` de cada terminal para que apunte al contenedor `compartido_con_us_termX` en vez del nodo del dueño real. Activa el aislamiento por topología.\',',
-        ],
-        'reemplazar' => [
-            '            \'descripcion\' => \'Cambia el enlace `dueno` de cada terminal para que apunte al contenedor `compartido_con_<terminal>` en vez del nodo del dueño real. Activa el aislamiento por topología.\',',
+            ' * @version   1.5piloto.79c',
         ],
     ],
 
     // ============================================================
-    // Compartidos.php: 1 comentario
+    // 3. plan_actual.md: §1.5.11
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Compartidos.php',
-        'descripcion' => 'Comentario en Compartidos.php:6',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual: agregar §1.5.11',
         'buscar' => [
-            ' * (`compartido_con_us_termX`) tienen que reflejar en cada momento',
+            '### 1.6 Pendientes de la línea',
         ],
         'reemplazar' => [
-            ' * (`compartido_con_<terminal>`) tienen que reflejar en cada momento',
+            '#### 1.5.11 Helper de nombres de árbol con contexto implícito (v79c)',
+            '',
+            '**Síntoma:** logueado como terminal, en la pestaña',
+            'Clientes, un pasajero con pasajes no mostraba el badge',
+            '"tiene pasajes" ni el botón "Ver pasajes" ni el aviso',
+            'de "imprimir pasajes actualizados". Como dueño sí',
+            'funcionaba.',
+            '',
+            '**Causa:** tres funciones de `Pasajero.php`',
+            '(`pasajero_tiene_pasajes`,',
+            '`pasajero_tiene_pasajes_activos`,',
+            '`pasajero_tiene_ventas_activas`) llamaban',
+            '`_nombres_arbol_para_contexto($nodo_contexto, \'\')`.',
+            'Con `\'\'` como nombre de terminal, el helper devolvía',
+            'null (por el `if ($nombre_terminal === \'\')`), y las',
+            'funciones caían a los nombres default (`hmi`/`hd`).',
+            'Pero el contenedor de ventas del compartido usa',
+            'nombres parametrizados (`hmi_<term>`). `hmi($cont, null)`',
+            'buscaba `hmi`, no lo encontraba, devolvía null, y el',
+            'while no corría.',
+            '',
+            '**Solución:** hacer que `_nombres_arbol_para_contexto`',
+            'derive el nombre del terminal desde el propio',
+            'compartido cuando no se lo pasan. El compartido tiene',
+            '`terminales → <nombre_terminal>`, y ese nombre es el',
+            'que se necesita para construir los enlaces',
+            'parametrizados. Retrocompatible: si el llamador pasa el',
+            'nombre, se usa tal cual.',
+            '',
+            '**Helper nuevo:** `_nombre_terminal_de_compartido`',
+            '(`miscelaneas/Arbol.php`). Deriva el nombre del',
+            'terminal del contenedor `terminales` del compartido.',
+            '',
+            '**Lección:** un helper que necesita un dato que el',
+            'llamador no tiene por qué conocer debe derivarlo del',
+            'contexto, no confiar en que el llamador se lo pase.',
+            'El patrón "`\'\'` = no aplica" es una trampa: mezcla',
+            '"no aplica" con "no me lo pasaron". Ver §5.12 del',
+            'prompt de seguridad.',
+            '',
+            '### 1.6 Pendientes de la línea',
         ],
     ],
 
     // ============================================================
-    // Bumps
+    // 4. plan_actual.md: bump
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Migraciones/Comandos.php',
-        'descripcion' => 'Bump Comandos.php',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual: bump a 79c',
         'buscar' => [
-            ' * @version 1.5piloto.77y',
+            '**Última actualización de este archivo:** v1.5piloto.79b.',
         ],
         'reemplazar' => [
-            ' * @version 1.5piloto.79b',
+            '**Última actualización de este archivo:** v1.5piloto.79c.',
+        ],
+    ],
+
+    // ============================================================
+    // 5. prompt_seguridad.md: §5.12
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_seguridad.md',
+        'descripcion' => 'prompt_seguridad: §5.12',
+        'buscar' => [
+            '### 5.11 Lecciones de método',
+        ],
+        'reemplazar' => [
+            '### 5.12 Helpers con contexto implícito',
+            '',
+            'Cuando un helper necesita información que el llamador',
+            'no tiene por qué conocer, **derivarla del contexto en',
+            'vez de exigir que se la pasen**. Firma robusta: el',
+            'parámetro es opcional, y si no viene, el helper lo',
+            'obtiene por su cuenta.',
+            '',
+            '**Caso real (§1.5.11).** Tres funciones de',
+            '`Pasajero.php` llaman a',
+            '`_nombres_arbol_para_contexto($ctx, \'\')`. Pasar `\'\'`',
+            'como nombre del terminal hacía que el helper devolviera',
+            'null, y las funciones cayeran silenciosamente a los',
+            'nombres default. Pero el contenedor del compartido usa',
+            'nombres parametrizados. Resultado: el terminal nunca',
+            'veía los badges ni los botones relacionados.',
+            '',
+            '**Patrón de la trampa.** El llamador no conoce el',
+            'nombre del terminal (solo tiene el nodo compartido).',
+            'El helper exigía el nombre. El llamador pasaba `\'\'`',
+            'para "no aplica". El helper interpretaba `\'\'` como',
+            '"no hay contexto" y devolvía null. Bug silencioso:',
+            'sin errores, sin warnings, comportamiento incorrecto.',
+            '',
+            '**Fix.** El helper deriva el nombre del propio',
+            'contexto cuando no se lo pasan. El compartido tiene',
+            '`terminales → <nombre>`, de donde se puede leer.',
+            'Retrocompatible: si el nombre viene, se usa tal cual.',
+            '',
+            '**Regla.** Antes de agregar un parámetro obligatorio a',
+            'un helper, preguntarse: "¿el llamador realmente lo',
+            'tiene?". Si no, el helper debe derivarlo del contexto',
+            'o aceptar `null`/`\'\'` como "derivalo vos".',
+            '',
+            '### 5.11 Lecciones de método',
+        ],
+    ],
+
+    // ============================================================
+    // 6. prompt_seguridad.md: anti-patrón §6.11
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/prompt_seguridad.md',
+        'descripcion' => 'prompt_seguridad: anti-patrón §6.11',
+        'buscar' => [
+            '### 6.10 Filtrar compartidos con el prefijo `us_` de más',
+        ],
+        'reemplazar' => [
+            '### 6.11 Pasar `\'\'` a `_nombres_arbol_para_contexto`',
+            '',
+            'Ver §5.12. Pasar cadena vacía como nombre del',
+            'terminal cuando el contexto es un compartido hace que',
+            'el helper devuelva null y las funciones caigan a los',
+            'nombres default, pero el contenedor del compartido usa',
+            'nombres parametrizados. Bug silencioso.',
+            '',
+            '**Caso real:** v79c. `pasajero_tiene_pasajes`,',
+            '`pasajero_tiene_pasajes_activos` y',
+            '`pasajero_tiene_ventas_activas` en `Pasajero.php`.',
+            'El helper ahora deriva el nombre del propio',
+            'compartido.',
+            '',
+            '### 6.10 Filtrar compartidos con el prefijo `us_` de más',
         ],
     ],
 ];
@@ -112,7 +300,7 @@ $cambios = [
 // Runner
 // ============================================================
 
-echo "=== Aplicador — Limpieza de comentarios ===\n\n";
+echo "=== Aplicador — Fix helper nombres de árbol ===\n\n";
 
 function detectar_eol(string $c): string { return (strpos($c, "\r\n") !== false) ? "\r\n" : "\n"; }
 function normalizar_a_unix(string $c): string { return str_replace("\r\n", "\n", $c); }

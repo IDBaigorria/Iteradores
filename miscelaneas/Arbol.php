@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.76v
+ * @version   1.5piloto.79c
  */
 
 use Iteradores\Nodos\Nodo;
@@ -26,6 +26,34 @@ use Iteradores\Nodos\Nodo;
  * @return array
  */
 /**
+ * Deriva el nombre del terminal desde un nodo compartido.
+ *
+ * El compartido tiene un contenedor `terminales` con un
+ * único hijo cuyo nombre de enlace es el nombre del
+ * terminal. Devuelve ese nombre, o '' si no se puede
+ * derivar.
+ *
+ * Se usa desde `_nombres_arbol_para_contexto` cuando el
+ * llamador no pasa el nombre explícitamente (por ejemplo,
+ * funciones de Pasajero.php que solo reciben el contexto).
+ * Bug §1.5.11: esas funciones antes recibían null y
+ * caían a los nombres default, pero el contenedor del
+ * compartido usa nombres parametrizados.
+ *
+ * @param Nodo $nodo_compartido
+ * @return string
+ * @since 1.5piloto.79c
+ */
+function _nombre_terminal_de_compartido(Nodo $nodo_compartido): string {
+    $cont = $nodo_compartido->adyacente('terminales');
+    if (!$cont) return '';
+    foreach ((array)$cont->adyacentes() as $enlace => $nodo_term) {
+        return (string)$enlace;
+    }
+    return '';
+}
+
+/**
  * Devuelve el array de nombres de enlace que un terminal
  * debe usar para recorrer el árbol de un contenedor, según
  * el contexto.
@@ -38,17 +66,27 @@ use Iteradores\Nodos\Nodo;
  *   terminal (p_<terminal>, hd_<terminal>, hmi_<terminal>).
  * - Si el contexto no es un compartido (todavía), null.
  *
- * Mientras no existan compartidos marcados, esta función
- * siempre devuelve null y el comportamiento es idéntico al
- * actual. Los marcadores los agrega la migración de B2.3.3.
+ * A partir de v79c (bug §1.5.11): si el llamador no pasa
+ * el nombre del terminal, se deriva del propio compartido
+ * (`terminales → <nombre>`). Retrocompatible: si el
+ * nombre viene, se usa tal cual.
  *
  * @param Nodo|null $nodo_contexto
  * @param string    $nombre_terminal
  * @return array|null
+ * @version 1.5piloto.79c
  */
 function _nombres_arbol_para_contexto(?Nodo $nodo_contexto, string $nombre_terminal): ?array {
-    if ($nodo_contexto === null || $nombre_terminal === '') return null;
+    if ($nodo_contexto === null) return null;
     if (!$nodo_contexto->adyacente('_es_compartido')) return null;
+
+    // Si no nos pasaron el nombre del terminal, derivarlo
+    // del propio compartido.
+    if ($nombre_terminal === '') {
+        $nombre_terminal = _nombre_terminal_de_compartido($nodo_contexto);
+        if ($nombre_terminal === '') return null;
+    }
+
     return [
         'p'   => 'p_'   . $nombre_terminal,
         'hd'  => 'hd_'  . $nombre_terminal,
