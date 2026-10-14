@@ -17,7 +17,7 @@ que queda **congelada como referencia histórica** desde v1.5piloto.76v.
 
 ### 1.1 Última actualización
 
-**Última actualización de este archivo:** v1.5piloto.79e.
+**Última actualización de este archivo:** v1.5piloto.79f.
 
 Cierre del fix del bug §1.5 (viaje viejo) y de los bugs
 §1.5.7, §1.5.8, §1.5.10 (nodos compartidos entre contextos,
@@ -409,6 +409,38 @@ propio croquis. No es una fuga nueva.
 permisos. Cualquiera con la URL puede ver los datos.
 Es un problema preexistente. Anotado para una tanda
 futura.
+
+#### 1.5.14 Arista `us_Administrador → usuarios` perdida tras recuperar desde backup (v79f)
+
+**Síntoma:** logueado como admin, todas las pestañas
+mostraban el select de dueño vacío. Sin poder elegir
+dueño, ninguna pestaña funcionaba.
+
+**Causa:** la arista `us_Administrador → usuarios`
+no existía en el grafo. `listar_duenos` navega por
+esa arista para llegar a `usuarios` y enumerar los
+dueños. Sin ella, devolvía vacío. `usuarios` tenía
+el bit del admin (máscara 4) pero como residuo:
+en algún momento la arista existió, después se
+perdió, y el bitmask no se actualizó.
+
+**Cómo se perdió:** el flujo de recuperación tras
+un TRUNCATE + `?migrar_a_sql64=1` copia fielmente
+el grafo de las tablas viejas (`nodo`/`adyacente`).
+Si la arista no estaba en esas tablas, no se crea.
+El bloque `?reparar_topologia=1` (v78n) reparaba
+aristas del dueño pero **no** la del admin.
+
+**Fix:** agregar `migrar_topologia_admin($nombre_app)`
+al bloque `?reparar_topologia=1`. Idempotente. El
+total reportado incluye la creación si ocurrió.
+
+**Lección:** el bloque `?reparar_topologia=1` debe
+cubrir **todas** las aristas estructurales del
+modelo: admin → usuarios, dueño → compartido,
+viajes/empresas/pasajeros del dueño. Si una
+arista estructural puede perderse, debe poder
+repararse.
 
 ### 1.6 Pendientes de la línea
 

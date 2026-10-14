@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.78z
+ * @version   1.5piloto.79f
  */
 
 // --- Utilidades base ----------------------------------
@@ -398,6 +398,16 @@ if (isset($_GET['reparar_topologia'])) {
     header('Content-Type: text/plain; charset=utf-8');
     require_once __DIR__ . '/miscelaneas/migrar_topologia.php';
 
+    // Reparar la arista `us_Administrador → usuarios`
+    // (v78f). Sin ella, el admin no alcanza la raíz
+    // `usuarios` en carga parcial y `listar_duenos`
+    // devuelve vacío. Se pierde al recuperar el grafo
+    // desde un backup viejo (TRUNCATE + migrar_a_sql64)
+    // porque esa migración copia fielmente lo que hay:
+    // si la arista no estaba en las tablas viejas, no
+    // se crea. v79f.
+    $r_admin = migrar_topologia_admin($nombre_app);
+
     $r_comp = reparar_compartidos_dueno();
     $r_viajes = reparar_viajes_dueno();
     $r_emp = reparar_empresas_dueno();
@@ -406,7 +416,16 @@ if (isset($_GET['reparar_topologia'])) {
     echo "Reparación topológica\n";
     echo "====================\n\n";
 
-    echo "-- Enlaces dueño → compartido_con_* --\n";
+    echo "-- us_Administrador → usuarios --\n";
+    if (!empty($r_admin['errores'])) {
+        foreach ($r_admin['errores'] as $e) echo "  ERROR: $e\n";
+    } elseif ($r_admin['ya_existia']) {
+        echo "  ya existía\n";
+    } elseif ($r_admin['creado']) {
+        echo "  creado\n";
+    }
+
+    echo "\n-- Enlaces dueño → compartido_con_* --\n";
     echo "   dueños procesados: " . $r_comp['duenos'] . "\n";
     echo "   enlaces agregados: " . $r_comp['reparados'] . "\n";
     foreach ($r_comp['detalles'] as $d) {
@@ -434,7 +453,11 @@ if (isset($_GET['reparar_topologia'])) {
         echo "     " . $d['dueno'] . "\n";
     }
 
-    $total_reparados = $r_comp['reparados'] + $r_viajes['reparados'] + $r_emp['reparados'] + $r_pas['reparados'];
+    $total_reparados = ($r_admin['creado'] ? 1 : 0)
+        + $r_comp['reparados']
+        + $r_viajes['reparados']
+        + $r_emp['reparados']
+        + $r_pas['reparados'];
     if ($total_reparados > 0) {
         guardar_ambos($nombre_app);
         echo "\nGuardado.\n";

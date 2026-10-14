@@ -1,9 +1,15 @@
 <?php
 /**
- * Aplicador — Mostrar botones de impresión del micro a la terminal.
+ * Aplicador — Agregar migrar_topologia_admin a ?reparar_topologia=1.
  *
- * La condición actual solo muestra los botones a dueño, admin y
- * soporte. Agregar terminal. (v79e)
+ * Después de un TRUNCATE + migrar_a_sql64, la arista
+ * `us_Administrador → usuarios` no se recrea. El bloque
+ * ?reparar_topologia=1 repara aristas del dueño pero no la
+ * del admin. Sin ella, el admin no alcanza la raíz `usuarios`
+ * en carga parcial y `listar_duenos` devuelve vacío.
+ *
+ * Fix: invocar migrar_topologia_admin desde el bloque
+ * ?reparar_topologia=1. Idempotente.
  *
  * Uso: php aplicar_cambios.php
  */
@@ -13,130 +19,159 @@ $raiz_proyecto = __DIR__;
 
 $cambios = [
     // ============================================================
-    // 1. viajes-asientos.js: condición de visibilidad
+    // 1. index.php: agregar migrar_topologia_admin
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-        'descripcion' => 'viajes-asientos.js: botones de impresión para terminal',
+        'archivo' => 'index.php',
+        'descripcion' => 'index.php: migrar_topologia_admin en ?reparar_topologia=1',
         'buscar' => [
-            '    // Botones de impresión: solo dueño y admin.',
-            '    if (usuario_actual.nivel === \'dueno\' || es_admin_o_soporte()) {',
+            '    $r_comp = reparar_compartidos_dueno();',
+            '    $r_viajes = reparar_viajes_dueno();',
+            '    $r_emp = reparar_empresas_dueno();',
+            '    $r_pas = reparar_pasajeros_dueno();',
         ],
         'reemplazar' => [
-            '    // Botones de impresión: dueño, terminal, admin y soporte.',
-            '    // La terminal se agrega en v79e. Antes se la excluía porque',
-            '    // el backend no estaba adaptado a carga parcial; hoy sí lo',
-            '    // está. Los datos que exponen croquis y planilla ya los ve',
-            '    // la terminal en el modal "Ver pasaje" y en el propio croquis,',
-            '    // así que no es una fuga nueva.',
-            '    if (usuario_actual.nivel === \'dueno\' || usuario_actual.nivel === \'terminal\' || es_admin_o_soporte()) {',
+            '    // Reparar la arista `us_Administrador → usuarios`',
+            '    // (v78f). Sin ella, el admin no alcanza la raíz',
+            '    // `usuarios` en carga parcial y `listar_duenos`',
+            '    // devuelve vacío. Se pierde al recuperar el grafo',
+            '    // desde un backup viejo (TRUNCATE + migrar_a_sql64)',
+            '    // porque esa migración copia fielmente lo que hay:',
+            '    // si la arista no estaba en las tablas viejas, no',
+            '    // se crea. v79f.',
+            '    $r_admin = migrar_topologia_admin($nombre_app);',
+            '',
+            '    $r_comp = reparar_compartidos_dueno();',
+            '    $r_viajes = reparar_viajes_dueno();',
+            '    $r_emp = reparar_empresas_dueno();',
+            '    $r_pas = reparar_pasajeros_dueno();',
         ],
     ],
 
     // ============================================================
-    // 2. viajes-asientos.js: bump
+    // 2. index.php: reportar el resultado
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-        'descripcion' => 'Bump viajes-asientos.js',
+        'archivo' => 'index.php',
+        'descripcion' => 'index.php: reporte del admin',
         'buscar' => [
-            ' * @version 1.5piloto.77d',
+            '    echo "Reparación topológica\\n";',
+            '    echo "====================\\n\\n";',
+            '',
+            '    echo "-- Enlaces dueño → compartido_con_* --\\n";',
         ],
         'reemplazar' => [
-            ' * @version 1.5piloto.79e',
+            '    echo "Reparación topológica\\n";',
+            '    echo "====================\\n\\n";',
+            '',
+            '    echo "-- us_Administrador → usuarios --\\n";',
+            '    if (!empty($r_admin[\'errores\'])) {',
+            '        foreach ($r_admin[\'errores\'] as $e) echo "  ERROR: $e\\n";',
+            '    } elseif ($r_admin[\'ya_existia\']) {',
+            '        echo "  ya existía\\n";',
+            '    } elseif ($r_admin[\'creado\']) {',
+            '        echo "  creado\\n";',
+            '    }',
+            '',
+            '    echo "\\n-- Enlaces dueño → compartido_con_* --\\n";',
         ],
     ],
 
     // ============================================================
-    // 3. plan_actual.md: agregar §1.5.13
+    // 3. index.php: total_reparados incluye al admin
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'index.php',
+        'descripcion' => 'index.php: total_reparados con admin',
+        'buscar' => [
+            '    $total_reparados = $r_comp[\'reparados\'] + $r_viajes[\'reparados\'] + $r_emp[\'reparados\'] + $r_pas[\'reparados\'];',
+        ],
+        'reemplazar' => [
+            '    $total_reparados = ($r_admin[\'creado\'] ? 1 : 0)',
+            '        + $r_comp[\'reparados\']',
+            '        + $r_viajes[\'reparados\']',
+            '        + $r_emp[\'reparados\']',
+            '        + $r_pas[\'reparados\'];',
+        ],
+    ],
+
+    // ============================================================
+    // 4. index.php: bump
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'index.php',
+        'descripcion' => 'Bump index.php a 79f',
+        'buscar' => [
+            ' * @version   1.5piloto.78z',
+        ],
+        'reemplazar' => [
+            ' * @version   1.5piloto.79f',
+        ],
+    ],
+
+    // ============================================================
+    // 5. plan_actual.md: nota del bug
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: agregar §1.5.13',
+        'descripcion' => 'plan_actual: agregar §1.5.14',
         'buscar' => [
             '### 1.6 Pendientes de la línea',
         ],
         'reemplazar' => [
-            '#### 1.5.13 Botones de impresión del micro para terminal (v79e)',
+            '#### 1.5.14 Arista `us_Administrador → usuarios` perdida tras recuperar desde backup (v79f)',
             '',
-            '**Síntoma:** los botones "Imprimir Croquis",',
-            '"Imprimir Planilla" e "Imprimir Planilla Vacía"',
-            'aparecían para el dueño pero no para la terminal.',
+            '**Síntoma:** logueado como admin, todas las pestañas',
+            'mostraban el select de dueño vacío. Sin poder elegir',
+            'dueño, ninguna pestaña funcionaba.',
             '',
-            '**Causa:** condición JS en `renderizar_pasaje_micro`',
-            '(`viajes-asientos.js`):',
+            '**Causa:** la arista `us_Administrador → usuarios`',
+            'no existía en el grafo. `listar_duenos` navega por',
+            'esa arista para llegar a `usuarios` y enumerar los',
+            'dueños. Sin ella, devolvía vacío. `usuarios` tenía',
+            'el bit del admin (máscara 4) pero como residuo:',
+            'en algún momento la arista existió, después se',
+            'perdió, y el bitmask no se actualizó.',
             '',
-            '```js',
-            'if (usuario_actual.nivel === \'dueno\' || es_admin_o_soporte())',
-            '```',
+            '**Cómo se perdió:** el flujo de recuperación tras',
+            'un TRUNCATE + `?migrar_a_sql64=1` copia fielmente',
+            'el grafo de las tablas viejas (`nodo`/`adyacente`).',
+            'Si la arista no estaba en esas tablas, no se crea.',
+            'El bloque `?reparar_topologia=1` (v78n) reparaba',
+            'aristas del dueño pero **no** la del admin.',
             '',
-            'La terminal quedaba afuera. Cuando se agregaron esos',
-            'botones, el backend de impresión no estaba adaptado a',
-            'carga parcial. Hoy sí: `_contextos_para_operacion`',
-            'devuelve `[\'us_<dueno>\']` para `?imprimir=1&dueno=X`',
-            '(salvo los tipos B3.3c, que no incluyen croquis ni',
-            'planilla).',
+            '**Fix:** agregar `migrar_topologia_admin($nombre_app)`',
+            'al bloque `?reparar_topologia=1`. Idempotente. El',
+            'total reportado incluye la creación si ocurrió.',
             '',
-            '**Solución:** agregar `terminal` a la condición.',
-            '',
-            '**Nota:** la información que exponen croquis y',
-            'planilla (nombre de pasajero, DNI, contacto) ya la',
-            've la terminal en el modal "Ver pasaje" y en el',
-            'propio croquis. No es una fuga nueva.',
-            '',
-            '**Deuda de seguridad anotada:** las URLs de impresión',
-            '(`?imprimir=1&tipo=...`) no validan sesión ni',
-            'permisos. Cualquiera con la URL puede ver los datos.',
-            'Es un problema preexistente. Anotado para una tanda',
-            'futura.',
+            '**Lección:** el bloque `?reparar_topologia=1` debe',
+            'cubrir **todas** las aristas estructurales del',
+            'modelo: admin → usuarios, dueño → compartido,',
+            'viajes/empresas/pasajeros del dueño. Si una',
+            'arista estructural puede perderse, debe poder',
+            'repararse.',
             '',
             '### 1.6 Pendientes de la línea',
         ],
     ],
 
     // ============================================================
-    // 4. plan_actual.md: bump
+    // 6. plan_actual.md: bump
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: bump a 79e',
+        'descripcion' => 'plan_actual: bump a 79f',
         'buscar' => [
-            '**Última actualización de este archivo:** v1.5piloto.79d.',
-        ],
-        'reemplazar' => [
             '**Última actualización de este archivo:** v1.5piloto.79e.',
         ],
-    ],
-
-    // ============================================================
-    // 5. plan_actual.md: deuda de seguridad de impresión
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §1.6: deuda de seguridad',
-        'buscar' => [
-            '- **Módulos menores sin contexto:** `Liquidacion.php`,',
-            '  `Rendicion.php`, `Empresa.php`, `Vehiculo.php`. Sub-',
-            '  tandas cortas.',
-            '- **Plugin: dividir la ventana en pestañas, una por rol.**',
-            '  Idea anotada al cierre de v78v.',
-        ],
         'reemplazar' => [
-            '- **Módulos menores sin contexto:** `Liquidacion.php`,',
-            '  `Rendicion.php`, `Empresa.php`, `Vehiculo.php`. Sub-',
-            '  tandas cortas.',
-            '- **Plugin: dividir la ventana en pestañas, una por rol.**',
-            '  Idea anotada al cierre de v78v.',
-            '- **Deuda de seguridad en impresión.** Las URLs de',
-            '  impresión (`?imprimir=1&tipo=...`) no validan sesión',
-            '  ni permisos. Cualquiera con la URL ve el HTML. Se',
-            '  anota para una tanda futura, cuando se rehaga el',
-            '  módulo de impresión o se agregue un chequeo general.',
+            '**Última actualización de este archivo:** v1.5piloto.79f.',
         ],
     ],
 ];
@@ -145,7 +180,7 @@ $cambios = [
 // Runner
 // ============================================================
 
-echo "=== Aplicador — Botones de impresión para terminal ===\n\n";
+echo "=== Aplicador — Reparar admin → usuarios ===\n\n";
 
 function detectar_eol(string $c): string { return (strpos($c, "\r\n") !== false) ? "\r\n" : "\n"; }
 function normalizar_a_unix(string $c): string { return str_replace("\r\n", "\n", $c); }
