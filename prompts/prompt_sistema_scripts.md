@@ -1,5 +1,12 @@
 # Prompt de trabajo — Sistema de scripts de aplicación de cambios
 
+> **DEPRECADO desde v1.5piloto.79o.** Este archivo fue
+> reemplazado por `prompts/prompt_sistema_scripts_v2.md`,
+> que consolida este prompt con
+> `prompts/prompt_runner_aplicar_cambios.md` y agrega el
+> runner v2 con bumps automáticos. Este archivo queda
+> como referencia histórica. No se actualiza más.
+
 Este es un prompt autocontenido. Vive en el propio proyecto, en
 `prompts/prompt_sistema_scripts.md`, y se pega al principio de la conversación
 junto con `prompts/prompt_framework_iteradores.md` y `prompts/prompt_piloto.md`.
