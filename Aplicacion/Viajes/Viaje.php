@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.78j
+ * @version   1.5piloto.79g
  */
 
 use Iteradores\Nodos\Nodo;
@@ -236,6 +236,18 @@ function listar_viajes_de_dueno(string $nombre_dueno): array {
 
     $adyacentes = (array) $nodo_viajes->adyacentes();
     if (!$adyacentes) return [];
+
+    // Drenar buzones pendientes. Con el fix v79a (inserción
+    // diferida), el admin y el terminal dejan las ventas
+    // nuevas en el buzón del compartido. Si no las drena
+    // nadie antes de armar el índice, los viajes aparecen
+    // con tiene_ventas="0". Idempotente. Bug §1.5.15.
+    if (function_exists('_procesar_pendientes_del_dueno')) {
+        $hubo_drenado = _procesar_pendientes_del_dueno($nombre_dueno);
+        if ($hubo_drenado) {
+            guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+        }
+    }
 
     // Fase 3, v76a: precalcular el índice de ventas por viaje
     // UNA VEZ. Antes, formatear_viaje recorría todo el contenedor
