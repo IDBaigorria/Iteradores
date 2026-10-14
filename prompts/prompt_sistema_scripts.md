@@ -278,6 +278,14 @@ if (!empty($bloques_fallidos)) {
 echo "\nListo.\n";
 ```
 
+> **Nota (v1.5piloto.79n):** existe un runner v2 con
+> **bumps automáticos** en
+> `prompts/prompt_runner_aplicar_cambios.md`. A partir de esa
+> versión, los scripts declaran `$version_nueva` en la
+> cabecera y el runner bumpea solo. No hacen falta bloques
+> de bump manuales. El runner de abajo queda como referencia
+> para el runner viejo (sin bumps automáticos).
+
 ## FORMATO DE CADA BLOQUE EN `$cambios`
 
 ### Tipo `reemplazar`
@@ -695,6 +703,19 @@ costó un fallo real del runner y una iteración extra.
     aparece en combinación, anotar explícitamente el
     orden de las pruebas que lo reproducen. Es el dato
     más valioso para diagnosticarlo.
+24. **Criterios por prefijo, sufijo o keyword: verificar
+    el caso positivo Y el negativo.** Un typo en un
+    prefijo (`viajedeselgraf` vs `viajedeselegraf`) no
+    rompe el código: falla silenciosamente y el síntoma
+    aparece lejos. Regla: cuando se agrega un criterio
+    de matching por string, el test o el chequeo debe
+    incluir al menos un caso que debería matchear (para
+    confirmar que el matching funciona) y uno que no
+    (para confirmar que no matchea de más). Casos
+    reales: v79j (prefijo con typo), v6q (`nombre_dueno`
+    agregado al POST pero no a la firma), v5f
+    (`nombre_usuario_actual` devolvía objeto en vez de
+    string).
 
 ---
 
@@ -715,7 +736,13 @@ costó un fallo real del runner y una iteración extra.
 
 ## DISCUSIÓN ACTUAL
 
-**Última actualización de este prompt:** v1.5piloto.78s.
+**Última actualización de este prompt:** v1.5piloto.79n.
+Se agrega la referencia al runner v2
+(`prompt_runner_aplicar_cambios.md`) con bumps automáticos,
+y la lección 24 sobre criterios por prefijo/string. A partir
+de acá, los scripts declaran `$version_nueva` en la cabecera
+y el runner bumpea solo. Sin bloques de bump manuales.
+Antes: v1.5piloto.78s.
 Se agregan dos aprendizajes (22-23): anotar intentos de
 fix fallidos antes de seguir (caso v78r/v78s) y anotar el
 orden de las pruebas cuando un bug solo aparece por
