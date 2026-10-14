@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.79k
+ * @version   1.5piloto.79l
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1413,6 +1413,78 @@ function guardar_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, 
  * @param string $nombre_dueno
  * @return array
  */
+
+/**
+ * Chequea si TODAS las ventas de un viaje tienen comprador
+ * con email terminado en @test.local. Solo en ese caso el
+ * viaje se puede destruir como "de prueba".
+ *
+ * Devuelve:
+ *   [
+ *     'todas'      => bool,  // true si TODAS son de prueba
+ *     'conteo'     => int,   // cantidad de ventas del viaje
+ *     'ids_venta'  => array, // ids de ventas de prueba (a cancelar)
+ *     'no_prueba'  => array, // ids de ventas NO de prueba (bloqueantes)
+ *   ]
+ *
+ * Se llama desde limpiar_viajes_de_prueba. La decisión de
+ * cancelar o conservar la toma el llamador.
+ *
+ * @param string $nombre_dueno
+ * @param string $nombre_viaje
+ * @return array
+ * @since 1.5piloto.79l
+ */
+function _todas_las_ventas_del_viaje_son_de_prueba(string $nombre_dueno, string $nombre_viaje): array {
+    $res = [
+        'todas' => true,
+        'conteo' => 0,
+        'ids_venta' => [],
+        'no_prueba' => [],
+    ];
+
+    $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+    if (!$contenedor_ventas) return $res;
+
+    $venta = hmi($contenedor_ventas);
+    $seg = 0;
+    while ($venta && $seg < 2000) {
+        $seg++;
+        $nodo_viaje = $venta->adyacente('viaje');
+        if (!$nodo_viaje || $nodo_viaje->dato() !== $nombre_viaje) {
+            $venta = hd($venta);
+            continue;
+        }
+        $res['conteo']++;
+        $id_venta = (string)$venta->dato();
+
+        // Chequear comprador. Solo el email @test.local
+        // marca la venta como de prueba. Email real, vacío
+        // o inválido => venta real (no se toca).
+        $es_prueba = false;
+        $nodo_comprador = $venta->adyacente('comprador');
+        if ($nodo_comprador) {
+            $nodo_email = $nodo_comprador->adyacente('email');
+            if ($nodo_email) {
+                $email = (string)$nodo_email->dato();
+                if (substr($email, -11) === '@test.local') {
+                    $es_prueba = true;
+                }
+            }
+        }
+
+        if ($es_prueba) {
+            $res['ids_venta'][] = $id_venta;
+        } else {
+            $res['todas'] = false;
+            $res['no_prueba'][] = $id_venta;
+        }
+
+        $venta = hd($venta);
+    }
+    return $res;
+}
+
 function limpiar_viajes_de_prueba(string $nombre_dueno): array {
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
     if (!$nodo_viajes) {
@@ -1433,6 +1505,7 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
     $borrados = [];
     $conservados = [];
     $con_ventas = [];
+    $canceladas = [];
 
     foreach ($adyacentes as $nombre_viaje => $nodo_viaje) {
         $nombre_viaje = (string)$nombre_viaje;
@@ -1459,10 +1532,48 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
             continue;
         }
 
-        // No eliminar si tiene ventas registradas.
+        // Si tiene ventas, chequear si TODAS son de prueba
+        // (comprador con email @test.local). Solo en ese caso
+        // se cancelan y se procede a destruir el viaje. Si
+        // alguna venta NO es de prueba, se conserva el viaje.
         if (viaje_tiene_ventas($nombre_dueno, $nombre_viaje)) {
-            $con_ventas[] = $nombre_viaje;
-            continue;
+            $analisis = _todas_las_ventas_del_viaje_son_de_prueba(
+                $nombre_dueno, $nombre_viaje
+            );
+            if (!$analisis['todas']) {
+                // Hay al menos una venta real: conservar el viaje.
+                $con_ventas[] = $nombre_viaje;
+                continue;
+            }
+
+            // Cancelar cada venta de prueba. cancelar_venta
+            // destruye el nodo venta y crea un Nodo Cancelación
+            // (auditoría). Los asientos se liberan y los cupones
+            // se destruyen como en una cancelación normal.
+            $cancelacion_fallida = false;
+            foreach ($analisis['ids_venta'] as $id_venta_cancelar) {
+                $res_cancel = cancelar_venta(
+                    $id_venta_cancelar,
+                    'Limpieza de pruebas automáticas',
+                    null,
+                    $nombre_dueno
+                );
+                if (!$res_cancel || empty($res_cancel['exito'])) {
+                    $cancelacion_fallida = true;
+                    break;
+                }
+                $canceladas[] = $id_venta_cancelar;
+            }
+            if ($cancelacion_fallida) {
+                // Algo falló a mitad de camino: conservar el
+                // viaje. Si quedó alguna venta cancelada, no
+                // afecta al usuario: se ve como cancelación
+                // normal en la pestaña Vendidos.
+                $con_ventas[] = $nombre_viaje;
+                continue;
+            }
+            // Ahora el viaje ya no tiene ventas activas. Sigue
+            // el flujo normal de destrucción.
         }
 
         // Fase 2, v74z: destruir el subárbol completo del viaje
@@ -1493,6 +1604,13 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
         'cantidad_borrados' => count($borrados),
         'conservados' => $conservados,
         'con_ventas' => $con_ventas,
+        // v79l: ids de ventas de prueba canceladas durante
+        // la limpieza. Quedan como nodos Cancelación en el
+        // árbol del dueño (auditoría). Se puede agregar
+        // un botón "Eliminar cancelaciones de prueba" en
+        // una tanda futura.
+        'canceladas' => $canceladas,
+        'cantidad_canceladas' => count($canceladas),
     ];
 }
 
