@@ -1,14 +1,15 @@
 <?php
 /**
- * Aplicador — aplicacion.js: clases de rol en el body.
+ * Aplicador — Ampliar prefijos de prueba + reportar conservados.
  *
- * Agrega las clases `rol-admin` y `modo-pruebas` al <body>
- * según el usuario logueado y la bandera window.entorno_es_pruebas.
- * El CSS (estilos-botones-admin.css) usa esas clases para mostrar
- * el botón "Limpiar viajes de prueba" solo al admin en modo pruebas.
- *
- * Sin esto, el botón quedaba visible al cambiar de sesión sin
- * recargar la página (bug reportado: aparece para terminal y dueño).
+ * Dos cambios:
+ *   1. Viaje.php: agregar `viajeregres` a los prefijos.
+ *      La prueba listar_viajes_indice_comportamiento (Fase 3)
+ *      usa viajeregresA / viajeregresB. Faltaban en la lista
+ *      y los viajes quedaban conservados silenciosamente.
+ *   2. viajes-nucleo.js: reportar también los conservados en
+ *      el mensaje, para que el admin entienda por qué no baja
+ *      el conteo.
  *
  * Uso (raíz del proyecto PHP): php aplicar_cambios.php
  */
@@ -16,169 +17,102 @@
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
 
-$helper = [
-    '',
-    '/**',
-    ' * Aplica las clases de rol y modo al <body>. Se usa para que',
-    ' * el CSS condicione la visibilidad de botones solo-admin',
-    ' * (por ejemplo, "Limpiar viajes de prueba"). Las clases se',
-    ' * limpian en _limpiar_contenido_dinamico, así que un cambio',
-    ' * de sesión sin recargar la página las quita antes de',
-    ' * configurar la nueva UI.',
-    ' *',
-    ' * Pasar usuario = null quita las dos clases.',
-    ' *',
-    ' * @param {object|null} usuario',
-    ' */',
-    'function _aplicar_clases_de_rol(usuario) {',
-    '    const body = document.body;',
-    '    if (!body) return;',
-    '    body.classList.toggle(\'rol-admin\', !!(usuario && usuario.nivel === \'admin\'));',
-    '    body.classList.toggle(\'modo-pruebas\', window.entorno_es_pruebas === true);',
-    '}',
-];
-
 $cambios = [
     // ============================================================
-    // 1. Nuevo helper _aplicar_clases_de_rol, justo antes de
-    //    _aplicar_login_exitoso.
+    // 1. Agregar viajeregres a prefijos
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion.js',
-        'descripcion' => 'Nuevo helper _aplicar_clases_de_rol',
+        'archivo' => 'Aplicacion/Viajes/Viaje.php',
+        'descripcion' => 'Agregar prefijo viajeregres',
         'buscar' => [
-            '/**',
-            ' * Aplica un login exitoso: guarda estado, muestra la app y configura pestañas.',
-            ' * Se usa tanto en login por código como por usuario.',
-            ' */',
-            'function _aplicar_login_exitoso(usuario) {',
-        ],
-        'reemplazar' => array_merge(
-            $helper,
-            [
-                '',
-                '/**',
-                ' * Aplica un login exitoso: guarda estado, muestra la app y configura pestañas.',
-                ' * Se usa tanto en login por código como por usuario.',
-                ' */',
-                'function _aplicar_login_exitoso(usuario) {',
-            ]
-        ),
-    ],
-
-    // ============================================================
-    // 2. Llamar al helper dentro de _aplicar_login_exitoso.
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion.js',
-        'descripcion' => 'Aplicar clases de rol en login exitoso',
-        'buscar' => [
-            '    $("#nombre_usuario_actual").textContent = usuario.nombre_usuario;',
-            '    $("#nivel_usuario_actual").textContent = usuario.nivel;',
-            '    configurar_pestanas_segun_nivel(usuario.nivel);',
-            '}',
-            '',
-            '/**',
-            ' * Muestra el bloque de login por usuario y oculta el de código.',
-            ' */',
+            '    $prefijos = [',
+            '        \'viajeprueba\', \'viajemicro\', \'viajeval\', \'viajedup\', \'viajecol\', \'viajesin\',',
+            '        // Prefijos de las pruebas del plugin (agregados en v79j).',
+            '        \'viajeventgraf\',    // prueba 34: cancelar venta',
+            '        \'viajedeselgraf\',   // prueba 35: deseleccionar asiento',
+            '        \'viajecambiomicro\', // prueba 36: cambiar micro',
+            '    ];',
         ],
         'reemplazar' => [
-            '    $("#nombre_usuario_actual").textContent = usuario.nombre_usuario;',
-            '    $("#nivel_usuario_actual").textContent = usuario.nivel;',
-            '    _aplicar_clases_de_rol(usuario);',
-            '    configurar_pestanas_segun_nivel(usuario.nivel);',
-            '}',
-            '',
-            '/**',
-            ' * Muestra el bloque de login por usuario y oculta el de código.',
-            ' */',
+            '    $prefijos = [',
+            '        \'viajeprueba\', \'viajemicro\', \'viajeval\', \'viajedup\', \'viajecol\', \'viajesin\',',
+            '        // Prefijos de las pruebas del plugin (agregados en v79j).',
+            '        \'viajeventgraf\',    // prueba 34: cancelar venta',
+            '        \'viajedeselgraf\',   // prueba 35: deseleccionar asiento',
+            '        \'viajecambiomicro\', // prueba 36: cambiar micro',
+            '        \'viajeregres\',      // prueba 43: listar viajes con índice',
+            '    ];',
         ],
     ],
 
     // ============================================================
-    // 3. Aplicar clases en la restauración de sesión (DOMContentLoaded).
+    // 2. Bump Viaje.php
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion.js',
-        'descripcion' => 'Aplicar clases de rol al restaurar sesión',
+        'archivo' => 'Aplicacion/Viajes/Viaje.php',
+        'descripcion' => 'Bump Viaje.php',
+        'buscar' => [' * @version   1.5piloto.79j'],
+        'reemplazar' => [' * @version   1.5piloto.79k'],
+    ],
+
+    // ============================================================
+    // 3. Reportar conservados en el mensaje del frontend
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Viajes/viajes-nucleo.js',
+        'descripcion' => 'Reportar conservados en el mensaje',
         'buscar' => [
-            '                $("#nombre_usuario_actual").textContent = usuario_actual.nombre_usuario;',
-            '                $("#nivel_usuario_actual").textContent = usuario_actual.nivel;',
-            '                configurar_pestanas_segun_nivel(usuario_actual.nivel);',
-            '                ocultar_detalle_viaje();',
+            '    let msg = "Se eliminaron " + datos.cantidad_borrados + " viaje(s) de prueba.";',
+            '    if (datos.con_ventas && datos.con_ventas.length > 0) {',
+            '        msg += " " + datos.con_ventas.length + " no se pudieron eliminar (tienen ventas).";',
+            '    }',
+            '    mostrar_aviso(msg, \'exito\');',
         ],
         'reemplazar' => [
-            '                $("#nombre_usuario_actual").textContent = usuario_actual.nombre_usuario;',
-            '                $("#nivel_usuario_actual").textContent = usuario_actual.nivel;',
-            '                _aplicar_clases_de_rol(usuario_actual);',
-            '                configurar_pestanas_segun_nivel(usuario_actual.nivel);',
-            '                ocultar_detalle_viaje();',
+            '    let msg = "Se eliminaron " + datos.cantidad_borrados + " viaje(s) de prueba.";',
+            '    if (datos.con_ventas && datos.con_ventas.length > 0) {',
+            '        msg += " " + datos.con_ventas.length + " no se pudieron eliminar (tienen ventas).";',
+            '    }',
+            '    // v79k: reportar también los conservados por no tener',
+            '    // prefijo de prueba ni nombre principal. Antes quedaban',
+            '    // silenciosos y el admin no entendía por qué el conteo',
+            '    // total no bajaba.',
+            '    const conservados_sin_prefijo = (datos.conservados || []).filter(',
+            '        function (n) { return n !== null; }',
+            '    );',
+            '    if (conservados_sin_prefijo.length > 0) {',
+            '        msg += " " + conservados_sin_prefijo.length + " conservado(s) sin prefijo de prueba.";',
+            '    }',
+            '    mostrar_aviso(msg, \'exito\');',
         ],
     ],
 
     // ============================================================
-    // 4. Quitar clases en _limpiar_contenido_dinamico.
+    // 4. Bump viajes-nucleo.js
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion.js',
-        'descripcion' => 'Quitar clases de rol al limpiar',
-        'buscar' => [
-            'function _limpiar_contenido_dinamico() {',
-            '    // Fase 8.5, v76b: cerrar todos los modales antes de limpiar',
-            '    // el contenido. Antes solo se limpiaba el contenido interno',
-            '    // (tablas, listas, selectores), pero los overlays de modal',
-            '    // quedaban visibles al salir. Esto tapaba la pantalla de',
-            '    // login con el modal abierto hasta el próximo clic.',
-            '    //',
-            '    // Se llama desde salir() y desde _aplicar_login_exitoso(),',
-            '    // así que cubre tanto el logout manual como el cambio de',
-            '    // sesión sin recargar la página.',
-        ],
-        'reemplazar' => [
-            'function _limpiar_contenido_dinamico() {',
-            '    // Fase 8.5, v76b: cerrar todos los modales antes de limpiar',
-            '    // el contenido. Antes solo se limpiaba el contenido interno',
-            '    // (tablas, listas, selectores), pero los overlays de modal',
-            '    // quedaban visibles al salir. Esto tapaba la pantalla de',
-            '    // login con el modal abierto hasta el próximo clic.',
-            '    //',
-            '    // Se llama desde salir() y desde _aplicar_login_exitoso(),',
-            '    // así que cubre tanto el logout manual como el cambio de',
-            '    // sesión sin recargar la página.',
-            '',
-            '    // v79j: quitar las clases de rol del body, así el CSS',
-            '    // no muestra botones de admin en la próxima sesión.',
-            '    _aplicar_clases_de_rol(null);',
-        ],
+        'archivo' => 'Aplicacion/Viajes/viajes-nucleo.js',
+        'descripcion' => 'Bump viajes-nucleo.js',
+        'buscar' => [' * @version 1.5piloto.79j'],
+        'reemplazar' => [' * @version 1.5piloto.79k'],
     ],
 
     // ============================================================
-    // 5. Bump aplicacion.js
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion.js',
-        'descripcion' => 'Bump aplicacion.js',
-        'buscar' => [' * @version 1.5piloto.76b'],
-        'reemplazar' => [' * @version 1.5piloto.79j'],
-    ],
-
-    // ============================================================
-    // 6. Bump del ?v= en el HTML
+    // 5. Bump ?v= en el HTML
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'Bump ?v= de aplicacion.js',
+        'descripcion' => 'Bump ?v= de viajes-nucleo.js',
         'buscar' => [
-            '<script src="aplicacion.js?v=1.5piloto.76b"></script>',
+            '<script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.79j"></script>',
         ],
         'reemplazar' => [
-            '<script src="aplicacion.js?v=1.5piloto.79j"></script>',
+            '<script src="Aplicacion/Viajes/viajes-nucleo.js?v=1.5piloto.79k"></script>',
         ],
     ],
 ];
@@ -187,7 +121,7 @@ $cambios = [
 // Runner
 // ============================================================
 
-echo "=== Aplicador — aplicacion.js: clases de rol ===\n\n";
+echo "=== Aplicador — Ampliar prefijos + reportar conservados ===\n\n";
 
 function detectar_eol(string $c): string { return (strpos($c, "\r\n") !== false) ? "\r\n" : "\n"; }
 function normalizar_a_unix(string $c): string { return str_replace("\r\n", "\n", $c); }

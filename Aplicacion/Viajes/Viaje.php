@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.79j
+ * @version   1.5piloto.79k
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1425,6 +1425,7 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
         'viajeventgraf',    // prueba 34: cancelar venta
         'viajedeselgraf',   // prueba 35: deseleccionar asiento
         'viajecambiomicro', // prueba 36: cambiar micro
+        'viajeregres',      // prueba 43: listar viajes con índice
     ];
     $nombre_principal = 'Peregrinación a la Visita del Papa León XIV a Luján';
 

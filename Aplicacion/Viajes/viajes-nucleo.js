@@ -1,6 +1,6 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.79j
+ * @version 1.5piloto.79k
  */
 
 function obtener_nombre_dueno_actual() {
@@ -61,6 +61,16 @@ async function limpiar_viajes_de_prueba_ui() {
     let msg = "Se eliminaron " + datos.cantidad_borrados + " viaje(s) de prueba.";
     if (datos.con_ventas && datos.con_ventas.length > 0) {
         msg += " " + datos.con_ventas.length + " no se pudieron eliminar (tienen ventas).";
+    }
+    // v79k: reportar también los conservados por no tener
+    // prefijo de prueba ni nombre principal. Antes quedaban
+    // silenciosos y el admin no entendía por qué el conteo
+    // total no bajaba.
+    const conservados_sin_prefijo = (datos.conservados || []).filter(
+        function (n) { return n !== null; }
+    );
+    if (conservados_sin_prefijo.length > 0) {
+        msg += " " + conservados_sin_prefijo.length + " conservado(s) sin prefijo de prueba.";
     }
     mostrar_aviso(msg, 'exito');
     await listar_viajes(nombre_dueno, 'dueno');
