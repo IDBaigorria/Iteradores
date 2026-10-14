@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.77u
+ * @version   1.5piloto.79h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1051,4 +1051,75 @@ function _buscar_asiento_en_venta_persistente(Nodo $nodo_venta, Nodo $nodo_asien
         $seg++;
     }
     return null;
+}
+
+/**
+ * Reinicia por completo la selección de asientos de una
+ * terminal: libera los asientos reales que tenga en estado
+ * "seleccionado" y destruye la venta_actual colgada.
+ *
+ * A diferencia de "deseleccionar todos los propios" del
+ * frontend (que itera asiento por asiento con la info del
+ * viaje actual), este helper limpia la venta_actual entera
+ * aunque el viaje ya no esté en la lista. Sirve para casos
+ * donde el usuario cerró la ventana a mitad de una venta, o
+ * para las pruebas automatizadas que dejaron una venta a
+ * medias de una corrida anterior fallida.
+ *
+ * Idempotente: si no hay venta_actual, devuelve exito con
+ * habia_venta = false.
+ *
+ * @param string $nombre_terminal
+ * @return array
+ * @since 1.5piloto.79h
+ */
+function reiniciar_seleccion_completa_terminal(string $nombre_terminal): array {
+    if ($nombre_terminal === '') {
+        return ['exito' => false, 'error' => 'Terminal no especificada'];
+    }
+
+    // Fase B3.3b: ID especial directo.
+    $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre_terminal);
+    if (!$nodo_terminal) {
+        return ['exito' => false, 'error' => 'Terminal no encontrada'];
+    }
+
+    $venta_actual = $nodo_terminal->adyacente('venta_actual');
+    if (!$venta_actual) {
+        return ['exito' => true, 'habia_venta' => false];
+    }
+
+    // 1. Liberar los asientos reales referenciados. Solo se
+    //    pisan los que estén en estado "seleccionado" y cuya
+    //    referencia `seleccionado_por` apunte a esta terminal.
+    //    Los asientos vendidos o reservados por otros flujos
+    //    se respetan.
+    $cabeza = $venta_actual->adyacente('asientos');
+    if ($cabeza) {
+        $actual_av = $cabeza->adyacente('primer');
+        $seg_av = 0;
+        while ($actual_av && $actual_av->id() !== $cabeza->id() && $seg_av < 200) {
+            $nodo_asiento_real = $actual_av->adyacente('asiento');
+            if ($nodo_asiento_real) {
+                $estado = $nodo_asiento_real->adyacente('estado');
+                if ($estado && $estado->dato() === 'seleccionado') {
+                    $estado->_dato('libre');
+                }
+                $sel_por = $nodo_asiento_real->adyacente('seleccionado_por');
+                if ($sel_por && $sel_por->dato() === $nombre_terminal) {
+                    $nodo_asiento_real->eliminar_adyacente('seleccionado_por');
+                }
+            }
+            $actual_av = $actual_av->adyacente('siguiente');
+            $seg_av++;
+        }
+    }
+
+    // 2. Desenlazar la venta_actual del terminal y destruirla
+    //    con todo su subárbol (asientos-en-venta, cabeza).
+    $nodo_terminal->eliminar_adyacente('venta_actual');
+    _destruir_venta_actual($venta_actual);
+
+    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    return ['exito' => true, 'habia_venta' => true];
 }

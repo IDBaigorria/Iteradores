@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.78x
+ * @version   1.5piloto.79h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -814,6 +814,19 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     $resultado = deseleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal);
                     responder_json($resultado);
+                    break;
+
+                case 'reiniciar_seleccion_completa':
+                    // Limpia la venta_actual de una terminal (si
+                    // quedó colgada) y libera los asientos reales
+                    // que tenía seleccionados. Idempotente.
+                    // @since 1.5piloto.79h
+                    $nombre_terminal_rsc = $post['nombre_terminal'] ?? '';
+                    if (empty($nombre_terminal_rsc)) {
+                        responder_json(['exito' => false, 'error' => 'Terminal no especificada']);
+                    }
+                    $resultado_rsc = reiniciar_seleccion_completa_terminal($nombre_terminal_rsc);
+                    responder_json($resultado_rsc);
                     break;
 
                 case 'reservar_asiento':
