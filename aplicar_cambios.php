@@ -1,46 +1,33 @@
 <?php
 /**
- * Aplicador — DIAGNOSTICO TEMPORAL de autenticacion.
+ * Aplicador — Limpieza de Autenticacion.php.
  *
- * Agrega error_log en 3 puntos del flujo de autenticacion para
- * ver por que el bloqueo no se aplica entre requests:
- *   - autenticar_por_usuario: estado al entrar.
- *   - _esta_bloqueado: valor leido.
- *   - _registrar_intento_fallido: intentos antes/despues.
- *
- * Los mensajes van con prefijo [DIAG-AUTH] para filtrarlos
- * facil. SE SACAN CUANDO TERMINE EL DIAGNOSTICO.
+ * 1. Saca los error_log temporales [DIAG-AUTH] que agregamos
+ *    para diagnosticar el bug de la prueba 54.
+ * 2. Fix del doble time() en _esta_bloqueado: cachea el valor
+ *    en $ahora y usa esa variable tanto para el log interno
+ *    como para la comparación. Antes, si el segundo cambiaba
+ *    entre las dos llamadas, la comparación podía fallar en
+ *    el borde (bug latente, no se manifestaba con 10s de
+ *    bloqueo).
  *
  * Uso (raiz del proyecto piloto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.80c';
+$version_nueva = '1.5piloto.80d';
 
 $htmls_a_bumpear = [];
 
 $cambios = [
 
-    // 1. autenticar_por_usuario: log al entrar
+    // 1. autenticar_por_usuario: sacar el bloque DIAG-AUTH
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
-        'descripcion' => 'DIAG: log en autenticar_por_usuario',
+        'descripcion' => 'Autenticacion: sacar DIAG-AUTH de autenticar_por_usuario',
         'buscar' => [
-            '        // ¿Está bloqueado el usuario?',
-            '        if (_esta_bloqueado($nodo_usuario)) {',
-            '            _verificacion_dummy($contrasena);',
-            '            return;',
-            '        }',
-            '',
-            '        // Verificar contraseña.',
-            '        if (!password_verify($contrasena, $nodo_contrasena->dato())) {',
-            '            _registrar_intento_fallido($nodo_usuario);',
-            '            return;',
-            '        }',
-        ],
-        'reemplazar' => [
             '        // [DIAG-AUTH] Estado del usuario al entrar.',
             '        $diag_int = $nodo_usuario->adyacente(\'intentos_fallidos\');',
             '        $diag_blq = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
@@ -51,34 +38,19 @@ $cambios = [
             '',
             '        // ¿Está bloqueado el usuario?',
             '        if (_esta_bloqueado($nodo_usuario)) {',
-            '            _verificacion_dummy($contrasena);',
-            '            return;',
-            '        }',
-            '',
-            '        // Verificar contraseña.',
-            '        if (!password_verify($contrasena, $nodo_contrasena->dato())) {',
-            '            _registrar_intento_fallido($nodo_usuario);',
-            '            return;',
-            '        }',
+        ],
+        'reemplazar' => [
+            '        // ¿Está bloqueado el usuario?',
+            '        if (_esta_bloqueado($nodo_usuario)) {',
         ],
     ],
 
-    // 2. _esta_bloqueado: log del valor leido
+    // 2. _esta_bloqueado: sacar logs y cachear time()
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
-        'descripcion' => 'DIAG: log en _esta_bloqueado',
+        'descripcion' => 'Autenticacion: limpiar _esta_bloqueado y cachear time()',
         'buscar' => [
-            'function _esta_bloqueado(Nodo $nodo_usuario): bool {',
-            '    $nodo_bloqueo = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
-            '    if (!$nodo_bloqueo) return false;',
-            '',
-            '    $hasta = (int)$nodo_bloqueo->dato();',
-            '    if ($hasta > time()) {',
-            '        return true;',
-            '    }',
-        ],
-        'reemplazar' => [
             'function _esta_bloqueado(Nodo $nodo_usuario): bool {',
             '    $nodo_bloqueo = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
             '    if (!$nodo_bloqueo) {',
@@ -92,31 +64,28 @@ $cambios = [
             '        return true;',
             '    }',
         ],
+        'reemplazar' => [
+            'function _esta_bloqueado(Nodo $nodo_usuario): bool {',
+            '    $nodo_bloqueo = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
+            '    if (!$nodo_bloqueo) return false;',
+            '',
+            '    $hasta = (int)$nodo_bloqueo->dato();',
+            '    // Cachear time() en $ahora: comparar contra dos valores',
+            '    // distintos de time() puede fallar en el borde del',
+            '    // segundo si el reloj avanza entre las dos llamadas.',
+            '    $ahora = time();',
+            '    if ($hasta > $ahora) {',
+            '        return true;',
+            '    }',
+        ],
     ],
 
-    // 3. _registrar_intento_fallido: intentos antes/despues
+    // 3. _registrar_intento_fallido: sacar log y volver a la version limpia
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
-        'descripcion' => 'DIAG: log en _registrar_intento_fallido',
+        'descripcion' => 'Autenticacion: limpiar _registrar_intento_fallido',
         'buscar' => [
-            'function _registrar_intento_fallido(Nodo $nodo_usuario): void {',
-            '    $nodo_intentos = $nodo_usuario->adyacente(\'intentos_fallidos\');',
-            '    $intentos = $nodo_intentos ? (int)$nodo_intentos->dato() : 0;',
-            '    $intentos++;',
-            '',
-            '    if ($nodo_intentos) $nodo_intentos->_dato((string)$intentos);',
-            '    else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$intentos), \'intentos_fallidos\');',
-            '',
-            '    if ($intentos >= ConfiguracionApli::intentos_maximos_autenticacion()) {',
-            '        $hasta = time() + ConfiguracionApli::bloqueo_autenticacion_segundos();',
-            '        $nodo_bloqueo = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
-            '        if ($nodo_bloqueo) $nodo_bloqueo->_dato((string)$hasta);',
-            '        else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$hasta), \'bloqueado_hasta\');',
-            '    }',
-            '}',
-        ],
-        'reemplazar' => [
             'function _registrar_intento_fallido(Nodo $nodo_usuario): void {',
             '    $nodo_intentos = $nodo_usuario->adyacente(\'intentos_fallidos\');',
             '    $intentos_antes = $nodo_intentos ? (int)$nodo_intentos->dato() : 0;',
@@ -139,6 +108,23 @@ $cambios = [
             '        . " -> " . $intentos . " (max=" . $max . ", bloquea=" . ($bloqueo ? "si" : "no")',
             '        . ", hasta=" . ($hasta_str !== "" ? $hasta_str : "-") . ")"',
             '        . " nodo_id=" . $nodo_usuario->id());',
+            '}',
+        ],
+        'reemplazar' => [
+            'function _registrar_intento_fallido(Nodo $nodo_usuario): void {',
+            '    $nodo_intentos = $nodo_usuario->adyacente(\'intentos_fallidos\');',
+            '    $intentos = $nodo_intentos ? (int)$nodo_intentos->dato() : 0;',
+            '    $intentos++;',
+            '',
+            '    if ($nodo_intentos) $nodo_intentos->_dato((string)$intentos);',
+            '    else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$intentos), \'intentos_fallidos\');',
+            '',
+            '    if ($intentos >= ConfiguracionApli::intentos_maximos_autenticacion()) {',
+            '        $hasta = time() + ConfiguracionApli::bloqueo_autenticacion_segundos();',
+            '        $nodo_bloqueo = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
+            '        if ($nodo_bloqueo) $nodo_bloqueo->_dato((string)$hasta);',
+            '        else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$hasta), \'bloqueado_hasta\');',
+            '    }',
             '}',
         ],
     ],

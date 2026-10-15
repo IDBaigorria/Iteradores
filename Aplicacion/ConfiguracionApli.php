@@ -12,7 +12,7 @@
  * vía `Entorno::es_pruebas()`.
  *
  * @author Ignacio David Baigorria
- * @version 1.5piloto.76e
+ * @version 1.5piloto.80b
  * @since   1.5piloto.76e
  */
 
@@ -100,10 +100,15 @@ class ConfiguracionApli extends Conf {
      * en modo pruebas. Reducido para que las pruebas del plugin
      * puedan esperar la expiración del bloqueo.
      *
+     * Se subió de 2s a 10s en v1.5piloto.80b: con el grafo
+     * grande, los 5 intentos fallidos de la prueba 54 tardan
+     * más que 2s en total, y el bloqueo expiraba antes del
+     * intento bloqueado.
+     *
      * @var int
      * @since 1.5piloto.76e
      */
-    public const BLOQUEO_AUTENTICACION_SEGUNDOS_PRUEBAS = 2;
+    public const BLOQUEO_AUTENTICACION_SEGUNDOS_PRUEBAS = 10;
 
     /**
      * Hash bcrypt válido usado como señuelo para igualar tiempos

@@ -10,7 +10,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.80c
+ * @version   1.5piloto.80d
  */
 
 use Iteradores\Configuracion\Conf;
@@ -101,14 +101,6 @@ function autenticar_por_usuario(string $nombre_usuario, string $contrasena): ?ar
             return;
         }
 
-        // [DIAG-AUTH] Estado del usuario al entrar.
-        $diag_int = $nodo_usuario->adyacente('intentos_fallidos');
-        $diag_blq = $nodo_usuario->adyacente('bloqueado_hasta');
-        error_log("[DIAG-AUTH] autenticar_por_usuario usuario=" . $nombre_usuario
-            . " intentos=" . ($diag_int ? $diag_int->dato() : "(null)")
-            . " bloqueado_hasta=" . ($diag_blq ? $diag_blq->dato() : "(null)")
-            . " time=" . time());
-
         // ¿Está bloqueado el usuario?
         if (_esta_bloqueado($nodo_usuario)) {
             _verificacion_dummy($contrasena);
@@ -197,14 +189,14 @@ function _verificacion_dummy(string $valor): void {
  */
 function _esta_bloqueado(Nodo $nodo_usuario): bool {
     $nodo_bloqueo = $nodo_usuario->adyacente('bloqueado_hasta');
-    if (!$nodo_bloqueo) {
-        error_log("[DIAG-AUTH] _esta_bloqueado: sin nodo bloqueado_hasta. Usuario id=" . $nodo_usuario->id());
-        return false;
-    }
+    if (!$nodo_bloqueo) return false;
 
     $hasta = (int)$nodo_bloqueo->dato();
-    error_log("[DIAG-AUTH] _esta_bloqueado: hasta=" . $hasta . " time=" . time() . " (diff=" . ($hasta - time()) . "s)");
-    if ($hasta > time()) {
+    // Cachear time() en $ahora: comparar contra dos valores
+    // distintos de time() puede fallar en el borde del
+    // segundo si el reloj avanza entre las dos llamadas.
+    $ahora = time();
+    if ($hasta > $ahora) {
         return true;
     }
 
@@ -229,26 +221,18 @@ function _esta_bloqueado(Nodo $nodo_usuario): bool {
  */
 function _registrar_intento_fallido(Nodo $nodo_usuario): void {
     $nodo_intentos = $nodo_usuario->adyacente('intentos_fallidos');
-    $intentos_antes = $nodo_intentos ? (int)$nodo_intentos->dato() : 0;
-    $intentos = $intentos_antes + 1;
+    $intentos = $nodo_intentos ? (int)$nodo_intentos->dato() : 0;
+    $intentos++;
 
     if ($nodo_intentos) $nodo_intentos->_dato((string)$intentos);
     else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$intentos), 'intentos_fallidos');
 
-    $max = ConfiguracionApli::intentos_maximos_autenticacion();
-    $bloqueo = ($intentos >= $max);
-    $hasta_str = "";
-    if ($bloqueo) {
+    if ($intentos >= ConfiguracionApli::intentos_maximos_autenticacion()) {
         $hasta = time() + ConfiguracionApli::bloqueo_autenticacion_segundos();
-        $hasta_str = (string)$hasta;
         $nodo_bloqueo = $nodo_usuario->adyacente('bloqueado_hasta');
-        if ($nodo_bloqueo) $nodo_bloqueo->_dato($hasta_str);
-        else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($hasta_str), 'bloqueado_hasta');
+        if ($nodo_bloqueo) $nodo_bloqueo->_dato((string)$hasta);
+        else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$hasta), 'bloqueado_hasta');
     }
-    error_log("[DIAG-AUTH] _registrar_intento_fallido: intentos " . $intentos_antes
-        . " -> " . $intentos . " (max=" . $max . ", bloquea=" . ($bloqueo ? "si" : "no")
-        . ", hasta=" . ($hasta_str !== "" ? $hasta_str : "-") . ")"
-        . " nodo_id=" . $nodo_usuario->id());
 }
 
 /**
