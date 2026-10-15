@@ -1,7 +1,7 @@
 /***
  * Aplicación principal.
  * Contiene utilidades, estado global, autenticación y manejo de pestañas.
- * @version 1.5piloto.79j
+ * @version 1.5piloto.80h
  */
 
 // Utilidades
@@ -16,6 +16,34 @@ const $$ = s => document.querySelectorAll(s);
 function es_admin_o_soporte() {
     if (!usuario_actual) return false;
     return usuario_actual.nivel === 'admin' || usuario_actual.nivel === 'soporte';
+}
+
+/**
+ * Limpia la venta_actual colgada de un terminal.
+ *
+ * Se llama al arrancar la app (login o validacion de
+ * token guardado). Cubre el caso "usuario cerro el
+ * navegador a mitad de una venta": los asientos
+ * quedan en estado "seleccionado" en el backend, y
+ * este helper los libera y destruye la venta_actual.
+ *
+ * Best-effort: si falla, loguea un warning y no
+ * bloquea el arranque. El endpoint es idempotente.
+ */
+function _reiniciar_seleccion_si_terminal() {
+    if (!usuario_actual || usuario_actual.nivel !== 'terminal') return;
+    const nombre_terminal = usuario_actual.nombre_usuario;
+    if (!nombre_terminal) return;
+    fetch("index.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            accion: "viajes/reiniciar_seleccion_completa",
+            nombre_terminal
+        })
+    }).catch(e => {
+        console.warn("No se pudo reiniciar la seleccion de asientos:", e);
+    });
 }
 
 // Interceptor de fetch: agrega nombre_solicitante a toda petición POST
@@ -267,6 +295,11 @@ function _aplicar_login_exitoso(usuario) {
     $("#nivel_usuario_actual").textContent = usuario.nivel;
     _aplicar_clases_de_rol(usuario);
     configurar_pestanas_segun_nivel(usuario.nivel);
+
+    // Si el que entra es terminal, limpiar cualquier
+    // venta_actual colgada (por ejemplo, si cerro el
+    // navegador a mitad de una venta).
+    _reiniciar_seleccion_si_terminal();
 }
 
 /**
@@ -336,6 +369,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 _aplicar_clases_de_rol(usuario_actual);
                 configurar_pestanas_segun_nivel(usuario_actual.nivel);
                 ocultar_detalle_viaje();
+
+                // Mismo caso que en _aplicar_login_exitoso:
+                // si el que arranca es terminal, limpiar
+                // la venta_actual colgada. Aca entra cuando
+                // el navegador conservo el token y la app
+                // se reabre sin pedir login.
+                _reiniciar_seleccion_si_terminal();
             } else {
                 localStorage.removeItem('token_sesion');
                 localStorage.removeItem('usuario_actual');

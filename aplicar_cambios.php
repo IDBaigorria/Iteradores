@@ -1,128 +1,120 @@
 <?php
 /**
- * Aplicador — plan_actual.md: §1.12 (botón del plugin + prefijos).
+ * Aplicador — Reiniciar seleccion de asientos al arrancar la app.
  *
- * Solo documentacion. No bumpea @version.
+ * Cuando un terminal arranca la app (login o validacion de token
+ * guardado), limpia cualquier venta_actual colgada. Cubre el caso
+ * "usuario cerro el navegador a mitad de una venta".
+ *
+ * Endpoint: viajes/reiniciar_seleccion_completa (ya existia,
+ * v1.5piloto.79h). El frontend solo lo llama al arrancar.
+ *
+ * Best-effort: si falla, loguea warning y sigue. No bloquea el
+ * arranque de la app.
  *
  * Uso (raiz del proyecto piloto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '';
+$version_nueva = '1.5piloto.80h';
+
 $htmls_a_bumpear = [];
 
 $cambios = [
 
+    // 1. Nuevo helper despues de es_admin_o_soporte.
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: agregar §1.12',
+        'archivo' => 'aplicacion.js',
+        'descripcion' => 'aplicacion.js: nuevo helper _reiniciar_seleccion_si_terminal',
         'buscar' => [
-            '**Próxima tanda sugerida:** verificación final del',
-            'plugin, después elegir el siguiente frente de la lista.',
-            '',
-            '---',
-            '',
-            '## 2. PLAN DE LA LÍNEA DE TANDAS',
+            'function es_admin_o_soporte() {',
+            '    if (!usuario_actual) return false;',
+            '    return usuario_actual.nivel === \'admin\' || usuario_actual.nivel === \'soporte\';',
+            '}',
         ],
         'reemplazar' => [
-            '**Próxima tanda sugerida:** verificación final del',
-            'plugin, después elegir el siguiente frente de la lista.',
+            'function es_admin_o_soporte() {',
+            '    if (!usuario_actual) return false;',
+            '    return usuario_actual.nivel === \'admin\' || usuario_actual.nivel === \'soporte\';',
+            '}',
             '',
-            '### 1.12 Botón "Limpiar datos de prueba" en el plugin',
+            '/**',
+            ' * Limpia la venta_actual colgada de un terminal.',
+            ' *',
+            ' * Se llama al arrancar la app (login o validacion de',
+            ' * token guardado). Cubre el caso "usuario cerro el',
+            ' * navegador a mitad de una venta": los asientos',
+            ' * quedan en estado "seleccionado" en el backend, y',
+            ' * este helper los libera y destruye la venta_actual.',
+            ' *',
+            ' * Best-effort: si falla, loguea un warning y no',
+            ' * bloquea el arranque. El endpoint es idempotente.',
+            ' */',
+            'function _reiniciar_seleccion_si_terminal() {',
+            '    if (!usuario_actual || usuario_actual.nivel !== \'terminal\') return;',
+            '    const nombre_terminal = usuario_actual.nombre_usuario;',
+            '    if (!nombre_terminal) return;',
+            '    fetch("index.php", {',
+            '        method: "POST",',
+            '        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
+            '        body: new URLSearchParams({',
+            '            accion: "viajes/reiniciar_seleccion_completa",',
+            '            nombre_terminal',
+            '        })',
+            '    }).catch(e => {',
+            '        console.warn("No se pudo reiniciar la seleccion de asientos:", e);',
+            '    });',
+            '}',
+        ],
+    ],
+
+    // 2. Llamarla al final de _aplicar_login_exitoso.
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion.js',
+        'descripcion' => 'aplicacion.js: llamada en _aplicar_login_exitoso',
+        'buscar' => [
+            '    _aplicar_clases_de_rol(usuario);',
+            '    configurar_pestanas_segun_nivel(usuario.nivel);',
+            '}',
+        ],
+        'reemplazar' => [
+            '    _aplicar_clases_de_rol(usuario);',
+            '    configurar_pestanas_segun_nivel(usuario.nivel);',
             '',
-            '**Estado:** cerrada entre v1.5piloto.80f (piloto) y',
-            'v1.5plugin.7m-7n (plugin).',
+            '    // Si el que entra es terminal, limpiar cualquier',
+            '    // venta_actual colgada (por ejemplo, si cerro el',
+            '    // navegador a mitad de una venta).',
+            '    _reiniciar_seleccion_si_terminal();',
+            '}',
+        ],
+    ],
+
+    // 3. Llamarla tambien en el camino de token guardado.
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion.js',
+        'descripcion' => 'aplicacion.js: llamada en DOMContentLoaded (token guardado)',
+        'buscar' => [
+            '                _aplicar_clases_de_rol(usuario_actual);',
+            '                configurar_pestanas_segun_nivel(usuario_actual.nivel);',
+            '                ocultar_detalle_viaje();',
+            '            } else {',
+        ],
+        'reemplazar' => [
+            '                _aplicar_clases_de_rol(usuario_actual);',
+            '                configurar_pestanas_segun_nivel(usuario_actual.nivel);',
+            '                ocultar_detalle_viaje();',
             '',
-            '**Motivación.** Las pruebas del plugin acumulan datos de',
-            'prueba que quedan en el grafo y frenan las pruebas',
-            'siguientes (empresas sin vehículo configurado, viajes',
-            'duplicados, pasajeros con `@test.local`, etc.). El',
-            'usuario tenía que correr un snippet de consola',
-            'manualmente para limpiarlos. Ahora hay un botón.',
-            '',
-            '**Qué se hizo.**',
-            '',
-            '- **v1.5piloto.80f:** ampliar los prefijos que',
-            '  reconocen los limpiadores:',
-            '  - `Viaje.php` → `limpiar_viajes_de_prueba` reconoce',
-            '    `viajelimpia`, `viajemicrograf`, `viajetermgraf`,',
-            '    `viajeparadgraf`, `viajeparahora`, `viajeborrar`,',
-            '    `viajedesaut`, `viajemicrocomp`.',
-            '  - `Empresa.php` → `limpiar_empresas_vehiculos_de_prueba`',
-            '    reconoce `emprevgraf` y `vehgraf`.',
-            '  Sin esto, las empresas de las pruebas 37/38 quedaban',
-            '  colgadas y bloqueaban pruebas posteriores.',
-            '',
-            '- **v1.5plugin.7m:** botón "Limpiar datos de prueba" en',
-            '  el popup. Arquitectura:',
-            '  - Nuevo módulo `Aplicacion/LimpiezaPrueba.js`: itera',
-            '    dueños, llama los 6 endpoints por dueño + el global',
-            '    de usuarios. Chequea modo pruebas + nivel admin',
-            '    antes de empezar. Reporta progreso por callback.',
-            '  - `servicio.js`: import + `_ejecutar_limpieza` +',
-            '    caso `limpiar_datos_prueba` en el switch +',
-            '    `globalThis.limpiar_prueba` para la consola del SW.',
-            '  - `ventana.html`: botón + `<pre>` para el log.',
-            '  - `ventana.js`: confirm previo + progreso incremental',
-            '    + resumen final.',
-            '',
-            '- **v1.5plugin.7n:** fix del listener del botón. El',
-            '  bloque `DOMContentLoaded` anidado nunca disparaba',
-            '  (el DOM ya estaba cargado dentro del handler padre).',
-            '  Fix: conexión directa del botón.',
-            '',
-            '**Orden de la limpieza (importa).**',
-            '',
-            '1. Ventas (crea cancelaciones de auditoría).',
-            '2. Cancelaciones (barre las recién creadas).',
-            '3. Viajes (destruye micros, que referencian empresas).',
-            '4. Pasajeros (`@test.local` sin referencias).',
-            '5. Empresas/vehículos (los que ya no tienen micros).',
-            '6. Terminales (`termprueba`).',
-            '7. Usuarios (global, al final).',
-            '',
-            '**Resultado en una corrida real:**',
-            '',
-            '- Antes: 5480 nodos, 0 huérfanos.',
-            '- Después: 2057 nodos, 0 huérfanos.',
-            '- Borrados: 8 ventas, 65 cancelaciones, 2+4 viajes, 206',
-            '  pasajeros, 2 empresas.',
-            '',
-            '**Lecciones aprendidas.**',
-            '',
-            '4. **Un `addEventListener("DOMContentLoaded")` anidado',
-            '   nunca dispara.** El evento ya ocurrió cuando el',
-            '   bloque interno se registra. Bug v7n: el listener',
-            '   del botón quedó dentro del handler padre. Fix:',
-            '   conectar directo (el DOM ya está listo).',
-            '',
-            '5. **Los prefijos de prueba deben estar centralizados.**',
-            '   Cuando una prueba nueva usa un prefijo distinto, el',
-            '   limpiador no lo reconoce y los datos se acumulan.',
-            '   Anotado para una tanda futura: una constante',
-            '   compartida con todos los prefijos, o que las',
-            '   pruebas registren su prefijo en algún lado.',
-            '',
-            '**Pendientes que abre este cierre.**',
-            '',
-            '- **Pruebas 37 y 38 sin `try/finally`:** si el flujo',
-            '  falla a mitad, la empresa/vehículo de setup queda',
-            '  colgada. Los limpiadores ahora la agarran, pero la',
-            '  prueba debería limpiar por su cuenta.',
-            '- **Reorganización de la ventana en pestañas por rol**',
-            '  (plan del prompt del plugin §10).',
-            '- El resto de los pendientes de §1.11 sigue vigente.',
-            '',
-            '**Próxima tanda sugerida:** depende del paréntesis',
-            'urgente del usuario. Al volver, elegir entre la',
-            'reorganización del plugin o el siguiente punto de',
-            '§1.11.',
-            '',
-            '---',
-            '',
-            '## 2. PLAN DE LA LÍNEA DE TANDAS',
+            '                // Mismo caso que en _aplicar_login_exitoso:',
+            '                // si el que arranca es terminal, limpiar',
+            '                // la venta_actual colgada. Aca entra cuando',
+            '                // el navegador conservo el token y la app',
+            '                // se reabre sin pedir login.',
+            '                _reiniciar_seleccion_si_terminal();',
+            '            } else {',
         ],
     ],
 
@@ -201,6 +193,42 @@ if ($modo_estricto && !empty($bloques_fallidos)) {
     exit(1);
 }
 
+$archivos_bump_php_js = [];
+foreach ($archivos_a_escribir as $ruta_abs => $info) {
+    $rel = substr($ruta_abs, strlen($raiz_proyecto) + 1);
+    $ext = strtolower(pathinfo($ruta_abs, PATHINFO_EXTENSION));
+    if ($ext === 'php' || $ext === 'js') $archivos_bump_php_js[] = $rel;
+}
+
+$bumps_atversion = 0;
+$bumps_detalle = [];
+$info_bumps = [];
+
+if ($bumpear) {
+    foreach (array_unique($archivos_bump_php_js) as $archivo_rel) {
+        $ruta_abs = $raiz_proyecto . '/' . $archivo_rel;
+        if (!file_exists($ruta_abs)) continue;
+        if (isset($archivos_a_escribir[$ruta_abs])) {
+            list($contenido, $eol) = $archivos_a_escribir[$ruta_abs];
+        } else {
+            $contenido_original = file_get_contents($ruta_abs);
+            $eol = detectar_eol($contenido_original);
+            $contenido = normalizar_a_unix($contenido_original);
+        }
+        $patron = '/(\*\s+@version\s+)(\S+)/';
+        $viejo = '';
+        $nuevo = preg_replace_callback($patron, function($m) use ($version_nueva, &$viejo) {
+            $viejo = $m[2];
+            return $m[1] . $version_nueva;
+        }, $contenido, 1, $count);
+        if ($count === 0) { $info_bumps[] = "$archivo_rel (sin @version)"; continue; }
+        if ($viejo === $version_nueva) { continue; }
+        $archivos_a_escribir[$ruta_abs] = [normalizar_a_unix($nuevo), $eol];
+        $bumps_atversion++;
+        $bumps_detalle[] = "$archivo_rel  @version $viejo -> $version_nueva";
+    }
+}
+
 $archivos_escritos = 0;
 foreach ($archivos_a_escribir as $ruta_abs => $info) {
     list($contenido_unix, $eol) = $info;
@@ -213,9 +241,16 @@ foreach ($archivos_a_escribir as $ruta_abs => $info) {
     echo "[OK] " . substr($ruta_abs, strlen($raiz_proyecto) + 1) . "\n";
 }
 
+if ($bumpear && (!empty($bumps_detalle) || !empty($info_bumps))) {
+    echo "\n--- Bumps ---\n";
+    foreach ($bumps_detalle as $d) echo "[BUMP] $d\n";
+    foreach ($info_bumps as $i) echo "[INFO] $i\n";
+}
+
 echo "\n=== Resumen ===\n";
 echo "Bloques aplicados: $bloques_ok\n";
 echo "Archivos escritos: $archivos_escritos\n";
+if ($bumpear) echo "Bumps @version:    $bumps_atversion\n";
 if (!empty($bloques_fallidos)) {
     echo "Fallos: " . count($bloques_fallidos) . "\n";
     foreach ($bloques_fallidos as $f) echo "  - $f\n";
