@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.80a
+ * @version   1.5piloto.80f
  */
 
 use Iteradores\Nodos\Nodo;
@@ -226,8 +226,19 @@ function limpiar_empresas_vehiculos_de_prueba(string $nombre_dueno): array {
         ];
     }
 
-    $prefijos_empresa = ['fotoauto', 'viajecambiomicro_emp_'];
-    $prefijos_vehiculo = ['fotoauto', 'viajecambiomicro_veh_'];
+    // Prefijos agregados en v80f: emprevgraf es de las pruebas
+    // 37 (eliminar_vehiculo) y 38 (eliminar_empresa). Sin este
+    // prefijo, esas empresas quedaban colgadas en el grafo.
+    $prefijos_empresa = [
+        'fotoauto',
+        'viajecambiomicro_emp_',
+        'emprevgraf',
+    ];
+    $prefijos_vehiculo = [
+        'fotoauto',
+        'viajecambiomicro_veh_',
+        'vehgraf',
+    ];
 
     $empresas_borradas = [];
     $vehiculos_borrados = [];
