@@ -1,131 +1,134 @@
 <?php
 /**
- * Aplicador — Limpieza de Autenticacion.php.
+ * Aplicador — Actualizar prompts/plan_actual.md con el cierre de
+ * la Fase 2c.
  *
- * 1. Saca los error_log temporales [DIAG-AUTH] que agregamos
- *    para diagnosticar el bug de la prueba 54.
- * 2. Fix del doble time() en _esta_bloqueado: cachea el valor
- *    en $ahora y usa esa variable tanto para el log interno
- *    como para la comparación. Antes, si el segundo cambiaba
- *    entre las dos llamadas, la comparación podía fallar en
- *    el borde (bug latente, no se manifestaba con 10s de
- *    bloqueo).
+ * Solo documentacion. No toca prompt_piloto.md (no cambio la
+ * estructura del piloto: solo se agregaron endpoints).
  *
  * Uso (raiz del proyecto piloto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.80d';
+$version_nueva = '';
 
 $htmls_a_bumpear = [];
 
 $cambios = [
 
-    // 1. autenticar_por_usuario: sacar el bloque DIAG-AUTH
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
-        'descripcion' => 'Autenticacion: sacar DIAG-AUTH de autenticar_por_usuario',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual: agregar §1.11 (cierre de Fase 2c)',
         'buscar' => [
-            '        // [DIAG-AUTH] Estado del usuario al entrar.',
-            '        $diag_int = $nodo_usuario->adyacente(\'intentos_fallidos\');',
-            '        $diag_blq = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
-            '        error_log("[DIAG-AUTH] autenticar_por_usuario usuario=" . $nombre_usuario',
-            '            . " intentos=" . ($diag_int ? $diag_int->dato() : "(null)")',
-            '            . " bloqueado_hasta=" . ($diag_blq ? $diag_blq->dato() : "(null)")',
-            '            . " time=" . time());',
+            'Detalle completo en `prompt_framework_iteradores.md` §11.5.',
             '',
-            '        // ¿Está bloqueado el usuario?',
-            '        if (_esta_bloqueado($nodo_usuario)) {',
+            '---',
+            '',
+            '## 2. PLAN DE LA LÍNEA DE TANDAS',
         ],
         'reemplazar' => [
-            '        // ¿Está bloqueado el usuario?',
-            '        if (_esta_bloqueado($nodo_usuario)) {',
-        ],
-    ],
-
-    // 2. _esta_bloqueado: sacar logs y cachear time()
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
-        'descripcion' => 'Autenticacion: limpiar _esta_bloqueado y cachear time()',
-        'buscar' => [
-            'function _esta_bloqueado(Nodo $nodo_usuario): bool {',
-            '    $nodo_bloqueo = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
-            '    if (!$nodo_bloqueo) {',
-            '        error_log("[DIAG-AUTH] _esta_bloqueado: sin nodo bloqueado_hasta. Usuario id=" . $nodo_usuario->id());',
-            '        return false;',
-            '    }',
+            'Detalle completo en `prompt_framework_iteradores.md` §11.5.',
             '',
-            '    $hasta = (int)$nodo_bloqueo->dato();',
-            '    error_log("[DIAG-AUTH] _esta_bloqueado: hasta=" . $hasta . " time=" . time() . " (diff=" . ($hasta - time()) . "s)");',
-            '    if ($hasta > time()) {',
-            '        return true;',
-            '    }',
-        ],
-        'reemplazar' => [
-            'function _esta_bloqueado(Nodo $nodo_usuario): bool {',
-            '    $nodo_bloqueo = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
-            '    if (!$nodo_bloqueo) return false;',
+            '### 1.11 Cierre de la Fase 2c — migración del plugin a `_post`',
             '',
-            '    $hasta = (int)$nodo_bloqueo->dato();',
-            '    // Cachear time() en $ahora: comparar contra dos valores',
-            '    // distintos de time() puede fallar en el borde del',
-            '    // segundo si el reloj avanza entre las dos llamadas.',
-            '    $ahora = time();',
-            '    if ($hasta > $ahora) {',
-            '        return true;',
-            '    }',
-        ],
-    ],
-
-    // 3. _registrar_intento_fallido: sacar log y volver a la version limpia
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
-        'descripcion' => 'Autenticacion: limpiar _registrar_intento_fallido',
-        'buscar' => [
-            'function _registrar_intento_fallido(Nodo $nodo_usuario): void {',
-            '    $nodo_intentos = $nodo_usuario->adyacente(\'intentos_fallidos\');',
-            '    $intentos_antes = $nodo_intentos ? (int)$nodo_intentos->dato() : 0;',
-            '    $intentos = $intentos_antes + 1;',
+            '**Estado:** cerrada entre v1.5piloto.80a y v1.5piloto.80e',
+            '(del lado del piloto) y v1.5plugin.7a-7k (del lado del',
+            'plugin).',
             '',
-            '    if ($nodo_intentos) $nodo_intentos->_dato((string)$intentos);',
-            '    else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$intentos), \'intentos_fallidos\');',
+            '**Qué se hizo.**',
             '',
-            '    $max = ConfiguracionApli::intentos_maximos_autenticacion();',
-            '    $bloqueo = ($intentos >= $max);',
-            '    $hasta_str = "";',
-            '    if ($bloqueo) {',
-            '        $hasta = time() + ConfiguracionApli::bloqueo_autenticacion_segundos();',
-            '        $hasta_str = (string)$hasta;',
-            '        $nodo_bloqueo = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
-            '        if ($nodo_bloqueo) $nodo_bloqueo->_dato($hasta_str);',
-            '        else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato($hasta_str), \'bloqueado_hasta\');',
-            '    }',
-            '    error_log("[DIAG-AUTH] _registrar_intento_fallido: intentos " . $intentos_antes',
-            '        . " -> " . $intentos . " (max=" . $max . ", bloquea=" . ($bloqueo ? "si" : "no")',
-            '        . ", hasta=" . ($hasta_str !== "" ? $hasta_str : "-") . ")"',
-            '        . " nodo_id=" . $nodo_usuario->id());',
-            '}',
-        ],
-        'reemplazar' => [
-            'function _registrar_intento_fallido(Nodo $nodo_usuario): void {',
-            '    $nodo_intentos = $nodo_usuario->adyacente(\'intentos_fallidos\');',
-            '    $intentos = $nodo_intentos ? (int)$nodo_intentos->dato() : 0;',
-            '    $intentos++;',
+            '- **Fase 1 de §3 (v1.5piloto.80a):** 5 endpoints backend',
+            '  de limpieza de prueba:',
+            '  - `ventas/limpiar_prueba` (comprador con email',
+            '    `@test.local`).',
+            '  - `cancelaciones/limpiar_prueba` (motivo con',
+            '    "prueba"/"test").',
+            '  - `empresas/limpiar_prueba` (prefijos `fotoauto`',
+            '    y `viajecambiomicro_*`).',
+            '  - `administrador/limpiar_usuarios_prueba`',
+            '    (nombre_usuario con prueba/test/temp).',
+            '  - `dueno/limpiar_terminales_prueba` (prefijo',
+            '    `termprueba`).',
+            '  Todos chequean admin + modo pruebas. Saltean',
+            '  usuarios/entidades con referencias entrantes',
+            '  (conservador).',
             '',
-            '    if ($nodo_intentos) $nodo_intentos->_dato((string)$intentos);',
-            '    else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$intentos), \'intentos_fallidos\');',
+            '- **Fase 2 (plugin, v1.5plugin.7a-7k):** migración completa',
+            '  de las ~50 pruebas y 3 helpers auxiliares al wrapper',
+            '  `_post(ctx, accion, params, opts)` que delega en',
+            '  `ctx.post_accion(accion, params, opts)`. Este último:',
+            '  - resuelve `nombre_solicitante` del logueado (con',
+            '    cache invalidado en `asegurar_login` y',
+            '    `cerrar_sesion`),',
+            '  - inyecta `nombre_dueno` si no viene en params,',
+            '  - soporta `sin_solicitante`, `sin_dueno`,',
+            '    `devolver_crudo`, `lanzar_en_error_backend`,',
+            '  - respeta `params.nombre_solicitante` explícito',
+            '    (para casos "admin opera como terminal").',
             '',
-            '    if ($intentos >= ConfiguracionApli::intentos_maximos_autenticacion()) {',
-            '        $hasta = time() + ConfiguracionApli::bloqueo_autenticacion_segundos();',
-            '        $nodo_bloqueo = $nodo_usuario->adyacente(\'bloqueado_hasta\');',
-            '        if ($nodo_bloqueo) $nodo_bloqueo->_dato((string)$hasta);',
-            '        else $nodo_usuario->_adyacente_en(Nodo::crear_con_dato((string)$hasta), \'bloqueado_hasta\');',
-            '    }',
-            '}',
+            '- **v1.5piloto.80b:** subir `BLOQUEO_AUTENTICACION_SEGUNDOS_PRUEBAS`',
+            '  de 2 a 10. Con el grafo actual (~3000 nodos), los 5',
+            '  intentos fallidos consecutivos de la prueba 54 tardan',
+            '  más que 2s. El bloqueo funcionaba; era timing.',
+            '',
+            '- **v1.5piloto.80c:** logs `[DIAG-AUTH]` temporales en',
+            '  `Autenticacion.php` para diagnosticar lo anterior.',
+            '',
+            '- **v1.5piloto.80d:** limpieza — se sacaron los logs',
+            '  temporales y se arregló el doble `time()` en',
+            '  `_esta_bloqueado` (bug latente: la comparación podía',
+            '  fallar en el borde del segundo).',
+            '',
+            '**Lecciones aprendidas.**',
+            '',
+            '1. **`post_accion` cambia el modo de carga del backend.**',
+            '   Antes, `ctx.pedir_post` sin `nombre_solicitante` hacía',
+            '   **carga total** (grafo completo en memoria). Con',
+            '   `post_accion`, el backend hace **carga parcial**',
+            '   (`us_<sol>`) y no puede navegar `us_<dueño>` si el',
+            '   logueado no es el dueño. Las pruebas que necesitan',
+            '   carga total usan `{sin_solicitante: true,',
+            '   sin_dueno: true}`. Documentado en el prompt del',
+            '   plugin (§8, lección 57).',
+            '',
+            '2. **Si un fix no resuelve, verificar primero que los',
+            '   fixes previos se hayan aplicado.** Costó 3 iteraciones',
+            '   en la prueba 54 por no chequear el valor real de',
+            '   `BLOQUEO_AUTENTICACION_SEGUNDOS_PRUEBAS`.',
+            '',
+            '3. **Pruebas con tiempos de bloqueo fijos son frágiles',
+            '   ante el crecimiento del grafo.** El rate limiting',
+            '   funcionaba; los 5 POSTs juntos tardaban más que los',
+            '   2s del bloqueo.',
+            '',
+            '**Pendientes que abre este cierre.**',
+            '',
+            '- **Verificación final del plugin:** correr la suite',
+            '  completa (65 pruebas) para confirmar que la migración',
+            '  no rompió nada.',
+            '- **Llamar a `reiniciar_seleccion_completa` desde el',
+            '  login de terminal.** Caso real: usuario cierra el',
+            '  navegador a mitad de venta y la venta_actual queda',
+            '  colgada. Hoy el endpoint existe pero solo lo llaman',
+            '  las pruebas.',
+            '- **Auditar estados colgados:** reservas, DJ a medias,',
+            '  edición de viaje con paradas.',
+            '- **Auditar estructuras nuevas** con la regla de §5.9',
+            '  del prompt de seguridad.',
+            '- **Adaptar los 4 módulos menores** (Liquidacion,',
+            '  Rendicion, Empresa, Vehiculo) al contexto del',
+            '  solicitante.',
+            '- **B3.3c** (los 7 helpers que iteran sobre todos los',
+            '  dueños).',
+            '',
+            '**Próxima tanda sugerida:** verificación final del',
+            'plugin, después elegir el siguiente frente de la lista.',
+            '',
+            '---',
+            '',
+            '## 2. PLAN DE LA LÍNEA DE TANDAS',
         ],
     ],
 
@@ -204,42 +207,6 @@ if ($modo_estricto && !empty($bloques_fallidos)) {
     exit(1);
 }
 
-$archivos_bump_php_js = [];
-foreach ($archivos_a_escribir as $ruta_abs => $info) {
-    $rel = substr($ruta_abs, strlen($raiz_proyecto) + 1);
-    $ext = strtolower(pathinfo($ruta_abs, PATHINFO_EXTENSION));
-    if ($ext === 'php' || $ext === 'js') $archivos_bump_php_js[] = $rel;
-}
-
-$bumps_atversion = 0;
-$bumps_detalle = [];
-$info_bumps = [];
-
-if ($bumpear) {
-    foreach (array_unique($archivos_bump_php_js) as $archivo_rel) {
-        $ruta_abs = $raiz_proyecto . '/' . $archivo_rel;
-        if (!file_exists($ruta_abs)) continue;
-        if (isset($archivos_a_escribir[$ruta_abs])) {
-            list($contenido, $eol) = $archivos_a_escribir[$ruta_abs];
-        } else {
-            $contenido_original = file_get_contents($ruta_abs);
-            $eol = detectar_eol($contenido_original);
-            $contenido = normalizar_a_unix($contenido_original);
-        }
-        $patron = '/(\*\s+@version\s+)(\S+)/';
-        $viejo = '';
-        $nuevo = preg_replace_callback($patron, function($m) use ($version_nueva, &$viejo) {
-            $viejo = $m[2];
-            return $m[1] . $version_nueva;
-        }, $contenido, 1, $count);
-        if ($count === 0) { $info_bumps[] = "$archivo_rel (sin @version)"; continue; }
-        if ($viejo === $version_nueva) { continue; }
-        $archivos_a_escribir[$ruta_abs] = [normalizar_a_unix($nuevo), $eol];
-        $bumps_atversion++;
-        $bumps_detalle[] = "$archivo_rel  @version $viejo -> $version_nueva";
-    }
-}
-
 $archivos_escritos = 0;
 foreach ($archivos_a_escribir as $ruta_abs => $info) {
     list($contenido_unix, $eol) = $info;
@@ -252,16 +219,9 @@ foreach ($archivos_a_escribir as $ruta_abs => $info) {
     echo "[OK] " . substr($ruta_abs, strlen($raiz_proyecto) + 1) . "\n";
 }
 
-if ($bumpear && (!empty($bumps_detalle) || !empty($info_bumps))) {
-    echo "\n--- Bumps ---\n";
-    foreach ($bumps_detalle as $d) echo "[BUMP] $d\n";
-    foreach ($info_bumps as $i) echo "[INFO] $i\n";
-}
-
 echo "\n=== Resumen ===\n";
 echo "Bloques aplicados: $bloques_ok\n";
 echo "Archivos escritos: $archivos_escritos\n";
-if ($bumpear) echo "Bumps @version:    $bumps_atversion\n";
 if (!empty($bloques_fallidos)) {
     echo "Fallos: " . count($bloques_fallidos) . "\n";
     foreach ($bloques_fallidos as $f) echo "  - $f\n";
