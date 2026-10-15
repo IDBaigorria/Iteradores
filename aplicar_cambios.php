@@ -1,107 +1,128 @@
 <?php
 /**
- * Aplicador — Ampliar prefijos de prueba en los limpiadores.
+ * Aplicador — plan_actual.md: §1.12 (botón del plugin + prefijos).
  *
- * Contexto: el usuario corrio el snippet de limpieza y quedaron
- * 2 empresas "Empresa prueba grafo" sin borrar. Prefijo real:
- * `emprevgraf*`, que no estaba en la lista del limpiador.
- *
- * Al revisar las pruebas, aparecen varios prefijos mas que se
- * crean pero no se limpian:
- *
- *   Viajes (creados por pruebas del plugin):
- *     - viajelimpia (P30)
- *     - viajemicrograf (P31)
- *     - viajetermgraf (P32)
- *     - viajeparadgraf (P33)
- *     - viajeparahora (P42)
- *     - viajeborrar (P61)
- *     - viajedesaut (P63)
- *     - viajemicrocomp (P64)
- *
- *   Empresas:
- *     - emprevgraf (P37 y P38)
- *
- *   Vehiculos:
- *     - vehgraf (P37) y vehgrafA/vehgrafB (P38)
- *       (si la empresa matchea y se borra entera, se los lleva;
- *       se agrega igual por defensa)
+ * Solo documentacion. No bumpea @version.
  *
  * Uso (raiz del proyecto piloto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.80f';
-
+$version_nueva = '';
 $htmls_a_bumpear = [];
 
 $cambios = [
 
-    // ============================================================
-    // 1. Viaje.php: ampliar prefijos de limpiar_viajes_de_prueba
-    // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Viajes/Viaje.php',
-        'descripcion' => 'Viaje.php: ampliar prefijos de limpiar_viajes_de_prueba',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual: agregar §1.12',
         'buscar' => [
-            '    $prefijos = [',
-            '        \'viajeprueba\', \'viajemicro\', \'viajeval\', \'viajedup\', \'viajecol\', \'viajesin\',',
-            '        // Prefijos de las pruebas del plugin (agregados en v79j).',
-            '        \'viajeventgraf\',    // prueba 34: cancelar venta',
-            '        \'viajedeselegraf\',  // prueba 35: deseleccionar asiento',
-            '        \'viajecambiomicro\', // prueba 36: cambiar micro',
-            '        \'viajeregres\',      // prueba 43: listar viajes con índice',
-            '    ];',
+            '**Próxima tanda sugerida:** verificación final del',
+            'plugin, después elegir el siguiente frente de la lista.',
+            '',
+            '---',
+            '',
+            '## 2. PLAN DE LA LÍNEA DE TANDAS',
         ],
         'reemplazar' => [
-            '    $prefijos = [',
-            '        \'viajeprueba\', \'viajemicro\', \'viajeval\', \'viajedup\', \'viajecol\', \'viajesin\',',
-            '        // Prefijos de las pruebas del plugin (agregados en v79j).',
-            '        \'viajeventgraf\',    // prueba 34: cancelar venta',
-            '        \'viajedeselegraf\',  // prueba 35: deseleccionar asiento',
-            '        \'viajecambiomicro\', // prueba 36: cambiar micro',
-            '        \'viajeregres\',      // prueba 43: listar viajes con índice',
-            '        // Prefijos agregados en v80f: faltaban en la lista y se',
-            '        // acumulaban en el grafo.',
-            '        \'viajelimpia\',      // prueba 30: eliminar viaje',
-            '        \'viajemicrograf\',   // prueba 31: eliminar micro',
-            '        \'viajetermgraf\',    // prueba 32: eliminar terminal',
-            '        \'viajeparadgraf\',   // prueba 33: editar paradas',
-            '        \'viajeparahora\',    // prueba 42: editar paradas sin hora',
-            '        \'viajeborrar\',      // prueba 61: eliminar viaje con terminal',
-            '        \'viajedesaut\',      // prueba 63: desautorizar terminal',
-            '        \'viajemicrocomp\',   // prueba 64: agregar micro a compartido',
-            '    ];',
-        ],
-    ],
-
-    // ============================================================
-    // 2. Empresa.php: ampliar prefijos de limpiar_empresas_vehiculos_de_prueba
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Empresas/Empresa.php',
-        'descripcion' => 'Empresa.php: ampliar prefijos de limpieza',
-        'buscar' => [
-            '    $prefijos_empresa = [\'fotoauto\', \'viajecambiomicro_emp_\'];',
-            '    $prefijos_vehiculo = [\'fotoauto\', \'viajecambiomicro_veh_\'];',
-        ],
-        'reemplazar' => [
-            '    // Prefijos agregados en v80f: emprevgraf es de las pruebas',
-            '    // 37 (eliminar_vehiculo) y 38 (eliminar_empresa). Sin este',
-            '    // prefijo, esas empresas quedaban colgadas en el grafo.',
-            '    $prefijos_empresa = [',
-            '        \'fotoauto\',',
-            '        \'viajecambiomicro_emp_\',',
-            '        \'emprevgraf\',',
-            '    ];',
-            '    $prefijos_vehiculo = [',
-            '        \'fotoauto\',',
-            '        \'viajecambiomicro_veh_\',',
-            '        \'vehgraf\',',
-            '    ];',
+            '**Próxima tanda sugerida:** verificación final del',
+            'plugin, después elegir el siguiente frente de la lista.',
+            '',
+            '### 1.12 Botón "Limpiar datos de prueba" en el plugin',
+            '',
+            '**Estado:** cerrada entre v1.5piloto.80f (piloto) y',
+            'v1.5plugin.7m-7n (plugin).',
+            '',
+            '**Motivación.** Las pruebas del plugin acumulan datos de',
+            'prueba que quedan en el grafo y frenan las pruebas',
+            'siguientes (empresas sin vehículo configurado, viajes',
+            'duplicados, pasajeros con `@test.local`, etc.). El',
+            'usuario tenía que correr un snippet de consola',
+            'manualmente para limpiarlos. Ahora hay un botón.',
+            '',
+            '**Qué se hizo.**',
+            '',
+            '- **v1.5piloto.80f:** ampliar los prefijos que',
+            '  reconocen los limpiadores:',
+            '  - `Viaje.php` → `limpiar_viajes_de_prueba` reconoce',
+            '    `viajelimpia`, `viajemicrograf`, `viajetermgraf`,',
+            '    `viajeparadgraf`, `viajeparahora`, `viajeborrar`,',
+            '    `viajedesaut`, `viajemicrocomp`.',
+            '  - `Empresa.php` → `limpiar_empresas_vehiculos_de_prueba`',
+            '    reconoce `emprevgraf` y `vehgraf`.',
+            '  Sin esto, las empresas de las pruebas 37/38 quedaban',
+            '  colgadas y bloqueaban pruebas posteriores.',
+            '',
+            '- **v1.5plugin.7m:** botón "Limpiar datos de prueba" en',
+            '  el popup. Arquitectura:',
+            '  - Nuevo módulo `Aplicacion/LimpiezaPrueba.js`: itera',
+            '    dueños, llama los 6 endpoints por dueño + el global',
+            '    de usuarios. Chequea modo pruebas + nivel admin',
+            '    antes de empezar. Reporta progreso por callback.',
+            '  - `servicio.js`: import + `_ejecutar_limpieza` +',
+            '    caso `limpiar_datos_prueba` en el switch +',
+            '    `globalThis.limpiar_prueba` para la consola del SW.',
+            '  - `ventana.html`: botón + `<pre>` para el log.',
+            '  - `ventana.js`: confirm previo + progreso incremental',
+            '    + resumen final.',
+            '',
+            '- **v1.5plugin.7n:** fix del listener del botón. El',
+            '  bloque `DOMContentLoaded` anidado nunca disparaba',
+            '  (el DOM ya estaba cargado dentro del handler padre).',
+            '  Fix: conexión directa del botón.',
+            '',
+            '**Orden de la limpieza (importa).**',
+            '',
+            '1. Ventas (crea cancelaciones de auditoría).',
+            '2. Cancelaciones (barre las recién creadas).',
+            '3. Viajes (destruye micros, que referencian empresas).',
+            '4. Pasajeros (`@test.local` sin referencias).',
+            '5. Empresas/vehículos (los que ya no tienen micros).',
+            '6. Terminales (`termprueba`).',
+            '7. Usuarios (global, al final).',
+            '',
+            '**Resultado en una corrida real:**',
+            '',
+            '- Antes: 5480 nodos, 0 huérfanos.',
+            '- Después: 2057 nodos, 0 huérfanos.',
+            '- Borrados: 8 ventas, 65 cancelaciones, 2+4 viajes, 206',
+            '  pasajeros, 2 empresas.',
+            '',
+            '**Lecciones aprendidas.**',
+            '',
+            '4. **Un `addEventListener("DOMContentLoaded")` anidado',
+            '   nunca dispara.** El evento ya ocurrió cuando el',
+            '   bloque interno se registra. Bug v7n: el listener',
+            '   del botón quedó dentro del handler padre. Fix:',
+            '   conectar directo (el DOM ya está listo).',
+            '',
+            '5. **Los prefijos de prueba deben estar centralizados.**',
+            '   Cuando una prueba nueva usa un prefijo distinto, el',
+            '   limpiador no lo reconoce y los datos se acumulan.',
+            '   Anotado para una tanda futura: una constante',
+            '   compartida con todos los prefijos, o que las',
+            '   pruebas registren su prefijo en algún lado.',
+            '',
+            '**Pendientes que abre este cierre.**',
+            '',
+            '- **Pruebas 37 y 38 sin `try/finally`:** si el flujo',
+            '  falla a mitad, la empresa/vehículo de setup queda',
+            '  colgada. Los limpiadores ahora la agarran, pero la',
+            '  prueba debería limpiar por su cuenta.',
+            '- **Reorganización de la ventana en pestañas por rol**',
+            '  (plan del prompt del plugin §10).',
+            '- El resto de los pendientes de §1.11 sigue vigente.',
+            '',
+            '**Próxima tanda sugerida:** depende del paréntesis',
+            'urgente del usuario. Al volver, elegir entre la',
+            'reorganización del plugin o el siguiente punto de',
+            '§1.11.',
+            '',
+            '---',
+            '',
+            '## 2. PLAN DE LA LÍNEA DE TANDAS',
         ],
     ],
 
@@ -180,42 +201,6 @@ if ($modo_estricto && !empty($bloques_fallidos)) {
     exit(1);
 }
 
-$archivos_bump_php_js = [];
-foreach ($archivos_a_escribir as $ruta_abs => $info) {
-    $rel = substr($ruta_abs, strlen($raiz_proyecto) + 1);
-    $ext = strtolower(pathinfo($ruta_abs, PATHINFO_EXTENSION));
-    if ($ext === 'php' || $ext === 'js') $archivos_bump_php_js[] = $rel;
-}
-
-$bumps_atversion = 0;
-$bumps_detalle = [];
-$info_bumps = [];
-
-if ($bumpear) {
-    foreach (array_unique($archivos_bump_php_js) as $archivo_rel) {
-        $ruta_abs = $raiz_proyecto . '/' . $archivo_rel;
-        if (!file_exists($ruta_abs)) continue;
-        if (isset($archivos_a_escribir[$ruta_abs])) {
-            list($contenido, $eol) = $archivos_a_escribir[$ruta_abs];
-        } else {
-            $contenido_original = file_get_contents($ruta_abs);
-            $eol = detectar_eol($contenido_original);
-            $contenido = normalizar_a_unix($contenido_original);
-        }
-        $patron = '/(\*\s+@version\s+)(\S+)/';
-        $viejo = '';
-        $nuevo = preg_replace_callback($patron, function($m) use ($version_nueva, &$viejo) {
-            $viejo = $m[2];
-            return $m[1] . $version_nueva;
-        }, $contenido, 1, $count);
-        if ($count === 0) { $info_bumps[] = "$archivo_rel (sin @version)"; continue; }
-        if ($viejo === $version_nueva) { continue; }
-        $archivos_a_escribir[$ruta_abs] = [normalizar_a_unix($nuevo), $eol];
-        $bumps_atversion++;
-        $bumps_detalle[] = "$archivo_rel  @version $viejo -> $version_nueva";
-    }
-}
-
 $archivos_escritos = 0;
 foreach ($archivos_a_escribir as $ruta_abs => $info) {
     list($contenido_unix, $eol) = $info;
@@ -228,16 +213,9 @@ foreach ($archivos_a_escribir as $ruta_abs => $info) {
     echo "[OK] " . substr($ruta_abs, strlen($raiz_proyecto) + 1) . "\n";
 }
 
-if ($bumpear && (!empty($bumps_detalle) || !empty($info_bumps))) {
-    echo "\n--- Bumps ---\n";
-    foreach ($bumps_detalle as $d) echo "[BUMP] $d\n";
-    foreach ($info_bumps as $i) echo "[INFO] $i\n";
-}
-
 echo "\n=== Resumen ===\n";
 echo "Bloques aplicados: $bloques_ok\n";
 echo "Archivos escritos: $archivos_escritos\n";
-if ($bumpear) echo "Bumps @version:    $bumps_atversion\n";
 if (!empty($bloques_fallidos)) {
     echo "Fallos: " . count($bloques_fallidos) . "\n";
     foreach ($bloques_fallidos as $f) echo "  - $f\n";
