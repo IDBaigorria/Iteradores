@@ -1311,4 +1311,123 @@ la Fase 3 lleva su script en el proyecto PHP.
 
 ---
 
+---
+
+## 4. PENDIENTES CONSOLIDADOS
+
+**Estado al cierre:** piloto v1.5piloto.80j, plugin
+v1.5plugin.7y, framework PHP 1.5i.8c, framework JS
+V1.5i.8c. **66 pruebas del plugin corren en verde.**
+
+Lista de todo lo abierto, agrupada por naturaleza.
+Cada item tiene un origen (donde esta el detalle) y
+una prioridad estimada.
+
+### 4.1. Cierre del arco actual (Piloto + Plugin)
+
+Estos son los que cierran formalmente el plan §3 y la
+linea de UI del plugin. Prioridad alta.
+
+- **Fase 3 del plan §3: limpiar el piloto.** Sacar
+  `estilos-botones-admin.css`, el link en
+  `aplicacion_GET.html`, `_aplicar_clases_de_rol` + sus
+  llamadas en `aplicacion.js`, los botones viejos de
+  limpieza del HTML, y la logica JS asociada.
+  Los endpoints backend se quedan (los usa el plugin).
+  Ver §3.2 del plan original.
+
+- **Persistencia de la pestaña activa del plugin.**
+  Migrar de `localStorage['plugin_tab_activa']` a la
+  persistencia del framework. Anotado en el codigo
+  como `ANOTADO`.
+
+- **Pruebas 37 y 38 sin `try/finally`.** Si el flujo
+  falla a mitad, la empresa/vehiculo de setup queda
+  colgada. Los limpiadores la agarran, pero la prueba
+  deberia limpiar por su cuenta.
+
+### 4.2. Piloto — calidad y consistencia
+
+Prioridad media. Mejoran la consistencia del piloto
+con la carga parcial y cierran deudas tecnicas.
+
+- **Adaptar los 4 modulos menores al contexto del
+  solicitante:** `Liquidacion.php`, `Rendicion.php`,
+  `Empresa.php`, `Vehiculo.php`. Tanda repetitiva
+  (misma tecnica que Viaje/Venta). Ver §1.11.
+
+- **Auditar estados colgados:** reservas sin pasajero,
+  DJ a medias, edicion de viaje a mitad. Requiere
+  relevamiento primero. Ver §1.11.
+
+- **Auditar estructuras nuevas** con la regla de
+  deteccion de §5.9 del prompt de seguridad. Preventivo.
+
+- **B3.3c — 7 helpers que iteran sobre todos los
+  dueños buscando por id.** Postergado hasta que
+  aparezca dolor real o lleguen los iteradores con ID
+  especial. Ver §1.11.
+
+- **Deuda de seguridad en impresion.** Las URLs de
+  impresion (`?imprimir=1&tipo=...`) no validan sesion
+  ni permisos. Cualquiera con la URL ve los datos.
+  Ver §1.11.
+
+### 4.3. Framework Iteradores
+
+Prioridad baja hasta que el piloto lo requiera. Van
+todos juntos en una sesion del framework. Ver §11 del
+prompt del framework.
+
+- **Dejar el Nodo limpio.** Mover `contexto_mascara` a
+  la capa de persistencia antes de agregar mas metodos
+  de indexacion (256 bits, producto de primos).
+  Bloqueante de la Fase 5. Ver §11.4.
+
+- **Fase 3 del framework: JSON64 / XML64** con
+  `guardar_parcial`. Ver §11.4.
+
+- **Fase 4 del framework: `guardar_parcial` real por
+  delta** (no merge en memoria). Ver §11.4.
+
+- **Fase 5 (si hace falta): 256 contextos / producto de
+  primos.** Ver §11.4 y §11.1.
+
+- **Iteradores con ID especial + ocupante como raices
+  de subgrafo.** Resolveria los B3.3c. Ver §11.5.
+
+### 4.4. Plugin — mejoras futuras
+
+Prioridad baja. Se abordan cuando aparezcan pruebas
+nuevas o necesidad concreta.
+
+- **Centralizar prefijos de prueba.** Hoy cada
+  limpiador del piloto tiene su lista hardcodeada.
+  Cuando una prueba nueva usa un prefijo distinto, el
+  limpiador no lo reconoce. Idea: una constante
+  compartida o que las pruebas registren su prefijo.
+  Ver §1.12.
+
+- **Secciones vacias del plugin:** Rendiciones y
+  Liquidaciones esperan pruebas nuevas. Ver §1.13.
+
+- **Linting del payload del plugin:** verificar que
+  ninguna llamada a `_post` a acciones que requieren
+  `nombre_dueno` salga sin el. Se pospone hasta que
+  aparezca necesidad concreta. Ver §1.6.
+
+### 4.5. Proximas tandas sugeridas
+
+En orden:
+
+1. **Fase 3 del plan §3** (limpiar el piloto).
+2. **Migrar persistencia de la pestaña activa al
+   framework.**
+3. **Adaptar los 4 modulos menores.**
+4. **Auditar estados colgados.**
+5. **Auditar estructuras nuevas.**
+6. Resto de los pendientes.
+
+---
+
 **FIN DEL PLAN ACTUAL**
