@@ -971,6 +971,86 @@ urgente del usuario. Al volver, elegir entre la
 reorganización del plugin o el siguiente punto de
 §1.11.
 
+### 1.14 Cierre de la línea del grafo del plugin (v8b-v8f)
+
+**Estado:** cerrada. Plugin en v1.5plugin.8f.
+
+**Motivación.** El plugin guardaba cada corrida como un
+nodo suelto colgando de un contenedor plano (`corridas`).
+El estado "en vivo" (qué prueba corría ahora) vivía en
+`chrome.storage.session`, separado del historial. El
+popup no leía nada de eso: solo mostraba el resultado
+de la corrida actual, y se perdía todo al cerrar.
+
+**Qué se hizo.**
+
+- **v8b** — Rediseño de `GrafoPlugin.js`. Estructura
+  nueva: `plugin → pruebas → <id_prueba> → (hmi →
+  cadena de corridas con cierre)`. Cada prueba tiene
+  su propio mini-árbol con máximo 5 corridas
+  (`CORRIDAS_POR_PRUEBA_MAX`). El autoenlace
+  `corriendo` marca la prueba en ejecución. Se elimina
+  `chrome.storage.session`. `servicio.js` gana los
+  mensajes `estado_pruebas`, `corrida_iniciada`,
+  `corrida_terminada`. Migración automática desde el
+  contenedor viejo `corridas`.
+
+- **v8c** — UI del popup. Indicador de estado por fila
+  (última corrida persistida). Click despliega el
+  historial (hasta 5 corridas: resultado · fecha ·
+  duración · detalle). Refresco por broadcast.
+
+- **v8d** — Fix del import dinámico. `arranque.js`
+  usaba `await import("../Controlador/index.js")`,
+  prohibido en `ServiceWorkerGlobalScope` (MV3).
+  Síntoma: el SW se reiniciaba por inactividad y las
+  corridas dejaban de persistirse. Nuevo
+  `arranque_config.js` con la configuración como
+  efecto de lado, importado estáticamente ANTES del
+  Controlador. Los imports ES se evalúan depth-first
+  en orden de aparición, así que el orden importa.
+
+- **v8e** — Fix de iteración de `Map` en `GrafoPlugin`.
+  `Object.entries(x)` sobre un Map devuelve `[]`
+  silenciosamente. Afectaba a `obtener_estado_por_prueba`
+  (devolvía vacío y el popup veía todo `—`), a
+  `_podar_si_excede` (nunca podaba), a
+  `limpiar_autoenlaces_colgados` y a
+  `_destruir_contenedor_corridas_viejo`. Fix:
+  `for (const [k, v] of map)`.
+
+- **v8f** — Cierre de documentación (prompt del plugin
+  actualizado).
+
+**Lecciones aprendidas.**
+
+17. **`Object.entries(Map)` devuelve `[]`.** Para
+    iterar un Map, `for (const [k, v] of map)`.
+    `Nodo.adyacentes()` devuelve un Map; el bug es
+    silencioso (no error, simplemente no itera).
+
+18. **En MV3, todos los imports del service worker
+    tienen que ser estáticos.** Cualquier `await
+    import(...)` que aparezca en el grafo de
+    dependencias del SW rompe cuando el SW se
+    reinicia por inactividad (aunque las primeras
+    ejecuciones funcionen por timing).
+
+19. **Para configurar el framework antes de que un
+    módulo se auto-inicialice, usar un módulo
+    separado con la configuración como efecto de
+    lado, importado ANTES del módulo que la
+    consume.** Los imports ES se evalúan depth-first
+    en orden de aparición.
+
+**Pendientes que abre este cierre.**
+
+- **Persistencia de la pestaña activa del plugin.**
+  Sigue en `localStorage`. Migrarla a IndexedDB.
+  Anotado como `ANOTADO` en el código.
+- El resto de §4 (pendientes consolidados) sigue
+  vigente.
+
 ### 1.13 Cierre del arco del plugin (interfaz de usuario)
 
 **Estado:** cerrada entre v1.5piloto.80h-80i (piloto) y
