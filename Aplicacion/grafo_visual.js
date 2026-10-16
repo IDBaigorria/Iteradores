@@ -1,21 +1,22 @@
 /**
  * Vista visual del grafo (SVG, sin librerías).
  *
- * Fase 1: sub-pestañas, grilla, pan, zoom, nodos.
- * Fase 2: flechas curvas Bézier y colores por tipo.
- * Fase 3: panel lateral, expansión, buscador, reset.
- * Fase 4: force-directed con toggle y botones.
- * Fase 5 (en v80r-v80s): nodos más cuadrados, force
- * más separado, selector de max_nodos, compartidos
- * con estilo propio, refresco tras eliminar huérfanos,
- * etiquetas y colores de enlace, zoom preservado al
- * expandir.
+ * Fases implementadas:
+ *   1. Sub-pestañas, grilla, pan, zoom, nodos.
+ *   2. Flechas Bézier y colores por tipo.
+ *   3. Panel lateral, expansión, buscador, reset.
+ *   4. Force-directed con toggle.
+ *   5. Nodos más cuadrados, force más separado,
+ *      selector de max_nodos, compartidos, refresco
+ *      tras eliminar huérfanos, etiquetas y colores
+ *      de enlace, zoom preservado, centrar tras
+ *      expandir, drag de nodos con física.
  *
  * Se carga después de `grafo.js`. No hay imports:
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.80u
+ * @version 1.5piloto.80v
  * @since 1.5piloto.80n
  */
 
@@ -28,6 +29,20 @@ let _grafo_visual_match_actual = -1;
 let _grafo_visual_layout = 'grilla'; // 'grilla' | 'force'
 let _grafo_visual_max_nodos = 500;
 let _grafo_visual_mostrar_etiquetas = true;
+
+// Fuente de verdad de las posiciones después del primer
+// cálculo o de un drag. Los re-renders la usan salvo que
+// se pase { recalcular: true }.
+let _grafo_visual_posiciones = {};
+
+// Referencias a elementos del DOM para actualizar rápido
+// durante el drag (sin re-render).
+let _grafo_visual_refs_nodos = {};    // id -> { g, rect }
+let _grafo_visual_refs_enlaces = [];   // [{ path, origen, destino }]
+let _grafo_visual_svg = null;
+
+// Estado del drag.
+let _grafo_visual_drag = null;
 
 const GRAFO_VISUAL_NODO_W = 120;
 const GRAFO_VISUAL_NODO_H = 64;
@@ -72,7 +87,8 @@ async function cargar_grafo_visual() {
     _grafo_visual_seleccionado = null;
     _grafo_visual_matches = [];
     _grafo_visual_match_actual = -1;
-    _renderizar_grafo_visual();
+    _grafo_visual_posiciones = {};
+    _renderizar_grafo_visual(null, { recalcular: true });
 }
 
 function _conectar_subtabs_grafo() {
@@ -347,11 +363,14 @@ function _grafo_visual_calcular_posiciones(datos) {
 // ============================================================
 
 /**
- * Renderiza el SVG. Si `vb_preservado` viene, usa ese
- * viewBox (conserva zoom/pan); si no, lo calcula a partir
- * de las posiciones.
+ * Renderiza el SVG.
+ *
+ * @param {Object|null} vb_preservado  Si viene, se usa ese
+ *   viewBox (conserva zoom/pan).
+ * @param {Object} opciones
+ *   - recalcular: fuerza el recálculo del layout.
  */
-function _renderizar_grafo_visual(vb_preservado = null) {
+function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
     const cont = document.getElementById('grafo_visual_contenedor');
     if (!cont) return;
     const datos = _grafo_visual_datos;
@@ -363,7 +382,28 @@ function _renderizar_grafo_visual(vb_preservado = null) {
     const NODO_W = GRAFO_VISUAL_NODO_W;
     const NODO_H = GRAFO_VISUAL_NODO_H;
 
-    const posiciones = _grafo_visual_calcular_posiciones(datos);
+    // ¿Recalcular layout o usar las posiciones actuales?
+    let posiciones;
+    const hay_posiciones = Object.keys(_grafo_visual_posiciones).length > 0;
+    if (opciones.recalcular || !hay_posiciones) {
+        posiciones = _grafo_visual_calcular_posiciones(datos);
+        _grafo_visual_posiciones = posiciones;
+    } else {
+        // Asegurar que todos los nodos tengan posición.
+        posiciones = _grafo_visual_posiciones;
+        const padre_default = posiciones[Object.keys(posiciones)[0]] || { x: 0, y: 0 };
+        datos.nodos.forEach(nd => {
+            if (!posiciones[nd.id]) {
+                const ang = Math.random() * Math.PI * 2;
+                const r = 200 + Math.random() * 100;
+                posiciones[nd.id] = {
+                    x: padre_default.x + Math.cos(ang) * r,
+                    y: padre_default.y + Math.sin(ang) * r
+                };
+            }
+        });
+    }
+
     const centros = {};
     Object.keys(posiciones).forEach(id => {
         centros[id] = {
@@ -444,6 +484,9 @@ function _renderizar_grafo_visual(vb_preservado = null) {
     }
 
     wrapper.innerHTML = '';
+    _grafo_visual_refs_nodos = {};
+    _grafo_visual_refs_enlaces = [];
+
     const svg_ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svg_ns, 'svg');
     svg.setAttribute('class', 'grafo-visual-svg' + (_grafo_visual_mostrar_etiquetas ? '' : ' sin-etiquetas'));
@@ -480,8 +523,6 @@ function _renderizar_grafo_visual(vb_preservado = null) {
     marker.setAttribute('orient', 'auto-start-reverse');
     const marker_path = document.createElementNS(svg_ns, 'path');
     marker_path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
-    // La punta toma el color del trazo del path que la usa.
-    // Si el browser no soporta context-stroke, cae a gris.
     marker_path.setAttribute('fill', 'context-stroke');
     marker.appendChild(marker_path);
     defs.appendChild(marker);
@@ -496,7 +537,6 @@ function _renderizar_grafo_visual(vb_preservado = null) {
     fondo.setAttribute('fill', 'url(#grafo-grid)');
     svg.appendChild(fondo);
 
-    // Tipo por id (para colorear los enlaces por tipo del destino).
     const tipo_por_id = {};
     datos.nodos.forEach(n => { tipo_por_id[n.id] = n.tipo || ''; });
 
@@ -507,35 +547,15 @@ function _renderizar_grafo_visual(vb_preservado = null) {
         const co = centros[e.origen];
         const cd = centros[e.destino];
         if (!co || !cd) return;
-        const dx = cd.x - co.x;
-        const dy = cd.y - co.y;
-        if (dx === 0 && dy === 0) return;
 
-        const p_salida = _grafo_visual_punto_borde(co.x, co.y, dx, dy, NODO_W, NODO_H);
-        const p_entrada = _grafo_visual_punto_borde(cd.x, cd.y, -dx, -dy, NODO_W, NODO_H);
+        const geometria = _grafo_visual_geometria_enlace(co, cd, NODO_W, NODO_H);
+        if (!geometria) return;
 
-        const mx = (p_salida.x + p_entrada.x) / 2;
-        const my = (p_salida.y + p_entrada.y) / 2;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const offset = Math.min(dist * 0.15, 40);
-        const nx = -dy / dist;
-        const ny = dx / dist;
-        const cx_control = mx + nx * offset;
-        const cy_control = my + ny * offset;
-
-        // Punto medio del Bézier cuadrático: P(0.5) = 0.25*P0 + 0.5*C + 0.25*P1.
-        const px_label = 0.25 * p_salida.x + 0.5 * cx_control + 0.25 * p_entrada.x;
-        const py_label = 0.25 * p_salida.y + 0.5 * cy_control + 0.25 * p_entrada.y;
-
-        // Clase de tipo: del nodo ORIGEN. Las flechas salen con
-        // el color del nodo que las emite; las entrantes se ven
-        // del color del nodo incidente.
         const tipo_origen = tipo_por_id[e.origen] || '';
         const clase_tipo = tipo_origen ? (' enlace-' + _grafo_visual_clase_tipo(tipo_origen)) : '';
 
         const path = document.createElementNS(svg_ns, 'path');
-        path.setAttribute('d',
-            `M ${p_salida.x} ${p_salida.y} Q ${cx_control} ${cy_control} ${p_entrada.x} ${p_entrada.y}`);
+        path.setAttribute('d', geometria.d);
         path.setAttribute('class',
             'grafo-enlace' + clase_tipo + (e.destino_es_compartido ? ' compartido' : ''));
         path.setAttribute('marker-end', 'url(#grafo-flecha)');
@@ -544,15 +564,18 @@ function _renderizar_grafo_visual(vb_preservado = null) {
         path.dataset.enlace = e.enlace;
         g_enlaces.appendChild(path);
 
-        // Etiqueta del enlace.
         const label = document.createElementNS(svg_ns, 'text');
         label.setAttribute('class', 'grafo-enlace-label');
-        label.setAttribute('x', px_label);
-        label.setAttribute('y', py_label);
+        label.setAttribute('x', geometria.px_label);
+        label.setAttribute('y', geometria.py_label);
         label.setAttribute('text-anchor', 'middle');
         label.setAttribute('dominant-baseline', 'middle');
         label.textContent = e.enlace;
         g_enlaces.appendChild(label);
+
+        _grafo_visual_refs_enlaces.push({
+            path, label, origen: e.origen, destino: e.destino
+        });
     });
 
     svg.appendChild(g_enlaces);
@@ -594,20 +617,31 @@ function _renderizar_grafo_visual(vb_preservado = null) {
         texto_id.textContent = n.es_especial ? n.id : ('#' + n.id);
         g.appendChild(texto_id);
 
+        g.addEventListener('mousedown', (ev) => {
+            if (ev.button !== 0) return;
+            ev.stopPropagation();
+            _grafo_visual_iniciar_drag(ev, n.id);
+        });
+
         g.addEventListener('click', (ev) => {
             ev.stopPropagation();
+            // Solo seleccionar si no fue un drag.
+            if (_grafo_visual_drag && _grafo_visual_drag.movido) return;
             _grafo_visual_seleccionar(n.id);
         });
+
         g.addEventListener('dblclick', (ev) => {
             ev.stopPropagation();
             _grafo_visual_expandir(n.id);
         });
 
         g_nodos.appendChild(g);
+        _grafo_visual_refs_nodos[n.id] = { g, rect, textos: [texto_tipo, texto_id] };
     });
 
     svg.appendChild(g_nodos);
     wrapper.appendChild(svg);
+    _grafo_visual_svg = svg;
 
     const info = document.createElement('div');
     info.className = 'grafo-visual-info';
@@ -630,11 +664,281 @@ function _renderizar_grafo_visual(vb_preservado = null) {
     }
 }
 
+/**
+ * Calcula la geometría de un enlace: los puntos de salida,
+ * entrada, control del Bézier y el punto medio para la
+ * etiqueta. Reutilizado por el render y el drag.
+ */
+function _grafo_visual_geometria_enlace(co, cd, NODO_W, NODO_H) {
+    const dx = cd.x - co.x;
+    const dy = cd.y - co.y;
+    if (dx === 0 && dy === 0) return null;
+
+    const p_salida = _grafo_visual_punto_borde(co.x, co.y, dx, dy, NODO_W, NODO_H);
+    const p_entrada = _grafo_visual_punto_borde(cd.x, cd.y, -dx, -dy, NODO_W, NODO_H);
+
+    const mx = (p_salida.x + p_entrada.x) / 2;
+    const my = (p_salida.y + p_entrada.y) / 2;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const offset = Math.min(dist * 0.15, 40);
+    const nx = -dy / dist;
+    const ny = dx / dist;
+    const cx_control = mx + nx * offset;
+    const cy_control = my + ny * offset;
+
+    const px_label = 0.25 * p_salida.x + 0.5 * cx_control + 0.25 * p_entrada.x;
+    const py_label = 0.25 * p_salida.y + 0.5 * cy_control + 0.25 * p_entrada.y;
+
+    return {
+        d: `M ${p_salida.x} ${p_salida.y} Q ${cx_control} ${cy_control} ${p_entrada.x} ${p_entrada.y}`,
+        px_label, py_label
+    };
+}
+
 function _grafo_visual_actualizar_toggle() {
     const cont = document.getElementById('grafo_visual_toggle');
     if (!cont) return;
     cont.querySelectorAll('button').forEach(b => {
         b.classList.toggle('active', b.dataset.layout === _grafo_visual_layout);
+    });
+}
+
+// ============================================================
+// Drag con física
+// ============================================================
+
+function _grafo_visual_iniciar_drag(ev, id) {
+    const svg = _grafo_visual_svg;
+    if (!svg) return;
+
+    const rect = svg.getBoundingClientRect();
+    const vb = _grafo_visual_vb;
+    const escala_x = vb.w / rect.width;
+    const escala_y = vb.h / rect.height;
+
+    // Coordenadas del cursor en el espacio del SVG.
+    const cursor_x = vb.x + (ev.clientX - rect.left) * escala_x;
+    const cursor_y = vb.y + (ev.clientY - rect.top) * escala_y;
+
+    const pos = _grafo_visual_posiciones[id];
+    if (!pos) return;
+
+    _grafo_visual_drag = {
+        id,
+        offset_x: cursor_x - pos.x,
+        offset_y: cursor_y - pos.y,
+        movido: false,
+        start_x: ev.clientX,
+        start_y: ev.clientY
+    };
+
+    const ref = _grafo_visual_refs_nodos[id];
+    if (ref) ref.g.classList.add('arrastrando');
+
+    document.addEventListener('mousemove', _grafo_visual_drag_move);
+    document.addEventListener('mouseup', _grafo_visual_drag_end);
+}
+
+function _grafo_visual_drag_move(ev) {
+    const drag = _grafo_visual_drag;
+    if (!drag) return;
+
+    // Marcar como movido (para no seleccionar al soltar).
+    if (Math.abs(ev.clientX - drag.start_x) > 5 || Math.abs(ev.clientY - drag.start_y) > 5) {
+        drag.movido = true;
+    }
+
+    const svg = _grafo_visual_svg;
+    if (!svg) return;
+
+    const rect = svg.getBoundingClientRect();
+    const vb = _grafo_visual_vb;
+    const escala_x = vb.w / rect.width;
+    const escala_y = vb.h / rect.height;
+
+    const cursor_x = vb.x + (ev.clientX - rect.left) * escala_x;
+    const cursor_y = vb.y + (ev.clientY - rect.top) * escala_y;
+
+    // Mover el nodo arrastrado directo.
+    const pos_antes = _grafo_visual_posiciones[drag.id];
+    const dx_nodo = (cursor_x - drag.offset_x) - pos_antes.x;
+    const dy_nodo = (cursor_y - drag.offset_y) - pos_antes.y;
+    pos_antes.x = cursor_x - drag.offset_x;
+    pos_antes.y = cursor_y - drag.offset_y;
+
+    // Aplicar física a los demás: empujón del arrastrado +
+    // atracción hacia el arrastrado por enlaces.
+    _grafo_visual_aplicar_fisica_drag(drag.id, dx_nodo, dy_nodo);
+
+    // Actualizar el DOM sin re-render.
+    _grafo_visual_actualizar_dom_drag();
+}
+
+function _grafo_visual_drag_end() {
+    const drag = _grafo_visual_drag;
+    if (!drag) return;
+
+    const ref = _grafo_visual_refs_nodos[drag.id];
+    if (ref) ref.g.classList.remove('arrastrando');
+
+    document.removeEventListener('mousemove', _grafo_visual_drag_move);
+    document.removeEventListener('mouseup', _grafo_visual_drag_end);
+
+    // Un par de pasos finales de asentado para que se vea prolijo.
+    _grafo_visual_asentar_vecinos(drag.id);
+    _grafo_visual_actualizar_dom_drag();
+
+    _grafo_visual_drag = null;
+}
+
+/**
+ * Aplica un empujón a los vecinos del nodo arrastrado. El
+ * empujón es mayor cerca del nodo y decae con la distancia.
+ * La atracción por enlaces hace que los vecinos conectados
+ * se acerquen un poco. La amortiguación es suave para que
+ * se vea natural.
+ */
+function _grafo_visual_aplicar_fisica_drag(id_movido, dx_nodo, dy_nodo) {
+    const datos = _grafo_visual_datos;
+    if (!datos) return;
+
+    const pos_movido = _grafo_visual_posiciones[id_movido];
+    if (!pos_movido) return;
+
+    // Centro del nodo movido (en coordenadas del SVG).
+    const cx_m = pos_movido.x + GRAFO_VISUAL_NODO_W / 2;
+    const cy_m = pos_movido.y + GRAFO_VISUAL_NODO_H / 2;
+
+    // Empujón proporcional al desplazamiento del nodo movido.
+    const magn_mov = Math.sqrt(dx_nodo * dx_nodo + dy_nodo * dy_nodo);
+    const direccion_x = magn_mov > 0 ? dx_nodo / magn_mov : 0;
+    const direccion_y = magn_mov > 0 ? dy_nodo / magn_mov : 0;
+
+    const radio_influencia = 260;
+    const fuerza = Math.min(magn_mov * 0.35, 30);
+
+    // Vecinos conectados por enlaces (para la atracción).
+    const vecinos_directos = {};
+    datos.enlaces.forEach(e => {
+        if (e.origen === id_movido) vecinos_directos[e.destino] = true;
+        if (e.destino === id_movido) vecinos_directos[e.origen] = true;
+    });
+
+    datos.nodos.forEach(nd => {
+        if (nd.id === id_movido) return;
+        const pos = _grafo_visual_posiciones[nd.id];
+        if (!pos) return;
+
+        const cx = pos.x + GRAFO_VISUAL_NODO_W / 2;
+        const cy = pos.y + GRAFO_VISUAL_NODO_H / 2;
+        const dx = cx - cx_m;
+        const dy = cy - cy_m;
+        const dist = Math.sqrt(dx * dx + dy * dy) + 0.01;
+
+        // Atracción por enlace: se mueve un poco hacia el nodo movido.
+        if (vecinos_directos[nd.id]) {
+            const k_atr = 0.05;
+            pos.x += dx_nodo * k_atr * -1;
+            pos.y += dy_nodo * k_atr * -1;
+        }
+
+        // Empujón si está dentro del radio de influencia.
+        if (dist < radio_influencia) {
+            const factor = (1 - dist / radio_influencia);
+            const empuje = fuerza * factor * factor;
+            // Empuja en la dirección del movimiento del nodo movido,
+            // con un componente radial pequeño para separar.
+            const ux = dx / dist;
+            const uy = dy / dist;
+            const k_radial = 0.5;
+            pos.x += (direccion_x + ux * k_radial) * empuje;
+            pos.y += (direccion_y + uy * k_radial) * empuje;
+        }
+    });
+}
+
+/**
+ * Pequeño relax final para que quede prolijo al soltar.
+ */
+function _grafo_visual_asentar_vecinos(id_movido) {
+    const datos = _grafo_visual_datos;
+    if (!datos) return;
+
+    const pos_movido = _grafo_visual_posiciones[id_movido];
+    if (!pos_movido) return;
+
+    const diag_nodo = Math.sqrt(
+        GRAFO_VISUAL_NODO_W * GRAFO_VISUAL_NODO_W +
+        GRAFO_VISUAL_NODO_H * GRAFO_VISUAL_NODO_H
+    );
+    const min_dist = diag_nodo + 15;
+
+    // 30 pasadas de anti-solapamiento entre los nodos afectados.
+    for (let it = 0; it < 30; it++) {
+        for (let i = 0; i < datos.nodos.length; i++) {
+            const a_id = datos.nodos[i].id;
+            if (a_id === id_movido) continue;
+            const pa = _grafo_visual_posiciones[a_id];
+            if (!pa) continue;
+            for (let j = i + 1; j < datos.nodos.length; j++) {
+                const b_id = datos.nodos[j].id;
+                if (b_id === id_movido) continue;
+                const pb = _grafo_visual_posiciones[b_id];
+                if (!pb) continue;
+                const dx = pa.x - pb.x;
+                const dy = pa.y - pb.y;
+                const d = Math.sqrt(dx * dx + dy * dy) + 0.01;
+                if (d >= min_dist) continue;
+                const empuje = (min_dist - d) * 0.5;
+                const ux = dx / d;
+                const uy = dy / d;
+                pa.x += ux * empuje;
+                pa.y += uy * empuje;
+                pb.x -= ux * empuje;
+                pb.y -= uy * empuje;
+            }
+        }
+    }
+}
+
+/**
+ * Actualiza rects, textos y enlaces sin re-render. Rápido
+ * incluso con muchos nodos.
+ */
+function _grafo_visual_actualizar_dom_drag() {
+    const posiciones = _grafo_visual_posiciones;
+
+    // Actualizar nodos.
+    Object.keys(_grafo_visual_refs_nodos).forEach(id => {
+        const ref = _grafo_visual_refs_nodos[id];
+        const p = posiciones[id];
+        if (!ref || !p) return;
+        ref.rect.setAttribute('x', p.x);
+        ref.rect.setAttribute('y', p.y);
+        if (ref.textos && ref.textos.length === 2) {
+            ref.textos[0].setAttribute('x', p.x + 8);
+            ref.textos[0].setAttribute('y', p.y + 22);
+            ref.textos[1].setAttribute('x', p.x + 8);
+            ref.textos[1].setAttribute('y', p.y + 46);
+        }
+    });
+
+    // Actualizar enlaces.
+    const NODO_W = GRAFO_VISUAL_NODO_W;
+    const NODO_H = GRAFO_VISUAL_NODO_H;
+    _grafo_visual_refs_enlaces.forEach(ref => {
+        const p_o = posiciones[ref.origen];
+        const p_d = posiciones[ref.destino];
+        if (!p_o || !p_d) return;
+        const co = { x: p_o.x + NODO_W / 2, y: p_o.y + NODO_H / 2 };
+        const cd = { x: p_d.x + NODO_W / 2, y: p_d.y + NODO_H / 2 };
+        const geom = _grafo_visual_geometria_enlace(co, cd, NODO_W, NODO_H);
+        if (!geom) return;
+        ref.path.setAttribute('d', geom.d);
+        if (ref.label) {
+            ref.label.setAttribute('x', geom.px_label);
+            ref.label.setAttribute('y', geom.py_label);
+        }
     });
 }
 
@@ -662,13 +966,13 @@ function _conectar_pan_zoom(svg) {
         svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
     }, { passive: false });
 
-    let arrastrando = false;
+    let arrastrando_fondo = false;
     let start_x = 0, start_y = 0;
     let vb_inicial = null;
 
     svg.addEventListener('mousedown', (e) => {
         if (e.target.closest && e.target.closest('.grafo-nodo')) return;
-        arrastrando = true;
+        arrastrando_fondo = true;
         svg.classList.add('arrastrando');
         start_x = e.clientX;
         start_y = e.clientY;
@@ -677,7 +981,7 @@ function _conectar_pan_zoom(svg) {
     });
 
     window.addEventListener('mousemove', (e) => {
-        if (!arrastrando) return;
+        if (!arrastrando_fondo) return;
         const dx = e.clientX - start_x;
         const dy = e.clientY - start_y;
         const rect = svg.getBoundingClientRect();
@@ -690,8 +994,8 @@ function _conectar_pan_zoom(svg) {
     });
 
     window.addEventListener('mouseup', () => {
-        if (arrastrando) {
-            arrastrando = false;
+        if (arrastrando_fondo) {
+            arrastrando_fondo = false;
             svg.classList.remove('arrastrando');
         }
     });
@@ -816,19 +1120,15 @@ function _grafo_visual_renderizar_panel(n) {
 
 function _grafo_visual_centrar_en(id) {
     if (!_grafo_visual_vb) return;
-    const g = document.querySelector('.grafo-nodo[data-id-nodo="' + CSS.escape(id) + '"]');
-    if (!g) return;
-    const rect = g.querySelector('rect');
-    if (!rect) return;
-    const x = parseFloat(rect.getAttribute('x'));
-    const y = parseFloat(rect.getAttribute('y'));
-    const cx = x + GRAFO_VISUAL_NODO_W / 2;
-    const cy = y + GRAFO_VISUAL_NODO_H / 2;
+    const pos = _grafo_visual_posiciones[id];
+    if (!pos) return;
+    const cx = pos.x + GRAFO_VISUAL_NODO_W / 2;
+    const cy = pos.y + GRAFO_VISUAL_NODO_H / 2;
 
     const vb = _grafo_visual_vb;
     vb.x = cx - vb.w / 2;
     vb.y = cy - vb.h / 2;
-    const svg = document.querySelector('.grafo-visual-svg');
+    const svg = _grafo_visual_svg;
     if (svg) svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
 }
 
@@ -846,7 +1146,6 @@ async function _grafo_visual_expandir(id) {
         return;
     }
 
-    // Guardar el viewBox actual para no perder el zoom.
     const vb_antes = _grafo_visual_vb
         ? { x: _grafo_visual_vb.x, y: _grafo_visual_vb.y,
             w: _grafo_visual_vb.w, h: _grafo_visual_vb.h }
@@ -876,6 +1175,7 @@ async function _grafo_visual_expandir(id) {
         enlaces_actuales[e.origen + '|' + e.enlace + '|' + e.destino] = true;
     });
 
+    const pos_padre = _grafo_visual_posiciones[id] || { x: 0, y: 0 };
     let agregados = 0;
 
     (detalle.adyacentes || []).forEach(a => {
@@ -890,6 +1190,13 @@ async function _grafo_visual_expandir(id) {
                 n_adyacentes: 0,
                 n_referencias: 0
             });
+            // Posición inicial: cerca del padre, en un ángulo random.
+            const ang = Math.random() * Math.PI * 2;
+            const r = 200 + Math.random() * 80;
+            _grafo_visual_posiciones[a.id_destino] = {
+                x: pos_padre.x + Math.cos(ang) * r,
+                y: pos_padre.y + Math.sin(ang) * r
+            };
             ids_actuales[a.id_destino] = true;
             agregados++;
         }
@@ -917,6 +1224,12 @@ async function _grafo_visual_expandir(id) {
                 n_adyacentes: 0,
                 n_referencias: 0
             });
+            const ang = Math.random() * Math.PI * 2;
+            const r_ = 200 + Math.random() * 80;
+            _grafo_visual_posiciones[r.id_origen] = {
+                x: pos_padre.x + Math.cos(ang) * r_,
+                y: pos_padre.y + Math.sin(ang) * r_
+            };
             ids_actuales[r.id_origen] = true;
             agregados++;
         }
@@ -934,9 +1247,9 @@ async function _grafo_visual_expandir(id) {
 
     if (agregados > 0) {
         mostrar_aviso('Agregados ' + agregados + ' nodo(s)', 'exito');
+        // Un poco de relax para que los nuevos no queden pisados.
+        _grafo_visual_asentar_vecinos(id);
         _renderizar_grafo_visual(vb_antes);
-        // Centrar la vista en el nodo tocado, sin cambiar el
-        // zoom actual (solo se ajustan x/y del viewBox).
         _grafo_visual_centrar_en(id);
     } else {
         mostrar_aviso('Sin vecinos nuevos', 'info');
@@ -1028,7 +1341,8 @@ function _conectar_controles_grafo_visual() {
                 if (layout === _grafo_visual_layout) return;
                 _grafo_visual_layout = layout;
                 _grafo_visual_actualizar_toggle();
-                _renderizar_grafo_visual();
+                _grafo_visual_posiciones = {};
+                _renderizar_grafo_visual(null, { recalcular: true });
             });
         });
     }
@@ -1074,7 +1388,8 @@ function _conectar_controles_grafo_visual() {
     const btn_reacomodar = document.getElementById('grafo_visual_btn_reacomodar');
     if (btn_reacomodar) {
         btn_reacomodar.addEventListener('click', () => {
-            _renderizar_grafo_visual();
+            _grafo_visual_posiciones = {};
+            _renderizar_grafo_visual(null, { recalcular: true });
         });
     }
 
@@ -1105,7 +1420,7 @@ function _conectar_controles_grafo_visual() {
             vb.h = h;
             vb.x = cx - w / 2;
             vb.y = cy - h / 2;
-            const svg = document.querySelector('.grafo-visual-svg');
+            const svg = _grafo_visual_svg;
             if (svg) svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
         });
     }
@@ -1113,7 +1428,7 @@ function _conectar_controles_grafo_visual() {
     const btn_reset = document.getElementById('grafo_visual_btn_reset');
     if (btn_reset) {
         btn_reset.addEventListener('click', () => {
-            _renderizar_grafo_visual();
+            _renderizar_grafo_visual(null, { recalcular: false });
         });
     }
 }

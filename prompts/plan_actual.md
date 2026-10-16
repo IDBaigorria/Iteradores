@@ -1092,6 +1092,13 @@ navegable y con zoom.
   preserva el `viewBox` actual antes de re-renderizar.
   Además, tras expandir, la vista se centra en el nodo
   tocado (solo cambia x/y del viewBox, no el zoom).
+- Drag de nodos con física en vivo: al arrastrar un
+  nodo, sigue al cursor y los vecinos se acomodan
+  (repulsión + atracción amortiguada). Al soltar,
+  todo queda en la última posición. La fuente de
+  verdad es `_grafo_visual_posiciones`; el layout
+  solo se recalcula con "Reacomodar" o al cambiar
+  el toggle Grilla/Force.
 
 ### 1.14 Cierre de la línea del grafo del plugin (v8b-v8f)
 

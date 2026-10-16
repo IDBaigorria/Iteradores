@@ -6,7 +6,7 @@
  * tipo, el panel lateral y los controles. Se carga
  * después de estilos.css.
  *
- * @version 1.5piloto.80u
+ * @version 1.5piloto.80v
  * @since 1.5piloto.80n
  */
 
@@ -182,6 +182,11 @@
     stroke: #1a73e8;
     stroke-width: 3.5;
 }
+.grafo-nodo.arrastrando rect {
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.25));
+    stroke-width: 2.5;
+}
+.grafo-nodo.arrastrando { cursor: grabbing; }
 .grafo-nodo.atenuado { opacity: 0.15; }
 
 /* ── Colores por tipo ── */
