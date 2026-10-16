@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.80a
+ * @version   1.5piloto.80n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1641,6 +1641,28 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         responder_json(['exito' => false, 'error' => 'Nodo no encontrado']);
                     }
                     responder_json(['exito' => true, 'nodo' => $nodo_gr]);
+                    break;
+
+                case 'vecindario':
+                    // Carga inicial del visualizador gráfico:
+                    // nodos alcanzables desde las raíces hasta N
+                    // niveles, más los enlaces entre ellos.
+                    $contextos_raw = $post['contextos'] ?? '';
+                    $contextos_vc = [];
+                    if ($contextos_raw !== '') {
+                        $dec_vc = json_decode($contextos_raw, true);
+                        if (is_array($dec_vc)) $contextos_vc = $dec_vc;
+                    }
+                    $opciones_vc = [
+                        'contextos' => $contextos_vc,
+                        'niveles' => (int)($post['niveles'] ?? 1),
+                        'max_nodos' => (int)($post['max_nodos'] ?? 500),
+                    ];
+                    $res_vc = Controlador::ejecutar_comando('grafo:vecindario', $opciones_vc);
+                    if (!$res_vc) {
+                        responder_json(['exito' => false, 'error' => 'No se pudo cargar el vecindario']);
+                    }
+                    responder_json(['exito' => true, 'vecindario' => $res_vc]);
                     break;
 
                 case 'raices':

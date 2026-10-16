@@ -1,0 +1,132 @@
+/*
+ * Estilos de la pestaña Grafo.
+ *
+ * Cubre las sub-pestañas Tabla / Visual, el contenedor
+ * SVG del visualizador, los enlaces y los colores por
+ * tipo de nodo. Se carga después de estilos.css.
+ *
+ * @version 1.5piloto.80o
+ * @since 1.5piloto.80n
+ */
+
+/* Sub-pestañas Tabla / Visual */
+.grafo-subtabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 2px solid var(--border);
+    margin: 12px 0 14px 0;
+}
+.grafo-subtab {
+    border: 0;
+    background: none;
+    padding: 8px 16px;
+    color: var(--muted);
+    font-weight: 600;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--transition), color var(--transition);
+}
+.grafo-subtab:hover { background: #f9d857; color: var(--primary-dark); }
+.grafo-subtab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+/* Contenedor del SVG */
+.grafo-visual-wrapper {
+    position: relative;
+    width: 100%;
+    height: 600px;
+    background: #fafafa;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    user-select: none;
+}
+.grafo-visual-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+.grafo-visual-svg.arrastrando { cursor: grabbing; }
+
+/* Enlaces */
+.grafo-enlace {
+    fill: none;
+    stroke: #aaa;
+    stroke-width: 1.4;
+    stroke-opacity: 0.75;
+    transition: stroke-opacity 0.15s;
+}
+.grafo-enlace:hover {
+    stroke-opacity: 1;
+    stroke-width: 2.2;
+}
+.grafo-enlace.compartido {
+    stroke: #b06000;
+    stroke-dasharray: 4 3;
+}
+
+/* Nodo base. El color de fondo se setea por tipo más abajo. */
+.grafo-nodo { cursor: pointer; }
+.grafo-nodo rect {
+    fill: #fff;
+    stroke: #888;
+    stroke-width: 1.5;
+    transition: filter 0.15s;
+}
+.grafo-nodo:hover rect { filter: brightness(0.94); }
+.grafo-nodo text {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 11px;
+    fill: #333;
+    pointer-events: none;
+}
+.grafo-nodo.especial rect {
+    stroke: #b06000;
+    stroke-width: 2.5;
+}
+
+/* ── Colores por tipo (la clase la arma _grafo_visual_clase_tipo) ── */
+.grafo-nodo.tipo-usuario rect { fill: #dbe9f6; stroke: #4a90d9; }
+.grafo-nodo.tipo-pasajero rect { fill: #e2f0d9; stroke: #6ba84f; }
+.grafo-nodo.tipo-viaje rect { fill: #fbe6c1; stroke: #e6a23c; }
+.grafo-nodo.tipo-micro rect { fill: #ecd9f5; stroke: #b06fc4; }
+.grafo-nodo.tipo-venta rect { fill: #f9d6d5; stroke: #d9534f; }
+.grafo-nodo.tipo-cupon rect { fill: #fdf0cd; stroke: #d4a017; }
+.grafo-nodo.tipo-rendicion rect { fill: #d5f0d5; stroke: #4caf50; }
+.grafo-nodo.tipo-liquidacion rect { fill: #d6eef6; stroke: #3d9bc1; }
+.grafo-nodo.tipo-cancelacion rect { fill: #f8d7d7; stroke: #c08080; }
+.grafo-nodo.tipo-sesion rect { fill: #ececec; stroke: #888; }
+.grafo-nodo.tipo-empresa rect { fill: #e1defb; stroke: #7b68ee; }
+.grafo-nodo.tipo-vehiculo rect { fill: #d9f0ee; stroke: #20b2aa; }
+.grafo-nodo.tipo-piso rect { fill: #f0f0f0; stroke: #aaa; }
+.grafo-nodo.tipo-asiento rect { fill: #fafafa; stroke: #bbb; }
+.grafo-nodo.tipo-especial rect { fill: #fff3cd; stroke: #b06000; }
+.grafo-nodo.tipo-desconocido rect { fill: #f5f5f5; stroke: #999; }
+
+/* Info flotante (arriba a la izquierda) */
+.grafo-visual-info {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(255,255,255,0.92);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #444;
+    border: 1px solid #ddd;
+    pointer-events: none;
+}
+.grafo-visual-info .truncado {
+    color: #b06000;
+    font-weight: 600;
+}
+
+/* Aviso cuando no hay datos o hay error */
+.grafo-visual-aviso {
+    padding: 30px;
+    text-align: center;
+    color: #888;
+    font-style: italic;
+}

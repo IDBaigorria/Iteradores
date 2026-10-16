@@ -1012,7 +1012,7 @@ navegable y con zoom.
 
 **Fases:**
 
-- [ ] **Fase 1 — Esqueleto visual.**
+- [x] **Fase 1 — Esqueleto visual.** (v80n)
   Sub-pestañas Tabla/Visual. SVG con grilla de fondo.
   Pan + zoom funcionales. Nodos como rectángulos
   (sin flechas). Carga inicial de las raíces + 1 nivel
@@ -1021,9 +1021,12 @@ navegable y con zoom.
   `estilos-grafo.css` (nuevo), `aplicacion_GET.html`,
   `Enrutador.php`, `Controlador.php` (comando nuevo).
 
-- [ ] **Fase 2 — Flechas y colores.**
-  Flechas curvas Bézier con `<marker>`. Colores por
-  tipo inferido. Raíces con borde destacado.
+- [x] **Fase 2 — Flechas y colores.** (v80o)
+  Flechas curvas Bézier con `<marker>`. Trazo
+  recortado a los bordes de los rects (no desde
+  el centro). Colores por tipo inferido vía clase
+  CSS (`tipo-usuario`, `tipo-pasajero`, etc.).
+  Raíces con borde naranja destacado.
 
 - [ ] **Fase 3 — Interacción.**
   Panel lateral con el detalle del nodo (usa

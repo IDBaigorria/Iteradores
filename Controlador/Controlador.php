@@ -57,7 +57,7 @@ require_once("interfaces/Dominios.php");
  * @implements VectorGravitacional
  * @implements Dominios
  * @since V1.2.0
- * @version 1.5i.7p
+ * @version 1.5i.7q
  */
 class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor, Dominios {
 
@@ -1725,6 +1725,128 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
                 'es_especial' => !is_numeric($id),
                 'adyacentes' => $adyacentes,
                 'referencias' => $referencias,
+            ];
+        }, null, false);
+
+        // ─── grafo:vecindario ─────────────────────────────
+        //
+        // Devuelve los nodos alcanzables desde un conjunto
+        // de raíces hasta `niveles` de profundidad, junto
+        // con los enlaces entre ellos. Es la carga inicial
+        // del visualizador gráfico.
+        //
+        // Args: [
+        //   "contextos" => array de IDs (o ['*'] para
+        //                  todas las raíces especiales),
+        //   "niveles"   => int (0..3),
+        //   "max_nodos" => int (10..500),
+        // ]
+        //
+        // Devuelve: {
+        //   nodos: [ { id, dato, es_especial, es_raiz,
+        //              tipo, n_adyacentes, n_referencias } ],
+        //   enlaces: [ { origen, destino, enlace,
+        //                destino_es_compartido } ],
+        //   raices: [ids],
+        //   total: int,
+        //   truncado: bool,
+        //   max_nodos: int,
+        // }
+        self::registrar_comando('grafo:vecindario', function(string $token, array $args) {
+            $opciones = $args[0] ?? [];
+            $contextos = $opciones['contextos'] ?? ['*'];
+            $niveles = max(0, min(3, (int)($opciones['niveles'] ?? 1)));
+            $max_nodos = max(10, min(500, (int)($opciones['max_nodos'] ?? 500)));
+
+            $estructura = self::_grafo_cargar_estructura($token);
+
+            // Determinar las raíces de partida.
+            $raices = [];
+            if (in_array('*', $contextos, true) || empty($contextos)) {
+                foreach ($estructura as $id => $info) {
+                    if (!is_numeric($id)) $raices[] = (string)$id;
+                }
+            } else {
+                foreach ($contextos as $ctx) {
+                    $ctx = (string)$ctx;
+                    if (isset($estructura[$ctx])) $raices[] = $ctx;
+                }
+            }
+
+            // BFS limitado.
+            $incluidos = [];
+            $cola = [];
+            foreach ($raices as $id) {
+                if (!isset($incluidos[$id])) {
+                    $incluidos[$id] = true;
+                    $cola[] = [$id, 0];
+                }
+            }
+            $truncado = false;
+            while (!empty($cola)) {
+                [$id, $nivel] = array_shift($cola);
+                if (!isset($estructura[$id])) continue;
+                if ($nivel >= $niveles) continue;
+                foreach ($estructura[$id]['ady'] as $destino) {
+                    if (!isset($incluidos[$destino])) {
+                        if (count($incluidos) >= $max_nodos) { $truncado = true; break 2; }
+                        $incluidos[$destino] = true;
+                        $cola[] = [$destino, $nivel + 1];
+                    }
+                }
+            }
+
+            // Referencias entrantes (sobre todo el grafo).
+            $refs_count = [];
+            foreach ($estructura as $info) {
+                foreach ($info['ady'] as $destino) {
+                    $refs_count[$destino] = ($refs_count[$destino] ?? 0) + 1;
+                }
+            }
+
+            // Armar los nodos.
+            $nodos = [];
+            $raices_str = array_map('strval', $raices);
+            foreach ($incluidos as $id => $_) {
+                if (!isset($estructura[$id])) continue;
+                $info = $estructura[$id];
+                $nodos[] = [
+                    'id' => (string)$id,
+                    'dato' => mb_substr($info['dato'], 0, 100),
+                    'es_especial' => !is_numeric($id),
+                    'es_raiz' => in_array((string)$id, $raices_str, true),
+                    'tipo' => self::_grafo_inferir_tipo((string)$id, $info['ady']),
+                    'n_adyacentes' => count($info['ady']),
+                    'n_referencias' => $refs_count[$id] ?? 0,
+                ];
+            }
+
+            // Enlaces (solo entre nodos incluidos).
+            $enlaces = [];
+            foreach ($incluidos as $id => $_) {
+                if (!isset($estructura[$id])) continue;
+                foreach ($estructura[$id]['ady'] as $enlace => $destino) {
+                    if (!isset($incluidos[$destino])) continue;
+                    $nodo_dest = Nodo::nodo_por_id((string)$destino);
+                    $destino_es_compartido = $nodo_dest
+                        ? ($nodo_dest->adyacente('_es_compartido') !== null)
+                        : false;
+                    $enlaces[] = [
+                        'origen' => (string)$id,
+                        'destino' => (string)$destino,
+                        'enlace' => (string)$enlace,
+                        'destino_es_compartido' => $destino_es_compartido,
+                    ];
+                }
+            }
+
+            return [
+                'nodos' => $nodos,
+                'enlaces' => $enlaces,
+                'raices' => $raices_str,
+                'total' => count($estructura),
+                'truncado' => $truncado,
+                'max_nodos' => $max_nodos,
             ];
         }, null, false);
 
