@@ -6,7 +6,7 @@
  * tipo, el panel lateral y los controles. Se carga
  * después de estilos.css.
  *
- * @version 1.5piloto.80p
+ * @version 1.5piloto.80q
  * @since 1.5piloto.80n
  */
 
@@ -39,6 +39,31 @@
     gap: 10px;
     margin-bottom: 10px;
     flex-wrap: wrap;
+}
+.grafo-visual-layout-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.grafo-visual-layout-toggle button {
+    border: 0;
+    background: #fff;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--transition), color var(--transition);
+}
+.grafo-visual-layout-toggle button:hover:not(.active) {
+    background: #f9e08a;
+    color: var(--primary-dark);
+}
+.grafo-visual-layout-toggle button.active {
+    background: var(--primary);
+    color: #fff;
 }
 .grafo-visual-controles input[type="text"] {
     width: 260px;

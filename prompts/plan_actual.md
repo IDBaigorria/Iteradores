@@ -1038,9 +1038,15 @@ navegable y con zoom.
   atenúa los no-match, Enter recorre los matches.
   Botón "Reset zoom".
 
-- [ ] **Fase 4 — Layout alternativo.**
-  Force-directed con toggle. Botones "acomodar",
-  "reset zoom", "centrar".
+- [x] **Fase 4 — Layout alternativo.** (v80q)
+  Motor force-directed simplificado (Fruchterman-
+  Reingold: repulsión 1/d², atracción lineal por
+  enlaces, fuerza centrípeta, temperature decreciente).
+  Toggle Grilla/Force. Botones "Reacomodar",
+  "Reset zoom" y "Centrar". El layout se recalcula
+  automáticamente al expandir un nodo (doble click).
+  Optimización: si N > 300, repulsión solo contra
+  los 50 vecinos más cercanos.
 
 - [ ] **Fase 5 — Persistencia.**
   Guardar posiciones, zoom y layout elegido. Dónde

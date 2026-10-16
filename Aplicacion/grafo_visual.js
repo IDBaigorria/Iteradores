@@ -3,16 +3,14 @@
  *
  * Fase 1: sub-pestañas, grilla, pan, zoom, nodos.
  * Fase 2: flechas curvas Bézier y colores por tipo.
- * Fase 3: panel lateral, doble click para expandir,
- *         buscador, reset zoom.
- *
- * Fase 4 agregará el force-directed.
+ * Fase 3: panel lateral, expansión, buscador, reset.
+ * Fase 4: force-directed con toggle y botones.
  *
  * Se carga después de `grafo.js`. No hay imports:
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.80p
+ * @version 1.5piloto.80q
  * @since 1.5piloto.80n
  */
 
@@ -22,6 +20,7 @@ let _grafo_visual_vb = null;
 let _grafo_visual_seleccionado = null;
 let _grafo_visual_matches = [];
 let _grafo_visual_match_actual = -1;
+let _grafo_visual_layout = 'grilla'; // 'grilla' | 'force'
 
 const GRAFO_VISUAL_NODO_W = 140;
 const GRAFO_VISUAL_NODO_H = 44;
@@ -94,7 +93,7 @@ function _conectar_subtabs_grafo() {
 }
 
 // ============================================================
-// Utilidades de layout
+// Utilidades
 // ============================================================
 
 function _grafo_visual_clase_tipo(tipo) {
@@ -124,7 +123,212 @@ function _grafo_visual_escape(s) {
 }
 
 // ============================================================
-// Render principal
+// Layout: grilla y force-directed
+// ============================================================
+
+function _grafo_visual_orden_bfs(datos) {
+    const indice = {};
+    datos.nodos.forEach(n => { indice[n.id] = n; });
+
+    const ady_por_origen = {};
+    datos.enlaces.forEach(e => {
+        if (!ady_por_origen[e.origen]) ady_por_origen[e.origen] = [];
+        ady_por_origen[e.origen].push(e.destino);
+    });
+
+    const visitados = {};
+    const cola = [];
+    (datos.raices || []).forEach(id => {
+        if (indice[id] && !visitados[id]) { visitados[id] = true; cola.push(id); }
+    });
+    datos.nodos.forEach(n => {
+        if (!visitados[n.id]) { visitados[n.id] = true; cola.push(n.id); }
+    });
+
+    const ordenados = [];
+    while (cola.length > 0) {
+        const id = cola.shift();
+        ordenados.push(id);
+        const vecinos = ady_por_origen[id] || [];
+        for (const v of vecinos) {
+            if (indice[v] && !visitados[v]) {
+                visitados[v] = true;
+                cola.push(v);
+            }
+        }
+    }
+    return ordenados;
+}
+
+function _grafo_visual_layout_grilla(datos) {
+    const NODO_W = GRAFO_VISUAL_NODO_W;
+    const NODO_H = GRAFO_VISUAL_NODO_H;
+    const GAP_X = 60;
+    const GAP_Y = 60;
+    const COLUMNAS = Math.max(4, Math.ceil(Math.sqrt(datos.nodos.length * 1.5)));
+
+    const ordenados = _grafo_visual_orden_bfs(datos);
+    const posiciones = {};
+    ordenados.forEach((id, i) => {
+        const col = i % COLUMNAS;
+        const fila = Math.floor(i / COLUMNAS);
+        posiciones[id] = {
+            x: col * (NODO_W + GAP_X),
+            y: fila * (NODO_H + GAP_Y)
+        };
+    });
+    return posiciones;
+}
+
+function _grafo_visual_layout_force(datos) {
+    const nodos = datos.nodos;
+    const enlaces = datos.enlaces;
+    const n = nodos.length;
+    if (n === 0) return {};
+
+    // Parámetros.
+    const area = n * 200 * 200;
+    const k = Math.sqrt(area / n);              // distancia ideal
+    const k_repulsion = k * k;                  // para 1/d²
+    const k_atraccion = 0.08;                   // Hooke lineal
+    const k_centro = 0.02;                      // centrípeta
+    const iteraciones = 250;
+    const usar_muestreo = n > 300;
+    const vecinos_muestreo = 50;
+
+    // Posiciones iniciales: aleatorias en un círculo.
+    const pos = {};
+    const radio_inicial = Math.sqrt(area) / 2;
+    nodos.forEach(nd => {
+        const ang = Math.random() * Math.PI * 2;
+        const r = Math.random() * radio_inicial;
+        pos[nd.id] = {
+            x: Math.cos(ang) * r,
+            y: Math.sin(ang) * r
+        };
+    });
+
+    // Enlaces indexados por nodo (para atracción).
+    const vecinos_de = {};
+    nodos.forEach(nd => { vecinos_de[nd.id] = []; });
+    enlaces.forEach(e => {
+        if (vecinos_de[e.origen]) vecinos_de[e.origen].push(e.destino);
+        if (vecinos_de[e.destino]) vecinos_de[e.destino].push(e.origen);
+    });
+
+    // Centro de masa.
+    let cx = 0, cy = 0;
+    nodos.forEach(nd => { cx += pos[nd.id].x; cy += pos[nd.id].y; });
+    cx /= n; cy /= n;
+
+    for (let it = 0; it < iteraciones; it++) {
+        const t = 1 - it / iteraciones; // temperature
+        const max_disp = 30 * t + 5;    // desplazamiento máximo
+
+        const desp = {};
+        nodos.forEach(nd => { desp[nd.id] = { x: 0, y: 0 }; });
+
+        // Repulsión entre pares.
+        if (!usar_muestreo) {
+            for (let i = 0; i < n; i++) {
+                const a = nodos[i].id;
+                for (let j = i + 1; j < n; j++) {
+                    const b = nodos[j].id;
+                    const dx = pos[a].x - pos[b].x;
+                    const dy = pos[a].y - pos[b].y;
+                    const d2 = dx * dx + dy * dy + 0.01;
+                    const d = Math.sqrt(d2);
+                    const f = k_repulsion / d2;
+                    const fx = (dx / d) * f;
+                    const fy = (dy / d) * f;
+                    desp[a].x += fx;
+                    desp[a].y += fy;
+                    desp[b].x -= fx;
+                    desp[b].y -= fy;
+                }
+            }
+        } else {
+            // Muestreo: solo contra los primeros vecinos_muestreo
+            // (rotando el índice de inicio para no sesgar).
+            for (let i = 0; i < n; i++) {
+                const a = nodos[i].id;
+                const inicio = (i * 7) % n;
+                for (let m = 0; m < vecinos_muestreo; m++) {
+                    const j = (inicio + m) % n;
+                    if (j === i) continue;
+                    const b = nodos[j].id;
+                    const dx = pos[a].x - pos[b].x;
+                    const dy = pos[a].y - pos[b].y;
+                    const d2 = dx * dx + dy * dy + 0.01;
+                    const d = Math.sqrt(d2);
+                    const f = k_repulsion / d2;
+                    desp[a].x += (dx / d) * f;
+                    desp[a].y += (dy / d) * f;
+                }
+            }
+        }
+
+        // Atracción por enlaces.
+        enlaces.forEach(e => {
+            if (!pos[e.origen] || !pos[e.destino]) return;
+            const dx = pos[e.destino].x - pos[e.origen].x;
+            const dy = pos[e.destino].y - pos[e.origen].y;
+            const d = Math.sqrt(dx * dx + dy * dy) + 0.01;
+            const f = d * k_atraccion;
+            const fx = (dx / d) * f;
+            const fy = (dy / d) * f;
+            desp[e.origen].x += fx;
+            desp[e.origen].y += fy;
+            desp[e.destino].x -= fx;
+            desp[e.destino].y -= fy;
+        });
+
+        // Fuerza centrípeta.
+        nodos.forEach(nd => {
+            desp[nd.id].x += (cx - pos[nd.id].x) * k_centro;
+            desp[nd.id].y += (cy - pos[nd.id].y) * k_centro;
+        });
+
+        // Aplicar con límite de desplazamiento.
+        nodos.forEach(nd => {
+            const id = nd.id;
+            const vx = desp[id].x;
+            const vy = desp[id].y;
+            const magn = Math.sqrt(vx * vx + vy * vy) + 0.001;
+            const lim = Math.min(magn, max_disp);
+            pos[id].x += (vx / magn) * lim;
+            pos[id].y += (vy / magn) * lim;
+        });
+    }
+
+    // Reajustar al bounding box.
+    let min_x = Infinity, min_y = Infinity, max_x = -Infinity, max_y = -Infinity;
+    nodos.forEach(nd => {
+        const p = pos[nd.id];
+        if (p.x < min_x) min_x = p.x;
+        if (p.y < min_y) min_y = p.y;
+        if (p.x > max_x) max_x = p.x;
+        if (p.y > max_y) max_y = p.y;
+    });
+
+    // Desplazar todo para que arranque en (0,0).
+    nodos.forEach(nd => {
+        pos[nd.id].x -= min_x;
+        pos[nd.id].y -= min_y;
+    });
+
+    return pos;
+}
+
+function _grafo_visual_calcular_posiciones(datos) {
+    if (_grafo_visual_layout === 'force') {
+        return _grafo_visual_layout_force(datos);
+    }
+    return _grafo_visual_layout_grilla(datos);
+}
+
+// ============================================================
+// Render
 // ============================================================
 
 function _renderizar_grafo_visual() {
@@ -138,50 +342,14 @@ function _renderizar_grafo_visual() {
 
     const NODO_W = GRAFO_VISUAL_NODO_W;
     const NODO_H = GRAFO_VISUAL_NODO_H;
-    const GAP_X = 60;
-    const GAP_Y = 60;
-    const COLUMNAS = Math.max(4, Math.ceil(Math.sqrt(datos.nodos.length * 1.5)));
 
-    const indice = {};
-    datos.nodos.forEach(n => { indice[n.id] = n; });
-
-    const ady_por_origen = {};
-    datos.enlaces.forEach(e => {
-        if (!ady_por_origen[e.origen]) ady_por_origen[e.origen] = [];
-        ady_por_origen[e.origen].push(e.destino);
-    });
-
-    const visitados_bfs = {};
-    const cola_bfs = [];
-    (datos.raices || []).forEach(id => {
-        if (indice[id] && !visitados_bfs[id]) { visitados_bfs[id] = true; cola_bfs.push(id); }
-    });
-    datos.nodos.forEach(n => {
-        if (!visitados_bfs[n.id]) { visitados_bfs[n.id] = true; cola_bfs.push(n.id); }
-    });
-
-    const ordenados = [];
-    while (cola_bfs.length > 0) {
-        const id = cola_bfs.shift();
-        ordenados.push(id);
-        const vecinos = ady_por_origen[id] || [];
-        for (const v of vecinos) {
-            if (indice[v] && !visitados_bfs[v]) {
-                visitados_bfs[v] = true;
-                cola_bfs.push(v);
-            }
-        }
-    }
-
-    const posiciones = {};
+    const posiciones = _grafo_visual_calcular_posiciones(datos);
     const centros = {};
-    ordenados.forEach((id, i) => {
-        const col = i % COLUMNAS;
-        const fila = Math.floor(i / COLUMNAS);
-        const x = col * (NODO_W + GAP_X);
-        const y = fila * (NODO_H + GAP_Y);
-        posiciones[id] = { x, y };
-        centros[id] = { x: x + NODO_W / 2, y: y + NODO_H / 2 };
+    Object.keys(posiciones).forEach(id => {
+        centros[id] = {
+            x: posiciones[id].x + NODO_W / 2,
+            y: posiciones[id].y + NODO_H / 2
+        };
     });
 
     let min_x = Infinity, min_y = Infinity, max_x = -Infinity, max_y = -Infinity;
@@ -200,9 +368,7 @@ function _renderizar_grafo_visual() {
     };
     _grafo_visual_vb = { x: vb.x, y: vb.y, w: vb.w, h: vb.h };
 
-    // Estructura del contenedor: se crea una sola vez, y en
-    // los re-renders solo se reemplaza el SVG y se actualiza
-    // el panel y las clases.
+    // Estructura: crear una sola vez.
     let wrapper = document.getElementById('grafo_visual_wrapper');
     let panel = document.getElementById('grafo_visual_panel');
     if (!wrapper || !panel) {
@@ -210,7 +376,13 @@ function _renderizar_grafo_visual() {
         const controles = document.createElement('div');
         controles.className = 'grafo-visual-controles';
         controles.innerHTML =
+            '<div class="grafo-visual-layout-toggle" id="grafo_visual_toggle">' +
+            '  <button type="button" data-layout="grilla">Grilla</button>' +
+            '  <button type="button" data-layout="force">Force</button>' +
+            '</div>' +
             '<input type="text" id="grafo_visual_buscar" placeholder="Buscar por ID o dato...">' +
+            '<button type="button" class="btn" id="grafo_visual_btn_reacomodar">Reacomodar</button>' +
+            '<button type="button" class="btn" id="grafo_visual_btn_centrar">Centrar</button>' +
             '<button type="button" class="btn" id="grafo_visual_btn_reset">Reset zoom</button>' +
             '<span class="grafo-visual-buscar-info" id="grafo_visual_buscar_info"></span>';
         cont.appendChild(controles);
@@ -232,6 +404,7 @@ function _renderizar_grafo_visual() {
         cont.appendChild(layout);
 
         _conectar_controles_grafo_visual();
+        _grafo_visual_actualizar_toggle();
     }
 
     // SVG (se recrea).
@@ -373,7 +546,6 @@ function _renderizar_grafo_visual() {
     svg.appendChild(g_nodos);
     wrapper.appendChild(svg);
 
-    // Info flotante.
     const info = document.createElement('div');
     info.className = 'grafo-visual-info';
     info.textContent = datos.nodos.length + ' nodos · '
@@ -389,11 +561,18 @@ function _renderizar_grafo_visual() {
 
     _conectar_pan_zoom(svg);
 
-    // Si hay búsqueda activa, reaplicar.
     const input_buscar = document.getElementById('grafo_visual_buscar');
     if (input_buscar && input_buscar.value.trim() !== '') {
         _grafo_visual_aplicar_busqueda(input_buscar.value);
     }
+}
+
+function _grafo_visual_actualizar_toggle() {
+    const cont = document.getElementById('grafo_visual_toggle');
+    if (!cont) return;
+    cont.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('active', b.dataset.layout === _grafo_visual_layout);
+    });
 }
 
 // ============================================================
@@ -463,14 +642,12 @@ async function _grafo_visual_seleccionar(id) {
     if (!id) return;
     _grafo_visual_seleccionado = id;
 
-    // Marcar el nodo seleccionado visualmente.
     document.querySelectorAll('.grafo-nodo.seleccionado').forEach(g => {
         g.classList.remove('seleccionado');
     });
     const g_nodo = document.querySelector('.grafo-nodo[data-id-nodo="' + CSS.escape(id) + '"]');
     if (g_nodo) g_nodo.classList.add('seleccionado');
 
-    // Cargar detalle y pintar el panel.
     const panel = document.getElementById('grafo_visual_panel');
     if (!panel) return;
     panel.style.display = 'block';
@@ -575,12 +752,7 @@ function _grafo_visual_renderizar_panel(n) {
 }
 
 function _grafo_visual_centrar_en(id) {
-    const datos = _grafo_visual_datos;
-    if (!datos || !_grafo_visual_vb) return;
-    const nodo = (datos.nodos || []).find(n => n.id === id);
-    if (!nodo) return;
-
-    // Buscar su posición en la última renderización.
+    if (!_grafo_visual_vb) return;
     const g = document.querySelector('.grafo-nodo[data-id-nodo="' + CSS.escape(id) + '"]');
     if (!g) return;
     const rect = g.querySelector('rect');
@@ -591,10 +763,8 @@ function _grafo_visual_centrar_en(id) {
     const cy = y + GRAFO_VISUAL_NODO_H / 2;
 
     const vb = _grafo_visual_vb;
-    const nw = vb.w;
-    const nh = vb.h;
-    vb.x = cx - nw / 2;
-    vb.y = cy - nh / 2;
+    vb.x = cx - vb.w / 2;
+    vb.y = cy - vb.h / 2;
     const svg = document.querySelector('.grafo-visual-svg');
     if (svg) svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
 }
@@ -665,7 +835,6 @@ async function _grafo_visual_expandir(id) {
         }
     });
 
-    // También agrego los orígenes de las referencias entrantes como nodos.
     (detalle.referencias || []).forEach(r => {
         if (!ids_actuales[r.id_origen]) {
             datos.nodos.push({
@@ -737,7 +906,6 @@ function _grafo_visual_aplicar_busqueda(texto) {
         }
     });
 
-    // Atenuar enlaces que no toquen un match (opcional).
     datos.enlaces.forEach(e => {
         if (!ids_match[e.origen] && !ids_match[e.destino]) {
             document.querySelectorAll('.grafo-enlace').forEach(p => {
@@ -774,10 +942,23 @@ function _grafo_visual_ir_a_match(delta) {
 }
 
 // ============================================================
-// Controles (buscador, reset)
+// Controles
 // ============================================================
 
 function _conectar_controles_grafo_visual() {
+    const toggle = document.getElementById('grafo_visual_toggle');
+    if (toggle) {
+        toggle.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const layout = btn.dataset.layout;
+                if (layout === _grafo_visual_layout) return;
+                _grafo_visual_layout = layout;
+                _grafo_visual_actualizar_toggle();
+                _renderizar_grafo_visual();
+            });
+        });
+    }
+
     const input = document.getElementById('grafo_visual_buscar');
     if (input) {
         let timeout = null;
@@ -792,6 +973,45 @@ function _conectar_controles_grafo_visual() {
                 e.preventDefault();
                 _grafo_visual_ir_a_match(e.shiftKey ? -1 : 1);
             }
+        });
+    }
+
+    const btn_reacomodar = document.getElementById('grafo_visual_btn_reacomodar');
+    if (btn_reacomodar) {
+        btn_reacomodar.addEventListener('click', () => {
+            _renderizar_grafo_visual();
+        });
+    }
+
+    const btn_centrar = document.getElementById('grafo_visual_btn_centrar');
+    if (btn_centrar) {
+        btn_centrar.addEventListener('click', () => {
+            if (!_grafo_visual_datos || !_grafo_visual_vb) return;
+            const gs = document.querySelectorAll('.grafo-nodo rect');
+            if (gs.length === 0) return;
+            let min_x = Infinity, min_y = Infinity, max_x = -Infinity, max_y = -Infinity;
+            gs.forEach(r => {
+                const x = parseFloat(r.getAttribute('x'));
+                const y = parseFloat(r.getAttribute('y'));
+                const w = parseFloat(r.getAttribute('width'));
+                const h = parseFloat(r.getAttribute('height'));
+                if (x < min_x) min_x = x;
+                if (y < min_y) min_y = y;
+                if (x + w > max_x) max_x = x + w;
+                if (y + h > max_y) max_y = y + h;
+            });
+            const padding = 40;
+            const vb = _grafo_visual_vb;
+            const w = (max_x - min_x) + 2 * padding;
+            const h = (max_y - min_y) + 2 * padding;
+            const cx = (min_x + max_x) / 2;
+            const cy = (min_y + max_y) / 2;
+            vb.w = w;
+            vb.h = h;
+            vb.x = cx - w / 2;
+            vb.y = cy - h / 2;
+            const svg = document.querySelector('.grafo-visual-svg');
+            if (svg) svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
         });
     }
 
