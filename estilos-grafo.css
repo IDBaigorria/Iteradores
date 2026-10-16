@@ -2,10 +2,11 @@
  * Estilos de la pestaña Grafo.
  *
  * Cubre las sub-pestañas Tabla / Visual, el contenedor
- * SVG del visualizador, los enlaces y los colores por
- * tipo de nodo. Se carga después de estilos.css.
+ * SVG del visualizador, los enlaces, los colores por
+ * tipo, el panel lateral y los controles. Se carga
+ * después de estilos.css.
  *
- * @version 1.5piloto.80o
+ * @version 1.5piloto.80p
  * @since 1.5piloto.80n
  */
 
@@ -30,6 +31,33 @@
 }
 .grafo-subtab:hover { background: #f9d857; color: var(--primary-dark); }
 .grafo-subtab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+/* Barra de controles */
+.grafo-visual-controles {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.grafo-visual-controles input[type="text"] {
+    width: 260px;
+}
+.grafo-visual-buscar-info {
+    font-size: 12px;
+    color: #666;
+}
+
+/* Layout: SVG + panel lateral */
+.grafo-visual-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: start;
+}
+.grafo-visual-layout:has(.grafo-visual-panel[style*="block"]) {
+    grid-template-columns: 1fr 340px;
+}
 
 /* Contenedor del SVG */
 .grafo-visual-wrapper {
@@ -56,7 +84,7 @@
     stroke: #aaa;
     stroke-width: 1.4;
     stroke-opacity: 0.75;
-    transition: stroke-opacity 0.15s;
+    transition: stroke-opacity 0.15s, stroke-width 0.15s;
 }
 .grafo-enlace:hover {
     stroke-opacity: 1;
@@ -66,14 +94,15 @@
     stroke: #b06000;
     stroke-dasharray: 4 3;
 }
+.grafo-enlace.atenuado { stroke-opacity: 0.1; }
 
-/* Nodo base. El color de fondo se setea por tipo más abajo. */
+/* Nodo base. El color se setea por tipo más abajo. */
 .grafo-nodo { cursor: pointer; }
 .grafo-nodo rect {
     fill: #fff;
     stroke: #888;
     stroke-width: 1.5;
-    transition: filter 0.15s;
+    transition: filter 0.15s, stroke-width 0.15s;
 }
 .grafo-nodo:hover rect { filter: brightness(0.94); }
 .grafo-nodo text {
@@ -86,8 +115,13 @@
     stroke: #b06000;
     stroke-width: 2.5;
 }
+.grafo-nodo.seleccionado rect {
+    stroke: #1a73e8;
+    stroke-width: 3.5;
+}
+.grafo-nodo.atenuado { opacity: 0.15; }
 
-/* ── Colores por tipo (la clase la arma _grafo_visual_clase_tipo) ── */
+/* ── Colores por tipo ── */
 .grafo-nodo.tipo-usuario rect { fill: #dbe9f6; stroke: #4a90d9; }
 .grafo-nodo.tipo-pasajero rect { fill: #e2f0d9; stroke: #6ba84f; }
 .grafo-nodo.tipo-viaje rect { fill: #fbe6c1; stroke: #e6a23c; }
@@ -130,3 +164,116 @@
     color: #888;
     font-style: italic;
 }
+
+/* ── Panel lateral ── */
+.grafo-visual-panel {
+    background: #fffaf0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-height: 600px;
+    overflow-y: auto;
+    font-size: 13px;
+}
+.grafo-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: #f9e08a;
+}
+.grafo-panel-header h3 {
+    margin: 4px 0 0 0;
+    font-size: 14px;
+    font-family: Consolas, Monaco, monospace;
+}
+.grafo-panel-tipo {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #eee;
+    color: #444;
+}
+.grafo-panel-cerrar {
+    padding: 2px 8px;
+    font-size: 13px;
+}
+.grafo-panel-cuerpo {
+    padding: 10px 12px;
+}
+.grafo-panel-campo {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    gap: 6px;
+    padding: 3px 0;
+    align-items: baseline;
+}
+.grafo-panel-campo label {
+    color: var(--muted);
+    font-size: 12px;
+}
+.grafo-panel-campo code {
+    font-size: 12px;
+    word-break: break-all;
+}
+.grafo-panel-seccion {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+}
+.grafo-panel-seccion h4 {
+    margin: 0 0 6px 0;
+    font-size: 13px;
+    color: var(--primary-dark);
+}
+.grafo-panel-seccion ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 11px;
+    line-height: 1.5;
+}
+.grafo-panel-seccion li {
+    padding: 3px 0;
+    border-bottom: 1px solid #f0ede4;
+    word-break: break-all;
+}
+.grafo-panel-seccion li:last-child { border-bottom: 0; }
+.grafo-panel-seccion a {
+    color: var(--primary);
+    text-decoration: none;
+}
+.grafo-panel-seccion a:hover { text-decoration: underline; }
+.grafo-panel-seccion code {
+    background: #f5f0e0;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+.tipo-mini {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    background: #eaeaea;
+    color: #555;
+}
+.tag-compartido {
+    background: #ffe9c4;
+    color: #8a5000;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 4px;
+}
+.grafo-panel-cargando,
+.grafo-panel-error {
+    padding: 12px;
+    color: #888;
+    font-style: italic;
+}
+.grafo-panel-error { color: #c00; font-style: normal; }

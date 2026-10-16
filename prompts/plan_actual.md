@@ -1028,10 +1028,15 @@ navegable y con zoom.
   CSS (`tipo-usuario`, `tipo-pasajero`, etc.).
   Raíces con borde naranja destacado.
 
-- [ ] **Fase 3 — Interacción.**
+- [x] **Fase 3 — Interacción.** (v80p)
   Panel lateral con el detalle del nodo (usa
-  `grafo:nodo`). Doble click → centrar y expandir
-  vecinos. Buscador por texto / ID.
+  `grafo:nodo` enriquecido con `tipo`, `tipo_destino`
+  y `tipo_origen`). Click en un vecino del panel
+  reabre ese nodo. Doble click en un nodo → expande
+  sus vecinos (agrega nodos/enlaces al grafo local,
+  cap duro de 1000). Buscador por ID o dato,
+  atenúa los no-match, Enter recorre los matches.
+  Botón "Reset zoom".
 
 - [ ] **Fase 4 — Layout alternativo.**
   Force-directed con toggle. Botones "acomodar",

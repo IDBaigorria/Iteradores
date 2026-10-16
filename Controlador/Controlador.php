@@ -57,7 +57,7 @@ require_once("interfaces/Dominios.php");
  * @implements VectorGravitacional
  * @implements Dominios
  * @since V1.2.0
- * @version 1.5i.7q
+ * @version 1.5i.7r
  */
 class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor, Dominios {
 
@@ -1683,6 +1683,12 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
         }, null, false);
 
         // ─── grafo:nodo ────────────────────────────────────
+        //
+        // Devuelve el detalle de un nodo. Incluye el tipo
+        // inferido del nodo y de sus vecinos (adyacentes y
+        // referencias). La estructura se carga una sola vez,
+        // así que el cálculo de tipos es O(1) por vecino
+        // (usando los adyacentes ya en memoria).
         self::registrar_comando('grafo:nodo', function(string $token, array $args) {
             $id = (string)($args[0] ?? '');
             if ($id === '') return null;
@@ -1690,38 +1696,48 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             $nodo = Nodo::nodo_por_id($id);
             if (!$nodo) return null;
 
+            $estructura = self::_grafo_cargar_estructura($token);
+            $info_propio = $estructura[$id] ?? ['dato' => '', 'ady' => []];
+
             $adyacentes = [];
-            foreach ($nodo->adyacentes() as $enlace => $ady) {
-                // Fase B2.3.5c.1 (1.5i.7m): marcar si el destino es
-                // un contenedor compartido. El chequeo es O(1)
-                // porque el nodo destino ya está en memoria (el
-                // grafo está cargado).
-                $destino_es_compartido = $ady->adyacente('_es_compartido') !== null;
+            foreach ($info_propio['ady'] as $enlace => $id_destino) {
+                $id_destino_str = (string)$id_destino;
+                $ady = Nodo::nodo_por_id($id_destino_str);
+                $destino_es_compartido = $ady
+                    ? ($ady->adyacente('_es_compartido') !== null)
+                    : false;
+                $info_dest = $estructura[$id_destino_str] ?? null;
                 $adyacentes[] = [
                     'enlace' => (string)$enlace,
-                    'id_destino' => $ady->id(),
-                    'dato_destino' => mb_substr((string)$ady->dato(), 0, 80),
+                    'id_destino' => $id_destino_str,
+                    'dato_destino' => $info_dest ? mb_substr($info_dest['dato'], 0, 80) : '',
+                    'tipo_destino' => $info_dest
+                        ? self::_grafo_inferir_tipo($id_destino_str, $info_dest['ady'])
+                        : '?',
                     'destino_es_compartido' => $destino_es_compartido,
                 ];
             }
 
-            // Referencias entrantes: recorrido completo, filtrado.
+            // Referencias entrantes: recorrido de la estructura
+            // ya cargada. Filtramos por id_destino.
             $referencias = [];
-            Nodo::por_cada_nodo_ejecutar($token, function($otro) use ($id, &$referencias) {
-                foreach ($otro->adyacentes() as $enlace => $destino) {
-                    if ($destino->id() === $id) {
+            foreach ($estructura as $id_origen => $info_o) {
+                foreach ($info_o['ady'] as $enlace => $destino) {
+                    if ((string)$destino === $id) {
                         $referencias[] = [
-                            'id_origen' => $otro->id(),
+                            'id_origen' => (string)$id_origen,
                             'enlace' => (string)$enlace,
-                            'dato_origen' => mb_substr((string)$otro->dato(), 0, 80),
+                            'dato_origen' => mb_substr($info_o['dato'], 0, 80),
+                            'tipo_origen' => self::_grafo_inferir_tipo((string)$id_origen, $info_o['ady']),
                         ];
                     }
                 }
-            }, null);
+            }
 
             return [
                 'id' => $id,
                 'dato' => (string)$nodo->dato(),
+                'tipo' => self::_grafo_inferir_tipo($id, $info_propio['ady']),
                 'es_especial' => !is_numeric($id),
                 'adyacentes' => $adyacentes,
                 'referencias' => $referencias,
