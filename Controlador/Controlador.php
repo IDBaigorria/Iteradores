@@ -57,7 +57,7 @@ require_once("interfaces/Dominios.php");
  * @implements VectorGravitacional
  * @implements Dominios
  * @since V1.2.0
- * @version 1.5i.7r
+ * @version 1.5i.7s
  */
 class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, Comunicadores, VectorGravitacional, Motor, Dominios {
 
@@ -1826,11 +1826,19 @@ class Controlador extends Objeto implements PerdurarSuperestructura, Comandos, C
             foreach ($incluidos as $id => $_) {
                 if (!isset($estructura[$id])) continue;
                 $info = $estructura[$id];
+
+                // Chequear el marcador _es_compartido (O(1)).
+                $nodo_compartido = Nodo::nodo_por_id((string)$id);
+                $es_compartido = $nodo_compartido
+                    ? ($nodo_compartido->adyacente('_es_compartido') !== null)
+                    : false;
+
                 $nodos[] = [
                     'id' => (string)$id,
                     'dato' => mb_substr($info['dato'], 0, 100),
                     'es_especial' => !is_numeric($id),
                     'es_raiz' => in_array((string)$id, $raices_str, true),
+                    'es_compartido' => $es_compartido,
                     'tipo' => self::_grafo_inferir_tipo((string)$id, $info['ady']),
                     'n_adyacentes' => count($info['ady']),
                     'n_referencias' => $refs_count[$id] ?? 0,

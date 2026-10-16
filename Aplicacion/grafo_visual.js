@@ -5,12 +5,15 @@
  * Fase 2: flechas curvas Bézier y colores por tipo.
  * Fase 3: panel lateral, expansión, buscador, reset.
  * Fase 4: force-directed con toggle y botones.
+ * Fase 5 (en v80r): nodos más cuadrados, force más
+ * separado, selector de max_nodos, compartidos con
+ * estilo propio, refresco tras eliminar huérfanos.
  *
  * Se carga después de `grafo.js`. No hay imports:
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.80q
+ * @version 1.5piloto.80r
  * @since 1.5piloto.80n
  */
 
@@ -21,10 +24,11 @@ let _grafo_visual_seleccionado = null;
 let _grafo_visual_matches = [];
 let _grafo_visual_match_actual = -1;
 let _grafo_visual_layout = 'grilla'; // 'grilla' | 'force'
+let _grafo_visual_max_nodos = 500;
 
-const GRAFO_VISUAL_NODO_W = 140;
-const GRAFO_VISUAL_NODO_H = 44;
-const GRAFO_VISUAL_MAX_NODOS = 1000;
+const GRAFO_VISUAL_NODO_W = 120;
+const GRAFO_VISUAL_NODO_H = 64;
+const GRAFO_VISUAL_MAX_NODOS = 2000;
 
 // ============================================================
 // API principal
@@ -46,7 +50,7 @@ async function cargar_grafo_visual() {
                 nombre_solicitante: usuario_actual.nombre_usuario,
                 contextos: JSON.stringify(['*']),
                 niveles: "1",
-                max_nodos: "500"
+                max_nodos: String(_grafo_visual_max_nodos)
             })
         });
     } catch (e) {
@@ -186,15 +190,27 @@ function _grafo_visual_layout_force(datos) {
     const n = nodos.length;
     if (n === 0) return {};
 
-    // Parámetros.
-    const area = n * 200 * 200;
-    const k = Math.sqrt(area / n);              // distancia ideal
-    const k_repulsion = k * k;                  // para 1/d²
-    const k_atraccion = 0.08;                   // Hooke lineal
-    const k_centro = 0.02;                      // centrípeta
+    // Parámetros. El área base subió de 200 a 260 para
+    // separar más los nodos. La atracción bajó de 0.08 a
+    // 0.06 para no aplastarlos.
+    const lado = 260;
+    const area = n * lado * lado;
+    const k = Math.sqrt(area / n);
+    const k_repulsion = k * k;
+    const k_atraccion = 0.06;
+    const k_centro = 0.015;
     const iteraciones = 250;
+    const iteraciones_relax = 50;
     const usar_muestreo = n > 300;
     const vecinos_muestreo = 50;
+
+    // Distancia mínima entre centros: diagonal del nodo
+    // + margen. Evita solapamiento en el paso de relax.
+    const diag_nodo = Math.sqrt(
+        GRAFO_VISUAL_NODO_W * GRAFO_VISUAL_NODO_W +
+        GRAFO_VISUAL_NODO_H * GRAFO_VISUAL_NODO_H
+    );
+    const min_dist = diag_nodo + 20;
 
     // Posiciones iniciales: aleatorias en un círculo.
     const pos = {};
@@ -208,27 +224,17 @@ function _grafo_visual_layout_force(datos) {
         };
     });
 
-    // Enlaces indexados por nodo (para atracción).
-    const vecinos_de = {};
-    nodos.forEach(nd => { vecinos_de[nd.id] = []; });
-    enlaces.forEach(e => {
-        if (vecinos_de[e.origen]) vecinos_de[e.origen].push(e.destino);
-        if (vecinos_de[e.destino]) vecinos_de[e.destino].push(e.origen);
-    });
-
-    // Centro de masa.
     let cx = 0, cy = 0;
     nodos.forEach(nd => { cx += pos[nd.id].x; cy += pos[nd.id].y; });
     cx /= n; cy /= n;
 
     for (let it = 0; it < iteraciones; it++) {
-        const t = 1 - it / iteraciones; // temperature
-        const max_disp = 30 * t + 5;    // desplazamiento máximo
+        const t = 1 - it / iteraciones;
+        const max_disp = 40 * t + 5;
 
         const desp = {};
         nodos.forEach(nd => { desp[nd.id] = { x: 0, y: 0 }; });
 
-        // Repulsión entre pares.
         if (!usar_muestreo) {
             for (let i = 0; i < n; i++) {
                 const a = nodos[i].id;
@@ -248,8 +254,6 @@ function _grafo_visual_layout_force(datos) {
                 }
             }
         } else {
-            // Muestreo: solo contra los primeros vecinos_muestreo
-            // (rotando el índice de inicio para no sesgar).
             for (let i = 0; i < n; i++) {
                 const a = nodos[i].id;
                 const inicio = (i * 7) % n;
@@ -268,7 +272,6 @@ function _grafo_visual_layout_force(datos) {
             }
         }
 
-        // Atracción por enlaces.
         enlaces.forEach(e => {
             if (!pos[e.origen] || !pos[e.destino]) return;
             const dx = pos[e.destino].x - pos[e.origen].x;
@@ -283,13 +286,11 @@ function _grafo_visual_layout_force(datos) {
             desp[e.destino].y -= fy;
         });
 
-        // Fuerza centrípeta.
         nodos.forEach(nd => {
             desp[nd.id].x += (cx - pos[nd.id].x) * k_centro;
             desp[nd.id].y += (cy - pos[nd.id].y) * k_centro;
         });
 
-        // Aplicar con límite de desplazamiento.
         nodos.forEach(nd => {
             const id = nd.id;
             const vx = desp[id].x;
@@ -301,17 +302,38 @@ function _grafo_visual_layout_force(datos) {
         });
     }
 
+    // Relax anti-solapamiento: empujar aparte los pares
+    // más cercanos que la diagonal del nodo. Si n es muy
+    // grande, se saltea para no bloquear el render.
+    if (n <= 800) {
+        for (let it = 0; it < iteraciones_relax; it++) {
+            for (let i = 0; i < n; i++) {
+                const a = nodos[i].id;
+                for (let j = i + 1; j < n; j++) {
+                    const b = nodos[j].id;
+                    const dx = pos[a].x - pos[b].x;
+                    const dy = pos[a].y - pos[b].y;
+                    const d = Math.sqrt(dx * dx + dy * dy) + 0.01;
+                    if (d >= min_dist) continue;
+                    const empuje = (min_dist - d) * 0.5;
+                    const ux = dx / d;
+                    const uy = dy / d;
+                    pos[a].x += ux * empuje;
+                    pos[a].y += uy * empuje;
+                    pos[b].x -= ux * empuje;
+                    pos[b].y -= uy * empuje;
+                }
+            }
+        }
+    }
+
     // Reajustar al bounding box.
-    let min_x = Infinity, min_y = Infinity, max_x = -Infinity, max_y = -Infinity;
+    let min_x = Infinity, min_y = Infinity;
     nodos.forEach(nd => {
         const p = pos[nd.id];
         if (p.x < min_x) min_x = p.x;
         if (p.y < min_y) min_y = p.y;
-        if (p.x > max_x) max_x = p.x;
-        if (p.y > max_y) max_y = p.y;
     });
-
-    // Desplazar todo para que arranque en (0,0).
     nodos.forEach(nd => {
         pos[nd.id].x -= min_x;
         pos[nd.id].y -= min_y;
@@ -368,7 +390,6 @@ function _renderizar_grafo_visual() {
     };
     _grafo_visual_vb = { x: vb.x, y: vb.y, w: vb.w, h: vb.h };
 
-    // Estructura: crear una sola vez.
     let wrapper = document.getElementById('grafo_visual_wrapper');
     let panel = document.getElementById('grafo_visual_panel');
     if (!wrapper || !panel) {
@@ -380,6 +401,15 @@ function _renderizar_grafo_visual() {
             '  <button type="button" data-layout="grilla">Grilla</button>' +
             '  <button type="button" data-layout="force">Force</button>' +
             '</div>' +
+            '<label class="grafo-visual-max-label">Nodos:' +
+            '  <select id="grafo_visual_max_nodos">' +
+            '    <option value="100">100</option>' +
+            '    <option value="250">250</option>' +
+            '    <option value="500" selected>500</option>' +
+            '    <option value="1000">1000</option>' +
+            '    <option value="2000">2000</option>' +
+            '  </select>' +
+            '</label>' +
             '<input type="text" id="grafo_visual_buscar" placeholder="Buscar por ID o dato...">' +
             '<button type="button" class="btn" id="grafo_visual_btn_reacomodar">Reacomodar</button>' +
             '<button type="button" class="btn" id="grafo_visual_btn_centrar">Centrar</button>' +
@@ -407,7 +437,6 @@ function _renderizar_grafo_visual() {
         _grafo_visual_actualizar_toggle();
     }
 
-    // SVG (se recrea).
     wrapper.innerHTML = '';
     const svg_ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svg_ns, 'svg');
@@ -504,8 +533,9 @@ function _renderizar_grafo_visual() {
         const g = document.createElementNS(svg_ns, 'g');
         const clase_tipo = _grafo_visual_clase_tipo(n.tipo);
         const clase_sel = (_grafo_visual_seleccionado === n.id) ? ' seleccionado' : '';
+        const clase_comp = n.es_compartido ? ' compartido' : '';
         g.setAttribute('class',
-            'grafo-nodo ' + clase_tipo + (n.es_especial ? ' especial' : '') + clase_sel);
+            'grafo-nodo ' + clase_tipo + (n.es_especial ? ' especial' : '') + clase_comp + clase_sel);
         g.dataset.idNodo = n.id;
 
         const rect = document.createElementNS(svg_ns, 'rect');
@@ -519,14 +549,14 @@ function _renderizar_grafo_visual() {
 
         const texto_tipo = document.createElementNS(svg_ns, 'text');
         texto_tipo.setAttribute('x', p.x + 8);
-        texto_tipo.setAttribute('y', p.y + 16);
+        texto_tipo.setAttribute('y', p.y + 22);
         texto_tipo.setAttribute('font-weight', '600');
         texto_tipo.textContent = n.tipo || '?';
         g.appendChild(texto_tipo);
 
         const texto_id = document.createElementNS(svg_ns, 'text');
         texto_id.setAttribute('x', p.x + 8);
-        texto_id.setAttribute('y', p.y + 32);
+        texto_id.setAttribute('y', p.y + 46);
         texto_id.setAttribute('fill', '#888');
         texto_id.textContent = n.es_especial ? n.id : ('#' + n.id);
         g.appendChild(texto_id);
@@ -816,6 +846,7 @@ async function _grafo_visual_expandir(id) {
                 dato: a.dato_destino || '',
                 es_especial: !/^\d+$/.test(a.id_destino),
                 es_raiz: false,
+                es_compartido: a.destino_es_compartido === true,
                 tipo: a.tipo_destino || '?',
                 n_adyacentes: 0,
                 n_referencias: 0
@@ -842,6 +873,7 @@ async function _grafo_visual_expandir(id) {
                 dato: r.dato_origen || '',
                 es_especial: !/^\d+$/.test(r.id_origen),
                 es_raiz: false,
+                es_compartido: false,
                 tipo: r.tipo_origen || '?',
                 n_adyacentes: 0,
                 n_referencias: 0
@@ -956,6 +988,17 @@ function _conectar_controles_grafo_visual() {
                 _grafo_visual_actualizar_toggle();
                 _renderizar_grafo_visual();
             });
+        });
+    }
+
+    const sel_max = document.getElementById('grafo_visual_max_nodos');
+    if (sel_max) {
+        sel_max.addEventListener('change', () => {
+            const val = parseInt(sel_max.value, 10);
+            if (!isNaN(val) && val > 0) {
+                _grafo_visual_max_nodos = val;
+                cargar_grafo_visual();
+            }
         });
     }
 

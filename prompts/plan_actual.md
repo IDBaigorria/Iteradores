@@ -1048,20 +1048,33 @@ navegable y con zoom.
   Optimización: si N > 300, repulsión solo contra
   los 50 vecinos más cercanos.
 
-- [ ] **Fase 5 — Persistencia.**
-  Guardar posiciones, zoom y layout elegido. Dónde
-  persistir (localStorage del navegador o el grafo
-  del plugin) a decidir en su momento.
+- [~] **Fase 5 — Persistencia.** POSPUESTA.
+  Va cuando integremos `iteradoresJS` en el cliente
+  del piloto, para persistir posiciones, zoom y
+  layout elegido en el mismo grafo del navegador.
+  Es una decisión de arquitectura, no del visualizador.
 
-**Pendientes de la línea:**
+**Pendientes de la línea — todos resueltos en v80r:**
 
-- Cómo se comporta el visualizador con grafos grandes
-  (miles de nodos): decidir si el límite duro de 500
-  nodos se queda o se hace configurable.
-- Cómo se resalta la pertenencia a compartidos en la
-  vista visual (color distinto? borde punteado? icono?).
-- Interacción con `eliminar_huerfanos`: después de
-  borrar huérfanos, refrescar la vista visual.
+- [x] **Grafos grandes.** Selector de `max_nodos` en la
+  barra de controles (100 / 250 / 500 / 1000 / 2000).
+  Default 500.
+- [x] **Compartidos en la vista visual.** Backend agrega
+  `es_compartido` a cada nodo del vecindario. Frontend
+  los marca con la clase `.compartido`: borde punteado
+  naranja + fondo amarillo pálido.
+- [x] **Refresco tras `eliminar_huerfanos`.** `grafo.js`
+  invoca `cargar_grafo_visual()` si la vista Visual está
+  activa.
+
+**Cambios de la v80r (cierre del visualizador):**
+
+- Nodos más cuadrados: `120×64` (antes `140×44`).
+- Force más separado: área base `n * 260²`, k_atraccion
+  0.06, y 50 iteraciones de relax anti-solapamiento.
+- Selector de `max_nodos`.
+- Nodos compartidos con estilo propio.
+- Refresco automático tras eliminar huérfanos.
 
 ### 1.14 Cierre de la línea del grafo del plugin (v8b-v8f)
 

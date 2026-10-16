@@ -6,7 +6,7 @@
  * tipo, el panel lateral y los controles. Se carga
  * después de estilos.css.
  *
- * @version 1.5piloto.80q
+ * @version 1.5piloto.80r
  * @since 1.5piloto.80n
  */
 
@@ -139,6 +139,12 @@
 .grafo-nodo.especial rect {
     stroke: #b06000;
     stroke-width: 2.5;
+}
+.grafo-nodo.compartido rect {
+    stroke: #d4a017;
+    stroke-width: 2;
+    stroke-dasharray: 5 3;
+    fill: #fdf5d8;
 }
 .grafo-nodo.seleccionado rect {
     stroke: #1a73e8;
