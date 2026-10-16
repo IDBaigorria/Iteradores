@@ -7,7 +7,7 @@
  * Es la base para la auditoría de la fuga de nodos (Fase 2).
  * Ver prompts/prompt_piloto.md §8.6.
  *
- * @version 1.5piloto.76y
+ * @version 1.5piloto.80r
  */
 
 let grafo_offset_actual = 0;
@@ -328,6 +328,14 @@ async function _grafo_ejecutar_eliminacion() {
     mostrar_aviso(`Eliminados ${datos.eliminados} nodos basura.`, 'exito');
     cerrar_modal_generico();
     await cargar_grafo();
+    // Fase 5 del visualizador: si la vista visual está activa,
+    // recargar el vecindario para reflejar la limpieza.
+    if (typeof cargar_grafo_visual === 'function') {
+        const v_visual = document.getElementById('grafo_vista_visual');
+        if (v_visual && !v_visual.classList.contains('hidden')) {
+            cargar_grafo_visual();
+        }
+    }
 }
 
 // ============================================================
