@@ -1,82 +1,11 @@
 /***
  * Núcleo de viajes: carga, listado, detalle en modal y eliminación.
- * @version 1.5piloto.79k
+ * @version 1.5piloto.80k
  */
 
 function obtener_nombre_dueno_actual() {
     return es_admin_o_soporte() ? $("#selector_dueno_viajes").value : usuario_actual.nombre_usuario;
 }
-
-/**
- * Muestra u oculta el botón "Limpiar viajes de prueba".
- * Solo visible para admin, y solo cuando hay un dueño
- * seleccionado en el selector.
- */
-function _actualizar_visibilidad_boton_limpiar_viajes(visible) {
-    if (!usuario_actual || usuario_actual.nivel !== 'admin') return;
-    // Solo en modo pruebas (bandera inyectada por index.php).
-    if (window.entorno_es_pruebas !== true) return;
-    const btn = document.getElementById('boton_limpiar_viajes_prueba');
-    if (!btn) return;
-    btn.style.display = visible ? 'inline-block' : 'none';
-}
-
-/**
- * Ejecuta la limpieza de viajes de prueba del dueño
- * seleccionado. El backend se encarga de preservar el viaje
- * principal y los que no tengan prefijo de prueba.
- */
-async function limpiar_viajes_de_prueba_ui() {
-    if (!usuario_actual || usuario_actual.nivel !== 'admin') {
-        mostrar_aviso("Solo el admin puede ejecutar esta acción", 'error');
-        return;
-    }
-    const select = document.getElementById("selector_dueno_viajes");
-    const nombre_dueno = select ? select.value : '';
-    if (!nombre_dueno) {
-        mostrar_aviso("Seleccione un dueño primero", 'error');
-        return;
-    }
-    const ok = confirm(
-        "¿Eliminar todos los viajes de prueba del dueño \"" + nombre_dueno + "\"?\n\n"
-        + "Se conserva el viaje principal y cualquier viaje que no tenga prefijo de prueba. Los viajes con ventas no se eliminan.\n\n"
-        + "Esta acción no se puede deshacer."
-    );
-    if (!ok) return;
-
-    const resp = await fetch("index.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            accion: "viajes/limpiar_prueba",
-            nombre_dueno,
-            nombre_solicitante: usuario_actual.nombre_usuario
-        })
-    });
-    const datos = await resp.json();
-    if (!datos.exito) {
-        mostrar_aviso(datos.error || "Error al limpiar viajes", 'error');
-        return;
-    }
-    let msg = "Se eliminaron " + datos.cantidad_borrados + " viaje(s) de prueba.";
-    if (datos.con_ventas && datos.con_ventas.length > 0) {
-        msg += " " + datos.con_ventas.length + " no se pudieron eliminar (tienen ventas).";
-    }
-    // v79k: reportar también los conservados por no tener
-    // prefijo de prueba ni nombre principal. Antes quedaban
-    // silenciosos y el admin no entendía por qué el conteo
-    // total no bajaba.
-    const conservados_sin_prefijo = (datos.conservados || []).filter(
-        function (n) { return n !== null; }
-    );
-    if (conservados_sin_prefijo.length > 0) {
-        msg += " " + conservados_sin_prefijo.length + " conservado(s) sin prefijo de prueba.";
-    }
-    mostrar_aviso(msg, 'exito');
-    await listar_viajes(nombre_dueno, 'dueno');
-}
-
-document.getElementById('boton_limpiar_viajes_prueba')?.addEventListener('click', limpiar_viajes_de_prueba_ui);
 
 async function cargar_viajes() {
     const panel_dueno = $("#panel_selector_dueno_viajes");
@@ -84,19 +13,6 @@ async function cargar_viajes() {
     const lista = $("#lista_viajes");
     lista.innerHTML = '';
     ocultar_detalle_viaje();
-
-    // v79j: defensa del botón "Limpiar viajes de prueba".
-    // Aunque el HTML lo muestre, forzamos el chequeo por
-    // nivel y modo pruebas. Cubre el caso de un cambio de
-    // sesión sin recargar la página (bug de _limpiar_
-    // contenido_dinamico).
-    const btn_limpiar_viajes = document.getElementById('boton_limpiar_viajes_prueba');
-    if (btn_limpiar_viajes) {
-        const puede_limpiar = usuario_actual
-            && usuario_actual.nivel === 'admin'
-            && window.entorno_es_pruebas === true;
-        btn_limpiar_viajes.style.display = puede_limpiar ? 'inline-block' : 'none';
-    }
 
     if (es_admin_o_soporte()) {
         panel_dueno.style.display = 'block';
@@ -134,11 +50,9 @@ async function cargar_duenos_en_select_viajes() {
             if (select.value) {
                 await listar_viajes(select.value, 'dueno');
                 $("#boton_agregar_viaje").style.display = 'inline-block';
-                _actualizar_visibilidad_boton_limpiar_viajes(true);
             } else {
                 $("#lista_viajes").innerHTML = '';
                 $("#boton_agregar_viaje").style.display = 'none';
-                _actualizar_visibilidad_boton_limpiar_viajes(false);
             }
         };
     }
