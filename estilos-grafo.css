@@ -6,7 +6,7 @@
  * tipo, el panel lateral y los controles. Se carga
  * después de estilos.css.
  *
- * @version 1.5piloto.80r
+ * @version 1.5piloto.80u
  * @since 1.5piloto.80n
  */
 
@@ -116,10 +116,42 @@
     stroke-width: 2.2;
 }
 .grafo-enlace.compartido {
-    stroke: #b06000;
+    stroke: #b06000 !important;
     stroke-dasharray: 4 3;
 }
 .grafo-enlace.atenuado { stroke-opacity: 0.1; }
+
+/* Colores de enlace por tipo del nodo destino. */
+.grafo-enlace.enlace-tipo-usuario { stroke: #4a90d9; }
+.grafo-enlace.enlace-tipo-pasajero { stroke: #6ba84f; }
+.grafo-enlace.enlace-tipo-viaje { stroke: #e6a23c; }
+.grafo-enlace.enlace-tipo-micro { stroke: #b06fc4; }
+.grafo-enlace.enlace-tipo-venta { stroke: #d9534f; }
+.grafo-enlace.enlace-tipo-cupon { stroke: #d4a017; }
+.grafo-enlace.enlace-tipo-rendicion { stroke: #4caf50; }
+.grafo-enlace.enlace-tipo-liquidacion { stroke: #3d9bc1; }
+.grafo-enlace.enlace-tipo-cancelacion { stroke: #c08080; }
+.grafo-enlace.enlace-tipo-sesion { stroke: #888; }
+.grafo-enlace.enlace-tipo-empresa { stroke: #7b68ee; }
+.grafo-enlace.enlace-tipo-vehiculo { stroke: #20b2aa; }
+.grafo-enlace.enlace-tipo-piso { stroke: #aaa; }
+.grafo-enlace.enlace-tipo-asiento { stroke: #bbb; }
+.grafo-enlace.enlace-tipo-especial { stroke: #b06000; }
+.grafo-enlace.enlace-tipo-desconocido { stroke: #aaa; }
+
+/* Etiquetas de enlace. */
+.grafo-enlace-label {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 9px;
+    fill: #333;
+    paint-order: stroke;
+    stroke: #fff;
+    stroke-width: 3px;
+    stroke-linejoin: round;
+    pointer-events: none;
+    user-select: none;
+}
+.grafo-visual-svg.sin-etiquetas .grafo-enlace-label { display: none; }
 
 /* Nodo base. El color se setea por tipo más abajo. */
 .grafo-nodo { cursor: pointer; }

@@ -1076,6 +1076,23 @@ navegable y con zoom.
 - Nodos compartidos con estilo propio.
 - Refresco automático tras eliminar huérfanos.
 
+**Mejoras v80s:**
+
+- Etiquetas de enlace (nombre del enlace) sobre el
+  punto medio del Bézier. Fondo blanco vía
+  `paint-order: stroke` para legibilidad. Toggle
+  "Etiquetas" en la barra de controles.
+- Colores de enlace por tipo del nodo ORIGEN (no del
+  destino). Las flechas salen con el color del nodo
+  que las emite. La punta toma el mismo color vía
+  `context-stroke` en el `<marker>`. Compartidos:
+  naranja punteado (se mantiene, sobre el color de
+  origen).
+- Doble click para expandir ya no reinicia el zoom:
+  preserva el `viewBox` actual antes de re-renderizar.
+  Además, tras expandir, la vista se centra en el nodo
+  tocado (solo cambia x/y del viewBox, no el zoom).
+
 ### 1.14 Cierre de la línea del grafo del plugin (v8b-v8f)
 
 **Estado:** cerrada. Plugin en v1.5plugin.8f.

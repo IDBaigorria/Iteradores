@@ -5,15 +5,17 @@
  * Fase 2: flechas curvas Bézier y colores por tipo.
  * Fase 3: panel lateral, expansión, buscador, reset.
  * Fase 4: force-directed con toggle y botones.
- * Fase 5 (en v80r): nodos más cuadrados, force más
- * separado, selector de max_nodos, compartidos con
- * estilo propio, refresco tras eliminar huérfanos.
+ * Fase 5 (en v80r-v80s): nodos más cuadrados, force
+ * más separado, selector de max_nodos, compartidos
+ * con estilo propio, refresco tras eliminar huérfanos,
+ * etiquetas y colores de enlace, zoom preservado al
+ * expandir.
  *
  * Se carga después de `grafo.js`. No hay imports:
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.80r
+ * @version 1.5piloto.80u
  * @since 1.5piloto.80n
  */
 
@@ -25,6 +27,7 @@ let _grafo_visual_matches = [];
 let _grafo_visual_match_actual = -1;
 let _grafo_visual_layout = 'grilla'; // 'grilla' | 'force'
 let _grafo_visual_max_nodos = 500;
+let _grafo_visual_mostrar_etiquetas = true;
 
 const GRAFO_VISUAL_NODO_W = 120;
 const GRAFO_VISUAL_NODO_H = 64;
@@ -190,9 +193,6 @@ function _grafo_visual_layout_force(datos) {
     const n = nodos.length;
     if (n === 0) return {};
 
-    // Parámetros. El área base subió de 200 a 260 para
-    // separar más los nodos. La atracción bajó de 0.08 a
-    // 0.06 para no aplastarlos.
     const lado = 260;
     const area = n * lado * lado;
     const k = Math.sqrt(area / n);
@@ -204,15 +204,12 @@ function _grafo_visual_layout_force(datos) {
     const usar_muestreo = n > 300;
     const vecinos_muestreo = 50;
 
-    // Distancia mínima entre centros: diagonal del nodo
-    // + margen. Evita solapamiento en el paso de relax.
     const diag_nodo = Math.sqrt(
         GRAFO_VISUAL_NODO_W * GRAFO_VISUAL_NODO_W +
         GRAFO_VISUAL_NODO_H * GRAFO_VISUAL_NODO_H
     );
     const min_dist = diag_nodo + 20;
 
-    // Posiciones iniciales: aleatorias en un círculo.
     const pos = {};
     const radio_inicial = Math.sqrt(area) / 2;
     nodos.forEach(nd => {
@@ -302,9 +299,6 @@ function _grafo_visual_layout_force(datos) {
         });
     }
 
-    // Relax anti-solapamiento: empujar aparte los pares
-    // más cercanos que la diagonal del nodo. Si n es muy
-    // grande, se saltea para no bloquear el render.
     if (n <= 800) {
         for (let it = 0; it < iteraciones_relax; it++) {
             for (let i = 0; i < n; i++) {
@@ -327,7 +321,6 @@ function _grafo_visual_layout_force(datos) {
         }
     }
 
-    // Reajustar al bounding box.
     let min_x = Infinity, min_y = Infinity;
     nodos.forEach(nd => {
         const p = pos[nd.id];
@@ -353,7 +346,12 @@ function _grafo_visual_calcular_posiciones(datos) {
 // Render
 // ============================================================
 
-function _renderizar_grafo_visual() {
+/**
+ * Renderiza el SVG. Si `vb_preservado` viene, usa ese
+ * viewBox (conserva zoom/pan); si no, lo calcula a partir
+ * de las posiciones.
+ */
+function _renderizar_grafo_visual(vb_preservado = null) {
     const cont = document.getElementById('grafo_visual_contenedor');
     if (!cont) return;
     const datos = _grafo_visual_datos;
@@ -382,12 +380,17 @@ function _renderizar_grafo_visual() {
         if (p.y + NODO_H > max_y) max_y = p.y + NODO_H;
     });
     const padding = 40;
-    const vb = {
-        x: min_x - padding,
-        y: min_y - padding,
-        w: (max_x - min_x) + 2 * padding,
-        h: (max_y - min_y) + 2 * padding
-    };
+    let vb;
+    if (vb_preservado) {
+        vb = { x: vb_preservado.x, y: vb_preservado.y, w: vb_preservado.w, h: vb_preservado.h };
+    } else {
+        vb = {
+            x: min_x - padding,
+            y: min_y - padding,
+            w: (max_x - min_x) + 2 * padding,
+            h: (max_y - min_y) + 2 * padding
+        };
+    }
     _grafo_visual_vb = { x: vb.x, y: vb.y, w: vb.w, h: vb.h };
 
     let wrapper = document.getElementById('grafo_visual_wrapper');
@@ -409,6 +412,9 @@ function _renderizar_grafo_visual() {
             '    <option value="1000">1000</option>' +
             '    <option value="2000">2000</option>' +
             '  </select>' +
+            '</label>' +
+            '<label class="grafo-visual-etiquetas-label">' +
+            '  <input type="checkbox" id="grafo_visual_mostrar_etiquetas" checked> Etiquetas' +
             '</label>' +
             '<input type="text" id="grafo_visual_buscar" placeholder="Buscar por ID o dato...">' +
             '<button type="button" class="btn" id="grafo_visual_btn_reacomodar">Reacomodar</button>' +
@@ -440,7 +446,7 @@ function _renderizar_grafo_visual() {
     wrapper.innerHTML = '';
     const svg_ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svg_ns, 'svg');
-    svg.setAttribute('class', 'grafo-visual-svg');
+    svg.setAttribute('class', 'grafo-visual-svg' + (_grafo_visual_mostrar_etiquetas ? '' : ' sin-etiquetas'));
     svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
@@ -474,7 +480,9 @@ function _renderizar_grafo_visual() {
     marker.setAttribute('orient', 'auto-start-reverse');
     const marker_path = document.createElementNS(svg_ns, 'path');
     marker_path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
-    marker_path.setAttribute('fill', '#888');
+    // La punta toma el color del trazo del path que la usa.
+    // Si el browser no soporta context-stroke, cae a gris.
+    marker_path.setAttribute('fill', 'context-stroke');
     marker.appendChild(marker_path);
     defs.appendChild(marker);
 
@@ -487,6 +495,10 @@ function _renderizar_grafo_visual() {
     fondo.setAttribute('height', vb.h);
     fondo.setAttribute('fill', 'url(#grafo-grid)');
     svg.appendChild(fondo);
+
+    // Tipo por id (para colorear los enlaces por tipo del destino).
+    const tipo_por_id = {};
+    datos.nodos.forEach(n => { tipo_por_id[n.id] = n.tipo || ''; });
 
     const g_enlaces = document.createElementNS(svg_ns, 'g');
     g_enlaces.setAttribute('class', 'grafo-enlaces');
@@ -511,15 +523,36 @@ function _renderizar_grafo_visual() {
         const cx_control = mx + nx * offset;
         const cy_control = my + ny * offset;
 
+        // Punto medio del Bézier cuadrático: P(0.5) = 0.25*P0 + 0.5*C + 0.25*P1.
+        const px_label = 0.25 * p_salida.x + 0.5 * cx_control + 0.25 * p_entrada.x;
+        const py_label = 0.25 * p_salida.y + 0.5 * cy_control + 0.25 * p_entrada.y;
+
+        // Clase de tipo: del nodo ORIGEN. Las flechas salen con
+        // el color del nodo que las emite; las entrantes se ven
+        // del color del nodo incidente.
+        const tipo_origen = tipo_por_id[e.origen] || '';
+        const clase_tipo = tipo_origen ? (' enlace-' + _grafo_visual_clase_tipo(tipo_origen)) : '';
+
         const path = document.createElementNS(svg_ns, 'path');
         path.setAttribute('d',
             `M ${p_salida.x} ${p_salida.y} Q ${cx_control} ${cy_control} ${p_entrada.x} ${p_entrada.y}`);
-        path.setAttribute('class', 'grafo-enlace' + (e.destino_es_compartido ? ' compartido' : ''));
+        path.setAttribute('class',
+            'grafo-enlace' + clase_tipo + (e.destino_es_compartido ? ' compartido' : ''));
         path.setAttribute('marker-end', 'url(#grafo-flecha)');
         path.dataset.origen = e.origen;
         path.dataset.destino = e.destino;
         path.dataset.enlace = e.enlace;
         g_enlaces.appendChild(path);
+
+        // Etiqueta del enlace.
+        const label = document.createElementNS(svg_ns, 'text');
+        label.setAttribute('class', 'grafo-enlace-label');
+        label.setAttribute('x', px_label);
+        label.setAttribute('y', py_label);
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('dominant-baseline', 'middle');
+        label.textContent = e.enlace;
+        g_enlaces.appendChild(label);
     });
 
     svg.appendChild(g_enlaces);
@@ -813,6 +846,12 @@ async function _grafo_visual_expandir(id) {
         return;
     }
 
+    // Guardar el viewBox actual para no perder el zoom.
+    const vb_antes = _grafo_visual_vb
+        ? { x: _grafo_visual_vb.x, y: _grafo_visual_vb.y,
+            w: _grafo_visual_vb.w, h: _grafo_visual_vb.h }
+        : null;
+
     let detalle;
     try {
         const resp = await fetch("index.php", {
@@ -895,7 +934,10 @@ async function _grafo_visual_expandir(id) {
 
     if (agregados > 0) {
         mostrar_aviso('Agregados ' + agregados + ' nodo(s)', 'exito');
-        _renderizar_grafo_visual();
+        _renderizar_grafo_visual(vb_antes);
+        // Centrar la vista en el nodo tocado, sin cambiar el
+        // zoom actual (solo se ajustan x/y del viewBox).
+        _grafo_visual_centrar_en(id);
     } else {
         mostrar_aviso('Sin vecinos nuevos', 'info');
     }
@@ -999,6 +1041,16 @@ function _conectar_controles_grafo_visual() {
                 _grafo_visual_max_nodos = val;
                 cargar_grafo_visual();
             }
+        });
+    }
+
+    const chk_etiquetas = document.getElementById('grafo_visual_mostrar_etiquetas');
+    if (chk_etiquetas) {
+        chk_etiquetas.checked = _grafo_visual_mostrar_etiquetas;
+        chk_etiquetas.addEventListener('change', () => {
+            _grafo_visual_mostrar_etiquetas = chk_etiquetas.checked;
+            const svg = document.querySelector('.grafo-visual-svg');
+            if (svg) svg.classList.toggle('sin-etiquetas', !_grafo_visual_mostrar_etiquetas);
         });
     }
 
