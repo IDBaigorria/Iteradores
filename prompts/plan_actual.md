@@ -971,6 +971,84 @@ urgente del usuario. Al volver, elegir entre la
 reorganización del plugin o el siguiente punto de
 §1.11.
 
+### 1.15 Nueva línea: visualizador de grafo (v80m–)
+
+**Estado:** arrancando. Fase 1 en curso.
+
+**Motivación.** La pestaña Grafo hoy es una tabla.
+Funciona para leer datos, pero es imposible ver
+topología (quién apunta a quién, dónde hay cuellos,
+qué compartidos hay). El objetivo es sumar una vista
+visual en la misma pestaña, con nodos y flechas,
+navegable y con zoom.
+
+**Decisiones tomadas:**
+
+- La tabla se queda. Sub-pestañas **Tabla** / **Visual**.
+- SVG puro, sin librerías (CSP + cero dependencias).
+- Nodos: rectángulos redondeados. Círculo reservado
+  para raíces especiales.
+- Fondo: grilla con `<pattern>` de SVG.
+- Layout inicial: grilla ordenada por BFS desde las
+  raíces. Force-directed después, con toggle.
+- Flechas curvas (Bézier) con `<marker>`.
+- Colores por tipo inferido (`_grafo_inferir_tipo`
+  ya existe).
+- Al abrir: todas las raíces especiales + 1 nivel de
+  adyacentes.
+- Límite duro de 500 nodos en pantalla; si se supera,
+  avisar y cortar.
+- Panel lateral derecho para el detalle del nodo.
+- Filtro "todos / alcanzables / huérfanos", igual que
+  la tabla.
+- Reusar `grafo:nodo` para el detalle. Nuevo endpoint
+  `grafo/vecindario` para la carga inicial.
+
+**Nombres nuevos:**
+
+- CSS: `estilos-grafo.css`.
+- JS: `Aplicacion/grafo_visual.js`.
+- Endpoint: `grafo/vecindario`.
+
+**Fases:**
+
+- [ ] **Fase 1 — Esqueleto visual.**
+  Sub-pestañas Tabla/Visual. SVG con grilla de fondo.
+  Pan + zoom funcionales. Nodos como rectángulos
+  (sin flechas). Carga inicial de las raíces + 1 nivel
+  vía `grafo/vecindario`.
+  *Archivos:* `Aplicacion/grafo_visual.js` (nuevo),
+  `estilos-grafo.css` (nuevo), `aplicacion_GET.html`,
+  `Enrutador.php`, `Controlador.php` (comando nuevo).
+
+- [ ] **Fase 2 — Flechas y colores.**
+  Flechas curvas Bézier con `<marker>`. Colores por
+  tipo inferido. Raíces con borde destacado.
+
+- [ ] **Fase 3 — Interacción.**
+  Panel lateral con el detalle del nodo (usa
+  `grafo:nodo`). Doble click → centrar y expandir
+  vecinos. Buscador por texto / ID.
+
+- [ ] **Fase 4 — Layout alternativo.**
+  Force-directed con toggle. Botones "acomodar",
+  "reset zoom", "centrar".
+
+- [ ] **Fase 5 — Persistencia.**
+  Guardar posiciones, zoom y layout elegido. Dónde
+  persistir (localStorage del navegador o el grafo
+  del plugin) a decidir en su momento.
+
+**Pendientes de la línea:**
+
+- Cómo se comporta el visualizador con grafos grandes
+  (miles de nodos): decidir si el límite duro de 500
+  nodos se queda o se hace configurable.
+- Cómo se resalta la pertenencia a compartidos en la
+  vista visual (color distinto? borde punteado? icono?).
+- Interacción con `eliminar_huerfanos`: después de
+  borrar huérfanos, refrescar la vista visual.
+
 ### 1.14 Cierre de la línea del grafo del plugin (v8b-v8f)
 
 **Estado:** cerrada. Plugin en v1.5plugin.8f.
