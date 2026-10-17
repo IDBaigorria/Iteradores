@@ -17,7 +17,7 @@
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.80w
+ * @version 1.5piloto.80x
  * @since 1.5piloto.80n
  */
 
@@ -669,6 +669,16 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
         info.appendChild(aviso);
     }
     wrapper.appendChild(info);
+
+    // Botón de pantalla completa (abajo a la derecha).
+    const btn_fs = document.createElement('button');
+    btn_fs.type = 'button';
+    btn_fs.id = 'grafo_visual_btn_fullscreen';
+    btn_fs.className = 'grafo-visual-fullscreen';
+    btn_fs.title = 'Pantalla completa';
+    btn_fs.textContent = '\u2922';
+    btn_fs.addEventListener('click', _grafo_visual_toggle_fullscreen);
+    wrapper.appendChild(btn_fs);
 
     _conectar_pan_zoom(svg);
 
@@ -1430,6 +1440,32 @@ function _conectar_controles_grafo_visual() {
 }
 
 // ============================================================
+// Pantalla completa
+// ============================================================
+
+function _grafo_visual_toggle_fullscreen() {
+    const wrapper = document.getElementById('grafo_visual_wrapper');
+    if (!wrapper) return;
+    if (document.fullscreenElement === wrapper) {
+        if (document.exitFullscreen) document.exitFullscreen();
+    } else {
+        if (wrapper.requestFullscreen) {
+            const p = wrapper.requestFullscreen();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+        }
+    }
+}
+
+function _grafo_visual_actualizar_boton_fullscreen() {
+    const btn = document.getElementById('grafo_visual_btn_fullscreen');
+    if (!btn) return;
+    const wrapper = document.getElementById('grafo_visual_wrapper');
+    const en_fullscreen = (document.fullscreenElement === wrapper);
+    btn.textContent = en_fullscreen ? '\u2921' : '\u2922';
+    btn.title = en_fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa';
+}
+
+// ============================================================
 // Init
 // ============================================================
 
@@ -1438,6 +1474,8 @@ function _conectar_controles_grafo_visual() {
         if (_grafo_visual_inicializado) return;
         _grafo_visual_inicializado = true;
         _conectar_subtabs_grafo();
+        // Cambiar el ícono del botón al entrar/salir de fullscreen.
+        document.addEventListener('fullscreenchange', _grafo_visual_actualizar_boton_fullscreen);
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', _setup);

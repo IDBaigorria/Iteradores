@@ -6,7 +6,7 @@
  * tipo, el panel lateral y los controles. Se carga
  * después de estilos.css.
  *
- * @version 1.5piloto.80w
+ * @version 1.5piloto.80x
  * @since 1.5piloto.80n
  */
 
@@ -233,6 +233,36 @@
 .grafo-visual-info .truncado {
     color: #b06000;
     font-weight: 600;
+}
+
+/* Botón de pantalla completa, abajo a la derecha. */
+.grafo-visual-fullscreen {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.92);
+    color: #333;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    z-index: 5;
+    transition: background var(--transition);
+}
+.grafo-visual-fullscreen:hover { background: #f9d857; }
+
+/* Ajustes cuando el wrapper está en pantalla completa. */
+.grafo-visual-wrapper:fullscreen {
+    border: 0;
+    border-radius: 0;
+    background: #fafafa;
+}
+.grafo-visual-wrapper:fullscreen .grafo-visual-info {
+    background: rgba(255,255,255,0.95);
 }
 
 /* Aviso cuando no hay datos o hay error */

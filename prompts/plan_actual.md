@@ -1106,6 +1106,11 @@ navegable y con zoom.
   visible fino. El hover sobre esa área resalta el
   trazo visible (clase `.hover`, no `:hover`, porque
   el hit está arriba del path).
+- Botón de pantalla completa, abajo a la derecha del
+  wrapper. Usa la Fullscreen API (`requestFullscreen`
+  sobre `#grafo_visual_wrapper`). Esc sale. El ícono
+  cambia entre expandir (`⤢`) y contraer (`⤡`) según
+  `fullscreenchange`.
 
 ### 1.14 Cierre de la línea del grafo del plugin (v8b-v8f)
 
