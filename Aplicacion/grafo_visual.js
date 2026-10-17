@@ -17,7 +17,7 @@
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.81d
+ * @version 1.5piloto.81e
  * @since 1.5piloto.80n
  */
 
@@ -42,6 +42,11 @@ let _grafo_visual_svg = null;
 
 // Estado del drag de nodos.
 let _grafo_visual_drag = null;
+
+// Rect de la grilla de fondo y observer para redimensionarlo
+// cuando cambia el viewBox (pan/zoom/centrar/animaciones).
+let _grafo_visual_grid_rect = null;
+let _grafo_visual_grid_observer = null;
 
 const GRAFO_VISUAL_NODO_W = 120;
 const GRAFO_VISUAL_NODO_H = 64;
@@ -529,6 +534,13 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
         _grafo_visual_actualizar_toggle();
     }
 
+    // Limpiar el observer de la grilla anterior.
+    if (_grafo_visual_grid_observer) {
+        _grafo_visual_grid_observer.disconnect();
+        _grafo_visual_grid_observer = null;
+    }
+    _grafo_visual_grid_rect = null;
+
     wrapper.innerHTML = '';
     _grafo_visual_refs_nodos = {};
     _grafo_visual_refs_enlaces = [];
@@ -582,6 +594,7 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
     fondo.setAttribute('height', vb.h);
     fondo.setAttribute('fill', 'url(#grafo-grid)');
     svg.appendChild(fondo);
+    _grafo_visual_grid_rect = fondo;
 
     const tipo_por_id = {};
     datos.nodos.forEach(n => { tipo_por_id[n.id] = n.tipo || ''; });
@@ -743,6 +756,12 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
     wrapper.appendChild(svg);
     _grafo_visual_svg = svg;
 
+    // Observar cambios del viewBox para expandir la grilla
+    // de fondo al área visible (pan, zoom, centrar,
+    // animaciones).
+    _grafo_visual_grid_observer = new MutationObserver(_grafo_visual_actualizar_grid_rect);
+    _grafo_visual_grid_observer.observe(svg, { attributes: true, attributeFilter: ['viewBox'] });
+
     const info = document.createElement('div');
     info.className = 'grafo-visual-info';
     info.textContent = datos.nodos.length + ' nodos · '
@@ -822,6 +841,27 @@ function _grafo_visual_geometria_enlace(co, cd, NODO_W, NODO_H) {
         d: `M ${p_salida.x} ${p_salida.y} Q ${cx_control} ${cy_control} ${p_entrada.x} ${p_entrada.y}`,
         px_label, py_label
     };
+}
+
+/**
+ * Expande el rect de la grilla de fondo para que cubra el
+ * viewBox actual con margen. Se llama desde un
+ * MutationObserver cada vez que cambia el viewBox (pan,
+ * zoom, centrar, animaciones). El patrón es
+ * userSpaceOnUse, así que las líneas quedan ancladas al
+ * origen del grafo y la grilla "se reproduce" hacia los
+ * costados cuando el viewBox crece.
+ */
+function _grafo_visual_actualizar_grid_rect() {
+    const grid = _grafo_visual_grid_rect;
+    const vb = _grafo_visual_vb;
+    if (!grid || !vb) return;
+    const margen_x = vb.w * 0.5;
+    const margen_y = vb.h * 0.5;
+    grid.setAttribute('x', vb.x - margen_x);
+    grid.setAttribute('y', vb.y - margen_y);
+    grid.setAttribute('width', vb.w + 2 * margen_x);
+    grid.setAttribute('height', vb.h + 2 * margen_y);
 }
 
 function _grafo_visual_actualizar_toggle() {

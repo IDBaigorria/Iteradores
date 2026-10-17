@@ -1128,6 +1128,14 @@ navegable y con zoom.
   cargó todavía (vía `grafo_visual_esta_cargado()`).
   El botón del toggle dice "Forzar" (antes "Force");
   el `data-layout="force"` interno no cambia.
+- Grilla de fondo: se expande con el viewBox. Un
+  MutationObserver sobre el `viewBox` del SVG
+  redimensiona el rect de la grilla cada vez que
+  cambia (pan, zoom, centrar, animaciones). El patrón
+  es `userSpaceOnUse`, así que las líneas quedan
+  ancladas al origen del grafo y la grilla "se
+  reproduce" hacia los costados cuando el viewBox
+  crece. Margen: 50% del viewBox en cada dirección.
 - Inferencia de tipo en el frontend. Si el backend
   devuelve `?`, se mira el enlace entrante:
   - Un solo enlace entrante → ese nombre es el tipo.
