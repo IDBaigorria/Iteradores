@@ -1113,13 +1113,24 @@ navegable y con zoom.
   controles y el panel lateral). Esc sale. El ícono
   cambia entre expandir (`⤢`) y contraer (`⤡`) según
   `fullscreenchange`.
-- Contenido del nodo: tipo arriba, dato abajo, ID solo
-  si es especial. Usa `<foreignObject>` con HTML
-  adentro, para tener `text-overflow: ellipsis` real
-  (sin calcular el ancho del texto a mano). El
-  contenido completo aparece en un `<title>` (tooltip
-  nativo de SVG) al hover. El drag ahora mueve rect
-  + foreignObject (sin tocar textos individuales).
+- Contenido del nodo: tipo arriba, dato en el medio,
+  ID abajo (con `#` adelante, para todos los nodos).
+  Usa `<foreignObject>` con HTML adentro, para tener
+  `text-overflow: ellipsis` real (sin calcular el
+  ancho del texto a mano). El contenido completo
+  aparece en un `<title>` (tooltip nativo de SVG) al
+  hover. El drag mueve rect + foreignObject.
+- Inferencia de tipo en el frontend. Si el backend
+  devuelve `?`, se mira el enlace entrante:
+  - Un solo enlace entrante → ese nombre es el tipo.
+  - Varios → el más repetido.
+  - Empate → `?`.
+  Se aplica en `_grafo_visual_recalcular_tipos`, que
+  se llama al cargar el vecindario y al expandir. El
+  panel lateral usa el tipo local si lo tiene.
+  **Nota:** los tipos inferidos por enlace (por
+  ejemplo, `usuarios`, `empresas`, `viajes`) no
+  tienen color propio en el CSS; caen a gris.
 - Modo teatro (`⛶` / `▭`) y modo ampliado (`□` / `■`):
   dos botones entre el normal y el fullscreen. El
   modo ampliado (`grafo-visual-ampliar`) usa

@@ -17,7 +17,7 @@
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.81b
+ * @version 1.5piloto.81c
  * @since 1.5piloto.80n
  */
 
@@ -87,7 +87,54 @@ async function cargar_grafo_visual() {
     _grafo_visual_matches = [];
     _grafo_visual_match_actual = -1;
     _grafo_visual_posiciones = {};
+    _grafo_visual_recalcular_tipos(_grafo_visual_datos);
     _renderizar_grafo_visual(null, { recalcular: true });
+}
+
+/**
+ * Recalcula los tipos de los nodos a partir de los enlaces
+ * entrantes. Se aplica solo a los nodos cuyo tipo del
+ * backend sea "?" o vacío.
+ *
+ * Reglas:
+ *   - Un solo enlace entrante → ese nombre es el tipo.
+ *   - Varios enlaces distintos → el más repetido.
+ *   - Empate en la cantidad máxima → "?".
+ */
+function _grafo_visual_recalcular_tipos(datos) {
+    if (!datos || !datos.nodos) return;
+
+    // Contar enlaces entrantes por (destino, enlace).
+    const entrantes_por_id = {};
+    (datos.enlaces || []).forEach(e => {
+        if (!entrantes_por_id[e.destino]) entrantes_por_id[e.destino] = {};
+        entrantes_por_id[e.destino][e.enlace] =
+            (entrantes_por_id[e.destino][e.enlace] || 0) + 1;
+    });
+
+    (datos.nodos || []).forEach(n => {
+        const tipo_backend = String(n.tipo || '').trim();
+        if (tipo_backend !== '' && tipo_backend !== '?') return;
+
+        const cuenta = entrantes_por_id[n.id] || {};
+        const enlaces = Object.keys(cuenta);
+
+        if (enlaces.length === 0) {
+            n.tipo = '?';
+            return;
+        }
+        if (enlaces.length === 1) {
+            n.tipo = enlaces[0];
+            return;
+        }
+
+        let max = 0;
+        for (const k of enlaces) {
+            if (cuenta[k] > max) max = cuenta[k];
+        }
+        const con_max = enlaces.filter(k => cuenta[k] === max);
+        n.tipo = (con_max.length === 1) ? con_max[0] : '?';
+    });
 }
 
 function _conectar_subtabs_grafo() {
@@ -645,12 +692,10 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
             div_texto.appendChild(div_dato);
         }
 
-        if (n.es_especial) {
-            const div_id = document.createElementNS(ns_xhtml, 'div');
-            div_id.setAttribute('class', 'grafo-nodo-id');
-            div_id.textContent = n.id;
-            div_texto.appendChild(div_id);
-        }
+        const div_id = document.createElementNS(ns_xhtml, 'div');
+        div_id.setAttribute('class', 'grafo-nodo-id');
+        div_id.textContent = '#' + n.id;
+        div_texto.appendChild(div_id);
 
         fo.appendChild(div_texto);
         g.appendChild(fo);
@@ -659,7 +704,7 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
         const titulo_g = document.createElementNS(svg_ns, 'title');
         const partes_titulo = [n.tipo || '?'];
         if (n.dato) partes_titulo.push(n.dato);
-        if (n.es_especial) partes_titulo.push('ID: ' + n.id);
+        partes_titulo.push('ID: ' + n.id);
         titulo_g.textContent = partes_titulo.join(' · ');
         g.appendChild(titulo_g);
 
@@ -1085,6 +1130,13 @@ async function _grafo_visual_seleccionar(id) {
         return;
     }
 
+    // Usar el tipo local (inferido) si lo tenemos.
+    const nodo_local = (_grafo_visual_datos && _grafo_visual_datos.nodos || [])
+        .find(x => x.id === id);
+    if (nodo_local && nodo_local.tipo) {
+        detalle.tipo = nodo_local.tipo;
+    }
+
     _grafo_visual_renderizar_panel(detalle);
 }
 
@@ -1307,6 +1359,7 @@ async function _grafo_visual_expandir(id) {
 
     if (agregados > 0) {
         mostrar_aviso('Agregados ' + agregados + ' nodo(s)', 'exito');
+        _grafo_visual_recalcular_tipos(datos);
         _grafo_visual_asentar_vecinos(id);
         _renderizar_grafo_visual(vb_antes);
         _grafo_visual_animar_centrar_en(id);
