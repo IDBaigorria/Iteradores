@@ -1108,9 +1108,20 @@ navegable y con zoom.
   el hit está arriba del path).
 - Botón de pantalla completa, abajo a la derecha del
   wrapper. Usa la Fullscreen API (`requestFullscreen`
-  sobre `#grafo_visual_wrapper`). Esc sale. El ícono
+  sobre `#grafo_visual_contenedor`, para que en
+  pantalla completa se vean también la barra de
+  controles y el panel lateral). Esc sale. El ícono
   cambia entre expandir (`⤢`) y contraer (`⤡`) según
   `fullscreenchange`.
+- Modo teatro (`⛶` / `▭`): botón al lado del de
+  pantalla completa. Aplica `position: fixed;
+  inset: 10px` al contenedor y bloquea el scroll de
+  la página con `body.grafo-visual-teatro-on
+  { overflow: hidden }`. No es Fullscreen API: el
+  usuario sigue viendo las pestañas del navegador.
+  Esc sale si no está en fullscreen. Se puede
+  combinar con fullscreen (el fullscreen gana
+  mientras está activo; al salir, el teatro sigue).
 
 ### 1.14 Cierre de la línea del grafo del plugin (v8b-v8f)
 

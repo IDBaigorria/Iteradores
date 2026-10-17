@@ -6,7 +6,7 @@
  * tipo, el panel lateral y los controles. Se carga
  * después de estilos.css.
  *
- * @version 1.5piloto.80x
+ * @version 1.5piloto.80z
  * @since 1.5piloto.80n
  */
 
@@ -235,11 +235,16 @@
     font-weight: 600;
 }
 
-/* Botón de pantalla completa, abajo a la derecha. */
-.grafo-visual-fullscreen {
+/* Acciones flotantes abajo a la derecha (teatro y fullscreen). */
+.grafo-visual-acciones {
     position: absolute;
     bottom: 12px;
     right: 12px;
+    display: flex;
+    gap: 6px;
+    z-index: 5;
+}
+.grafo-visual-accion-btn {
     width: 36px;
     height: 36px;
     border: 1px solid var(--border);
@@ -250,19 +255,75 @@
     line-height: 1;
     padding: 0;
     cursor: pointer;
-    z-index: 5;
     transition: background var(--transition);
 }
-.grafo-visual-fullscreen:hover { background: #f9d857; }
+.grafo-visual-accion-btn:hover { background: #f9d857; }
 
-/* Ajustes cuando el wrapper está en pantalla completa. */
-.grafo-visual-wrapper:fullscreen {
+/* Modo teatro: el contenedor se fija al viewport con un
+   margen de 10px y bloquea el scroll de la página. El
+   usuario sigue viendo las pestañas del navegador. */
+#grafo_visual_contenedor.grafo-visual-teatro {
+    position: fixed;
+    inset: 10px;
+    z-index: 9999;
+    background: #fff;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+#grafo_visual_contenedor.grafo-visual-teatro .grafo-visual-controles {
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+#grafo_visual_contenedor.grafo-visual-teatro .grafo-visual-layout {
+    flex: 1;
+    align-items: stretch;
+    min-height: 0;
+}
+#grafo_visual_contenedor.grafo-visual-teatro .grafo-visual-wrapper {
+    height: 100%;
+}
+#grafo_visual_contenedor.grafo-visual-teatro .grafo-visual-panel {
+    max-height: 100%;
+}
+body.grafo-visual-teatro-on { overflow: hidden; }
+
+/* Pantalla completa: también sobre el contenedor entero,
+   así se ven la barra de controles y el panel lateral. */
+#grafo_visual_contenedor:fullscreen {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    padding: 12px;
+    gap: 10px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+#grafo_visual_contenedor:fullscreen .grafo-visual-controles {
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+#grafo_visual_contenedor:fullscreen .grafo-visual-layout {
+    flex: 1;
+    align-items: stretch;
+    min-height: 0;
+}
+#grafo_visual_contenedor:fullscreen .grafo-visual-wrapper {
     border: 0;
     border-radius: 0;
     background: #fafafa;
+    height: 100%;
 }
-.grafo-visual-wrapper:fullscreen .grafo-visual-info {
+#grafo_visual_contenedor:fullscreen .grafo-visual-info {
     background: rgba(255,255,255,0.95);
+}
+#grafo_visual_contenedor:fullscreen .grafo-visual-panel {
+    max-height: 100%;
 }
 
 /* Aviso cuando no hay datos o hay error */

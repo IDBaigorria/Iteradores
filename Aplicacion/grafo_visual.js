@@ -17,7 +17,7 @@
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.80x
+ * @version 1.5piloto.80z
  * @since 1.5piloto.80n
  */
 
@@ -670,15 +670,29 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
     }
     wrapper.appendChild(info);
 
-    // Botón de pantalla completa (abajo a la derecha).
+    // Acciones flotantes (abajo a la derecha): teatro + fullscreen.
+    const acciones = document.createElement('div');
+    acciones.className = 'grafo-visual-acciones';
+
+    const btn_teatro = document.createElement('button');
+    btn_teatro.type = 'button';
+    btn_teatro.id = 'grafo_visual_btn_teatro';
+    btn_teatro.className = 'grafo-visual-accion-btn';
+    btn_teatro.title = 'Modo teatro';
+    btn_teatro.textContent = '\u26F6';
+    btn_teatro.addEventListener('click', _grafo_visual_toggle_teatro);
+    acciones.appendChild(btn_teatro);
+
     const btn_fs = document.createElement('button');
     btn_fs.type = 'button';
     btn_fs.id = 'grafo_visual_btn_fullscreen';
-    btn_fs.className = 'grafo-visual-fullscreen';
+    btn_fs.className = 'grafo-visual-accion-btn';
     btn_fs.title = 'Pantalla completa';
     btn_fs.textContent = '\u2922';
     btn_fs.addEventListener('click', _grafo_visual_toggle_fullscreen);
-    wrapper.appendChild(btn_fs);
+    acciones.appendChild(btn_fs);
+
+    wrapper.appendChild(acciones);
 
     _conectar_pan_zoom(svg);
 
@@ -1440,29 +1454,48 @@ function _conectar_controles_grafo_visual() {
 }
 
 // ============================================================
-// Pantalla completa
+// Pantalla completa y modo teatro
 // ============================================================
 
 function _grafo_visual_toggle_fullscreen() {
-    const wrapper = document.getElementById('grafo_visual_wrapper');
-    if (!wrapper) return;
-    if (document.fullscreenElement === wrapper) {
+    const cont = document.getElementById('grafo_visual_contenedor');
+    if (!cont) return;
+    if (document.fullscreenElement === cont) {
         if (document.exitFullscreen) document.exitFullscreen();
     } else {
-        if (wrapper.requestFullscreen) {
-            const p = wrapper.requestFullscreen();
+        if (cont.requestFullscreen) {
+            const p = cont.requestFullscreen();
             if (p && typeof p.catch === 'function') p.catch(() => {});
         }
     }
 }
 
-function _grafo_visual_actualizar_boton_fullscreen() {
-    const btn = document.getElementById('grafo_visual_btn_fullscreen');
-    if (!btn) return;
-    const wrapper = document.getElementById('grafo_visual_wrapper');
-    const en_fullscreen = (document.fullscreenElement === wrapper);
-    btn.textContent = en_fullscreen ? '\u2921' : '\u2922';
-    btn.title = en_fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa';
+function _grafo_visual_toggle_teatro() {
+    // Si está en fullscreen, no hacer nada: el fullscreen manda.
+    if (document.fullscreenElement) return;
+    const cont = document.getElementById('grafo_visual_contenedor');
+    if (!cont) return;
+    const en_teatro = cont.classList.toggle('grafo-visual-teatro');
+    document.body.classList.toggle('grafo-visual-teatro-on', en_teatro);
+    _grafo_visual_actualizar_botones();
+}
+
+function _grafo_visual_actualizar_botones() {
+    const cont = document.getElementById('grafo_visual_contenedor');
+
+    const btn_teatro = document.getElementById('grafo_visual_btn_teatro');
+    if (btn_teatro && cont) {
+        const en_teatro = cont.classList.contains('grafo-visual-teatro');
+        btn_teatro.textContent = en_teatro ? '\u25AD' : '\u26F6';
+        btn_teatro.title = en_teatro ? 'Salir del modo teatro' : 'Modo teatro';
+    }
+
+    const btn_fs = document.getElementById('grafo_visual_btn_fullscreen');
+    if (btn_fs) {
+        const en_fs = (document.fullscreenElement === cont);
+        btn_fs.textContent = en_fs ? '\u2921' : '\u2922';
+        btn_fs.title = en_fs ? 'Salir de pantalla completa' : 'Pantalla completa';
+    }
 }
 
 // ============================================================
@@ -1474,8 +1507,19 @@ function _grafo_visual_actualizar_boton_fullscreen() {
         if (_grafo_visual_inicializado) return;
         _grafo_visual_inicializado = true;
         _conectar_subtabs_grafo();
-        // Cambiar el ícono del botón al entrar/salir de fullscreen.
-        document.addEventListener('fullscreenchange', _grafo_visual_actualizar_boton_fullscreen);
+        // Actualizar íconos al entrar/salir de fullscreen.
+        document.addEventListener('fullscreenchange', _grafo_visual_actualizar_botones);
+        // Esc cierra el modo teatro (si no está en fullscreen).
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const cont = document.getElementById('grafo_visual_contenedor');
+            if (!cont) return;
+            if (document.fullscreenElement) return;
+            if (!cont.classList.contains('grafo-visual-teatro')) return;
+            cont.classList.remove('grafo-visual-teatro');
+            document.body.classList.remove('grafo-visual-teatro-on');
+            _grafo_visual_actualizar_botones();
+        });
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', _setup);
