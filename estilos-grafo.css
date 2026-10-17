@@ -6,7 +6,7 @@
  * tipo, el panel lateral y los controles. Se carga
  * después de estilos.css.
  *
- * @version 1.5piloto.80v
+ * @version 1.5piloto.80w
  * @since 1.5piloto.80n
  */
 
@@ -111,9 +111,19 @@
     stroke-opacity: 0.75;
     transition: stroke-opacity 0.15s, stroke-width 0.15s;
 }
-.grafo-enlace:hover {
+.grafo-enlace.hover {
     stroke-opacity: 1;
-    stroke-width: 2.2;
+    stroke-width: 2.4;
+}
+/* Área de click del enlace. Invisible pero gruesa, para
+   poder tocarla con el mouse sobre un trazo fino. */
+.grafo-enlace-hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 14;
+    stroke-linecap: round;
+    cursor: pointer;
+    pointer-events: stroke;
 }
 .grafo-enlace.compartido {
     stroke: #b06000 !important;

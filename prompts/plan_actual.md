@@ -1099,6 +1099,13 @@ navegable y con zoom.
   verdad es `_grafo_visual_posiciones`; el layout
   solo se recalcula con "Reacomodar" o al cambiar
   el toggle Grilla/Force.
+- Click en un enlace: la vista hace pan animado
+  (ease-out cubic ~400 ms) hasta centrar el nodo
+  destino. El enlace tiene un área de click invisible
+  (`stroke-width: 14`, transparente) sobre el trazo
+  visible fino. El hover sobre esa área resalta el
+  trazo visible (clase `.hover`, no `:hover`, porque
+  el hit está arriba del path).
 
 ### 1.14 Cierre de la línea del grafo del plugin (v8b-v8f)
 
