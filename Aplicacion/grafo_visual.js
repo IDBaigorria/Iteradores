@@ -17,7 +17,7 @@
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.80z
+ * @version 1.5piloto.81b
  * @since 1.5piloto.80n
  */
 
@@ -618,19 +618,50 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
         rect.setAttribute('ry', '8');
         g.appendChild(rect);
 
-        const texto_tipo = document.createElementNS(svg_ns, 'text');
-        texto_tipo.setAttribute('x', p.x + 8);
-        texto_tipo.setAttribute('y', p.y + 22);
-        texto_tipo.setAttribute('font-weight', '600');
-        texto_tipo.textContent = n.tipo || '?';
-        g.appendChild(texto_tipo);
+        // Texto del nodo: tipo arriba, dato abajo, ID (solo
+        // si es especial) al pie. Usa foreignObject + HTML
+        // para tener ellipsis real sin calcular el ancho
+        // del texto a mano.
+        const ns_xhtml = 'http://www.w3.org/1999/xhtml';
+        const fo = document.createElementNS(svg_ns, 'foreignObject');
+        fo.setAttribute('x', p.x);
+        fo.setAttribute('y', p.y);
+        fo.setAttribute('width', NODO_W);
+        fo.setAttribute('height', NODO_H);
+        fo.setAttribute('pointer-events', 'none');
 
-        const texto_id = document.createElementNS(svg_ns, 'text');
-        texto_id.setAttribute('x', p.x + 8);
-        texto_id.setAttribute('y', p.y + 46);
-        texto_id.setAttribute('fill', '#888');
-        texto_id.textContent = n.es_especial ? n.id : ('#' + n.id);
-        g.appendChild(texto_id);
+        const div_texto = document.createElementNS(ns_xhtml, 'div');
+        div_texto.setAttribute('class', 'grafo-nodo-texto');
+
+        const div_tipo = document.createElementNS(ns_xhtml, 'div');
+        div_tipo.setAttribute('class', 'grafo-nodo-tipo');
+        div_tipo.textContent = n.tipo || '?';
+        div_texto.appendChild(div_tipo);
+
+        if (n.dato) {
+            const div_dato = document.createElementNS(ns_xhtml, 'div');
+            div_dato.setAttribute('class', 'grafo-nodo-dato');
+            div_dato.textContent = n.dato;
+            div_texto.appendChild(div_dato);
+        }
+
+        if (n.es_especial) {
+            const div_id = document.createElementNS(ns_xhtml, 'div');
+            div_id.setAttribute('class', 'grafo-nodo-id');
+            div_id.textContent = n.id;
+            div_texto.appendChild(div_id);
+        }
+
+        fo.appendChild(div_texto);
+        g.appendChild(fo);
+
+        // Tooltip con el contenido completo.
+        const titulo_g = document.createElementNS(svg_ns, 'title');
+        const partes_titulo = [n.tipo || '?'];
+        if (n.dato) partes_titulo.push(n.dato);
+        if (n.es_especial) partes_titulo.push('ID: ' + n.id);
+        titulo_g.textContent = partes_titulo.join(' · ');
+        g.appendChild(titulo_g);
 
         g.addEventListener('mousedown', (ev) => {
             if (ev.button !== 0) return;
@@ -650,7 +681,7 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
         });
 
         g_nodos.appendChild(g);
-        _grafo_visual_refs_nodos[n.id] = { g, rect, textos: [texto_tipo, texto_id] };
+        _grafo_visual_refs_nodos[n.id] = { g, rect, fo };
     });
 
     svg.appendChild(g_nodos);
@@ -670,9 +701,19 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
     }
     wrapper.appendChild(info);
 
-    // Acciones flotantes (abajo a la derecha): teatro + fullscreen.
+    // Acciones flotantes (abajo a la derecha): ampliar +
+    // teatro + fullscreen.
     const acciones = document.createElement('div');
     acciones.className = 'grafo-visual-acciones';
+
+    const btn_ampliar = document.createElement('button');
+    btn_ampliar.type = 'button';
+    btn_ampliar.id = 'grafo_visual_btn_ampliar';
+    btn_ampliar.className = 'grafo-visual-accion-btn';
+    btn_ampliar.title = 'Ampliar';
+    btn_ampliar.textContent = '\u25A1';
+    btn_ampliar.addEventListener('click', _grafo_visual_toggle_ampliar);
+    acciones.appendChild(btn_ampliar);
 
     const btn_teatro = document.createElement('button');
     btn_teatro.type = 'button';
@@ -917,11 +958,9 @@ function _grafo_visual_actualizar_dom_drag() {
         if (!ref || !p) return;
         ref.rect.setAttribute('x', p.x);
         ref.rect.setAttribute('y', p.y);
-        if (ref.textos && ref.textos.length === 2) {
-            ref.textos[0].setAttribute('x', p.x + 8);
-            ref.textos[0].setAttribute('y', p.y + 22);
-            ref.textos[1].setAttribute('x', p.x + 8);
-            ref.textos[1].setAttribute('y', p.y + 46);
+        if (ref.fo) {
+            ref.fo.setAttribute('x', p.x);
+            ref.fo.setAttribute('y', p.y);
         }
     });
 
@@ -1470,18 +1509,46 @@ function _grafo_visual_toggle_fullscreen() {
     }
 }
 
+function _grafo_visual_toggle_ampliar() {
+    if (document.fullscreenElement) return;
+    const cont = document.getElementById('grafo_visual_contenedor');
+    if (!cont) return;
+    // Excluyente con teatro.
+    cont.classList.remove('grafo-visual-teatro');
+    cont.classList.toggle('grafo-visual-ampliar');
+    _grafo_visual_actualizar_body_expandido();
+    _grafo_visual_actualizar_botones();
+}
+
 function _grafo_visual_toggle_teatro() {
     // Si está en fullscreen, no hacer nada: el fullscreen manda.
     if (document.fullscreenElement) return;
     const cont = document.getElementById('grafo_visual_contenedor');
     if (!cont) return;
-    const en_teatro = cont.classList.toggle('grafo-visual-teatro');
-    document.body.classList.toggle('grafo-visual-teatro-on', en_teatro);
+    // Excluyente con ampliar.
+    cont.classList.remove('grafo-visual-ampliar');
+    cont.classList.toggle('grafo-visual-teatro');
+    _grafo_visual_actualizar_body_expandido();
     _grafo_visual_actualizar_botones();
+}
+
+function _grafo_visual_actualizar_body_expandido() {
+    const cont = document.getElementById('grafo_visual_contenedor');
+    if (!cont) return;
+    const expandido = cont.classList.contains('grafo-visual-ampliar')
+        || cont.classList.contains('grafo-visual-teatro');
+    document.body.classList.toggle('grafo-visual-expandido', expandido);
 }
 
 function _grafo_visual_actualizar_botones() {
     const cont = document.getElementById('grafo_visual_contenedor');
+
+    const btn_ampliar = document.getElementById('grafo_visual_btn_ampliar');
+    if (btn_ampliar && cont) {
+        const en_ampliar = cont.classList.contains('grafo-visual-ampliar');
+        btn_ampliar.textContent = en_ampliar ? '\u25A0' : '\u25A1';
+        btn_ampliar.title = en_ampliar ? 'Restaurar tamaño' : 'Ampliar';
+    }
 
     const btn_teatro = document.getElementById('grafo_visual_btn_teatro');
     if (btn_teatro && cont) {
@@ -1509,15 +1576,18 @@ function _grafo_visual_actualizar_botones() {
         _conectar_subtabs_grafo();
         // Actualizar íconos al entrar/salir de fullscreen.
         document.addEventListener('fullscreenchange', _grafo_visual_actualizar_botones);
-        // Esc cierra el modo teatro (si no está en fullscreen).
+        // Esc cierra el modo ampliado o el teatro (si no está
+        // en fullscreen).
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
             const cont = document.getElementById('grafo_visual_contenedor');
             if (!cont) return;
             if (document.fullscreenElement) return;
-            if (!cont.classList.contains('grafo-visual-teatro')) return;
-            cont.classList.remove('grafo-visual-teatro');
-            document.body.classList.remove('grafo-visual-teatro-on');
+            const tiene_ampliar = cont.classList.contains('grafo-visual-ampliar');
+            const tiene_teatro = cont.classList.contains('grafo-visual-teatro');
+            if (!tiene_ampliar && !tiene_teatro) return;
+            cont.classList.remove('grafo-visual-ampliar', 'grafo-visual-teatro');
+            document.body.classList.remove('grafo-visual-expandido');
             _grafo_visual_actualizar_botones();
         });
     }

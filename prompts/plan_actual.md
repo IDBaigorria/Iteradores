@@ -1113,15 +1113,26 @@ navegable y con zoom.
   controles y el panel lateral). Esc sale. El ícono
   cambia entre expandir (`⤢`) y contraer (`⤡`) según
   `fullscreenchange`.
-- Modo teatro (`⛶` / `▭`): botón al lado del de
-  pantalla completa. Aplica `position: fixed;
-  inset: 10px` al contenedor y bloquea el scroll de
-  la página con `body.grafo-visual-teatro-on
+- Contenido del nodo: tipo arriba, dato abajo, ID solo
+  si es especial. Usa `<foreignObject>` con HTML
+  adentro, para tener `text-overflow: ellipsis` real
+  (sin calcular el ancho del texto a mano). El
+  contenido completo aparece en un `<title>` (tooltip
+  nativo de SVG) al hover. El drag ahora mueve rect
+  + foreignObject (sin tocar textos individuales).
+- Modo teatro (`⛶` / `▭`) y modo ampliado (`□` / `■`):
+  dos botones entre el normal y el fullscreen. El
+  modo ampliado (`grafo-visual-ampliar`) usa
+  `position: fixed; inset: 0`: ocupa todo el área
+  visible del navegador, sin margen ni sombra. El
+  modo teatro (`grafo-visual-teatro`) usa
+  `position: fixed; inset: 10px`: ocupa casi todo
+  con un margen de 10px y sombra. Ambos bloquean el
+  scroll de la página con `body.grafo-visual-expandido
   { overflow: hidden }`. No es Fullscreen API: el
   usuario sigue viendo las pestañas del navegador.
-  Esc sale si no está en fullscreen. Se puede
-  combinar con fullscreen (el fullscreen gana
-  mientras está activo; al salir, el teatro sigue).
+  Son excluyentes entre sí. Esc cierra cualquiera de
+  los dos (si no está en fullscreen).
 
 ### 1.14 Cierre de la línea del grafo del plugin (v8b-v8f)
 
