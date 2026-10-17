@@ -17,7 +17,7 @@
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.81c
+ * @version 1.5piloto.81d
  * @since 1.5piloto.80n
  */
 
@@ -27,7 +27,7 @@ let _grafo_visual_vb = null;
 let _grafo_visual_seleccionado = null;
 let _grafo_visual_matches = [];
 let _grafo_visual_match_actual = -1;
-let _grafo_visual_layout = 'grilla'; // 'grilla' | 'force'
+let _grafo_visual_layout = 'force'; // 'grilla' | 'force'
 let _grafo_visual_max_nodos = 500;
 let _grafo_visual_mostrar_etiquetas = true;
 
@@ -89,6 +89,16 @@ async function cargar_grafo_visual() {
     _grafo_visual_posiciones = {};
     _grafo_visual_recalcular_tipos(_grafo_visual_datos);
     _renderizar_grafo_visual(null, { recalcular: true });
+}
+
+/**
+ * Devuelve true si el visualizador ya tiene datos cargados.
+ * Lo usa grafo.js para decidir si hay que disparar la
+ * carga al entrar a la pestaña Grafo (la sub-pestaña
+ * Visual es la activa por defecto).
+ */
+function grafo_visual_esta_cargado() {
+    return _grafo_visual_datos !== null;
 }
 
 /**
@@ -478,7 +488,7 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
         controles.innerHTML =
             '<div class="grafo-visual-layout-toggle" id="grafo_visual_toggle">' +
             '  <button type="button" data-layout="grilla">Grilla</button>' +
-            '  <button type="button" data-layout="force">Force</button>' +
+            '  <button type="button" data-layout="force">Forzar</button>' +
             '</div>' +
             '<label class="grafo-visual-max-label">Nodos:' +
             '  <select id="grafo_visual_max_nodos">' +

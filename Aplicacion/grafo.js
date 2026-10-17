@@ -7,7 +7,7 @@
  * Es la base para la auditoría de la fuga de nodos (Fase 2).
  * Ver prompts/prompt_piloto.md §8.6.
  *
- * @version 1.5piloto.80r
+ * @version 1.5piloto.81d
  */
 
 let grafo_offset_actual = 0;
@@ -33,6 +33,19 @@ async function cargar_grafo() {
     await _grafo_cargar_tabla(0);
     await cargar_grafo_raices();
     await cargar_grafo_migraciones();
+
+    // La sub-pestaña Visual es la activa por defecto.
+    // Cargar el visual si todavía no se cargó, para que el
+    // usuario la vea sin tener que hacer click en la
+    // sub-pestaña.
+    if (typeof cargar_grafo_visual === 'function'
+        && typeof grafo_visual_esta_cargado === 'function') {
+        const v_visual = document.getElementById('grafo_vista_visual');
+        if (v_visual && !v_visual.classList.contains('hidden')
+            && !grafo_visual_esta_cargado()) {
+            cargar_grafo_visual();
+        }
+    }
 }
 
 function _grafo_renderizar_resumen(resumen) {

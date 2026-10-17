@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="estilos-viajes.css?v=1.5piloto.77c">
 <link rel="stylesheet" href="estilos-ventas.css?v=1.5piloto.65">
 <link rel="stylesheet" href="estilos-rendiciones.css?v=1.5piloto.65">
-<link rel="stylesheet" href="estilos-grafo.css?v=1.5piloto.81c">
+<link rel="stylesheet" href="estilos-grafo.css?v=1.5piloto.81d">
 </head>
 <body>
 <!-- Pantalla de login -->
@@ -477,11 +477,11 @@
         </div>
 
         <div class="grafo-subtabs" id="grafo_subtabs">
-          <button type="button" class="grafo-subtab active" data-vista="tabla">Tabla</button>
-          <button type="button" class="grafo-subtab" data-vista="visual">Visual</button>
+          <button type="button" class="grafo-subtab" data-vista="tabla">Tabla</button>
+          <button type="button" class="grafo-subtab active" data-vista="visual">Visual</button>
         </div>
 
-        <div id="grafo_vista_tabla">
+        <div id="grafo_vista_tabla" class="hidden">
           <div class="row" style="gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:flex-end;">
             <div class="field"><label for="grafo_filtro">Filtro</label>
               <select id="grafo_filtro">
@@ -517,7 +517,7 @@
           <div id="grafo_paginacion" class="row" style="margin-top:10px; gap:8px; align-items:center;"></div>
         </div>
 
-        <div id="grafo_vista_visual" class="hidden">
+        <div id="grafo_vista_visual">
           <div id="grafo_visual_contenedor"></div>
         </div>
       </div>
@@ -658,7 +658,7 @@
 <script src="Aplicacion/rendiciones.js?v=1.5piloto.73d"></script>
 <script src="Aplicacion/liquidaciones.js?v=1.5piloto.73d"></script>
 <script src="Aplicacion/pasajeros.js?v=1.5piloto.80k"></script>
-<script src="Aplicacion/grafo.js?v=1.5piloto.80r"></script>
-<script src="Aplicacion/grafo_visual.js?v=1.5piloto.81c"></script>
+<script src="Aplicacion/grafo.js?v=1.5piloto.81d"></script>
+<script src="Aplicacion/grafo_visual.js?v=1.5piloto.81d"></script>
 </body>
 </html>

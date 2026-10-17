@@ -1,6 +1,6 @@
 <?php
 /**
- * Aplicador — Tanda P: ID con # y tipo inferido por enlaces entrantes.
+ * Aplicador — Tanda Q: default Visual + default Forzar.
  *
  * Uso (raíz de iteradores/): php aplicar_cambios.php
  */
@@ -19,10 +19,21 @@ $cambios = [
         'archivo' => 'aplicacion_GET.html',
         'descripcion' => 'Bump ?v= de grafo_visual.js',
         'buscar' => [
-            '<script src="Aplicacion/grafo_visual.js?v=1.5piloto.81b"></script>',
+            '<script src="Aplicacion/grafo_visual.js?v=1.5piloto.81c"></script>',
         ],
         'reemplazar' => [
-            '<script src="Aplicacion/grafo_visual.js?v=1.5piloto.81c"></script>',
+            '<script src="Aplicacion/grafo_visual.js?v=1.5piloto.81d"></script>',
+        ],
+    ],
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_GET.html',
+        'descripcion' => 'Bump ?v= de grafo.js',
+        'buscar' => [
+            '<script src="Aplicacion/grafo.js?v=1.5piloto.80r"></script>',
+        ],
+        'reemplazar' => [
+            '<script src="Aplicacion/grafo.js?v=1.5piloto.81d"></script>',
         ],
     ],
     [
@@ -30,314 +41,222 @@ $cambios = [
         'archivo' => 'aplicacion_GET.html',
         'descripcion' => 'Bump ?v= de estilos-grafo.css',
         'buscar' => [
-            '<link rel="stylesheet" href="estilos-grafo.css?v=1.5piloto.81b">',
+            '<link rel="stylesheet" href="estilos-grafo.css?v=1.5piloto.81c">',
         ],
         'reemplazar' => [
-            '<link rel="stylesheet" href="estilos-grafo.css?v=1.5piloto.81c">',
+            '<link rel="stylesheet" href="estilos-grafo.css?v=1.5piloto.81d">',
         ],
     ],
 
     // ============================================================
-    // B) estilos-grafo.css: bump @version.
+    // B) HTML: sub-pestaña Visual activa por defecto.
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_GET.html',
+        'descripcion' => 'Sub-pestaña Visual activa por defecto',
+        'buscar' => [
+            '        <div class="grafo-subtabs" id="grafo_subtabs">',
+            '          <button type="button" class="grafo-subtab active" data-vista="tabla">Tabla</button>',
+            '          <button type="button" class="grafo-subtab" data-vista="visual">Visual</button>',
+            '        </div>',
+        ],
+        'reemplazar' => [
+            '        <div class="grafo-subtabs" id="grafo_subtabs">',
+            '          <button type="button" class="grafo-subtab" data-vista="tabla">Tabla</button>',
+            '          <button type="button" class="grafo-subtab active" data-vista="visual">Visual</button>',
+            '        </div>',
+        ],
+    ],
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_GET.html',
+        'descripcion' => 'Ocultar Tabla por defecto',
+        'buscar' => [
+            '        <div id="grafo_vista_tabla">',
+        ],
+        'reemplazar' => [
+            '        <div id="grafo_vista_tabla" class="hidden">',
+        ],
+    ],
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'aplicacion_GET.html',
+        'descripcion' => 'Mostrar Visual por defecto',
+        'buscar' => [
+            '        <div id="grafo_vista_visual" class="hidden">',
+        ],
+        'reemplazar' => [
+            '        <div id="grafo_vista_visual">',
+        ],
+    ],
+
+    // ============================================================
+    // C) estilos-grafo.css: bump @version.
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'estilos-grafo.css',
         'descripcion' => 'Bump @version de estilos-grafo.css',
         'buscar' => [
-            ' * @version 1.5piloto.81b',
+            ' * @version 1.5piloto.81c',
         ],
         'reemplazar' => [
-            ' * @version 1.5piloto.81c',
+            ' * @version 1.5piloto.81d',
         ],
     ],
 
     // ============================================================
-    // C) plan_actual: anotar la mejora.
+    // D) grafo.js: bump @version.
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §1.15: nota v81c',
+        'archivo' => 'Aplicacion/grafo.js',
+        'descripcion' => 'Bump @version de grafo.js',
         'buscar' => [
-            '- Contenido del nodo: tipo arriba, dato abajo, ID solo',
-            '  si es especial. Usa `<foreignObject>` con HTML',
-            '  adentro, para tener `text-overflow: ellipsis` real',
-            '  (sin calcular el ancho del texto a mano). El',
-            '  contenido completo aparece en un `<title>` (tooltip',
-            '  nativo de SVG) al hover. El drag ahora mueve rect',
-            '  + foreignObject (sin tocar textos individuales).',
+            ' * @version 1.5piloto.80r',
         ],
         'reemplazar' => [
-            '- Contenido del nodo: tipo arriba, dato en el medio,',
-            '  ID abajo (con `#` adelante, para todos los nodos).',
-            '  Usa `<foreignObject>` con HTML adentro, para tener',
-            '  `text-overflow: ellipsis` real (sin calcular el',
-            '  ancho del texto a mano). El contenido completo',
-            '  aparece en un `<title>` (tooltip nativo de SVG) al',
-            '  hover. El drag mueve rect + foreignObject.',
-            '- Inferencia de tipo en el frontend. Si el backend',
-            '  devuelve `?`, se mira el enlace entrante:',
-            '  - Un solo enlace entrante → ese nombre es el tipo.',
-            '  - Varios → el más repetido.',
-            '  - Empate → `?`.',
-            '  Se aplica en `_grafo_visual_recalcular_tipos`, que',
-            '  se llama al cargar el vecindario y al expandir. El',
-            '  panel lateral usa el tipo local si lo tiene.',
-            '  **Nota:** los tipos inferidos por enlace (por',
-            '  ejemplo, `usuarios`, `empresas`, `viajes`) no',
-            '  tienen color propio en el CSS; caen a gris.',
+            ' * @version 1.5piloto.81d',
         ],
     ],
 
     // ============================================================
-    // D) grafo_visual.js: bump @version.
+    // E) grafo.js: disparar carga del visual al entrar a Grafo.
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/grafo.js',
+        'descripcion' => 'Cargar visual al entrar a la pestaña Grafo',
+        'buscar' => [
+            '    _grafo_renderizar_resumen(datos_res.resumen);',
+            '    await _grafo_cargar_tabla(0);',
+            '    await cargar_grafo_raices();',
+            '    await cargar_grafo_migraciones();',
+            '}',
+        ],
+        'reemplazar' => [
+            '    _grafo_renderizar_resumen(datos_res.resumen);',
+            '    await _grafo_cargar_tabla(0);',
+            '    await cargar_grafo_raices();',
+            '    await cargar_grafo_migraciones();',
+            '',
+            '    // La sub-pestaña Visual es la activa por defecto.',
+            '    // Cargar el visual si todavía no se cargó, para que el',
+            '    // usuario la vea sin tener que hacer click en la',
+            '    // sub-pestaña.',
+            '    if (typeof cargar_grafo_visual === \'function\'',
+            '        && typeof grafo_visual_esta_cargado === \'function\') {',
+            '        const v_visual = document.getElementById(\'grafo_vista_visual\');',
+            '        if (v_visual && !v_visual.classList.contains(\'hidden\')',
+            '            && !grafo_visual_esta_cargado()) {',
+            '            cargar_grafo_visual();',
+            '        }',
+            '    }',
+            '}',
+        ],
+    ],
+
+    // ============================================================
+    // F) grafo_visual.js: bump @version.
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/grafo_visual.js',
         'descripcion' => 'Bump @version de grafo_visual.js',
         'buscar' => [
-            ' * @version 1.5piloto.81b',
+            ' * @version 1.5piloto.81c',
         ],
         'reemplazar' => [
-            ' * @version 1.5piloto.81c',
+            ' * @version 1.5piloto.81d',
         ],
     ],
 
     // ============================================================
-    // E) grafo_visual.js: llamar a recalcular_tipos al cargar.
+    // G) grafo_visual.js: layout default 'force'.
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/grafo_visual.js',
-        'descripcion' => 'Recalcular tipos al cargar el vecindario',
+        'descripcion' => 'Layout por defecto: force',
         'buscar' => [
-            '    _grafo_visual_datos = datos.vecindario;',
-            '    _grafo_visual_seleccionado = null;',
-            '    _grafo_visual_matches = [];',
-            '    _grafo_visual_match_actual = -1;',
-            '    _grafo_visual_posiciones = {};',
-            '    _renderizar_grafo_visual(null, { recalcular: true });',
-            '}',
+            'let _grafo_visual_layout = \'grilla\'; // \'grilla\' | \'force\'',
         ],
         'reemplazar' => [
-            '    _grafo_visual_datos = datos.vecindario;',
-            '    _grafo_visual_seleccionado = null;',
-            '    _grafo_visual_matches = [];',
-            '    _grafo_visual_match_actual = -1;',
-            '    _grafo_visual_posiciones = {};',
+            'let _grafo_visual_layout = \'force\'; // \'grilla\' | \'force\'',
+        ],
+    ],
+
+    // ============================================================
+    // H) grafo_visual.js: texto del botón Force → Forzar.
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/grafo_visual.js',
+        'descripcion' => 'Botón Force renombrado a Forzar',
+        'buscar' => [
+            '            \'  <button type="button" data-layout="force">Force</button>\' +',
+        ],
+        'reemplazar' => [
+            '            \'  <button type="button" data-layout="force">Forzar</button>\' +',
+        ],
+    ],
+
+    // ============================================================
+    // I) grafo_visual.js: getter grafo_visual_esta_cargado.
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/grafo_visual.js',
+        'descripcion' => 'Getter grafo_visual_esta_cargado',
+        'buscar' => [
             '    _grafo_visual_recalcular_tipos(_grafo_visual_datos);',
             '    _renderizar_grafo_visual(null, { recalcular: true });',
             '}',
-        ],
-    ],
-
-    // ============================================================
-    // F) grafo_visual.js: agregar la función de inferencia.
-    //    Se inserta antes de _conectar_subtabs_grafo.
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/grafo_visual.js',
-        'descripcion' => 'Función de inferencia de tipo por enlaces entrantes',
-        'buscar' => [
-            'function _conectar_subtabs_grafo() {',
-            '    const subtabs = document.querySelectorAll(\'#grafo_subtabs .grafo-subtab\');',
-        ],
-        'reemplazar' => [
+            '',
             '/**',
             ' * Recalcula los tipos de los nodos a partir de los enlaces',
-            ' * entrantes. Se aplica solo a los nodos cuyo tipo del',
-            ' * backend sea "?" o vacío.',
-            ' *',
-            ' * Reglas:',
-            ' *   - Un solo enlace entrante → ese nombre es el tipo.',
-            ' *   - Varios enlaces distintos → el más repetido.',
-            ' *   - Empate en la cantidad máxima → "?".',
+        ],
+        'reemplazar' => [
+            '    _grafo_visual_recalcular_tipos(_grafo_visual_datos);',
+            '    _renderizar_grafo_visual(null, { recalcular: true });',
+            '}',
+            '',
+            '/**',
+            ' * Devuelve true si el visualizador ya tiene datos cargados.',
+            ' * Lo usa grafo.js para decidir si hay que disparar la',
+            ' * carga al entrar a la pestaña Grafo (la sub-pestaña',
+            ' * Visual es la activa por defecto).',
             ' */',
-            'function _grafo_visual_recalcular_tipos(datos) {',
-            '    if (!datos || !datos.nodos) return;',
-            '',
-            '    // Contar enlaces entrantes por (destino, enlace).',
-            '    const entrantes_por_id = {};',
-            '    (datos.enlaces || []).forEach(e => {',
-            '        if (!entrantes_por_id[e.destino]) entrantes_por_id[e.destino] = {};',
-            '        entrantes_por_id[e.destino][e.enlace] =',
-            '            (entrantes_por_id[e.destino][e.enlace] || 0) + 1;',
-            '    });',
-            '',
-            '    (datos.nodos || []).forEach(n => {',
-            '        const tipo_backend = String(n.tipo || \'\').trim();',
-            '        if (tipo_backend !== \'\' && tipo_backend !== \'?\') return;',
-            '',
-            '        const cuenta = entrantes_por_id[n.id] || {};',
-            '        const enlaces = Object.keys(cuenta);',
-            '',
-            '        if (enlaces.length === 0) {',
-            '            n.tipo = \'?\';',
-            '            return;',
-            '        }',
-            '        if (enlaces.length === 1) {',
-            '            n.tipo = enlaces[0];',
-            '            return;',
-            '        }',
-            '',
-            '        let max = 0;',
-            '        for (const k of enlaces) {',
-            '            if (cuenta[k] > max) max = cuenta[k];',
-            '        }',
-            '        const con_max = enlaces.filter(k => cuenta[k] === max);',
-            '        n.tipo = (con_max.length === 1) ? con_max[0] : \'?\';',
-            '    });',
+            'function grafo_visual_esta_cargado() {',
+            '    return _grafo_visual_datos !== null;',
             '}',
             '',
-            'function _conectar_subtabs_grafo() {',
-            '    const subtabs = document.querySelectorAll(\'#grafo_subtabs .grafo-subtab\');',
+            '/**',
+            ' * Recalcula los tipos de los nodos a partir de los enlaces',
         ],
     ],
 
     // ============================================================
-    // G) grafo_visual.js: ID siempre visible con # adelante.
+    // J) plan_actual: anotar el ajuste.
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/grafo_visual.js',
-        'descripcion' => 'ID visible para todos los nodos, con # adelante',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual §1.15: nota v81d',
         'buscar' => [
-            '        if (n.es_especial) {',
-            '            const div_id = document.createElementNS(ns_xhtml, \'div\');',
-            '            div_id.setAttribute(\'class\', \'grafo-nodo-id\');',
-            '            div_id.textContent = n.id;',
-            '            div_texto.appendChild(div_id);',
-            '        }',
+            '- Inferencia de tipo en el frontend. Si el backend',
         ],
         'reemplazar' => [
-            '        const div_id = document.createElementNS(ns_xhtml, \'div\');',
-            '        div_id.setAttribute(\'class\', \'grafo-nodo-id\');',
-            '        div_id.textContent = \'#\' + n.id;',
-            '        div_texto.appendChild(div_id);',
-        ],
-    ],
-
-    // ============================================================
-    // H) grafo_visual.js: tooltip con ID siempre.
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/grafo_visual.js',
-        'descripcion' => 'Tooltip con ID siempre',
-        'buscar' => [
-            '        const titulo_g = document.createElementNS(svg_ns, \'title\');',
-            '        const partes_titulo = [n.tipo || \'?\'];',
-            '        if (n.dato) partes_titulo.push(n.dato);',
-            '        if (n.es_especial) partes_titulo.push(\'ID: \' + n.id);',
-            '        titulo_g.textContent = partes_titulo.join(\' · \');',
-            '        g.appendChild(titulo_g);',
-        ],
-        'reemplazar' => [
-            '        const titulo_g = document.createElementNS(svg_ns, \'title\');',
-            '        const partes_titulo = [n.tipo || \'?\'];',
-            '        if (n.dato) partes_titulo.push(n.dato);',
-            '        partes_titulo.push(\'ID: \' + n.id);',
-            '        titulo_g.textContent = partes_titulo.join(\' · \');',
-            '        g.appendChild(titulo_g);',
-        ],
-    ],
-
-    // ============================================================
-    // I) grafo_visual.js: recalcular tipos al expandir.
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/grafo_visual.js',
-        'descripcion' => 'Recalcular tipos al expandir',
-        'buscar' => [
-            '    if (agregados > 0) {',
-            '        mostrar_aviso(\'Agregados \' + agregados + \' nodo(s)\', \'exito\');',
-            '        _grafo_visual_asentar_vecinos(id);',
-            '        _renderizar_grafo_visual(vb_antes);',
-            '        _grafo_visual_animar_centrar_en(id);',
-            '    } else {',
-        ],
-        'reemplazar' => [
-            '    if (agregados > 0) {',
-            '        mostrar_aviso(\'Agregados \' + agregados + \' nodo(s)\', \'exito\');',
-            '        _grafo_visual_recalcular_tipos(datos);',
-            '        _grafo_visual_asentar_vecinos(id);',
-            '        _renderizar_grafo_visual(vb_antes);',
-            '        _grafo_visual_animar_centrar_en(id);',
-            '    } else {',
-        ],
-    ],
-
-    // ============================================================
-    // J) grafo_visual.js: panel lateral usa tipo local.
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/grafo_visual.js',
-        'descripcion' => 'Panel lateral usa tipo inferido local',
-        'buscar' => [
-            '    let detalle;',
-            '    try {',
-            '        const resp = await fetch("index.php", {',
-            '            method: "POST",',
-            '            headers: { "Content-Type": "application/x-www-form-urlencoded" },',
-            '            body: new URLSearchParams({',
-            '                accion: "grafo/nodo",',
-            '                nombre_solicitante: usuario_actual.nombre_usuario,',
-            '                id: id',
-            '            })',
-            '        });',
-            '        const datos = await resp.json();',
-            '        if (!datos.exito) {',
-            '            panel.innerHTML = \'<div class="grafo-panel-error">Error: \'',
-            '                + _grafo_visual_escape(datos.error || \'\') + \'</div>\';',
-            '            return;',
-            '        }',
-            '        detalle = datos.nodo;',
-            '    } catch (e) {',
-            '        panel.innerHTML = \'<div class="grafo-panel-error">Error de comunicación</div>\';',
-            '        return;',
-            '    }',
-            '',
-            '    _grafo_visual_renderizar_panel(detalle);',
-            '}',
-        ],
-        'reemplazar' => [
-            '    let detalle;',
-            '    try {',
-            '        const resp = await fetch("index.php", {',
-            '            method: "POST",',
-            '            headers: { "Content-Type": "application/x-www-form-urlencoded" },',
-            '            body: new URLSearchParams({',
-            '                accion: "grafo/nodo",',
-            '                nombre_solicitante: usuario_actual.nombre_usuario,',
-            '                id: id',
-            '            })',
-            '        });',
-            '        const datos = await resp.json();',
-            '        if (!datos.exito) {',
-            '            panel.innerHTML = \'<div class="grafo-panel-error">Error: \'',
-            '                + _grafo_visual_escape(datos.error || \'\') + \'</div>\';',
-            '            return;',
-            '        }',
-            '        detalle = datos.nodo;',
-            '    } catch (e) {',
-            '        panel.innerHTML = \'<div class="grafo-panel-error">Error de comunicación</div>\';',
-            '        return;',
-            '    }',
-            '',
-            '    // Usar el tipo local (inferido) si lo tenemos.',
-            '    const nodo_local = (_grafo_visual_datos && _grafo_visual_datos.nodos || [])',
-            '        .find(x => x.id === id);',
-            '    if (nodo_local && nodo_local.tipo) {',
-            '        detalle.tipo = nodo_local.tipo;',
-            '    }',
-            '',
-            '    _grafo_visual_renderizar_panel(detalle);',
-            '}',
+            '- Default de la pestaña Grafo: sub-pestaña Visual (antes',
+            '  Tabla). Layout por defecto: Forzar (force-directed,',
+            '  antes Grilla). Al entrar a la pestaña Grafo,',
+            '  `grafo.js` dispara `cargar_grafo_visual()` si la',
+            '  sub-pestaña Visual está activa y el visual no se',
+            '  cargó todavía (vía `grafo_visual_esta_cargado()`).',
+            '  El botón del toggle dice "Forzar" (antes "Force");',
+            '  el `data-layout="force"` interno no cambia.',
+            '- Inferencia de tipo en el frontend. Si el backend',
         ],
     ],
 ];

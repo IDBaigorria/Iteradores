@@ -1120,6 +1120,14 @@ navegable y con zoom.
   ancho del texto a mano). El contenido completo
   aparece en un `<title>` (tooltip nativo de SVG) al
   hover. El drag mueve rect + foreignObject.
+- Default de la pestaña Grafo: sub-pestaña Visual (antes
+  Tabla). Layout por defecto: Forzar (force-directed,
+  antes Grilla). Al entrar a la pestaña Grafo,
+  `grafo.js` dispara `cargar_grafo_visual()` si la
+  sub-pestaña Visual está activa y el visual no se
+  cargó todavía (vía `grafo_visual_esta_cargado()`).
+  El botón del toggle dice "Forzar" (antes "Force");
+  el `data-layout="force"` interno no cambia.
 - Inferencia de tipo en el frontend. Si el backend
   devuelve `?`, se mira el enlace entrante:
   - Un solo enlace entrante → ese nombre es el tipo.
