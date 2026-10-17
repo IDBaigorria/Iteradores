@@ -1,6 +1,6 @@
 <?php
 /**
- * Aplicador — Tanda Q: default Visual + default Forzar.
+ * Aplicador — Tanda R: grilla de fondo que se expande con el viewBox.
  *
  * Uso (raíz de iteradores/): php aplicar_cambios.php
  */
@@ -12,250 +12,195 @@ $htmls_a_bumpear = [];
 
 $cambios = [
     // ============================================================
-    // A) HTML: bumps de ?v=.
+    // A) HTML: bump ?v= de grafo_visual.js.
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'aplicacion_GET.html',
         'descripcion' => 'Bump ?v= de grafo_visual.js',
         'buscar' => [
-            '<script src="Aplicacion/grafo_visual.js?v=1.5piloto.81c"></script>',
-        ],
-        'reemplazar' => [
             '<script src="Aplicacion/grafo_visual.js?v=1.5piloto.81d"></script>',
         ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'Bump ?v= de grafo.js',
-        'buscar' => [
-            '<script src="Aplicacion/grafo.js?v=1.5piloto.80r"></script>',
-        ],
         'reemplazar' => [
-            '<script src="Aplicacion/grafo.js?v=1.5piloto.81d"></script>',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'Bump ?v= de estilos-grafo.css',
-        'buscar' => [
-            '<link rel="stylesheet" href="estilos-grafo.css?v=1.5piloto.81c">',
-        ],
-        'reemplazar' => [
-            '<link rel="stylesheet" href="estilos-grafo.css?v=1.5piloto.81d">',
+            '<script src="Aplicacion/grafo_visual.js?v=1.5piloto.81e"></script>',
         ],
     ],
 
     // ============================================================
-    // B) HTML: sub-pestaña Visual activa por defecto.
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'Sub-pestaña Visual activa por defecto',
-        'buscar' => [
-            '        <div class="grafo-subtabs" id="grafo_subtabs">',
-            '          <button type="button" class="grafo-subtab active" data-vista="tabla">Tabla</button>',
-            '          <button type="button" class="grafo-subtab" data-vista="visual">Visual</button>',
-            '        </div>',
-        ],
-        'reemplazar' => [
-            '        <div class="grafo-subtabs" id="grafo_subtabs">',
-            '          <button type="button" class="grafo-subtab" data-vista="tabla">Tabla</button>',
-            '          <button type="button" class="grafo-subtab active" data-vista="visual">Visual</button>',
-            '        </div>',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'Ocultar Tabla por defecto',
-        'buscar' => [
-            '        <div id="grafo_vista_tabla">',
-        ],
-        'reemplazar' => [
-            '        <div id="grafo_vista_tabla" class="hidden">',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'aplicacion_GET.html',
-        'descripcion' => 'Mostrar Visual por defecto',
-        'buscar' => [
-            '        <div id="grafo_vista_visual" class="hidden">',
-        ],
-        'reemplazar' => [
-            '        <div id="grafo_vista_visual">',
-        ],
-    ],
-
-    // ============================================================
-    // C) estilos-grafo.css: bump @version.
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'estilos-grafo.css',
-        'descripcion' => 'Bump @version de estilos-grafo.css',
-        'buscar' => [
-            ' * @version 1.5piloto.81c',
-        ],
-        'reemplazar' => [
-            ' * @version 1.5piloto.81d',
-        ],
-    ],
-
-    // ============================================================
-    // D) grafo.js: bump @version.
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/grafo.js',
-        'descripcion' => 'Bump @version de grafo.js',
-        'buscar' => [
-            ' * @version 1.5piloto.80r',
-        ],
-        'reemplazar' => [
-            ' * @version 1.5piloto.81d',
-        ],
-    ],
-
-    // ============================================================
-    // E) grafo.js: disparar carga del visual al entrar a Grafo.
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/grafo.js',
-        'descripcion' => 'Cargar visual al entrar a la pestaña Grafo',
-        'buscar' => [
-            '    _grafo_renderizar_resumen(datos_res.resumen);',
-            '    await _grafo_cargar_tabla(0);',
-            '    await cargar_grafo_raices();',
-            '    await cargar_grafo_migraciones();',
-            '}',
-        ],
-        'reemplazar' => [
-            '    _grafo_renderizar_resumen(datos_res.resumen);',
-            '    await _grafo_cargar_tabla(0);',
-            '    await cargar_grafo_raices();',
-            '    await cargar_grafo_migraciones();',
-            '',
-            '    // La sub-pestaña Visual es la activa por defecto.',
-            '    // Cargar el visual si todavía no se cargó, para que el',
-            '    // usuario la vea sin tener que hacer click en la',
-            '    // sub-pestaña.',
-            '    if (typeof cargar_grafo_visual === \'function\'',
-            '        && typeof grafo_visual_esta_cargado === \'function\') {',
-            '        const v_visual = document.getElementById(\'grafo_vista_visual\');',
-            '        if (v_visual && !v_visual.classList.contains(\'hidden\')',
-            '            && !grafo_visual_esta_cargado()) {',
-            '            cargar_grafo_visual();',
-            '        }',
-            '    }',
-            '}',
-        ],
-    ],
-
-    // ============================================================
-    // F) grafo_visual.js: bump @version.
+    // B) grafo_visual.js: bump @version.
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/grafo_visual.js',
         'descripcion' => 'Bump @version de grafo_visual.js',
         'buscar' => [
-            ' * @version 1.5piloto.81c',
-        ],
-        'reemplazar' => [
             ' * @version 1.5piloto.81d',
         ],
+        'reemplazar' => [
+            ' * @version 1.5piloto.81e',
+        ],
     ],
 
     // ============================================================
-    // G) grafo_visual.js: layout default 'force'.
+    // C) grafo_visual.js: globals para rect + observer.
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/grafo_visual.js',
-        'descripcion' => 'Layout por defecto: force',
+        'descripcion' => 'Globals para rect de grilla y observer',
         'buscar' => [
-            'let _grafo_visual_layout = \'grilla\'; // \'grilla\' | \'force\'',
+            '// Estado del drag de nodos.',
+            'let _grafo_visual_drag = null;',
         ],
         'reemplazar' => [
-            'let _grafo_visual_layout = \'force\'; // \'grilla\' | \'force\'',
+            '// Estado del drag de nodos.',
+            'let _grafo_visual_drag = null;',
+            '',
+            '// Rect de la grilla de fondo y observer para redimensionarlo',
+            '// cuando cambia el viewBox (pan/zoom/centrar/animaciones).',
+            'let _grafo_visual_grid_rect = null;',
+            'let _grafo_visual_grid_observer = null;',
         ],
     ],
 
     // ============================================================
-    // H) grafo_visual.js: texto del botón Force → Forzar.
+    // D) grafo_visual.js: guardar la referencia al crear el fondo.
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/grafo_visual.js',
-        'descripcion' => 'Botón Force renombrado a Forzar',
+        'descripcion' => 'Guardar referencia al rect de la grilla',
         'buscar' => [
-            '            \'  <button type="button" data-layout="force">Force</button>\' +',
+            '    fondo.setAttribute(\'fill\', \'url(#grafo-grid)\');',
+            '    svg.appendChild(fondo);',
         ],
         'reemplazar' => [
-            '            \'  <button type="button" data-layout="force">Forzar</button>\' +',
+            '    fondo.setAttribute(\'fill\', \'url(#grafo-grid)\');',
+            '    svg.appendChild(fondo);',
+            '    _grafo_visual_grid_rect = fondo;',
         ],
     ],
 
     // ============================================================
-    // I) grafo_visual.js: getter grafo_visual_esta_cargado.
+    // E) grafo_visual.js: limpiar el observer anterior en cada render.
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'Aplicacion/grafo_visual.js',
-        'descripcion' => 'Getter grafo_visual_esta_cargado',
+        'descripcion' => 'Limpiar el observer antes de re-renderizar',
         'buscar' => [
-            '    _grafo_visual_recalcular_tipos(_grafo_visual_datos);',
-            '    _renderizar_grafo_visual(null, { recalcular: true });',
+            '    wrapper.innerHTML = \'\';',
+            '    _grafo_visual_refs_nodos = {};',
+            '    _grafo_visual_refs_enlaces = [];',
+        ],
+        'reemplazar' => [
+            '    // Limpiar el observer de la grilla anterior.',
+            '    if (_grafo_visual_grid_observer) {',
+            '        _grafo_visual_grid_observer.disconnect();',
+            '        _grafo_visual_grid_observer = null;',
+            '    }',
+            '    _grafo_visual_grid_rect = null;',
+            '',
+            '    wrapper.innerHTML = \'\';',
+            '    _grafo_visual_refs_nodos = {};',
+            '    _grafo_visual_refs_enlaces = [];',
+        ],
+    ],
+
+    // ============================================================
+    // F) grafo_visual.js: crear el observer tras armar el SVG.
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/grafo_visual.js',
+        'descripcion' => 'Observer de viewBox para expandir la grilla',
+        'buscar' => [
+            '    svg.appendChild(g_nodos);',
+            '    wrapper.appendChild(svg);',
+            '    _grafo_visual_svg = svg;',
+        ],
+        'reemplazar' => [
+            '    svg.appendChild(g_nodos);',
+            '    wrapper.appendChild(svg);',
+            '    _grafo_visual_svg = svg;',
+            '',
+            '    // Observar cambios del viewBox para expandir la grilla',
+            '    // de fondo al área visible (pan, zoom, centrar,',
+            '    // animaciones).',
+            '    _grafo_visual_grid_observer = new MutationObserver(_grafo_visual_actualizar_grid_rect);',
+            '    _grafo_visual_grid_observer.observe(svg, { attributes: true, attributeFilter: [\'viewBox\'] });',
+        ],
+    ],
+
+    // ============================================================
+    // G) grafo_visual.js: helper de redimensión de la grilla.
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/grafo_visual.js',
+        'descripcion' => 'Helper que expande la grilla con el viewBox',
+        'buscar' => [
+            '    return {',
+            '        d: `M ${p_salida.x} ${p_salida.y} Q ${cx_control} ${cy_control} ${p_entrada.x} ${p_entrada.y}`,',
+            '        px_label, py_label',
+            '    };',
+            '}',
+            '',
+            'function _grafo_visual_actualizar_toggle() {',
+        ],
+        'reemplazar' => [
+            '    return {',
+            '        d: `M ${p_salida.x} ${p_salida.y} Q ${cx_control} ${cy_control} ${p_entrada.x} ${p_entrada.y}`,',
+            '        px_label, py_label',
+            '    };',
             '}',
             '',
             '/**',
-            ' * Recalcula los tipos de los nodos a partir de los enlaces',
-        ],
-        'reemplazar' => [
-            '    _grafo_visual_recalcular_tipos(_grafo_visual_datos);',
-            '    _renderizar_grafo_visual(null, { recalcular: true });',
-            '}',
-            '',
-            '/**',
-            ' * Devuelve true si el visualizador ya tiene datos cargados.',
-            ' * Lo usa grafo.js para decidir si hay que disparar la',
-            ' * carga al entrar a la pestaña Grafo (la sub-pestaña',
-            ' * Visual es la activa por defecto).',
+            ' * Expande el rect de la grilla de fondo para que cubra el',
+            ' * viewBox actual con margen. Se llama desde un',
+            ' * MutationObserver cada vez que cambia el viewBox (pan,',
+            ' * zoom, centrar, animaciones). El patrón es',
+            ' * userSpaceOnUse, así que las líneas quedan ancladas al',
+            ' * origen del grafo y la grilla "se reproduce" hacia los',
+            ' * costados cuando el viewBox crece.',
             ' */',
-            'function grafo_visual_esta_cargado() {',
-            '    return _grafo_visual_datos !== null;',
+            'function _grafo_visual_actualizar_grid_rect() {',
+            '    const grid = _grafo_visual_grid_rect;',
+            '    const vb = _grafo_visual_vb;',
+            '    if (!grid || !vb) return;',
+            '    const margen_x = vb.w * 0.5;',
+            '    const margen_y = vb.h * 0.5;',
+            '    grid.setAttribute(\'x\', vb.x - margen_x);',
+            '    grid.setAttribute(\'y\', vb.y - margen_y);',
+            '    grid.setAttribute(\'width\', vb.w + 2 * margen_x);',
+            '    grid.setAttribute(\'height\', vb.h + 2 * margen_y);',
             '}',
             '',
-            '/**',
-            ' * Recalcula los tipos de los nodos a partir de los enlaces',
+            'function _grafo_visual_actualizar_toggle() {',
         ],
     ],
 
     // ============================================================
-    // J) plan_actual: anotar el ajuste.
+    // H) plan_actual: anotar la mejora.
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §1.15: nota v81d',
+        'descripcion' => 'plan_actual §1.15: nota v81e',
         'buscar' => [
+            '  el `data-layout="force"` interno no cambia.',
             '- Inferencia de tipo en el frontend. Si el backend',
         ],
         'reemplazar' => [
-            '- Default de la pestaña Grafo: sub-pestaña Visual (antes',
-            '  Tabla). Layout por defecto: Forzar (force-directed,',
-            '  antes Grilla). Al entrar a la pestaña Grafo,',
-            '  `grafo.js` dispara `cargar_grafo_visual()` si la',
-            '  sub-pestaña Visual está activa y el visual no se',
-            '  cargó todavía (vía `grafo_visual_esta_cargado()`).',
-            '  El botón del toggle dice "Forzar" (antes "Force");',
             '  el `data-layout="force"` interno no cambia.',
+            '- Grilla de fondo: se expande con el viewBox. Un',
+            '  MutationObserver sobre el `viewBox` del SVG',
+            '  redimensiona el rect de la grilla cada vez que',
+            '  cambia (pan, zoom, centrar, animaciones). El patrón',
+            '  es `userSpaceOnUse`, así que las líneas quedan',
+            '  ancladas al origen del grafo y la grilla "se',
+            '  reproduce" hacia los costados cuando el viewBox',
+            '  crece. Margen: 50% del viewBox en cada dirección.',
             '- Inferencia de tipo en el frontend. Si el backend',
         ],
     ],
