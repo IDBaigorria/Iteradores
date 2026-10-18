@@ -138,9 +138,9 @@ paréntesis.
 ### 4.1. Piloto — calidad y consistencia (media)
 
 - **Adaptar los 4 módulos menores al contexto del
-  solicitante:** `Liquidacion.php`, `Rendicion.php`,
-  `Empresa.php`, `Vehiculo.php`. Tanda repetitiva (misma
-  técnica que Viaje/Venta).
+  solicitante** — **EN CURSO**, ver §6.
+  `Liquidacion.php`, `Rendicion.php`, `Empresa.php`,
+  `Vehiculo.php`.
 - **Auditar estados colgados:** reservas sin pasajero, DJ a
   medias, edición de viaje a mitad. Requiere relevamiento
   primero.
@@ -229,19 +229,115 @@ el trabajo actual.
 
 ---
 
-## 6. PRÓXIMO ARCO
+## 6. ARCO EN CURSO — 4 módulos menores al contexto del solicitante
 
-A definir. Cuando el usuario lo proponga, este bloque se
-actualiza con:
+**Estado:** planificado. Sin código todavía.
 
-- **Motivación** (por qué se hace).
-- **Decisiones tomadas.**
-- **Fases o tandas** con checklist.
-- **Archivos tocados.**
-- **Pendientes que abre.**
+### 6.1. Motivación
 
-Los candidatos que hoy están en la lista (sin prioridad) son
-los de §4. La decisión depende del usuario.
+Los módulos `Empresa.php`, `Vehiculo.php`,
+`Liquidacion.php` y `Rendicion.php` siguen navegando desde la
+raíz `usuarios` en varias funciones. Bajo **carga parcial**
+esa raíz solo está en el grafo del admin (vía
+`us_Administrador → usuarios`). Para **dueño** y **soporte**
+no está: cualquier `nodo_por_id('usuarios')` devuelve null y
+la operación falla silenciosa o cae a "no encontrado".
+
+El terminal **no** ve estas pestañas, así que no es un
+problema de terminal. Es de dueño y soporte.
+
+### 6.2. Diagnóstico
+
+- **Admin:** tiene `us_Administrador → usuarios`. Los 4
+  módulos andan.
+- **Dueño:** carga parcial `[us_<dueño>]`. Sin `usuarios`.
+  Falla cualquier navegación por la raíz.
+- **Soporte:** carga parcial `[us_<soporte>] → duenos →
+  us_<dueño>`. Puede llegar a `us_<dueño>` directo, pero no
+  a `usuarios` global. Mismo problema que dueño.
+- **Terminal:** no aplica (no ve estas pestañas).
+
+Es el mismo patrón de la Fase B3.1 (v77r), aplicado a los
+módulos que quedaron sin tocar.
+
+### 6.3. Decisiones tomadas
+
+- **Cambio de navegación:** `usuarios → dueño → X` pasa a
+  `us_<dueño> → X` (ID especial directo).
+- **Funciones que buscan por id:** reciben
+  `?string $nombre_dueno` y navegan desde `us_<dueño>`.
+  Mismo patrón que `obtener_venta_por_id` en `Venta.php`.
+- **Enrutador:** `_nombre_dueno_solicitante($sol, $post)`
+  provee el `$nombre_dueno` a esas funciones.
+- **Sin cambios de API pública** para el frontend: los
+  POST y las respuestas quedan iguales.
+- **Empresa y Vehiculo** (contenedores planos): cambio de
+  navegación. **Liquidacion y Rendicion** (árboles hmi/hd):
+  cambio de navegación + `$nombre_dueno` en las búsquedas
+  por id.
+
+### 6.4. Fases
+
+- [ ] **Fase 1 — Auditoría.** Leer los 4 archivos y el
+  Enrutador completos. Listar todos los
+  `nodo_por_id('usuarios')` y todos los casos donde un
+  `$nombre_dueno` no se usa para navegar directo.
+  Confirmar diagnósticos y ajustar si hay sorpresas.
+  *Solo lectura, sin código.*
+
+- [ ] **Fase 2 — Los 4 módulos + Enrutador.** Una sola
+  tanda con bloques por módulo.
+  *Archivos:* `Aplicacion/Empresas/Empresa.php`,
+  `Aplicacion/Vehiculos/Vehiculo.php`,
+  `Aplicacion/Liquidaciones/Liquidacion.php`,
+  `Aplicacion/Rendiciones/Rendicion.php`,
+  `Aplicacion/Enrutador.php`.
+  *Bumps:* cada archivo tocado a `1.5piloto.81h`.
+
+- [ ] **Fase 3 — Verificación manual.**
+  - Login **dueño**: Rendiciones, Liquidaciones,
+    Empresas/Micros cargan sin errores.
+  - Login **soporte** (con un dueño asignado): idem.
+  - Login **admin**: no se rompe nada.
+  - Si algo falla, fix chico antes de las pruebas del
+    plugin.
+
+- [ ] **Fase 4 — Pruebas del plugin (espejo).**
+  Tres pruebas mínimas:
+  - `rendiciones_listar_carga_parcial_dueno`: login
+    dueño, `rendiciones/listar`, verificar que devuelve
+    sin error.
+  - `liquidaciones_listar_carga_parcial_dueno`: idem.
+  - `empresas_listar_carga_parcial_soporte`: login
+    soporte, elegir un dueño asignado,
+    `empresas/listar`, verificar sin error.
+  *Archivo:* `iteradoresJS/Aplicacion/pruebas/`.
+  *Commit separado en el repo del plugin.*
+
+- [ ] **Fase 5 — Documentación.**
+  - `prompt_piloto.md` §5.11-5.12: si cambian firmas,
+    anotarlo.
+  - `plan_actual.md` §2: una línea con el arco cerrado.
+  - `prompt_seguridad.md` §8.6 (B3.3c): de los 7
+    helpers, quedan 3 sin adaptar (los de `Venta.php` y
+    la rama de historial de `Pasajero.php`).
+
+### 6.5. Pendientes que abre
+
+- **B3.3c se reduce:** de 7 helpers sin adaptar a 3
+  (`Venta.php`: `_buscar_venta_por_id` fallback y
+  `obtener_cancelacion_por_id`; `Pasajero.php`:
+  `obtener_pasajero_por_dni` rama del historial de
+  ventas).
+- **Verificación con soporte real:** hoy las pruebas del
+  plugin no cubren el caso "soporte opera sobre un dueño
+  asignado". Las 3 pruebas nuevas de la Fase 4 lo hacen
+  para Empresas. Si en el futuro aparecen más módulos con
+  este patrón, replicar.
+- **Falta de cobertura en rendiciones/liquidaciones
+  para soporte:** las pruebas de la Fase 4 cubren
+  `rendiciones/listar` y `liquidaciones/listar` con
+  dueño, pero no con soporte. Se puede agregar después.
 
 ---
 
