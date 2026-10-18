@@ -1,6 +1,6 @@
 /***
  * Funciones de la pestaña Rendiciones.
- * @version 1.5piloto.57b
+ * @version 1.5piloto.81i
  */
 
 let rendiciones_actuales = [];
@@ -283,10 +283,17 @@ function renderizar_tabla_rendiciones(rendiciones) {
  * Abre el modal con el detalle completo de una rendición.
  */
 async function ver_detalle_rendicion(id_rendicion) {
+    // Fase B3.3a (v81i): mandar nombre_dueno para que el backend
+    // navegue desde us_<dueño>. Sin esto, el soporte (carga
+    // parcial [us_<soporte>], sin `usuarios`) no puede navegar
+    // y recibe "Rendición no encontrada".
+    const params = { accion: "rendiciones/obtener", id_rendicion };
+    const nombre_dueno = obtener_nombre_dueno_rendiciones();
+    if (nombre_dueno) params.nombre_dueno = nombre_dueno;
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "rendiciones/obtener", id_rendicion })
+        body: new URLSearchParams(params)
     });
     const datos = await respuesta.json();
     if (!datos.exito) {
@@ -502,14 +509,19 @@ async function aceptar_ajuste_rendicion_ui(id_rendicion, id_cancelacion) {
     );
     if (!confirmacion) return;
 
+    // Fase B3.3a (v81i): mandar nombre_dueno, igual que
+    // ver_detalle_rendicion.
+    const params_ajuste = {
+        accion: "rendiciones/aceptar_ajuste",
+        id_rendicion,
+        id_cancelacion
+    };
+    const nombre_dueno_aj = obtener_nombre_dueno_rendiciones();
+    if (nombre_dueno_aj) params_ajuste.nombre_dueno = nombre_dueno_aj;
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            accion: "rendiciones/aceptar_ajuste",
-            id_rendicion,
-            id_cancelacion
-        })
+        body: new URLSearchParams(params_ajuste)
     });
     const resultado = await respuesta.json();
     if (!resultado.exito) {

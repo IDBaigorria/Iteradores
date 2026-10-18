@@ -1,6 +1,6 @@
 /***
  * Funciones de la pestaña Liquidaciones.
- * @version 1.5piloto.54d
+ * @version 1.5piloto.81i
  */
 
 let liquidaciones_actuales = [];
@@ -175,10 +175,16 @@ function renderizar_tabla_liquidaciones(liquidaciones) {
 }
 
 async function ver_detalle_liquidacion(id_liquidacion) {
+    // Fase B3.3a (v81i): mandar nombre_dueno para que el backend
+    // navegue desde us_<dueño>. Sin esto, el soporte (carga
+    // parcial sin `usuarios`) recibe "Liquidación no encontrada".
+    const params = { accion: "liquidaciones/obtener", id_liquidacion };
+    const nombre_dueno = obtener_nombre_dueno_liquidaciones();
+    if (nombre_dueno) params.nombre_dueno = nombre_dueno;
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "liquidaciones/obtener", id_liquidacion })
+        body: new URLSearchParams(params)
     });
     const datos = await respuesta.json();
     if (!datos.exito) {

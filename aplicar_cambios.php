@@ -1,413 +1,199 @@
 <?php
 /**
- * Aplicador — Tanda V: 3 funciones de rendiciones/liquidaciones + Enrutador.
+ * Aplicador — Tanda W: fix del frontend (mandar nombre_dueno en detalles).
  *
  * Uso (raíz de iteradores/): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '';
-$htmls_a_bumpear = [];
+$version_nueva = '1.5piloto.81i';
+$htmls_a_bumpear = ['aplicacion_GET.html'];
 
 $cambios = [
     // ============================================================
-    // A) Liquidacion.php: obtener_liquidacion_por_id con $nombre_dueno.
+    // A) rendiciones.js: ver_detalle_rendicion manda nombre_dueno.
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Liquidaciones/Liquidacion.php',
-        'descripcion' => 'obtener_liquidacion_por_id acepta $nombre_dueno',
+        'archivo' => 'Aplicacion/rendiciones.js',
+        'descripcion' => 'ver_detalle_rendicion manda nombre_dueno',
         'buscar' => [
-            '/**',
-            ' * Busca una liquidación por su id en todos los dueños.',
-            ' */',
-            'function obtener_liquidacion_por_id(string $id_liquidacion): ?array {',
-            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz_usuarios) return null;',
-            '',
-            '    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {',
-            '        $nivel = $nodo_dueno->adyacente(\'nivel\');',
-            '        if (!$nivel || $nivel->dato() !== \'dueno\') continue;',
-            '        $contenedor = $nodo_dueno->adyacente(\'liquidaciones\');',
-            '        if (!$contenedor) continue;',
-            '        $actual = hmi($contenedor);',
-            '        $seg = 0;',
-            '        while ($actual && $seg < 2000) {',
-            '            $seg++;',
-            '            if ($actual->dato() === $id_liquidacion) {',
-            '                return formatear_liquidacion_completa($actual);',
-            '            }',
-            '            $actual = hd($actual);',
-            '        }',
-            '    }',
-            '    return null;',
-            '}',
+            'async function ver_detalle_rendicion(id_rendicion) {',
+            '    const respuesta = await fetch("index.php", {',
+            '        method: "POST",',
+            '        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
+            '        body: new URLSearchParams({ accion: "rendiciones/obtener", id_rendicion })',
+            '    });',
         ],
         'reemplazar' => [
-            '/**',
-            ' * Busca una liquidación por su id.',
-            ' *',
-            ' * Fase B3.3a: acepta $nombre_dueno. Si viene, navega',
-            ' * directo desde `us_<dueño>` (con carga parcial del',
-            ' * dueño/soporte, la raíz `usuarios` no está en memoria).',
-            ' * Si no viene, recorre todos los dueños desde la raíz',
-            ' * `usuarios` (compatibilidad con llamadores que hacen',
-            ' * carga total, por ejemplo Impresion.php).',
-            ' */',
-            'function obtener_liquidacion_por_id(string $id_liquidacion, ?string $nombre_dueno = null): ?array {',
-            '    if ($nombre_dueno !== null && $nombre_dueno !== \'\') {',
-            '        $contenedor = obtener_contenedor_liquidaciones_dueno($nombre_dueno);',
-            '        if ($contenedor) {',
-            '            $actual = hmi($contenedor);',
-            '            $seg = 0;',
-            '            while ($actual && $seg < 2000) {',
-            '                $seg++;',
-            '                if ($actual->dato() === $id_liquidacion) {',
-            '                    return formatear_liquidacion_completa($actual);',
-            '                }',
-            '                $actual = hd($actual);',
-            '            }',
-            '        }',
-            '        return null;',
-            '    }',
-            '',
-            '    // Fallback: recorrido completo desde la raíz `usuarios`.',
-            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz_usuarios) return null;',
-            '',
-            '    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno_actual => $nodo_dueno) {',
-            '        $nivel = $nodo_dueno->adyacente(\'nivel\');',
-            '        if (!$nivel || $nivel->dato() !== \'dueno\') continue;',
-            '        $contenedor = $nodo_dueno->adyacente(\'liquidaciones\');',
-            '        if (!$contenedor) continue;',
-            '        $actual = hmi($contenedor);',
-            '        $seg = 0;',
-            '        while ($actual && $seg < 2000) {',
-            '            $seg++;',
-            '            if ($actual->dato() === $id_liquidacion) {',
-            '                return formatear_liquidacion_completa($actual);',
-            '            }',
-            '            $actual = hd($actual);',
-            '        }',
-            '    }',
-            '    return null;',
-            '}',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Liquidaciones/Liquidacion.php',
-        'descripcion' => 'Bump @version de Liquidacion.php',
-        'buscar' => [
-            ' * @version   1.5piloto.77t',
-        ],
-        'reemplazar' => [
-            ' * @version   1.5piloto.81h',
+            'async function ver_detalle_rendicion(id_rendicion) {',
+            '    // Fase B3.3a (v81i): mandar nombre_dueno para que el backend',
+            '    // navegue desde us_<dueño>. Sin esto, el soporte (carga',
+            '    // parcial [us_<soporte>], sin `usuarios`) no puede navegar',
+            '    // y recibe "Rendición no encontrada".',
+            '    const params = { accion: "rendiciones/obtener", id_rendicion };',
+            '    const nombre_dueno = obtener_nombre_dueno_rendiciones();',
+            '    if (nombre_dueno) params.nombre_dueno = nombre_dueno;',
+            '    const respuesta = await fetch("index.php", {',
+            '        method: "POST",',
+            '        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
+            '        body: new URLSearchParams(params)',
+            '    });',
         ],
     ],
 
     // ============================================================
-    // B) Rendicion.php: obtener_rendicion_por_id con $nombre_dueno.
+    // B) rendiciones.js: aceptar_ajuste_rendicion_ui manda nombre_dueno.
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Rendiciones/Rendicion.php',
-        'descripcion' => 'obtener_rendicion_por_id acepta $nombre_dueno',
+        'archivo' => 'Aplicacion/rendiciones.js',
+        'descripcion' => 'aceptar_ajuste_rendicion_ui manda nombre_dueno',
         'buscar' => [
-            '/**',
-            ' * Busca una rendición por su id en todos los dueños.',
-            ' *',
-            ' * @param string $id_rendicion',
-            ' * @return array|null',
-            ' */',
-            'function obtener_rendicion_por_id(string $id_rendicion): ?array {',
-            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz_usuarios) return null;',
-            '',
-            '    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {',
-            '        $nivel = $nodo_dueno->adyacente(\'nivel\');',
-            '        if (!$nivel || $nivel->dato() !== \'dueno\') continue;',
-            '        $contenedor = $nodo_dueno->adyacente(\'rendiciones\');',
-            '        if (!$contenedor) continue;',
-            '        $actual = hmi($contenedor);',
-            '        $seg = 0;',
-            '        while ($actual && $seg < 2000) {',
-            '            $seg++;',
-            '            if ($actual->dato() === $id_rendicion) {',
-            '                return formatear_rendicion_completa($actual);',
-            '            }',
-            '            $actual = hd($actual);',
-            '        }',
-            '    }',
-            '    return null;',
-            '}',
+            '    const respuesta = await fetch("index.php", {',
+            '        method: "POST",',
+            '        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
+            '        body: new URLSearchParams({',
+            '            accion: "rendiciones/aceptar_ajuste",',
+            '            id_rendicion,',
+            '            id_cancelacion',
+            '        })',
+            '    });',
         ],
         'reemplazar' => [
-            '/**',
-            ' * Busca una rendición por su id.',
-            ' *',
-            ' * Fase B3.3a: acepta $nombre_dueno. Si viene, navega',
-            ' * directo desde `us_<dueño>`. Si no, fallback a recorrer',
-            ' * todos los dueños desde la raíz `usuarios`.',
-            ' *',
-            ' * @param string      $id_rendicion',
-            ' * @param string|null $nombre_dueno',
-            ' * @return array|null',
-            ' */',
-            'function obtener_rendicion_por_id(string $id_rendicion, ?string $nombre_dueno = null): ?array {',
-            '    if ($nombre_dueno !== null && $nombre_dueno !== \'\') {',
-            '        $contenedor = obtener_contenedor_rendiciones_dueno($nombre_dueno);',
-            '        if ($contenedor) {',
-            '            $actual = hmi($contenedor);',
-            '            $seg = 0;',
-            '            while ($actual && $seg < 2000) {',
-            '                $seg++;',
-            '                if ($actual->dato() === $id_rendicion) {',
-            '                    return formatear_rendicion_completa($actual);',
-            '                }',
-            '                $actual = hd($actual);',
-            '            }',
-            '        }',
-            '        return null;',
-            '    }',
-            '',
-            '    // Fallback: recorrido completo desde la raíz `usuarios`.',
-            '    $raiz_usuarios = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz_usuarios) return null;',
-            '',
-            '    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno_actual => $nodo_dueno) {',
-            '        $nivel = $nodo_dueno->adyacente(\'nivel\');',
-            '        if (!$nivel || $nivel->dato() !== \'dueno\') continue;',
-            '        $contenedor = $nodo_dueno->adyacente(\'rendiciones\');',
-            '        if (!$contenedor) continue;',
-            '        $actual = hmi($contenedor);',
-            '        $seg = 0;',
-            '        while ($actual && $seg < 2000) {',
-            '            $seg++;',
-            '            if ($actual->dato() === $id_rendicion) {',
-            '                return formatear_rendicion_completa($actual);',
-            '            }',
-            '            $actual = hd($actual);',
-            '        }',
-            '    }',
-            '    return null;',
-            '}',
+            '    // Fase B3.3a (v81i): mandar nombre_dueno, igual que',
+            '    // ver_detalle_rendicion.',
+            '    const params_ajuste = {',
+            '        accion: "rendiciones/aceptar_ajuste",',
+            '        id_rendicion,',
+            '        id_cancelacion',
+            '    };',
+            '    const nombre_dueno_aj = obtener_nombre_dueno_rendiciones();',
+            '    if (nombre_dueno_aj) params_ajuste.nombre_dueno = nombre_dueno_aj;',
+            '    const respuesta = await fetch("index.php", {',
+            '        method: "POST",',
+            '        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
+            '        body: new URLSearchParams(params_ajuste)',
+            '    });',
         ],
     ],
 
     // ============================================================
-    // C) Rendicion.php: aceptar_ajuste_rendicion con $nombre_dueno.
+    // C) rendiciones.js: bump @version.
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Rendiciones/Rendicion.php',
-        'descripcion' => 'aceptar_ajuste_rendicion acepta $nombre_dueno',
+        'archivo' => 'Aplicacion/rendiciones.js',
+        'descripcion' => 'Bump @version de rendiciones.js',
         'buscar' => [
-            'function aceptar_ajuste_rendicion(string $id_rendicion, string $id_cancelacion): array {',
-            '    if ($id_rendicion === \'\' || $id_cancelacion === \'\') {',
-            '        return [\'exito\' => false, \'error\' => \'Parámetros incompletos\'];',
-            '    }',
-            '',
-            '    $raiz = Nodo::nodo_por_id(\'usuarios\');',
-            '    if (!$raiz) return [\'exito\' => false, \'error\' => \'No hay usuarios\'];',
-            '',
-            '    $nodo_rendicion = null;',
-            '    foreach ($raiz->adyacentes() as $nd => $nodo_dueno) {',
-            '        $nivel = $nodo_dueno->adyacente(\'nivel\');',
-            '        if (!$nivel || $nivel->dato() !== \'dueno\') continue;',
-            '        $cont = $nodo_dueno->adyacente(\'rendiciones\');',
-            '        if (!$cont) continue;',
-            '        $actual = hmi($cont);',
-            '        $seg = 0;',
-            '        while ($actual && $seg < 2000) {',
-            '            $seg++;',
-            '            if ($actual->dato() === $id_rendicion) { $nodo_rendicion = $actual; break 2; }',
-            '            $actual = hd($actual);',
-            '        }',
-            '    }',
-            '    if (!$nodo_rendicion) return [\'exito\' => false, \'error\' => \'Rendición no encontrada\'];',
+            ' * @version 1.5piloto.57b',
         ],
         'reemplazar' => [
-            'function aceptar_ajuste_rendicion(string $id_rendicion, string $id_cancelacion, ?string $nombre_dueno = null): array {',
-            '    if ($id_rendicion === \'\' || $id_cancelacion === \'\') {',
-            '        return [\'exito\' => false, \'error\' => \'Parámetros incompletos\'];',
-            '    }',
-            '',
-            '    // Fase B3.3a: si viene $nombre_dueno, navegar directo',
-            '    // desde us_<dueño>. Si no, fallback a iterar todos los',
-            '    // dueños (carga total).',
-            '    $nodo_rendicion = null;',
-            '    if ($nombre_dueno !== null && $nombre_dueno !== \'\') {',
-            '        $cont = obtener_contenedor_rendiciones_dueno($nombre_dueno);',
-            '        if ($cont) {',
-            '            $actual = hmi($cont);',
-            '            $seg = 0;',
-            '            while ($actual && $seg < 2000) {',
-            '                $seg++;',
-            '                if ($actual->dato() === $id_rendicion) { $nodo_rendicion = $actual; break; }',
-            '                $actual = hd($actual);',
-            '            }',
-            '        }',
-            '    } else {',
-            '        $raiz = Nodo::nodo_por_id(\'usuarios\');',
-            '        if ($raiz) {',
-            '            foreach ($raiz->adyacentes() as $nd => $nodo_dueno) {',
-            '                $nivel = $nodo_dueno->adyacente(\'nivel\');',
-            '                if (!$nivel || $nivel->dato() !== \'dueno\') continue;',
-            '                $cont = $nodo_dueno->adyacente(\'rendiciones\');',
-            '                if (!$cont) continue;',
-            '                $actual = hmi($cont);',
-            '                $seg = 0;',
-            '                while ($actual && $seg < 2000) {',
-            '                    $seg++;',
-            '                    if ($actual->dato() === $id_rendicion) { $nodo_rendicion = $actual; break 2; }',
-            '                    $actual = hd($actual);',
-            '                }',
-            '            }',
-            '        }',
-            '    }',
-            '    if (!$nodo_rendicion) return [\'exito\' => false, \'error\' => \'Rendición no encontrada\'];',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Rendiciones/Rendicion.php',
-        'descripcion' => 'Bump @version de Rendicion.php',
-        'buscar' => [
-            ' * @version   1.5piloto.77t',
-        ],
-        'reemplazar' => [
-            ' * @version   1.5piloto.81h',
+            ' * @version 1.5piloto.81i',
         ],
     ],
 
     // ============================================================
-    // D) Enrutador.php: rendiciones/obtener.
+    // D) liquidaciones.js: ver_detalle_liquidacion manda nombre_dueno.
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Enrutador.php',
-        'descripcion' => 'rendiciones/obtener pasa $nombre_dueno',
+        'archivo' => 'Aplicacion/liquidaciones.js',
+        'descripcion' => 'ver_detalle_liquidacion manda nombre_dueno',
         'buscar' => [
-            '                case \'obtener\':',
-            '                    $id_rendicion = $post[\'id_rendicion\'] ?? \'\';',
-            '                    if (empty($id_rendicion)) {',
-            '                        responder_json([\'exito\' => false, \'error\' => \'ID de rendición no especificado\']);',
-            '                    }',
-            '                    $rendicion = obtener_rendicion_por_id($id_rendicion);',
+            'async function ver_detalle_liquidacion(id_liquidacion) {',
+            '    const respuesta = await fetch("index.php", {',
+            '        method: "POST",',
+            '        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
+            '        body: new URLSearchParams({ accion: "liquidaciones/obtener", id_liquidacion })',
+            '    });',
         ],
         'reemplazar' => [
-            '                case \'obtener\':',
-            '                    $id_rendicion = $post[\'id_rendicion\'] ?? \'\';',
-            '                    if (empty($id_rendicion)) {',
-            '                        responder_json([\'exito\' => false, \'error\' => \'ID de rendición no especificado\']);',
-            '                    }',
-            '                    // Fase B3.3a: pasar $nombre_dueno para navegar directo.',
-            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
-            '                    $rendicion = obtener_rendicion_por_id($id_rendicion, $nombre_dueno_sol);',
+            'async function ver_detalle_liquidacion(id_liquidacion) {',
+            '    // Fase B3.3a (v81i): mandar nombre_dueno para que el backend',
+            '    // navegue desde us_<dueño>. Sin esto, el soporte (carga',
+            '    // parcial sin `usuarios`) recibe "Liquidación no encontrada".',
+            '    const params = { accion: "liquidaciones/obtener", id_liquidacion };',
+            '    const nombre_dueno = obtener_nombre_dueno_liquidaciones();',
+            '    if (nombre_dueno) params.nombre_dueno = nombre_dueno;',
+            '    const respuesta = await fetch("index.php", {',
+            '        method: "POST",',
+            '        headers: { "Content-Type": "application/x-www-form-urlencoded" },',
+            '        body: new URLSearchParams(params)',
+            '    });',
         ],
     ],
 
     // ============================================================
-    // E) Enrutador.php: rendiciones/aceptar_ajuste.
+    // E) liquidaciones.js: bump @version.
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Enrutador.php',
-        'descripcion' => 'rendiciones/aceptar_ajuste pasa $nombre_dueno',
+        'archivo' => 'Aplicacion/liquidaciones.js',
+        'descripcion' => 'Bump @version de liquidaciones.js',
         'buscar' => [
-            '                case \'aceptar_ajuste\':',
-            '                    $id_rendicion = $post[\'id_rendicion\'] ?? \'\';',
-            '                    $id_cancelacion = $post[\'id_cancelacion\'] ?? \'\';',
-            '                    $resultado = aceptar_ajuste_rendicion($id_rendicion, $id_cancelacion);',
-            '                    responder_json($resultado);',
-            '                    break;',
+            ' * @version 1.5piloto.54d',
         ],
         'reemplazar' => [
-            '                case \'aceptar_ajuste\':',
-            '                    $id_rendicion = $post[\'id_rendicion\'] ?? \'\';',
-            '                    $id_cancelacion = $post[\'id_cancelacion\'] ?? \'\';',
-            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
-            '                    $resultado = aceptar_ajuste_rendicion($id_rendicion, $id_cancelacion, $nombre_dueno_sol);',
-            '                    responder_json($resultado);',
-            '                    break;',
+            ' * @version 1.5piloto.81i',
         ],
     ],
 
     // ============================================================
-    // F) Enrutador.php: liquidaciones/obtener.
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Enrutador.php',
-        'descripcion' => 'liquidaciones/obtener pasa $nombre_dueno',
-        'buscar' => [
-            '                case \'obtener\':',
-            '                    $id_liquidacion = $post[\'id_liquidacion\'] ?? \'\';',
-            '                    if (empty($id_liquidacion)) {',
-            '                        responder_json([\'exito\' => false, \'error\' => \'ID de liquidación no especificado\']);',
-            '                    }',
-            '                    $liq = obtener_liquidacion_por_id($id_liquidacion);',
-        ],
-        'reemplazar' => [
-            '                case \'obtener\':',
-            '                    $id_liquidacion = $post[\'id_liquidacion\'] ?? \'\';',
-            '                    if (empty($id_liquidacion)) {',
-            '                        responder_json([\'exito\' => false, \'error\' => \'ID de liquidación no especificado\']);',
-            '                    }',
-            '                    // Fase B3.3a: pasar $nombre_dueno para navegar directo.',
-            '                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);',
-            '                    $liq = obtener_liquidacion_por_id($id_liquidacion, $nombre_dueno_sol);',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Enrutador.php',
-        'descripcion' => 'Bump @version del Enrutador',
-        'buscar' => [
-            ' * @version   1.5piloto.80n',
-        ],
-        'reemplazar' => [
-            ' * @version   1.5piloto.81h',
-        ],
-    ],
-
-    // ============================================================
-    // G) plan_actual §6: marcar Fase 2 como completada.
+    // F) plan_actual §6.4: nota del bug encontrado en verificación.
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §6.4: Fase 2 completada',
+        'descripcion' => 'plan_actual §6.4: nota del bug v81i',
         'buscar' => [
-            '- [ ] **Fase 2 — Los 4 módulos + Enrutador.** Una sola',
-            '  tanda con bloques por módulo.',
-            '  *Archivos:* `Aplicacion/Empresas/Empresa.php`,',
-            '  `Aplicacion/Vehiculos/Vehiculo.php`,',
-            '  `Aplicacion/Liquidaciones/Liquidacion.php`,',
-            '  `Aplicacion/Rendiciones/Rendicion.php`,',
-            '  `Aplicacion/Enrutador.php`.',
-            '  *Bumps:* cada archivo tocado a `1.5piloto.81h`.',
-        ],
-        'reemplazar' => [
-            '- [x] **Fase 2 — Módulos + Enrutador.** (v81h)',
-            '  **Alcance corregido tras la auditoría:** Empresa.php',
-            '  y Vehiculo.php ya estaban adaptados (fases v76u-v77v).',
-            '  Solo quedaban 3 funciones en Liquidacion.php y',
-            '  Rendicion.php con el patrón viejo + las 3 subacciones',
-            '  del Enrutador que las invocan sin `$nombre_dueno`.',
-            '  *Archivos tocados:* `Aplicacion/Liquidaciones/Liquidacion.php`',
-            '  (`obtener_liquidacion_por_id`),',
-            '  `Aplicacion/Rendiciones/Rendicion.php`',
-            '  (`obtener_rendicion_por_id` y `aceptar_ajuste_rendicion`),',
-            '  `Aplicacion/Enrutador.php` (3 subacciones).',
-            '  *Patrón:* `?string $nombre_dueno = null`. Si viene,',
-            '  navega desde `us_<dueño>`. Si no, fallback al',
-            '  recorrido completo (compatibilidad con Impresion.php,',
-            '  que hace carga total).',
             '  *Bumps:* Liquidacion.php, Rendicion.php y Enrutador.php',
             '  a `1.5piloto.81h`.',
+        ],
+        'reemplazar' => [
+            '  *Bumps:* Liquidacion.php, Rendicion.php y Enrutador.php',
+            '  a `1.5piloto.81h`.',
+            '',
+            '  **Bug encontrado en la verificación manual (v81i):**',
+            '  el backend ya navegaba bien, pero el frontend no',
+            '  mandaba `nombre_dueno` en `rendiciones/obtener`,',
+            '  `rendiciones/aceptar_ajuste` ni `liquidaciones/obtener`.',
+            '  Como el soporte no tiene `usuarios` en su carga',
+            '  parcial, el fallback del backend devolvía null y el',
+            '  modal decía "no encontrada". Fix: los 3 POST del',
+            '  frontend agregan `nombre_dueno` vía',
+            '  `obtener_nombre_dueno_rendiciones()` /',
+            '  `obtener_nombre_dueno_liquidaciones()`. Con dueño y',
+            '  admin ya funcionaba porque el backend devuelve el',
+            '  nombre solo; el bug era exclusivo de soporte.',
+        ],
+    ],
+
+    // ============================================================
+    // G) plan_actual §6.4: Fase 3 completada.
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual §6.4: Fase 3 completada',
+        'buscar' => [
+            '- [ ] **Fase 3 — Verificación manual.**',
+            '  - Login **dueño**: Rendiciones, Liquidaciones,',
+            '    Empresas/Micros cargan sin errores.',
+            '  - Login **soporte** (con un dueño asignado): idem.',
+            '  - Login **admin**: no se rompe nada.',
+            '  - Si algo falla, fix chico antes de las pruebas del',
+            '    plugin.',
+        ],
+        'reemplazar' => [
+            '- [x] **Fase 3 — Verificación manual.** (v81h + v81i)',
+            '  - Login **dueño**: Rendiciones y Liquidaciones cargan',
+            '    y el detalle abre. OK.',
+            '  - Login **soporte**: tabla cargaba pero el detalle',
+            '    decía "no encontrada" (bug v81i, ver §6.4).',
+            '    Fix aplicado en el frontend. Verificado tras el fix.',
+            '  - Login **admin**: no se rompió nada.',
         ],
     ],
 ];
@@ -487,6 +273,80 @@ if ($modo_estricto && !empty($bloques_fallidos)) {
     exit(1);
 }
 
+$archivos_bump_php_js = [];
+$archivos_bump_js_css = [];
+foreach ($archivos_a_escribir as $ruta_abs => $info) {
+    $rel = substr($ruta_abs, strlen($raiz_proyecto) + 1);
+    $ext = strtolower(pathinfo($ruta_abs, PATHINFO_EXTENSION));
+    if ($ext === 'php' || $ext === 'js') $archivos_bump_php_js[] = $rel;
+    if ($ext === 'js' || $ext === 'css') $archivos_bump_js_css[] = $rel;
+}
+foreach ($creaciones as $cr) {
+    $ext = strtolower(pathinfo($cr['archivo'], PATHINFO_EXTENSION));
+    if ($ext === 'php' || $ext === 'js') $archivos_bump_php_js[] = $cr['archivo'];
+    if ($ext === 'js' || $ext === 'css') $archivos_bump_js_css[] = $cr['archivo'];
+}
+
+$bumps_atversion = 0;
+$bumps_qv = 0;
+$bumps_detalle = [];
+$info_bumps = [];
+
+if ($bumpear) {
+    foreach (array_unique($archivos_bump_php_js) as $archivo_rel) {
+        $ruta_abs = $raiz_proyecto . '/' . $archivo_rel;
+        if (!file_exists($ruta_abs)) continue;
+        if (isset($archivos_a_escribir[$ruta_abs])) {
+            list($contenido, $eol) = $archivos_a_escribir[$ruta_abs];
+        } else {
+            $contenido_original = file_get_contents($ruta_abs);
+            $eol = detectar_eol($contenido_original);
+            $contenido = normalizar_a_unix($contenido_original);
+        }
+        $patron = '/(\*\s+@version\s+)(\S+)/';
+        $viejo = '';
+        $nuevo = preg_replace_callback($patron, function($m) use ($version_nueva, &$viejo) {
+            $viejo = $m[2];
+            return $m[1] . $version_nueva;
+        }, $contenido, 1, $count);
+        if ($count === 0) { $info_bumps[] = "$archivo_rel (sin @version)"; continue; }
+        if ($viejo === $version_nueva) { continue; }
+        $archivos_a_escribir[$ruta_abs] = [normalizar_a_unix($nuevo), $eol];
+        $bumps_atversion++;
+        $bumps_detalle[] = "$archivo_rel  @version $viejo → $version_nueva";
+    }
+
+    foreach ($htmls_a_bumpear as $html_rel) {
+        $html_abs = $raiz_proyecto . '/' . $html_rel;
+        if (!file_exists($html_abs)) { $info_bumps[] = "$html_rel (no encontrado)"; continue; }
+        if (isset($archivos_a_escribir[$html_abs])) {
+            list($html, $eol) = $archivos_a_escribir[$html_abs];
+        } else {
+            $html_orig = file_get_contents($html_abs);
+            $eol = detectar_eol($html_orig);
+            $html = normalizar_a_unix($html_orig);
+        }
+        $html_antes = $html;
+        foreach (array_unique($archivos_bump_js_css) as $archivo_rel) {
+            $base = basename($archivo_rel);
+            $base_esc = preg_quote($base, '/');
+            $patron = '/(' . $base_esc . '\?v=)([^"\'\s>]+)/';
+            $viejo_qv = '';
+            $html = preg_replace_callback($patron, function($m) use ($version_nueva, &$viejo_qv) {
+                $viejo_qv = $m[2];
+                return $m[1] . $version_nueva;
+            }, $html, 1, $c_qv);
+            if ($c_qv > 0 && $viejo_qv !== $version_nueva) {
+                $bumps_qv++;
+                $bumps_detalle[] = "$html_rel  $base ?v= $viejo_qv → $version_nueva";
+            }
+        }
+        if ($html !== $html_antes) {
+            $archivos_a_escribir[$html_abs] = [normalizar_a_unix($html), $eol];
+        }
+    }
+}
+
 $archivos_escritos = 0;
 foreach ($archivos_a_escribir as $ruta_abs => $info) {
     list($contenido_unix, $eol) = $info;
@@ -519,9 +379,19 @@ foreach ($eliminaciones as $elim) {
     else echo "[FALLO] No se pudo eliminar: " . $elim['archivo'] . "\n";
 }
 
+if ($bumpear && (!empty($bumps_detalle) || !empty($info_bumps))) {
+    echo "\n--- Bumps ---\n";
+    foreach ($bumps_detalle as $d) echo "[BUMP] $d\n";
+    foreach ($info_bumps as $i) echo "[INFO] $i\n";
+}
+
 echo "\n=== Resumen ===\n";
 echo "Bloques aplicados: $bloques_ok\n";
 echo "Archivos escritos: $archivos_escritos\n";
+if ($bumpear) {
+    echo "Bumps @version:    $bumps_atversion\n";
+    echo "Bumps ?v=:         $bumps_qv\n";
+}
 if (!empty($bloques_fallidos)) {
     echo "Fallos: " . count($bloques_fallidos) . "\n";
     foreach ($bloques_fallidos as $f) echo "  - $f\n";

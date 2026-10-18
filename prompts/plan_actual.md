@@ -303,13 +303,26 @@ módulos que quedaron sin tocar.
   *Bumps:* Liquidacion.php, Rendicion.php y Enrutador.php
   a `1.5piloto.81h`.
 
-- [ ] **Fase 3 — Verificación manual.**
-  - Login **dueño**: Rendiciones, Liquidaciones,
-    Empresas/Micros cargan sin errores.
-  - Login **soporte** (con un dueño asignado): idem.
-  - Login **admin**: no se rompe nada.
-  - Si algo falla, fix chico antes de las pruebas del
-    plugin.
+  **Bug encontrado en la verificación manual (v81i):**
+  el backend ya navegaba bien, pero el frontend no
+  mandaba `nombre_dueno` en `rendiciones/obtener`,
+  `rendiciones/aceptar_ajuste` ni `liquidaciones/obtener`.
+  Como el soporte no tiene `usuarios` en su carga
+  parcial, el fallback del backend devolvía null y el
+  modal decía "no encontrada". Fix: los 3 POST del
+  frontend agregan `nombre_dueno` vía
+  `obtener_nombre_dueno_rendiciones()` /
+  `obtener_nombre_dueno_liquidaciones()`. Con dueño y
+  admin ya funcionaba porque el backend devuelve el
+  nombre solo; el bug era exclusivo de soporte.
+
+- [x] **Fase 3 — Verificación manual.** (v81h + v81i)
+  - Login **dueño**: Rendiciones y Liquidaciones cargan
+    y el detalle abre. OK.
+  - Login **soporte**: tabla cargaba pero el detalle
+    decía "no encontrada" (bug v81i, ver §6.4).
+    Fix aplicado en el frontend. Verificado tras el fix.
+  - Login **admin**: no se rompió nada.
 
 - [ ] **Fase 4 — Pruebas del plugin (espejo).**
   Tres pruebas mínimas:
