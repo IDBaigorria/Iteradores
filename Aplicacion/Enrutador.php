@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.80n
+ * @version   1.5piloto.81h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1421,7 +1421,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($id_rendicion)) {
                         responder_json(['exito' => false, 'error' => 'ID de rendición no especificado']);
                     }
-                    $rendicion = obtener_rendicion_por_id($id_rendicion);
+                    // Fase B3.3a: pasar $nombre_dueno para navegar directo.
+                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
+                    $rendicion = obtener_rendicion_por_id($id_rendicion, $nombre_dueno_sol);
                     if ($rendicion) {
                         responder_json(['exito' => true, 'rendicion' => $rendicion]);
                     } else {
@@ -1432,7 +1434,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                 case 'aceptar_ajuste':
                     $id_rendicion = $post['id_rendicion'] ?? '';
                     $id_cancelacion = $post['id_cancelacion'] ?? '';
-                    $resultado = aceptar_ajuste_rendicion($id_rendicion, $id_cancelacion);
+                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
+                    $resultado = aceptar_ajuste_rendicion($id_rendicion, $id_cancelacion, $nombre_dueno_sol);
                     responder_json($resultado);
                     break;
 
@@ -1484,7 +1487,9 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($id_liquidacion)) {
                         responder_json(['exito' => false, 'error' => 'ID de liquidación no especificado']);
                     }
-                    $liq = obtener_liquidacion_por_id($id_liquidacion);
+                    // Fase B3.3a: pasar $nombre_dueno para navegar directo.
+                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
+                    $liq = obtener_liquidacion_por_id($id_liquidacion, $nombre_dueno_sol);
                     if ($liq) {
                         responder_json(['exito' => true, 'liquidacion' => $liq]);
                     } else {

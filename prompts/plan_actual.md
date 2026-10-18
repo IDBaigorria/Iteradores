@@ -285,14 +285,23 @@ módulos que quedaron sin tocar.
   Confirmar diagnósticos y ajustar si hay sorpresas.
   *Solo lectura, sin código.*
 
-- [ ] **Fase 2 — Los 4 módulos + Enrutador.** Una sola
-  tanda con bloques por módulo.
-  *Archivos:* `Aplicacion/Empresas/Empresa.php`,
-  `Aplicacion/Vehiculos/Vehiculo.php`,
-  `Aplicacion/Liquidaciones/Liquidacion.php`,
-  `Aplicacion/Rendiciones/Rendicion.php`,
-  `Aplicacion/Enrutador.php`.
-  *Bumps:* cada archivo tocado a `1.5piloto.81h`.
+- [x] **Fase 2 — Módulos + Enrutador.** (v81h)
+  **Alcance corregido tras la auditoría:** Empresa.php
+  y Vehiculo.php ya estaban adaptados (fases v76u-v77v).
+  Solo quedaban 3 funciones en Liquidacion.php y
+  Rendicion.php con el patrón viejo + las 3 subacciones
+  del Enrutador que las invocan sin `$nombre_dueno`.
+  *Archivos tocados:* `Aplicacion/Liquidaciones/Liquidacion.php`
+  (`obtener_liquidacion_por_id`),
+  `Aplicacion/Rendiciones/Rendicion.php`
+  (`obtener_rendicion_por_id` y `aceptar_ajuste_rendicion`),
+  `Aplicacion/Enrutador.php` (3 subacciones).
+  *Patrón:* `?string $nombre_dueno = null`. Si viene,
+  navega desde `us_<dueño>`. Si no, fallback al
+  recorrido completo (compatibilidad con Impresion.php,
+  que hace carga total).
+  *Bumps:* Liquidacion.php, Rendicion.php y Enrutador.php
+  a `1.5piloto.81h`.
 
 - [ ] **Fase 3 — Verificación manual.**
   - Login **dueño**: Rendiciones, Liquidaciones,

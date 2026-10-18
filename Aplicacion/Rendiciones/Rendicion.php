@@ -13,7 +13,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.50
- * @version   1.5piloto.77t
+ * @version   1.5piloto.81h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -728,26 +728,42 @@ function formatear_rendicion_completa(Nodo $nodo_rendicion): array {
  * @param string $id_cancelacion
  * @return array
  */
-function aceptar_ajuste_rendicion(string $id_rendicion, string $id_cancelacion): array {
+function aceptar_ajuste_rendicion(string $id_rendicion, string $id_cancelacion, ?string $nombre_dueno = null): array {
     if ($id_rendicion === '' || $id_cancelacion === '') {
         return ['exito' => false, 'error' => 'Parámetros incompletos'];
     }
 
-    $raiz = Nodo::nodo_por_id('usuarios');
-    if (!$raiz) return ['exito' => false, 'error' => 'No hay usuarios'];
-
+    // Fase B3.3a: si viene $nombre_dueno, navegar directo
+    // desde us_<dueño>. Si no, fallback a iterar todos los
+    // dueños (carga total).
     $nodo_rendicion = null;
-    foreach ($raiz->adyacentes() as $nd => $nodo_dueno) {
-        $nivel = $nodo_dueno->adyacente('nivel');
-        if (!$nivel || $nivel->dato() !== 'dueno') continue;
-        $cont = $nodo_dueno->adyacente('rendiciones');
-        if (!$cont) continue;
-        $actual = hmi($cont);
-        $seg = 0;
-        while ($actual && $seg < 2000) {
-            $seg++;
-            if ($actual->dato() === $id_rendicion) { $nodo_rendicion = $actual; break 2; }
-            $actual = hd($actual);
+    if ($nombre_dueno !== null && $nombre_dueno !== '') {
+        $cont = obtener_contenedor_rendiciones_dueno($nombre_dueno);
+        if ($cont) {
+            $actual = hmi($cont);
+            $seg = 0;
+            while ($actual && $seg < 2000) {
+                $seg++;
+                if ($actual->dato() === $id_rendicion) { $nodo_rendicion = $actual; break; }
+                $actual = hd($actual);
+            }
+        }
+    } else {
+        $raiz = Nodo::nodo_por_id('usuarios');
+        if ($raiz) {
+            foreach ($raiz->adyacentes() as $nd => $nodo_dueno) {
+                $nivel = $nodo_dueno->adyacente('nivel');
+                if (!$nivel || $nivel->dato() !== 'dueno') continue;
+                $cont = $nodo_dueno->adyacente('rendiciones');
+                if (!$cont) continue;
+                $actual = hmi($cont);
+                $seg = 0;
+                while ($actual && $seg < 2000) {
+                    $seg++;
+                    if ($actual->dato() === $id_rendicion) { $nodo_rendicion = $actual; break 2; }
+                    $actual = hd($actual);
+                }
+            }
         }
     }
     if (!$nodo_rendicion) return ['exito' => false, 'error' => 'Rendición no encontrada'];
@@ -848,16 +864,38 @@ function listar_rendiciones_de_dueno(string $nombre_dueno, array $filtros = []):
 }
 
 /**
- * Busca una rendición por su id en todos los dueños.
+ * Busca una rendición por su id.
  *
- * @param string $id_rendicion
+ * Fase B3.3a: acepta $nombre_dueno. Si viene, navega
+ * directo desde `us_<dueño>`. Si no, fallback a recorrer
+ * todos los dueños desde la raíz `usuarios`.
+ *
+ * @param string      $id_rendicion
+ * @param string|null $nombre_dueno
  * @return array|null
  */
-function obtener_rendicion_por_id(string $id_rendicion): ?array {
+function obtener_rendicion_por_id(string $id_rendicion, ?string $nombre_dueno = null): ?array {
+    if ($nombre_dueno !== null && $nombre_dueno !== '') {
+        $contenedor = obtener_contenedor_rendiciones_dueno($nombre_dueno);
+        if ($contenedor) {
+            $actual = hmi($contenedor);
+            $seg = 0;
+            while ($actual && $seg < 2000) {
+                $seg++;
+                if ($actual->dato() === $id_rendicion) {
+                    return formatear_rendicion_completa($actual);
+                }
+                $actual = hd($actual);
+            }
+        }
+        return null;
+    }
+
+    // Fallback: recorrido completo desde la raíz `usuarios`.
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     if (!$raiz_usuarios) return null;
 
-    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno_actual => $nodo_dueno) {
         $nivel = $nodo_dueno->adyacente('nivel');
         if (!$nivel || $nivel->dato() !== 'dueno') continue;
         $contenedor = $nodo_dueno->adyacente('rendiciones');

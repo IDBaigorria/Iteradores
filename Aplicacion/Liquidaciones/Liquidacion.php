@@ -8,7 +8,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.54
- * @version   1.5piloto.77t
+ * @version   1.5piloto.81h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -235,13 +235,37 @@ function listar_liquidaciones_de_dueno(string $nombre_dueno, array $filtros = []
 }
 
 /**
- * Busca una liquidación por su id en todos los dueños.
+ * Busca una liquidación por su id.
+ *
+ * Fase B3.3a: acepta $nombre_dueno. Si viene, navega
+ * directo desde `us_<dueño>` (con carga parcial del
+ * dueño/soporte, la raíz `usuarios` no está en memoria).
+ * Si no viene, recorre todos los dueños desde la raíz
+ * `usuarios` (compatibilidad con llamadores que hacen
+ * carga total, por ejemplo Impresion.php).
  */
-function obtener_liquidacion_por_id(string $id_liquidacion): ?array {
+function obtener_liquidacion_por_id(string $id_liquidacion, ?string $nombre_dueno = null): ?array {
+    if ($nombre_dueno !== null && $nombre_dueno !== '') {
+        $contenedor = obtener_contenedor_liquidaciones_dueno($nombre_dueno);
+        if ($contenedor) {
+            $actual = hmi($contenedor);
+            $seg = 0;
+            while ($actual && $seg < 2000) {
+                $seg++;
+                if ($actual->dato() === $id_liquidacion) {
+                    return formatear_liquidacion_completa($actual);
+                }
+                $actual = hd($actual);
+            }
+        }
+        return null;
+    }
+
+    // Fallback: recorrido completo desde la raíz `usuarios`.
     $raiz_usuarios = Nodo::nodo_por_id('usuarios');
     if (!$raiz_usuarios) return null;
 
-    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno => $nodo_dueno) {
+    foreach ($raiz_usuarios->adyacentes() as $nombre_dueno_actual => $nodo_dueno) {
         $nivel = $nodo_dueno->adyacente('nivel');
         if (!$nivel || $nivel->dato() !== 'dueno') continue;
         $contenedor = $nodo_dueno->adyacente('liquidaciones');
