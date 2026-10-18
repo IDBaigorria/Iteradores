@@ -17,7 +17,7 @@
  * se apoya en helpers globales (`usuario_actual`,
  * `mostrar_aviso`) definidos en `aplicacion.js`.
  *
- * @version 1.5piloto.81e
+ * @version 1.5piloto.81f
  * @since 1.5piloto.80n
  */
 
@@ -565,7 +565,7 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
     const path_linea = document.createElementNS(svg_ns, 'path');
     path_linea.setAttribute('d', 'M 40 0 L 0 0 0 40');
     path_linea.setAttribute('fill', 'none');
-    path_linea.setAttribute('stroke', '#e8e8e8');
+    path_linea.setAttribute('stroke', '#d0d0d0');
     path_linea.setAttribute('stroke-width', '1');
     pattern.appendChild(rect_bg);
     pattern.appendChild(path_linea);
@@ -761,6 +761,11 @@ function _renderizar_grafo_visual(vb_preservado = null, opciones = {}) {
     // animaciones).
     _grafo_visual_grid_observer = new MutationObserver(_grafo_visual_actualizar_grid_rect);
     _grafo_visual_grid_observer.observe(svg, { attributes: true, attributeFilter: ['viewBox'] });
+    // Aplicar el margen al rect desde el primer render. El
+    // observer solo dispara cuando CAMBIA el viewBox; sin
+    // esta llamada, el fondo inicial queda del tamaño exacto
+    // del viewBox y recién se expande con el primer pan/zoom.
+    _grafo_visual_actualizar_grid_rect();
 
     const info = document.createElement('div');
     info.className = 'grafo-visual-info';

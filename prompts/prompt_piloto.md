@@ -90,7 +90,7 @@ Cuando llegue el momento, `Conf::NOMBRE_APP` se derivará del subdominio.
 - `prompt_continuidad_proyecto.md`: stub histórico. Ver su contenido para
   más detalle.
 
-**CSS (dividido en 5 archivos):**
+**CSS (dividido en 6 archivos):**
 - `estilos.css`: base.
 - `estilos-vehiculos.css`: croquis, editor de asientos, foto, panel datos
   del vehículo.
@@ -100,6 +100,9 @@ Cuando llegue el momento, `Conf::NOMBRE_APP` se derivará del subdominio.
   saldos, sub-lista de cupones.
 - `estilos-rendiciones.css`: tabla de rendiciones, badges, detalle,
   ajustes.
+- `estilos-grafo.css`: pestaña Grafo, sub-pestaña Visual. Sub-pestañas,
+  controles, nodos, enlaces, panel lateral, tres modos de tamaño
+  (ampliado, teatro, fullscreen).
 
 **`Aplicacion/`:**
 - `GrafoCredenciales.php`: helper `en_grafo_credenciales`.
@@ -119,7 +122,13 @@ Cuando llegue el momento, `Conf::NOMBRE_APP` se derivará del subdominio.
 - `Enrutador.php`.
 - `FuncionesAuxiliares.php`.
 - `ventas.js`, `pasajeros.js`, `rendiciones.js`, `liquidaciones.js`.
-- `grafo.js`: pestaña Grafo (visualizador de la superestructura).
+- `grafo.js`: pestaña Grafo, sub-pestaña Tabla. Resumen, listado
+  paginado con filtros, modal de detalle, raíces, migraciones,
+  botón "Eliminar nodos basura".
+- `grafo_visual.js`: pestaña Grafo, sub-pestaña Visual. SVG puro
+  (sin librerías), layouts Grilla y Forzar, pan/zoom, drag con
+  física, panel lateral, búsqueda, tres modos de tamaño
+  (ampliado, teatro, fullscreen), etiquetas y colores de enlace.
 
 **`Configuracion/Configuracion.php`**: clase `Conf`.
 
@@ -172,57 +181,118 @@ pantallas angostas, las tabs van con scroll horizontal.
 Implementada en v1.5piloto.74p (Fase 1 del plan de optimización,
 ver §8.6). Visible solo para **admin y soporte**.
 
-**Originalmente de solo lectura; desde v76g incluye una
-acción de escritura.** El botón "Eliminar nodos basura"
-borra todos los nodos no alcanzables desde las raíces
-(IDs especiales) del grafo de la aplicación. **No está
-restringido a modo pruebas**: se usa en producción, donde
-más se acumulan los huérfanos. El chequeo es admin/soporte,
-heredado del módulo `grafo` del enrutador. Antes de
-eliminar, muestra un modal de confirmación con la cuenta
-total y una vista previa de los primeros 20 nodos
-huérfanos. El backend usa el comando
-`grafo:eliminar_huerfanos`, que desenlaza las salientes
-entre huérfanos y después los elimina uno a uno.
+**Dos sub-pestañas.** Desde v80n la pestaña Grafo tiene dos
+vistas: **Tabla** y **Visual**. La pestaña arranca directamente
+en **Visual** desde v81d. Cada sub-pestaña preserva su estado
+al cambiar entre ellas.
 
-**Qué muestra:**
+**Acción de escritura.** El botón "Eliminar nodos basura" borra
+todos los nodos no alcanzables desde las raíces (IDs
+especiales) del grafo de la aplicación. **No está restringido
+a modo pruebas**: se usa en producción, donde más se acumulan
+los huérfanos. El chequeo es admin/soporte, heredado del
+módulo `grafo` del enrutador. Antes de eliminar, muestra un
+modal de confirmación con la cuenta total y una vista previa
+de los primeros 20 nodos huérfanos. El backend usa el comando
+`grafo:eliminar_huerfanos`. Después de eliminar, si la
+sub-pestaña Visual está activa, se recarga el vecindario.
 
-- **Resumen:** total de nodos, alcanzables desde las raíces
-  (`usuarios`, `sesiones` y demás IDs especiales), huérfanos, y
-  top 20 de nodos por referencias entrantes.
-- **Tabla:** listado paginado con filtros por estado
-  (`todos` / `huerfanos` / `alcanzables`), por nombre de enlace y
-  por texto en el dato. Columnas: ID, tipo inferido, dato,
-  cantidad de enlaces salientes, cantidad de referencias
-  entrantes.
+#### Sub-pestaña Tabla
+
+Original de v74p. Vista "clásica" del grafo.
+
+- **Resumen:** total de nodos, alcanzables, huérfanos, top 20
+  por referencias entrantes.
+- **Tabla:** paginada, con filtros por estado (`todos` /
+  `huerfanos` / `alcanzables`), por nombre de enlace y por
+  texto en el dato. Columnas: ID, tipo inferido, dato, enlaces
+  salientes, referencias entrantes.
 - **Detalle (modal apilado):** click en una fila → enlaces
-  salientes, referencias entrantes, y navegación por los nodos
-  relacionados.
+  salientes, referencias entrantes, y navegación por los
+  nodos relacionados.
+
+#### Sub-pestaña Visual
+
+Nueva desde v80n. SVG puro, sin librerías.
+
+- **Carga inicial:** las raíces especiales (`usuarios`,
+  `sesiones`, `aplicacion`, etc.) y un nivel de adyacentes,
+  vía el comando `grafo:vecindario`. Selector de `max_nodos`
+  (100/250/500/1000/2000, default 500).
+- **Nodos:** rectángulos redondeados de 120×64, con tres
+  líneas: tipo (arriba), dato (medio, con `ellipsis`),
+  `#id` (abajo). Los IDs van siempre con `#` adelante. Los
+  IDs numéricos son efímeros pero se muestran porque sirven
+  para inspeccionar la estructura. Las raíces especiales
+  tienen borde naranja. Los compartidos (`_es_compartido`)
+  tienen borde punteado naranja.
+- **Inferencia de tipo:** si el backend devuelve `?`, el
+  frontend mira los enlaces entrantes. Un solo enlace → ese
+  nombre es el tipo. Varios → el más repetido. Empate → `?`.
+  Se recalcula al expandir.
+- **Enlaces:** Bézier con punta de flecha. Etiquetas con el
+  nombre del enlace. El color va por el tipo del nodo
+  **origen** (las flechas salen con el color del nodo que
+  las emite). Los compartidos van punteados naranja. Click
+  en un enlace → pan animado hasta centrar el nodo destino.
+- **Layouts:** Grilla (cuadrícula por BFS desde las raíces)
+  y Forzar (force-directed simplificado). Toggle en la barra
+  de controles. **Forzar** es el default desde v81d.
+- **Pan/zoom:** arrastrar el fondo = pan. Rueda del mouse =
+  zoom centrado en el cursor. La grilla de fondo se expande
+  automáticamente con el viewBox.
+- **Drag de nodos:** arrastrar un nodo lo sigue al cursor y
+  empuja/atrae a los vecinos (física amortiguada). Al soltar,
+  todo queda en la última posición. El layout no se recalcula
+  solo: "Reacomodar" o cambiar el toggle lo recalculan.
+- **Búsqueda:** atenúa los nodos que no matchean (por ID o
+  dato). Enter recorre los matches con zoom animado.
+- **Panel lateral:** click en un nodo → panel derecho con
+  ID, dato, tipo, enlaces salientes, referencias entrantes.
+  Los vecinos son links clickeables (reabren el panel en ese
+  nodo y lo centran).
+- **Doble click en un nodo:** expande sus vecinos (los
+  agrega al grafo local, cap de 2000 nodos) y centra en el
+  nodo tocado.
+- **Tres modos de tamaño:** normal (dentro del panel),
+  ampliado (`□`, ocupa todo el viewport con
+  `position: fixed; inset: 0`), teatro (`⛶`, ocupa casi
+  todo con margen de 10px y sombra), fullscreen (`⤢`,
+  Fullscreen API sobre el contenedor entero). Esc cierra
+  ampliado y teatro (si no está en fullscreen).
 
 **Cómo funciona:**
 
-- El frontend (`Aplicacion/grafo.js`) llama a tres subacciones
-  del enrutador: `grafo/resumen`, `grafo/listar`, `grafo/nodo`.
-- El enrutador (módulo `grafo`, chequeo admin/soporte) invoca
-  los comandos `grafo:resumen`, `grafo:listar`, `grafo:nodo`
-  del `Controlador` a través de `Controlador::ejecutar_comando()`.
+- El frontend está partido en dos archivos:
+  - `Aplicacion/grafo.js`: sub-pestaña Tabla + resumen +
+    raíces + migraciones. Llama a `grafo/resumen`,
+    `grafo/listar`, `grafo/nodo`, `grafo/eliminar_huerfanos`,
+    `grafo/raices`, `grafo/migraciones_*`.
+  - `Aplicacion/grafo_visual.js`: sub-pestaña Visual. Llama
+    a `grafo/vecindario` (carga inicial) y `grafo/nodo`
+    (detalle de un nodo y expansión).
+- El enrutador (módulo `grafo`, chequeo admin/soporte)
+  invoca los comandos del `Controlador` vía
+  `Controlador::ejecutar_comando()`.
 - Los comandos están definidos en
-  `Controlador::registrar_comandos_grafo()` (privado). Usan el
-  token interno sin exponerlo. **No usan el motor**: se ejecutan
-  de a uno.
+  `Controlador::registrar_comandos_grafo()` (privado). Usan
+  el token interno sin exponerlo. **No usan el motor**: se
+  ejecutan de a uno.
 - Helpers privados en `Controlador`: `_grafo_cargar_estructura`,
   `_grafo_bfs_desde_raices`, `_grafo_inferir_tipo`.
 
 **Limitaciones conocidas:**
 
-- El comando `grafo:nodo` recorre todo el grafo para encontrar
+- `grafo:nodo` recorre todo el grafo para encontrar
   referencias entrantes (O(N) por click).
-- `grafo:listar` carga todo el grafo en memoria y filtra en PHP.
-- `_grafo_inferir_tipo` es heurística; puede devolver `?` para
-  nodos que no cumplen ningún patrón conocido.
-
-Estas limitaciones son aceptables para Fase 1 (diagnóstico). Se
-pueden optimizar en Fase 3.
+- `grafo:listar` carga todo el grafo en memoria y filtra en
+  PHP.
+- `grafo:vecindario` también carga todo el grafo en memoria
+  (BFS sobre la estructura completa), pero el resultado que
+  devuelve está acotado por `niveles` y `max_nodos`.
+- `_grafo_inferir_tipo` es heurística; devuelve `?` cuando no
+  puede inferir. El frontend completa con inferencia por
+  enlace entrante.
 
 ---
 
@@ -589,15 +659,20 @@ Subacciones especiales:
   `en_grafo_credenciales_solo_lectura` (no guarda). Lo consume
   el plugin en la prueba de rate limiting.
 - Módulo `grafo` (admin y soporte): `grafo/resumen`,
-  `grafo/listar`, `grafo/nodo`, `grafo/eliminar_huerfanos`.
-  Los primeros tres invocan comandos del `Controlador`
-  (`grafo:resumen`, `grafo:listar`, `grafo:nodo`). El
-  cuarto (agregado en v76g) invoca el comando
-  `grafo:eliminar_huerfanos` y guarda el grafo con
-  `guardar_ambos`. **No lleva chequeo de `es_pruebas`:
-  se usa en producción**, por decisión consciente (la
-  limpieza es mantenimiento, no prueba). El control es
-  admin/soporte. Ver §3.4.
+  `grafo/listar`, `grafo/nodo`, `grafo/eliminar_huerfanos`,
+  `grafo/raices`, `grafo/vecindario`. Los seis invocan
+  comandos del `Controlador` (`grafo:resumen`,
+  `grafo:listar`, `grafo:nodo`, `grafo:eliminar_huerfanos`,
+  `grafo:raices`, `grafo:vecindario`). `grafo:nodo` desde
+  v80p devuelve `tipo`, `tipo_destino` y `tipo_origen`
+  (antes solo el detalle plano). `grafo:vecindario` desde
+  v80n devuelve los nodos alcanzables desde las raíces
+  hasta N niveles más los enlaces entre ellos; es la
+  carga inicial del visualizador gráfico.
+  `grafo:eliminar_huerfanos` **no lleva chequeo de
+  `es_pruebas`: se usa en producción**, por decisión
+  consciente (la limpieza es mantenimiento, no prueba).
+  El control es admin/soporte. Ver §3.4.
 
 ### 5.15 `index.php`
 
@@ -698,6 +773,17 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 
 ## 7. HISTORIAL DE VERSIONES (resumen)
 
+- **v80n-v81g** (línea del visualizador de grafo): ver
+  §3.4 y `prompts/plan_actual.md` §2. Nueva sub-pestaña
+  Visual con SVG puro. Layouts Grilla y Forzar, pan/zoom,
+  drag con física, panel lateral, búsqueda, tres modos
+  de tamaño (ampliado, teatro, fullscreen), etiquetas y
+  colores de enlace, inferencia de tipos por enlace
+  entrante, grilla infinita. **Archivos nuevos:**
+  `Aplicacion/grafo_visual.js` y `estilos-grafo.css`.
+  **Comando nuevo:** `grafo:vecindario`. **Subacción
+  nueva:** `grafo/vecindario`. Bumps del `Controlador`
+  hasta `1.5i.7s`.
 - **v26-v67**: agencia de viajes madura. Rendiciones, liquidaciones,
   cupones, declaraciones juradas, autocompletado, sticky tabs, etc. Ver
   commits anteriores para detalle.
