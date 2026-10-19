@@ -258,32 +258,77 @@ con el usuario:
 
 ---
 
-## 5. CAMINO A LARGO PLAZO
+## 5. PLAN GLOBAL — HOJA DE RUTA
 
-Planes de mediano/largo plazo, no implementados. No bloquean
-el trabajo actual.
+Mapa completo del proyecto. Se actualiza cuando una fase
+se cierra o se abre una nueva. El detalle de cada fase
+vive en el prompt correspondiente.
 
-- **B3.3c — 7 helpers que iteran sobre todos los dueños
-  buscando por id.** Postergado hasta que aparezca dolor
-  real o hasta que lleguen los iteradores con ID especial
-  (ver §4.3). La lista completa está en
-  `prompt_seguridad.md` §8.6.
-- **Iteradores con ID especial + ocupante.** Cuando el
-  framework los implemente, los B3.3c se resuelven
-  naturalmente. Ver `prompt_framework_iteradores.md`
-  §11.5.
-- **Framework — dejar el Nodo limpio.** Antes de agregar
-  más métodos de indexación de contextos.
-- **Framework — JSON64 / XML64** con `guardar_parcial`.
-- **Framework — `guardar_parcial` real por delta.**
-- **Diversificación del piloto por tipo de aplicación.**
-  Próximo tipo: `"tienda"` (catálogo de productos).
-  Requiere nodo `tipos_de_aplicacion` como raíz,
-  enlace `tipo_app` del dueño, ajustes del login y del
-  frontend por tipo. Ver `prompt_piloto.md` §1.2 y §8.7.
+### 5.1. Modelo topológico del piloto
+
+Plan de fases A → B → C → D, con la seguridad emergiendo
+de la topología. Detalle de cada fase en
+`prompt_seguridad.md` §3-5 y §8.6.
+
+| Fase | Qué hace | Estado |
+|---|---|---|
+| **A** — Usuarios como IDs especiales `us_<nombre>` | Reemplazo de la navegación `usuarios → dueño` por `us_<dueño>`. | ✅ v76k |
+| **B1** — Contenedores `publico`/`privado` | Cada usuario tiene contenedores por nivel de exposición. | ✅ v76m |
+| **B2.1** — Compartidos por terminal | Contenedores `compartido_con_<terminal>` colgando del dueño. | ✅ v76q |
+| **B2.2** — Contexto opcional | Viaje, Venta, ViajeAsientos y Empresa aceptan `?Nodo $nodo_contexto`. | ✅ v76r-v76u |
+| **B2.3** — Árboles paralelos | Ventas con `hmi`/`hd`/`p` y `hmi_<term>`/`hd_<term>`/`p_<term>`. | ✅ v76v-v77o |
+| **B2.4** — Mantener compartidos vivos | Sincronización en cada operación de escritura. | ✅ v77q |
+| **B3.1** — Accesos viejos eliminados | `usuarios → dueño` → `us_<dueño>` en todos los módulos principales. | ✅ v77r |
+| **B3.3a-e** — Módulos menores adaptados | Liquidacion, Rendicion, Empresa, Vehiculo, y Vehiculo JS. | ✅ v77t-v77x + v81h |
+| **B3.3c** — 3 helpers que iteran `usuarios` | `_buscar_venta_por_id` (fallback), `obtener_cancelacion_por_id`, `obtener_pasajero_por_dni` (rama historial). | **Pendiente — próximo arco** |
+| **C** — Tipos como IDs especiales (opcional) | Roots explícitos `tipo_empresas`, `tipo_viajes`, etc. | Pendiente |
+| **D** — Carga parcial como optimización real | Guardado por delta. Bloqueada por framework Fase 4. | Bloqueada |
+
+Con **B3.3c** cerrado, la **Fase B queda completa**.
+
+### 5.2. Framework Iteradores
+
+Plan de fases del framework. Detalle en
+`prompt_framework_iteradores.md` §11.4 y §11.5.
+
+| Fase | Qué hace | Estado |
+|---|---|---|
+| SQL64 (bitmask + 3 tablas nuevas) | `nodo_contexto`, `adyacente_contexto`, `contexto`. | ✅ 1.5i.7k |
+| IndexedDB64 (espejo JS) | Misma API, base `HyS_ctx`. | ✅ V1.5i.7k |
+| `guardar_parcial` real (SQL64) | Filtro por `contexto_mask`. | ✅ 1.5i.7o |
+| Propagación de máscaras a nodos nuevos | `_guardar_con_filtro` con BFS por enlaces entrantes. | ✅ 1.5i.8c |
+| **JSON64 / XML64** con `guardar_parcial` | Fase 3 del framework. | Pendiente |
+| **`guardar_parcial` real por delta** | Delta real, no merge en memoria. Bloquea Fase D del piloto. | Pendiente |
+| **Dejar el Nodo limpio** | Mover `contexto_mascara` fuera del Nodo. Bloquea 256 contextos. | Pendiente |
+| **256 contextos / producto de primos** | Fase 5 del framework, si hace falta. | Pendiente |
+| **Iteradores con ID especial + ocupante** | Raíces de subgrafo con posición mutable. Resolvería B3.3c. | Pendiente |
+
+### 5.3. Diversificación del piloto
+
+- **Tipos de aplicación.** Próximo tipo: `"tienda"`
+  (catálogo de productos). Requiere nodo
+  `tipos_de_aplicacion` como raíz, enlace `tipo_app` del
+  dueño, ajustes del login y del frontend por tipo. Ver
+  `prompt_piloto.md` §1.2.
 - **Multi-cliente.** Cada cliente con su subdominio y su
-  propio grafo, misma base de código. `Conf::NOMBRE_APP`
-  derivado del subdominio. Ver `prompt_piloto.md` §1.4.
+  propio grafo, misma base de código.
+  `Conf::NOMBRE_APP` derivado del subdominio. Ver
+  `prompt_piloto.md` §1.4.
+
+### 5.4. Otros frentes
+
+Calidad, plugin y visualizador. Detalle en §4.
+
+- **Piloto — calidad** (§4.1): auditar estados colgados,
+  auditar estructuras nuevas, deuda de seguridad en
+  impresión.
+- **Plugin** (§4.2): migrar persistencia de la pestaña
+  activa a IndexedDB, pruebas 37/38 con `try/finally`,
+  centralizar prefijos.
+- **Visualizador de grafo** (§4.4): Fase 5 (persistencia
+  de posiciones/zoom/layout), colores para tipos
+  inferidos por enlace, patrón de grilla adaptativo al
+  zoom.
 
 ---
 
