@@ -9,21 +9,25 @@ Se actualiza cuando: se agrega un patrón nuevo de aislamiento, se
 descubre una fuga, se modifica el modelo de contextos, o se
 documenta un bug relevante.
 
-**Estado al cierre de v1.5piloto.78z:**
+**Estado al cierre de v1.5piloto.81i:**
 
 - La topología es la única fuente de verdad de la seguridad. Los
   chequeos por código (nivel, dueño asignado) siguen existiendo
   como respaldo, pero la garantía fuerte viene del grafo.
-- El bug §1.5 (viaje viejo que desaparecía tras una operación
-  del terminal) está **resuelto**. Ver §8.1.
-- El bug §1.5.7/§1.5.8 (nodos compartidos entre contextos) está
-  **resuelto en ventas** con soft delete coordinado. Falta
-  replicarlo a los otros árboles.
-- La **carga parcial está desactivada** desde v78v:
-  `_contextos_para_operacion` devuelve `null`. Todo carga total.
-  Se reactiva cuando la batería completa de pruebas pase.
-- El espejo JS del framework está alineado a V1.5i.8b
-  (V1.5plugin.7a).
+- Los bugs estructurales del framework (§1.5, §1.5.7, §1.5.8,
+  §1.5.10, §1.5.15, §1.5.16) están **resueltos**. Ver §8.
+- El soft delete coordinado está aplicado en **ventas** y
+  **cancelaciones**. Rendiciones y liquidaciones solo las crea
+  el dueño, no aplica.
+- La **carga parcial está activa** desde v78g. Toda operación
+  POST con `nombre_solicitante` carga parcial con `[us_<sol>]`.
+  Excepciones puntuales documentadas en
+  `_contextos_para_operacion`. Ver §8.9.
+- **B3.3c reducido a 4 helpers** (antes 7). Liquidación y
+  rendición se adaptaron en v81h. Ver §8.6.
+- El espejo JS del framework está alineado a **V1.5i.8c**
+  (V1.5plugin.7b).
+- Los **módulos menores** ya están todos adaptados. Ver §8.7.
 
 ---
 
@@ -773,6 +777,27 @@ tenía el filtro mal. El buzón de ventas nunca se
 drenaba y el dueño no veía las ventas nuevas. El
 mismo bug latente en `reparar_arboles.php`.
 
+### 6.12 Confiar en el POST del backend sin probar el flujo del usuario
+
+Un test que solo hace POST al backend puede pasar aunque
+el flujo del usuario esté roto. Si el frontend no manda
+los parámetros que el backend espera, el usuario ve un
+error aunque el endpoint funcione con los parámetros
+correctos.
+
+**Caso real:** v81i. Los POST `rendiciones/obtener`,
+`rendiciones/aceptar_ajuste` y `liquidaciones/obtener`
+existían y funcionaban si se les pasaba `nombre_dueno`,
+pero el frontend del piloto no lo mandaba, y el soporte
+veía "no encontrada". Un test que solo hace POST con el
+`nombre_dueno` explícito NO detecta el bug.
+
+**Patrón correcto:** las pruebas que verifican flujos
+del usuario deben hacer el clic del usuario y verificar
+el efecto en el DOM (modal abierto con contenido). El
+POST es un detalle de implementación del frontend, no
+el contrato.
+
 ---
 
 ## 7. CÓMO VERIFICAR EL AISLAMIENTO
@@ -799,6 +824,11 @@ verifican aislamiento. Ejemplos:
   (`ventas/listar` tipo=dueno y tipo=terminal).
 - Prueba 60 (`cancelar_venta_arbol_dual`): simétrica. Cancelar
   una venta la quita de los dos árboles.
+- Pruebas 67, 68, 69 (v1.5plugin.8f): verifican el flujo del
+  usuario completo (login → pestaña → elegir dueño → click en
+  "Ver detalle") para rendiciones y liquidaciones con
+  solicitante soporte y dueño. Detectan bugs del frontend que
+  un POST directo no vería (ver §6.12).
 
 ### 7.3 Comando `grafo:raices`
 
@@ -813,8 +843,11 @@ topología sin seguir IDs numéricos.
 
 ### 7.5 Verificación de carga parcial
 
-**Importante:** la carga parcial está desactivada desde v78v.
-Cuando se reactive, esta verificación aplica.
+La carga parcial está **activa desde v78g**. Las
+verificaciones de abajo aplican al código actual, con las
+excepciones documentadas en `_contextos_para_operacion`
+(gestión de usuarios, informes de cancelación/liquidación/
+rendición).
 
 Después de un `cargar_parcial([us_X])`:
 
@@ -888,10 +921,11 @@ de aristas), v78s (unir máscaras). El bug era de esquema, no de
 máscaras. La lección: dos fixes que no alcanzan son la señal de
 parar y hacer un test de diagnóstico en serio.
 
-### 8.2 Nodos compartidos entre contextos — RESUELTO en ventas
+### 8.2 Nodos compartidos entre contextos — RESUELTO
 
-**Estado:** resuelto para ventas (v78w-v78z). Pendiente para
-rendiciones, liquidaciones, cancelaciones. Ver §9.
+**Estado:** resuelto para ventas (v78w-v78z) y cancelaciones
+(v79a con buzón). Rendiciones y liquidaciones solo las crea el
+dueño, no aplica. Ver §9.
 
 **Síntoma:** el terminal cancela una venta y, al volver el
 dueño, desaparecen todas las ventas.
@@ -926,8 +960,10 @@ explícito. Hoy no existe; se hace a mano.
 
 ### 8.5 Espejo JS
 
-Alineado a V1.5i.8b en V1.5plugin.7a. El espejo JS implementa
-el mismo esquema `id_fila` + `id_especial` + mapa estático.
+Alineado a **V1.5i.8c** en V1.5plugin.7b. El espejo JS
+implementa el mismo esquema `id_fila` + `id_especial` + mapa
+estático, y la misma propagación de máscaras a nodos nuevos
+que el PHP (fix v1.5i.8c).
 
 **Nota:** al abrir la extensión por primera vez tras el bump,
 IndexedDB hace upgrade a la versión 2 y borra los almacenes
@@ -936,27 +972,48 @@ real es MySQL del piloto).
 
 ### 8.6 Helpers que iteran sobre todos los dueños (B3.3c)
 
-7 funciones siguen iterando sobre la raíz `usuarios` para
-buscar por id:
+**Reducido a 4 funciones** (v81h; antes eran 7). Las
+funciones de liquidación y rendición se adaptaron al patrón
+`?string $nombre_dueno`:
 
 - `Venta.php`: `_buscar_venta_por_id` (fallback),
   `obtener_cancelacion_por_id`.
-- `Liquidacion.php`: `obtener_liquidacion_por_id`.
-- `Rendicion.php`: `aceptar_ajuste_rendicion`,
-  `obtener_rendicion_por_id`.
 - `Pasajero.php`: `obtener_pasajero_por_dni` (rama del
   historial de ventas).
 
-**Consecuencia:** con carga parcial, esas funciones devuelven
-null o vacío. Se resuelven cuando aparezca dolor real o cuando
-implementemos iteradores con ID especial.
+**Ya adaptadas en v81h:**
+- `Liquidacion.php`: `obtener_liquidacion_por_id(?string
+  $nombre_dueno = null)`. Si viene, navega directo desde
+  `us_<dueño>`. Si no, fallback a recorrer todos los dueños
+  desde la raíz (carga total, compatibilidad con
+  `Impresion.php`).
+- `Rendicion.php`: `obtener_rendicion_por_id(...)` y
+  `aceptar_ajuste_rendicion(...)` con el mismo patrón.
 
-### 8.7 Módulos menores sin contexto
+**Consecuencia:** con carga parcial, las 4 restantes
+devuelven null o vacío si el solicitante no tiene `usuarios`
+en memoria (dueño y soporte). Se resuelven cuando aparezca
+dolor real o cuando implementemos iteradores con ID especial.
 
-`Liquidacion.php`, `Rendicion.php`, `Empresa.php`,
-`Vehiculo.php` no fueron adaptados al contexto del solicitante.
-Cuando un terminal los invoca (raro), cargan total o fallan.
-Sub-tandas cortas cuando aparezcan errores.
+**Bug de frontend asociado (v81i).** El backend ya navegaba
+correctamente con `nombre_dueno`, pero el frontend del piloto
+no lo mandaba en `rendiciones/obtener`,
+`rendiciones/aceptar_ajuste` ni `liquidaciones/obtener`. Solo
+fallaba con soporte (dueño y admin lo resolvían por otros
+caminos). Fix en `rendiciones.js` y `liquidaciones.js`. Ver
+§6.12.
+
+### 8.7 Módulos menores sin contexto — CERRADO en v81h
+
+Los cuatro módulos ya están adaptados al patrón `us_<dueño>`:
+
+- `Empresa.php`: adaptado en v76u-v77r.
+- `Vehiculo.php`: adaptado en v77v-v77x.
+- `Liquidacion.php`: adaptado en v81h.
+- `Rendicion.php`: adaptado en v81h.
+
+Solo quedan los 4 helpers de §8.6, que son funciones que
+buscan por id y no módulos completos.
 
 ### 8.8 Contexto del solicitante viene del cliente
 
@@ -970,15 +1027,22 @@ operación. La verificación de nivel sigue en el enrutador.
 **Futuro:** el `nombre_solicitante` debería venir de la sesión
 del servidor.
 
-### 8.9 Carga parcial desactivada
+### 8.9 Carga parcial: activa y en producción
 
-Desde v78v, `_contextos_para_operacion` devuelve `null`. Todo
-carga total. Se reactiva cuando la batería completa de pruebas
-pase en verde.
+La carga parcial está **activa desde v78g**. Toda operación
+POST con `nombre_solicitante` carga parcial con `[us_<sol>]`.
+Sin solicitante, carga total.
 
-**Por qué:** el bug §1.5 y sus vecinos (§1.5.7, §1.5.8)
-aparecían solo con carga parcial activa. Mientras se validan
-los fixes, la carga total es correcta (aunque lenta).
+Las excepciones (acciones que siguen usando carga total) están
+documentadas en `_contextos_para_operacion`:
+
+- Gestión de usuarios (crear, editar, eliminar usuario y
+  terminal).
+- Informes de cancelación, liquidación y rendición (usan los
+  helpers de §8.6).
+
+Los bugs §1.5 y §1.5.10, que aparecían solo con carga parcial
+activa, están resueltos en el framework 1.5i.8a-c.
 
 ---
 
@@ -987,34 +1051,24 @@ los fixes, la carga total es correcta (aunque lenta).
 Los tres bugs encadenados que resolvimos en ventas pueden
 aparecer en los otros árboles. Hay que revisarlos uno por uno:
 
-### 9.1 Rendiciones
+### 9.1 Rendiciones — no aplica
 
-Solo el dueño las crea (no hay terminal). El contenedor vive en
-`us_dueno/rendiciones`. Con la carga parcial del dueño, el
-contenedor está en `$filas_cargadas` y `hmi` sobrevive. Pero
-el guardado parcial del terminal podría, en teoría, afectarlo
-si `rendiciones` estuviera alcanzable desde el compartido (no
-lo está hoy). Igual: aplicar la reparación preventiva.
+Solo el dueño las crea. El contenedor vive en
+`us_dueno/rendiciones`. No es alcanzable desde ningún
+compartido. No tiene el problema de nodos multi-contexto. Los
+listados y detalles funcionan con carga parcial desde v81h.
 
-### 9.2 Liquidaciones
+### 9.2 Liquidaciones — no aplica
 
 Igual que rendiciones. Solo el dueño.
 
-### 9.3 Cancelaciones
+### 9.3 Cancelaciones — resuelto en v79a (buzón)
 
-Pueden crearse desde el dueño o desde un terminal. Si es desde
-el terminal, hoy se insertan **solo en el contenedor del
-compartido** (`_crear_nodo_cancelacion` con `$nodo_contexto`).
-El dueño no las ve.
-
-Hay que decidir el diseño:
-
-- **Opción A:** insertar en ambos árboles (dueño real +
-  compartido), como las ventas.
-- **Opción B:** consolidar todo en el dueño y que el compartido
-  sea solo un puntero.
-
-Pendiente de discusión.
+Pueden crearse desde el dueño o desde un terminal. Se resolvió
+con el mismo patrón que las ventas: **inserción diferida con
+buzón**. El terminal deposita la cancelación en
+`compartido_con_us_termX/pendientes_cancelaciones`; el dueño
+lo drena en su próxima carga. Ver §5.8.
 
 ### 9.4 Regla general a aplicar en cada caso
 
