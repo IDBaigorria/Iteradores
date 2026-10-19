@@ -27,8 +27,23 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.81g (cierre del arco
-del visualizador de grafo).
+**Última actualización:** v1.5piloto.81i (cierre del arco
+de los 4 módulos menores).
+
+Empresa.php y Vehiculo.php ya estaban adaptados
+(v76u-v77v); Liquidacion.php y Rendicion.php se adaptaron
+en v81h. El fix v81i (el frontend no mandaba
+`nombre_dueno` en `rendiciones/obtener`,
+`rendiciones/aceptar_ajuste` ni `liquidaciones/obtener`)
+dejó la verificación manual y las 3 pruebas del plugin
+en verde. B3.3c reducido a 3 helpers (antes el texto
+decía "7", era un typo: eran 6; se adaptaron 3).
+
+**Antes (v81g):** cierre del arco del visualizador de
+grafo. Antes (v79o): cierre de la línea "grafo + plugin +
+sistema de scripts". Carga parcial activa. La topología
+sigue siendo la fuente de la seguridad: el bitmask lo
+propaga el framework, no la app.
 
 **Versiones:**
 
@@ -137,10 +152,21 @@ paréntesis.
 
 ### 4.1. Piloto — calidad y consistencia (media)
 
-- **Adaptar los 4 módulos menores al contexto del
-  solicitante** — **EN CURSO**, ver §6.
-  `Liquidacion.php`, `Rendicion.php`, `Empresa.php`,
-  `Vehiculo.php`.
+- [x] **Adaptar los 4 módulos menores al contexto del
+  solicitante** — CERRADO (v81h + v81i, ver §6).
+  `Empresa.php` y `Vehiculo.php` ya estaban adaptados
+  (fases v76u-v77v); `Liquidacion.php` y `Rendicion.php`
+  se adaptaron en v81h. El frontend del piloto no mandaba
+  `nombre_dueno` en `rendiciones/obtener`,
+  `rendiciones/aceptar_ajuste` ni `liquidaciones/obtener`
+  (bug v81i); solo fallaba con soporte. Corregido en
+  `rendiciones.js` y `liquidaciones.js`.
+- **B3.3c restante (3 helpers).** `Venta.php`:
+  `_buscar_venta_por_id` (fallback) y
+  `obtener_cancelacion_por_id`. `Pasajero.php`:
+  `obtener_pasajero_por_dni` (rama del historial de
+  ventas). Postergado hasta que aparezca dolor real o
+  hasta que el framework tenga iteradores con ID especial.
 - **Auditar estados colgados:** reservas sin pasajero, DJ a
   medias, edición de viaje a mitad. Requiere relevamiento
   primero.
@@ -197,6 +223,38 @@ Van todos juntos en una sesión del framework.
   paleta cuando se use con datos reales.
 - **Tamaño del patrón de la grilla adaptativo al zoom**
   (opcional). Hoy el patrón mide 40×40 user units fijo.
+
+### 4.5. Próximas tandas sugeridas
+
+**Foco inmediato: Piloto — calidad.**
+
+Con el arco de los 4 módulos menores cerrado (v81h +
+v81i), el foco pasa a los pendientes de calidad del
+piloto (§4.1). Candidatos, en orden tentativo a definir
+con el usuario:
+
+1. **Auditar estados colgados.** Reservas sin pasajero,
+   DJ a medias, edición de viaje a mitad. Requiere
+   relevamiento primero. Empezar por "cierre de navegador
+   a mitad de venta".
+2. **Auditar estructuras nuevas** con la regla de
+   detección de §5.9 del prompt de seguridad. Preventivo.
+3. **Deuda de seguridad en impresión.** Las URLs
+   `?imprimir=1&tipo=...` no validan sesión ni permisos.
+   Cualquiera con la URL ve los datos. Preexistente.
+4. **B3.3c restante (3 helpers).** Cuando aparezca dolor
+   real o lleguen los iteradores con ID especial.
+
+**Después, según prioridad:**
+
+- **Migrar persistencia de la pestaña activa del plugin**
+  (`localStorage` → IndexedDB).
+- **Visualizador de grafo, Fase 5** (persistencia de
+  posiciones, zoom y layout).
+- **Framework Iteradores:** dejar el Nodo limpio,
+  JSON64/XML64, `guardar_parcial` por delta, iteradores
+  con ID especial.
+- **Diversificación por tipo de aplicación** (`tienda`).
 
 ---
 

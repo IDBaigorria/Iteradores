@@ -972,9 +972,14 @@ real es MySQL del piloto).
 
 ### 8.6 Helpers que iteran sobre todos los dueños (B3.3c)
 
-**Reducido a 4 funciones** (v81h; antes eran 7). Las
-funciones de liquidación y rendición se adaptaron al patrón
-`?string $nombre_dueno`:
+**Reducido a 3 funciones.** Nota sobre el conteo: el texto
+original decía "7" (era un typo: las funciones realmente
+listadas eran 6). De esas 6, se adaptaron 3 en v81h
+(liquidación y rendición). Las 3 restantes siguen
+pendientes.
+
+Las funciones de liquidación y rendición se adaptaron al
+patrón `?string $nombre_dueno`:
 
 - `Venta.php`: `_buscar_venta_por_id` (fallback),
   `obtener_cancelacion_por_id`.
@@ -990,7 +995,7 @@ funciones de liquidación y rendición se adaptaron al patrón
 - `Rendicion.php`: `obtener_rendicion_por_id(...)` y
   `aceptar_ajuste_rendicion(...)` con el mismo patrón.
 
-**Consecuencia:** con carga parcial, las 4 restantes
+**Consecuencia:** con carga parcial, las 3 restantes
 devuelven null o vacío si el solicitante no tiene `usuarios`
 en memoria (dueño y soporte). Se resuelven cuando aparezca
 dolor real o cuando implementemos iteradores con ID especial.
