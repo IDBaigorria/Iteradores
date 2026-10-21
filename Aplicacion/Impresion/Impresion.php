@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.78m
+ * @version   1.5piloto.81j
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -1240,13 +1240,15 @@ function imprimir_informe_ventas(array $params): void {
  *
  * @param string $id_cancelacion
  */
-function imprimir_informe_cancelacion(string $id_cancelacion): void {
+function imprimir_informe_cancelacion(string $id_cancelacion, ?string $nombre_dueno = null): void {
     if ($id_cancelacion === '') {
         echo "ID de cancelación no especificado";
         return;
     }
 
-    $c = obtener_cancelacion_por_id($id_cancelacion);
+    // Fase B3.3c: pasar el dueño para navegar directo por us_<dueño>
+    // en carga parcial.
+    $c = obtener_cancelacion_por_id($id_cancelacion, $nombre_dueno);
     if (!$c) {
         echo "Cancelación no encontrada";
         return;
@@ -1374,13 +1376,14 @@ function imprimir_informe_cancelacion(string $id_cancelacion): void {
  *                                         (se usa cuando el que imprime
  *                                         es el propio dueño).
  */
-function imprimir_informe_liquidacion(string $id_liquidacion, bool $ocultar_datos_generales = false): void {
+function imprimir_informe_liquidacion(string $id_liquidacion, bool $ocultar_datos_generales = false, ?string $nombre_dueno = null): void {
     if ($id_liquidacion === '') {
         echo "ID de liquidación no especificado";
         return;
     }
 
-    $liq = obtener_liquidacion_por_id($id_liquidacion);
+    // Fase B3.3c: pasar el dueño para navegar directo por us_<dueño>.
+    $liq = obtener_liquidacion_por_id($id_liquidacion, $nombre_dueno);
     if (!$liq) {
         echo "Liquidación no encontrada";
         return;
@@ -2029,13 +2032,14 @@ function imprimir_planilla_pasajeros_micro(string $nombre_dueno, string $nombre_
  *
  * @param string $id_rendicion
  */
-function imprimir_informe_rendicion(string $id_rendicion): void {
+function imprimir_informe_rendicion(string $id_rendicion, ?string $nombre_dueno = null): void {
     if ($id_rendicion === '') {
         echo "ID de rendición no especificado";
         return;
     }
 
-    $r = obtener_rendicion_por_id($id_rendicion);
+    // Fase B3.3c: pasar el dueño para navegar directo por us_<dueño>.
+    $r = obtener_rendicion_por_id($id_rendicion, $nombre_dueno);
     if (!$r) {
         echo "Rendición no encontrada";
         return;

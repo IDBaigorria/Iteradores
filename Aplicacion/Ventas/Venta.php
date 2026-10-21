@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.80a
+ * @version   1.5piloto.81j
  */
 
 
@@ -1074,8 +1074,26 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
  * Busca una venta por ID y devuelve el nodo junto con el nombre del
  * dueño. Devuelve [null, ''] si no la encuentra.
  *
- * @param string $id_venta
+ * Prioridad de búsqueda:
+ *   1. Si viene $nombre_terminal: contexto del terminal (compartido).
+ *   2. Si viene $nombre_dueno (sin terminal): us_<dueño> directo.
+ *   3. Ambos null: recorrido por `usuarios` (carga total).
+ *
+ * La rama 3 (fallback) solo se activa cuando $nombre_solicitante
+ * está vacío → carga total → `usuarios` disponible. Los llamadores
+ * del Enrutador siempre pasan al menos uno de los dos vía
+ * `_nombre_terminal_para_busqueda` + `_nombre_dueno_solicitante`.
+ *
+ * Pendiente anotado en plan_actual.md: convertir `usuarios` en un
+ * contenedor de nombres (dato string) para que la rama 3 no
+ * arrastre los subgrafos completos de todos los usuarios. Ese
+ * cambio es de esquema y va en una sesión del framework.
+ *
+ * @param string      $id_venta
+ * @param string|null $nombre_terminal
+ * @param string|null $nombre_dueno
  * @return array{0: ?Nodo, 1: string}
+ * @version 1.5piloto.81j
  */
 function _buscar_venta_por_id(string $id_venta, ?string $nombre_terminal = null, ?string $nombre_dueno = null): array {
     // Fase 1c.2: si se pasa el dueño (sin terminal), buscar
@@ -2717,15 +2735,68 @@ function _agregar_ajuste_a_rendicion(Nodo $nodo_rendicion, string $id_cancelacio
 }
 
 /**
- * Busca una cancelación por su id en todos los dueños.
+ * Busca una cancelación por su id.
  *
- * @param string $id_cancelacion
+ * Fase B3.3c (v1.5piloto.81j): acepta contexto opcional para no
+ * depender de la raíz `usuarios` en carga parcial.
+ *
+ *   - Terminal: navega por el árbol del compartido.
+ *   - Dueño/admin/soporte: navega por us_<dueño>.
+ *   - Ambos null: fallback al recorrido por `usuarios` (carga total).
+ *
+ * Nota: el contenedor `cancelaciones` del compartido usa nombres
+ * default (hmi/hd/p), igual que el del dueño. No hay árboles
+ * paralelos acá (a diferencia de ventas).
+ *
+ * @param string      $id_cancelacion
+ * @param string|null $nombre_dueno
+ * @param string|null $nombre_terminal
  * @return array|null
+ * @version 1.5piloto.81j
  */
-function obtener_cancelacion_por_id(string $id_cancelacion): ?array {
+function obtener_cancelacion_por_id(string $id_cancelacion, ?string $nombre_dueno = null, ?string $nombre_terminal = null): ?array {
+    // Caso 1: terminal → árbol del compartido.
+    if ($nombre_terminal !== null && $nombre_terminal !== '') {
+        $nodo_terminal = Nodo::nodo_por_id('us_' . $nombre_terminal);
+        if (!$nodo_terminal) return null;
+        $nodo_ctx = $nodo_terminal->adyacente('dueno');
+        if (!$nodo_ctx) return null;
+        $cont = $nodo_ctx->adyacente('cancelaciones');
+        if (!$cont) return null;
+        $actual = hmi($cont);
+        $seg = 0;
+        while ($actual && $seg < 2000) {
+            $seg++;
+            if ($actual->dato() === $id_cancelacion) {
+                return formatear_cancelacion_completa($actual);
+            }
+            $actual = hd($actual);
+        }
+        return null;
+    }
+
+    // Caso 2: dueño/admin/soporte → us_<dueño>.
+    if ($nombre_dueno !== null && $nombre_dueno !== '') {
+        $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+        if (!$nodo_dueno) return null;
+        $cont = $nodo_dueno->adyacente('cancelaciones');
+        if (!$cont) return null;
+        $actual = hmi($cont);
+        $seg = 0;
+        while ($actual && $seg < 2000) {
+            $seg++;
+            if ($actual->dato() === $id_cancelacion) {
+                return formatear_cancelacion_completa($actual);
+            }
+            $actual = hd($actual);
+        }
+        return null;
+    }
+
+    // Caso 3: fallback por `usuarios` (carga total, sin solicitante).
     $raiz = Nodo::nodo_por_id('usuarios');
     if (!$raiz) return null;
-    foreach ($raiz->adyacentes() as $nombre_dueno => $nodo_dueno) {
+    foreach ($raiz->adyacentes() as $nombre_dueno_iter => $nodo_dueno) {
         $nivel = $nodo_dueno->adyacente('nivel');
         if (!$nivel || $nivel->dato() !== 'dueno') continue;
         $cont = $nodo_dueno->adyacente('cancelaciones');

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.81h
+ * @version   1.5piloto.81j
  */
 
 use Iteradores\Nodos\Nodo;
@@ -224,15 +224,10 @@ function _contextos_para_operacion(string $accion, string $nombre_solicitante, a
         $dueno = $get['dueno'] ?? '';
         if ($dueno === '') return null;
 
-        // Fase 1c.2: los informes de cancelación, liquidación y
-        // rendición usan helpers que iteran sobre todos los dueños
-        // (B3.3c, postergado). Carga total hasta que se reescriban.
-        $tipo_imp = $get['tipo'] ?? '';
-        $tipos_con_b33c = ['informe_cancelacion', 'informe_liquidacion', 'informe_rendicion'];
-        if (in_array($tipo_imp, $tipos_con_b33c, true)) {
-            return null;
-        }
-
+        // Fase B3.3c (v1.5piloto.81j): los informes de
+        // cancelación, liquidación y rendición ahora navegan
+        // directo por us_<dueño>. Se eliminó la excepción de
+        // carga total que existía acá.
         return ['us_' . $dueno];
     }
 
@@ -1523,7 +1518,11 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($id_cancelacion)) {
                         responder_json(['exito' => false, 'error' => 'ID de cancelación no especificado']);
                     }
-                    $canc = obtener_cancelacion_por_id($id_cancelacion);
+                    // Fase B3.3c: navegar por el contexto del solicitante.
+                    // Terminal → compartido. Dueño/admin/soporte → us_<dueño>.
+                    $nombre_terminal_sol = _nombre_terminal_para_busqueda($nombre_solicitante, $post);
+                    $nombre_dueno_sol = _nombre_dueno_solicitante($nombre_solicitante, $post);
+                    $canc = obtener_cancelacion_por_id($id_cancelacion, $nombre_dueno_sol, $nombre_terminal_sol);
                     if ($canc) {
                         responder_json(['exito' => true, 'cancelacion' => $canc]);
                     } else {

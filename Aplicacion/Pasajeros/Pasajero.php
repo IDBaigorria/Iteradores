@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.79d
+ * @version   1.5piloto.81j
  */
 
 use Iteradores\Nodos\Nodo;
@@ -55,12 +55,10 @@ function obtener_contenedor_pasajeros_dueno(string $nombre_dueno, ?Nodo $nodo_co
     return $contenedor;
 }
 
-/**
- * Obtiene el nodo raíz de pasajeros (por compatibilidad).
- */
-function obtener_raiz_pasajeros(): ?Nodo {
-    return obtener_contenedor_pasajeros_dueno('Parroquia_del_Carmen');
-}
+// v1.5piloto.81j: obtener_raiz_pasajeros() eliminada.
+// Era código muerto: solo se definía, nunca se llamaba (verificado
+// con grep sobre Aplicacion/, index.php). Tenía un dueño
+// hardcodeado ('Parroquia_del_Carmen') que ya no aplica.
 
 /**
  * Obtiene el nodo pasajero por DNI si existe, sin crearlo.
@@ -169,13 +167,15 @@ function obtener_pasajero_por_dni(string $nombre_dueno, string $dni, ?Nodo $nodo
 
     // Obtener ventas relacionadas.
     //
-    // Con contexto (terminal → compartido), navegar el
-    // árbol del contexto con nombres parametrizados.
-    // Sin contexto (dueño, admin, impresión), iterar sobre
-    // todos los dueños desde `usuarios` (comportamiento
-    // actual). Bug §1.5.12: con carga parcial del
-    // terminal, `usuarios` no está en memoria y el bloque
-    // devolvía lista vacía.
+    // Con contexto (terminal → compartido): navegar el árbol del
+    // contexto con nombres parametrizados.
+    //
+    // Sin contexto (dueño/admin/soporte/impresión): navegar directo
+    // por us_<dueño>. Fase B3.3c (v1.5piloto.81j): antes se iteraba
+    // sobre todos los dueños desde `usuarios`, lo que mezclaba
+    // ventas de distintos dueños cuando dos pasajeros compartían DNI
+    // (mismo DNI, distinto nodo pasajero en cada dueño). Ahora el
+    // historial se restringe al dueño del pasajero.
     $ventas = [];
     $nombres_arbol = _nombres_arbol_para_contexto($nodo_contexto, '');
 
@@ -202,31 +202,35 @@ function obtener_pasajero_por_dni(string $nombre_dueno, string $dni, ?Nodo $nodo
             }
         }
     } else {
-        // Sin contexto: iterar sobre todos los dueños.
-        $raiz_usuarios = Nodo::nodo_por_id('usuarios');
-        if ($raiz_usuarios) {
-            foreach ((array)$raiz_usuarios->adyacentes() as $nombre_dueno_iter => $nodo_dueno) {
-                $nodo_nivel = $nodo_dueno->adyacente('nivel');
-                if (!$nodo_nivel || $nodo_nivel->dato() !== 'dueno') continue;
-
-                $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno_iter);
-                if (!$contenedor_ventas) continue;
-
-                $actual = hmi($contenedor_ventas);
-                while ($actual) {
-                    $venta_formateada = formatear_venta_para_pasajero($actual, $dni);
-                    if ($venta_formateada) {
-                        if ($venta_formateada['es_comprador'] && $venta_formateada['es_pasajero']) {
-                            $venta_formateada['rol'] = 'ambos';
-                        } elseif ($venta_formateada['es_comprador']) {
-                            $venta_formateada['rol'] = 'comprador';
-                        } else {
-                            $venta_formateada['rol'] = 'pasajero';
-                        }
-                        $ventas[] = $venta_formateada;
+        // Fase B3.3c (v1.5piloto.81j): navegar directo por us_<dueño>.
+        //
+        // Antes se iteraba sobre TODOS los dueños desde la raíz
+        // `usuarios`, lo que mezclaba ventas de distintos dueños cuando
+        // dos pasajeros compartían DNI. El detalle de un pasajero
+        // mostraba compras de otros dueños.
+        //
+        // Ahora el historial se restringe al dueño del pasajero. Es el
+        // comportamiento correcto por topología: el pasajero es un
+        // nodo del dueño, y el historial de ventas vive en el árbol
+        // de ese dueño. La carga parcial ya no ve otros dueños.
+        $contenedor_ventas = obtener_contenedor_ventas_dueno($nombre_dueno);
+        if ($contenedor_ventas) {
+            $actual = hmi($contenedor_ventas);
+            $seg = 0;
+            while ($actual && $seg < 2000) {
+                $seg++;
+                $venta_formateada = formatear_venta_para_pasajero($actual, $dni);
+                if ($venta_formateada) {
+                    if ($venta_formateada['es_comprador'] && $venta_formateada['es_pasajero']) {
+                        $venta_formateada['rol'] = 'ambos';
+                    } elseif ($venta_formateada['es_comprador']) {
+                        $venta_formateada['rol'] = 'comprador';
+                    } else {
+                        $venta_formateada['rol'] = 'pasajero';
                     }
-                    $actual = hd($actual);
+                    $ventas[] = $venta_formateada;
                 }
+                $actual = hd($actual);
             }
         }
     }

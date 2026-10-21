@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.79j
+ * @version   1.5piloto.81j
  */
 
 // --- Utilidades base ----------------------------------
@@ -653,10 +653,16 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
         exit;
     }
 
+    // Fase B3.3c: pasar el dueño por GET a los informes. Con carga
+    // parcial (us_<dueño>), los helpers de búsqueda por id navegan
+    // directo por el dueño sin tocar la raíz `usuarios`.
+    $nombre_dueno_informe = $_GET['dueno'] ?? null;
+    if ($nombre_dueno_informe === '') $nombre_dueno_informe = null;
+
     // Caso especial: informe imprimible de una rendición.
     // Se pasa el id_rendicion por GET.
     if ($tipo === 'informe_rendicion') {
-        imprimir_informe_rendicion($_GET['id_rendicion'] ?? '');
+        imprimir_informe_rendicion($_GET['id_rendicion'] ?? '', $nombre_dueno_informe);
         exit;
     }
 
@@ -665,13 +671,13 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
     // ocultar_datos_generales=1 para no mostrarle su propio nombre.
     if ($tipo === 'informe_liquidacion') {
         $ocultar_datos = ($_GET['ocultar_datos_generales'] ?? '0') === '1';
-        imprimir_informe_liquidacion($_GET['id_liquidacion'] ?? '', $ocultar_datos);
+        imprimir_informe_liquidacion($_GET['id_liquidacion'] ?? '', $ocultar_datos, $nombre_dueno_informe);
         exit;
     }
 
     // Caso especial: informe imprimible de una cancelación de compra.
     if ($tipo === 'informe_cancelacion') {
-        imprimir_informe_cancelacion($_GET['id_cancelacion'] ?? '');
+        imprimir_informe_cancelacion($_GET['id_cancelacion'] ?? '', $nombre_dueno_informe);
         exit;
     }
 
