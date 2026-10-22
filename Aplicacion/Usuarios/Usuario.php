@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.80a
+ * @version   1.5piloto.81l
  */
 
 use Iteradores\Nodos\Nodo;
@@ -504,21 +504,46 @@ function _puede_cerrar_sesion(string $nombre_solicitante, string $token): bool {
 
 /**
  * Asigna una lista de dueños a un soporte, manteniendo consistencia
- * bidireccional (soporte→dueno y dueno→soporte).
+ * bidireccional (soporte→dueno y dueno→soportes).
+ *
+ * v1.5piloto.81l (rediseño): el dueño ahora tiene un contenedor
+ * `soportes → publico_<soporte1>, publico_<soporte2>, ...` en
+ * lugar del enlace singular `soporte → publico_<soporte>`.
+ * Permite varios soportes por dueño y elimina el fallback al
+ * nodo real del soporte (causa de la fuga cruzada entre dueños).
+ *
+ * Idempotente:
+ *   - Si el dueño ya estaba, se asegura el enlace inverso.
+ *   - Si el dueño tenía el enlace singular `soporte` legacy,
+ *     se elimina.
  *
  * @param Nodo $nodo_soporte Nodo del soporte.
  * @param array $nuevos_duenos Lista de nombres de dueños.
  * @return void
  */
 function _asignar_duenos_a_soporte(Nodo $nodo_soporte, array $nuevos_duenos): void {
-    // Fase B3.1: los dueños se resuelven por ID especial.
-
-    // Asegurar que exista el contenedor.
+    // Asegurar el contenedor `duenos` del soporte.
     $nodo_duenos = $nodo_soporte->adyacente('duenos');
     if (!$nodo_duenos) {
         $nodo_duenos = Nodo::crear_con_dato('');
         $nodo_soporte->_adyacente_en($nodo_duenos, 'duenos');
     }
+
+    // Asegurar el `publico` del soporte (lo usa el dueño para
+    // exponer solo datos públicos). Normalmente ya existe si el
+    // llamador siguió el orden correcto (`_asegurar_niveles_usuario`
+    // antes), pero por las dudas se crea si falta.
+    $publico_soporte = $nodo_soporte->adyacente('publico');
+    if (!$publico_soporte) {
+        $nombre_soporte = (string)$nodo_soporte->dato();
+        $publico_soporte = Nodo::crear_con_dato($nombre_soporte);
+        $nodo_soporte->_adyacente_en($publico_soporte, 'publico');
+        foreach (['nivel', 'nombre_real', 'email'] as $campo) {
+            $nodo_campo = $nodo_soporte->adyacente($campo);
+            if ($nodo_campo) $publico_soporte->_adyacente_en($nodo_campo, $campo);
+        }
+    }
+    $nombre_soporte = (string)$nodo_soporte->dato();
 
     // Normalizar la lista de nuevos (solo strings).
     $lista_nuevos = [];
@@ -527,38 +552,98 @@ function _asignar_duenos_a_soporte(Nodo $nodo_soporte, array $nuevos_duenos): vo
         if ($n !== '') $lista_nuevos[$n] = true;
     }
 
-    // Quitar los que ya no van.
+    // Recolectar el estado actual.
     $actuales = [];
     foreach ($nodo_duenos->adyacentes() as $nombre_dueno => $nodo_dueno) {
         $actuales[(string)$nombre_dueno] = $nodo_dueno;
     }
+
+    // Quitar los que ya no van.
     foreach ($actuales as $nombre_dueno => $nodo_dueno) {
         if (!isset($lista_nuevos[$nombre_dueno])) {
-            $nodo_dueno->eliminar_adyacente('soporte');
             $nodo_duenos->eliminar_adyacente($nombre_dueno);
+            _quitar_soporte_del_dueno($nodo_dueno, $nombre_soporte);
         }
     }
 
-    // Agregar los nuevos.
+    // Agregar los nuevos y asegurar el enlace inverso en los
+    // que ya estaban (idempotente: cubre el caso de re-guardar
+    // sin cambios, migra el enlace `soporte` legacy al
+    // contenedor `soportes` si es la primera vez que corre
+    // después del rediseño).
     foreach ($lista_nuevos as $nombre_dueno => $_) {
-        if (isset($actuales[$nombre_dueno])) continue;
-        $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+        $nodo_dueno = isset($actuales[$nombre_dueno])
+            ? $actuales[$nombre_dueno]
+            : Nodo::nodo_por_id('us_' . $nombre_dueno);
         if (!$nodo_dueno) continue;
+
         $nodo_nivel_d = $nodo_dueno->adyacente('nivel');
         if (!$nodo_nivel_d || $nodo_nivel_d->dato() !== 'dueno') continue;
 
-        $nodo_duenos->_adyacente_en($nodo_dueno, $nombre_dueno);
-        // v78f: el enlace del dueño apunta al contenedor
-        // `publico` del soporte, no al nodo del soporte. Con
-        // esto, el BFS de contextos no propaga el bit del
-        // dueño al resto del subgrafo del soporte (fuga
-        // cruzada entre dueños que comparten un mismo soporte).
-        // Fallback: si el soporte no tiene `publico`, se usa
-        // el nodo del soporte como antes.
-        $publico_soporte = $nodo_soporte->adyacente('publico');
-        $destino_soporte = $publico_soporte ?: $nodo_soporte;
+        // Insertar en `duenos` del soporte (si no estaba).
+        if (!isset($actuales[$nombre_dueno])) {
+            $nodo_duenos->_adyacente_en($nodo_dueno, $nombre_dueno);
+        }
+
+        // Asegurar el enlace inverso en el dueño.
+        _asegurar_soporte_en_dueno($nodo_dueno, $publico_soporte, $nombre_soporte);
+    }
+}
+
+/**
+ * Asegura que el dueño tenga el `publico` del soporte en su
+ * contenedor `soportes`. Elimina el enlace `soporte` singular
+ * si quedó del diseño viejo.
+ *
+ * v1.5piloto.81l.
+ *
+ * @param Nodo   $nodo_dueno
+ * @param Nodo   $publico_soporte
+ * @param string $nombre_soporte
+ * @return void
+ */
+function _asegurar_soporte_en_dueno(Nodo $nodo_dueno, Nodo $publico_soporte, string $nombre_soporte): void {
+    // Eliminar el enlace `soporte` singular si quedó del diseño viejo.
+    if ($nodo_dueno->adyacente('soporte')) {
         $nodo_dueno->eliminar_adyacente('soporte');
-        $nodo_dueno->_adyacente_en($destino_soporte, 'soporte');
+    }
+
+    $contenedor = $nodo_dueno->adyacente('soportes');
+    if (!$contenedor) {
+        $contenedor = Nodo::crear_con_dato('');
+        $nodo_dueno->_adyacente_en($contenedor, 'soportes');
+    }
+    if (!$contenedor->adyacente($nombre_soporte)) {
+        $contenedor->_adyacente_en($publico_soporte, $nombre_soporte);
+    }
+}
+
+/**
+ * Quita el `publico` de un soporte del contenedor `soportes`
+ * del dueño. Si el contenedor queda vacío, lo destruye.
+ * Contempla también el enlace `soporte` singular legacy.
+ *
+ * v1.5piloto.81l.
+ *
+ * @param Nodo   $nodo_dueno
+ * @param string $nombre_soporte
+ * @return void
+ */
+function _quitar_soporte_del_dueno(Nodo $nodo_dueno, string $nombre_soporte): void {
+    // Limpiar enlace `soporte` singular legacy si apuntaba a este soporte.
+    $nodo_soporte_legacy = $nodo_dueno->adyacente('soporte');
+    if ($nodo_soporte_legacy && (string)$nodo_soporte_legacy->dato() === $nombre_soporte) {
+        $nodo_dueno->eliminar_adyacente('soporte');
+    }
+
+    // Contenedor `soportes` plural.
+    $contenedor = $nodo_dueno->adyacente('soportes');
+    if (!$contenedor) return;
+    $contenedor->eliminar_adyacente($nombre_soporte);
+    if (empty($contenedor->adyacentes())) {
+        $nodo_dueno->eliminar_adyacente('soportes');
+        _destruir_campos_simples($contenedor);
+        Nodo::eliminar($contenedor);
     }
 }
 
@@ -711,18 +796,25 @@ function agregar_usuario(array $datos): array {
 
     $raiz->_adyacente_en($nodo_usuario, $nombre_usuario);
 
-    // Si es soporte, asignar dueños.
-    if ($nivel === 'soporte' && !empty($duenos_asignados)) {
-        _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);
-    }
-
     // Fase B1: asegurar los contenedores `publico` y
     // `privado`. Mismo cierre de agujero que v77l hizo
     // para compartidos: sin esto, un usuario creado
     // después de la migración B1 queda sin contenedores,
     // y la detección de la migración da `false`
     // permanentemente.
+    //
+    // v1.5piloto.81l: se llama ANTES de asignar dueños a
+    // un soporte. `_asignar_duenos_a_soporte` necesita el
+    // `publico` del soporte para enlazarlo en el contenedor
+    // `soportes` del dueño. Antes se llamaba después y el
+    // enlace `dueno → soporte` caía al fallback (nodo real
+    // del soporte), causando la fuga cruzada entre dueños.
     _asegurar_niveles_usuario($nodo_usuario);
+
+    // Si es soporte, asignar dueños.
+    if ($nivel === 'soporte' && !empty($duenos_asignados)) {
+        _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);
+    }
 
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
 
@@ -849,6 +941,12 @@ function actualizar_usuario(array $datos): array {
     if ($nivel === 'dueno' && !$nodo_usuario->adyacente('efectivo')) {
         $nodo_usuario->_adyacente_en(Nodo::crear_con_dato('0'), 'efectivo');
     }
+
+    // v1.5piloto.81l: asegurar `publico`/`privado` (idempotente)
+    // antes de tocar los enlaces de soporte. `_asignar_duenos_a_soporte`
+    // necesita el `publico` del soporte para el contenedor `soportes`
+    // del dueño.
+    _asegurar_niveles_usuario($nodo_usuario);
 
     // Si es soporte y se pasaron dueños asignados, actualizarlos.
     if ($nivel === 'soporte' && $duenos_asignados !== null) {
@@ -1039,27 +1137,54 @@ function eliminar_usuario(string $nombre_usuario): array {
     $nodo_nivel_actual = $nodo_usuario->adyacente('nivel');
     $nivel_actual_del = $nodo_nivel_actual ? $nodo_nivel_actual->dato() : '';
     if ($nivel_actual_del === 'soporte') {
+        $nombre_soporte_del = (string)$nodo_usuario->dato();
         $nodo_duenos_del = $nodo_usuario->adyacente('duenos');
         if ($nodo_duenos_del) {
             foreach ($nodo_duenos_del->adyacentes() as $nombre_d => $nodo_d) {
-                $nodo_d->eliminar_adyacente('soporte');
+                // v1.5piloto.81l: quitar el `publico` del
+                // soporte del contenedor `soportes` del dueño.
+                _quitar_soporte_del_dueno($nodo_d, $nombre_soporte_del);
             }
         }
     }
 
-    // Dueño: limpiar la referencia en su soporte.
+    // Dueño: limpiar la referencia en sus soportes.
+    // v1.5piloto.81l: el contenedor `soportes` permite varios
+    // soportes por dueño. Se limpia el `duenos` de cada uno.
+    // También se contempla el enlace `soporte` singular legacy.
     if ($nivel_actual_del === 'dueno') {
-        $nodo_soporte_del = $nodo_usuario->adyacente('soporte');
-        if ($nodo_soporte_del) {
-            $nombre_soporte_del = $nodo_soporte_del->dato();
-            // Fase B3.1: ID especial directo.
-            $nodo_soporte_real = Nodo::nodo_por_id('us_' . $nombre_soporte_del);
-            if ($nodo_soporte_real) {
-                $nodo_duenos_sop = $nodo_soporte_real->adyacente('duenos');
-                if ($nodo_duenos_sop) {
-                    $nodo_duenos_sop->eliminar_adyacente($nombre_usuario);
+        // Enlace singular legacy.
+        $nodo_soporte_legacy = $nodo_usuario->adyacente('soporte');
+        if ($nodo_soporte_legacy) {
+            $nombre_soporte_legacy = (string)$nodo_soporte_legacy->dato();
+            $nodo_soporte_real_legacy = Nodo::nodo_por_id('us_' . $nombre_soporte_legacy);
+            if ($nodo_soporte_real_legacy) {
+                $nodo_duenos_sop_legacy = $nodo_soporte_real_legacy->adyacente('duenos');
+                if ($nodo_duenos_sop_legacy) {
+                    $nodo_duenos_sop_legacy->eliminar_adyacente($nombre_usuario);
                 }
             }
+            $nodo_usuario->eliminar_adyacente('soporte');
+        }
+
+        // Contenedor plural.
+        $nodo_soportes = $nodo_usuario->adyacente('soportes');
+        if ($nodo_soportes) {
+            $adyacentes_sop = (array)$nodo_soportes->adyacentes();
+            foreach ($adyacentes_sop as $nombre_sop => $nodo_pub) {
+                $nombre_sop = (string)$nombre_sop;
+                $nodo_sop_real = Nodo::nodo_por_id('us_' . $nombre_sop);
+                if ($nodo_sop_real) {
+                    $nodo_duenos_sop = $nodo_sop_real->adyacente('duenos');
+                    if ($nodo_duenos_sop) {
+                        $nodo_duenos_sop->eliminar_adyacente($nombre_usuario);
+                    }
+                }
+                $nodo_soportes->eliminar_adyacente($nombre_sop);
+            }
+            $nodo_usuario->eliminar_adyacente('soportes');
+            _destruir_campos_simples($nodo_soportes);
+            Nodo::eliminar($nodo_soportes);
         }
     }
 
