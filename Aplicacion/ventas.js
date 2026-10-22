@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.77a
+ * @version 1.5piloto.81k
  */
 
 // (aplicar_cambios.php funcionó)
@@ -770,6 +770,33 @@ function configurar_filtros_vendidos() {
 }
 
 /**
+ * Devuelve el nombre del dueño cuyas ventas se están viendo en la
+ * pestaña Vendidos, según el rol del usuario actual.
+ *
+ * - Admin/soporte: el dueño elegido en el selector.
+ * - Dueño: él mismo.
+ * - Terminal: cadena vacía (el backend resuelve su contexto con
+ *   `_nombre_terminal_para_busqueda`).
+ *
+ * Se usa en los fetch que operan sobre una venta concreta (obtener,
+ * pagar cupón, cancelar, cancelaciones/obtener). Sin nombre_dueno,
+ * el backend con carga parcial del soporte (sin `usuarios` en
+ * memoria) no puede navegar `us_<dueño>` y devuelve "no encontrada".
+ *
+ * @returns {string}
+ * @since 1.5piloto.81k
+ */
+function _nombre_dueno_para_peticiones_vendidos() {
+    if (!usuario_actual) return '';
+    if (es_admin_o_soporte()) {
+        const sel = document.getElementById('selector_dueno_vendidos');
+        return (sel && sel.value) ? sel.value : '';
+    }
+    if (usuario_actual.nivel === 'dueno') return usuario_actual.nombre_usuario;
+    return '';
+}
+
+/**
  * Muestra u oculta el botón "Ver cancelaciones" según el rol.
  * - Dueño y terminal: siempre visible.
  * - Admin: visible solo si hay un dueño seleccionado.
@@ -1257,10 +1284,16 @@ function renderizar_saldos_vendidos(ventas_filtradas) {
  * @param {string} id_venta
  */
 async function ver_cuponera_venta(id_venta) {
+    // Fix B3.3c (v81k): agregar nombre_dueno para admin/soporte.
+    // Sin esto, "ventas/obtener" no puede navegar us_<dueño> en
+    // carga parcial y devuelve "Venta no encontrada".
+    const params_cuponera = { accion: "ventas/obtener", id_venta };
+    const nombre_dueno_cuponera = _nombre_dueno_para_peticiones_vendidos();
+    if (nombre_dueno_cuponera) params_cuponera.nombre_dueno = nombre_dueno_cuponera;
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "ventas/obtener", id_venta })
+        body: new URLSearchParams(params_cuponera)
     });
     const datos = await respuesta.json();
     if (!datos.exito) {
@@ -1489,16 +1522,20 @@ function _abrir_modal_pagar_cupon(numero_cupon) {
             return;
         }
 
+        // Fix B3.3c (v81k): agregar nombre_dueno para admin/soporte.
+        const params_pagar = {
+            accion: "ventas/pagar_cupon",
+            id_venta: venta.id_venta,
+            numero_cupon: cupon.numero,
+            monto: monto_num.toFixed(2),
+            metodo_pago: metodo
+        };
+        const nombre_dueno_pagar = _nombre_dueno_para_peticiones_vendidos();
+        if (nombre_dueno_pagar) params_pagar.nombre_dueno = nombre_dueno_pagar;
         const respuesta = await fetch("index.php", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-                accion: "ventas/pagar_cupon",
-                id_venta: venta.id_venta,
-                numero_cupon: cupon.numero,
-                monto: monto_num.toFixed(2),
-                metodo_pago: metodo
-            })
+            body: new URLSearchParams(params_pagar)
         });
         const resultado = await respuesta.json();
         if (!resultado.exito) {
@@ -1632,10 +1669,14 @@ async function ir_a_venta_en_vendidos(id_venta, nombre_dueno = '', nombre_viaje 
  * @param {string} id_venta
  */
 async function cancelar_venta(id_venta) {
+    // Fix B3.3c (v81k): agregar nombre_dueno para admin/soporte.
+    const params_info_canc = { accion: "ventas/info_cancelacion", id_venta };
+    const nombre_dueno_info_canc = _nombre_dueno_para_peticiones_vendidos();
+    if (nombre_dueno_info_canc) params_info_canc.nombre_dueno = nombre_dueno_info_canc;
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "ventas/info_cancelacion", id_venta })
+        body: new URLSearchParams(params_info_canc)
     });
     const datos = await respuesta.json();
     if (!datos.exito) {
@@ -1779,10 +1820,14 @@ async function cancelar_venta(id_venta) {
         const micro_previo = (typeof micro_seleccionado !== 'undefined') ? micro_seleccionado : null;
         const viaje_previo = (typeof viaje_seleccionado !== 'undefined' && viaje_seleccionado) ? viaje_seleccionado : null;
 
+        // Fix B3.3c (v81k): agregar nombre_dueno para admin/soporte.
+        const params_cancelar = { accion: "ventas/cancelar", id_venta, motivo };
+        const nombre_dueno_cancelar = _nombre_dueno_para_peticiones_vendidos();
+        if (nombre_dueno_cancelar) params_cancelar.nombre_dueno = nombre_dueno_cancelar;
         const resp2 = await fetch("index.php", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({ accion: "ventas/cancelar", id_venta, motivo })
+            body: new URLSearchParams(params_cancelar)
         });
         const resultado = await resp2.json();
         if (resultado.exito) {
@@ -2777,10 +2822,18 @@ function _renderizar_modal_cancelaciones(cancelaciones) {
  * @param {string} id_cancelacion
  */
 async function ver_detalle_cancelacion(id_cancelacion) {
+    // Fix B3.3c (v81k): el backend necesita nombre_dueno para
+    // navegar us_<dueño> en carga parcial. Sin esto, el soporte
+    // (carga parcial sin `usuarios` en memoria) recibe
+    // "Cancelación no encontrada". Mismo patrón que el bug v81i
+    // de rendiciones/liquidaciones.
+    const params_det_canc = { accion: "cancelaciones/obtener", id_cancelacion };
+    const nombre_dueno_det_canc = _nombre_dueno_para_peticiones_vendidos();
+    if (nombre_dueno_det_canc) params_det_canc.nombre_dueno = nombre_dueno_det_canc;
     const respuesta = await fetch("index.php", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ accion: "cancelaciones/obtener", id_cancelacion })
+        body: new URLSearchParams(params_det_canc)
     });
     const datos = await respuesta.json();
     if (!datos.exito) {
