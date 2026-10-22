@@ -1,372 +1,190 @@
 <?php
 /**
- * Aplicador — v81m: cierre del arco B3.3c + rediseño soportes
- * plural. Solo documentación. (v2: sin el bloque de index.php,
- * porque `auditar_soporte` no existe.)
+ * Aplicador — v81n: fix urgente de reparar_arboles.
+ *
+ * Bug: _reparar_arboles_precalcular indexaba por `p` y `hd`
+ * default, ignorando los enlaces parametrizados (p_<term>,
+ * hd_<term>). Para un compartido (con árbol parametrizado),
+ * $por_padre[$id_cont] daba vacío, y _reparar_arbol
+ * interpretaba "contenedor sin hijos" y borraba el
+ * hmi_<term>. Eso rompía el árbol del compartido: las ventas
+ * viejas quedaban huérfanas y el terminal solo veía las
+ * nuevas.
+ *
+ * Fix: indexar por nombre de enlace (no por nombre fijo),
+ * y consultar por el enlace correcto según $nombres.
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.81m';
+$version_nueva = '1.5piloto.81n';
 $htmls_a_bumpear = ['aplicacion_GET.html'];
 
 $cambios = [
 
     // ============================================================
-    // prompt_seguridad.md §1: encabezado de estado
+    // 1. _reparar_arboles_precalcular: indexar por enlace
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_seguridad.md',
-        'descripcion' => 'prompt_seguridad.md: versión del estado al cierre',
+        'archivo' => 'Aplicacion/Reparacion/RepararArboles.php',
+        'descripcion' => 'RepararArboles.php: precalcular indexa por enlace',
         'buscar' => [
-            '**Estado al cierre de v1.5piloto.81i:**',
+            'function _reparar_arboles_precalcular(string $token): array {',
+            '    $por_padre = [];',
+            '    $es_dest_hd = [];',
+            '    Nodo::por_cada_nodo_ejecutar(',
+            '        $token,',
+            '        function ($nodo) use (&$por_padre, &$es_dest_hd) {',
+            '            $ady = (array)$nodo->adyacentes();',
+            '            if (isset($ady[\'p\'])) {',
+            '                $id_padre = $ady[\'p\']->id();',
+            '                $por_padre[$id_padre][] = $nodo;',
+            '            }',
+            '            if (isset($ady[\'hd\'])) {',
+            '                $es_dest_hd[$ady[\'hd\']->id()] = true;',
+            '            }',
+            '        },',
+            '        null',
+            '    );',
+            '    return [\'por_padre\' => $por_padre, \'es_dest_hd\' => $es_dest_hd];',
+            '}',
         ],
         'reemplazar' => [
-            '**Estado al cierre de v1.5piloto.81m:**',
+            'function _reparar_arboles_precalcular(string $token): array {',
+            '    // v1.5piloto.81n: indexar por nombre de enlace, no por',
+            '    // nombre fijo. Los compartidos usan p_<term> y hd_<term>;',
+            '    // con el indexado viejo, $por_padre[$id_cont] daba vacío',
+            '    // para esos contenedores y _reparar_arbol los trataba',
+            '    // como "sin hijos", borrando el hmi_<term> del compartido.',
+            '    //',
+            '    // Estructura:',
+            '    //   $por_padre[$enlace_p][$id_padre] = [Nodo, ...]',
+            '    //   $es_dest_hd[$enlace_hd][$id_nodo] = true',
+            '    // donde $enlace_p / $enlace_hd pueden ser "p"/"hd"',
+            '    // o "p_<term>"/"hd_<term>".',
+            '    $por_padre = [];',
+            '    $es_dest_hd = [];',
+            '    Nodo::por_cada_nodo_ejecutar(',
+            '        $token,',
+            '        function ($nodo) use (&$por_padre, &$es_dest_hd) {',
+            '            $ady = (array)$nodo->adyacentes();',
+            '            foreach ($ady as $enlace => $destino) {',
+            '                $enlace = (string)$enlace;',
+            '                if ($enlace === \'p\' || strpos($enlace, \'p_\') === 0) {',
+            '                    $por_padre[$enlace][$destino->id()][] = $nodo;',
+            '                }',
+            '                if ($enlace === \'hd\' || strpos($enlace, \'hd_\') === 0) {',
+            '                    $es_dest_hd[$enlace][$destino->id()] = true;',
+            '                }',
+            '            }',
+            '        },',
+            '        null',
+            '    );',
+            '    return [\'por_padre\' => $por_padre, \'es_dest_hd\' => $es_dest_hd];',
+            '}',
         ],
     ],
 
     // ============================================================
-    // prompt_seguridad.md §3.4
+    // 2. _reparar_arbol: consultar con $n['p'] y $n['hd']
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_seguridad.md',
-        'descripcion' => 'prompt_seguridad.md §3.4: soportes contenedor plural',
+        'archivo' => 'Aplicacion/Reparacion/RepararArboles.php',
+        'descripcion' => 'RepararArboles.php: _reparar_arbol consulta por enlace',
         'buscar' => [
-            '### 3.4 Enlaces de permiso',
+            'function _reparar_arbol(Nodo $contenedor, ?array $nombres, array $por_padre, array $es_dest_hd): array {',
+            '    $n = _arbol_nombres($nombres);',
+            '    $id_cont = $contenedor->id();',
+            '    $cambios = 0;',
+            '    $detalles = [];',
             '',
-            'Van directo en la raíz del usuario, no en un contenedor:',
+            '    $hijos = $por_padre[$id_cont] ?? [];',
             '',
-            '- `dueno` en el terminal → apunta al `compartido_con_us_termX`',
-            '  del dueño.',
-            '- `soporte` en el dueño → apunta al `publico` del soporte.',
-            '- `duenos` en el soporte → apunta al nodo real de cada dueño',
-            '  asignado. **Este es el enlace que abre la puerta del soporte',
-            '  hacia sus dueños.**',
-            '',
-            '**Nota asimétrica:** `soporte → dueno` apunta al nodo real (el',
-            'soporte ve todo del dueño); `dueno → soporte` apunta al',
-            '`publico` (el dueño solo ve datos públicos del soporte). La',
-            'asimetría es intencional.',
+            '    $primer = null;',
+            '    $candidatos = 0;',
+            '    foreach ($hijos as $hijo) {',
+            '        $id_h = $hijo->id();',
+            '        if (!isset($es_dest_hd[$id_h])) {',
+            '            $primer = $hijo;',
+            '            $candidatos++;',
+            '        }',
+            '    }',
         ],
         'reemplazar' => [
-            '### 3.4 Enlaces de permiso',
+            'function _reparar_arbol(Nodo $contenedor, ?array $nombres, array $por_padre, array $es_dest_hd): array {',
+            '    $n = _arbol_nombres($nombres);',
+            '    $id_cont = $contenedor->id();',
+            '    $cambios = 0;',
+            '    $detalles = [];',
             '',
-            'Van directo en la raíz del usuario, no en un contenedor:',
+            '    // v1.5piloto.81n: consultar por el enlace concreto del',
+            '    // árbol (default o parametrizado), no por nombre fijo.',
+            '    $hijos = $por_padre[$n[\'p\']][$id_cont] ?? [];',
+            '    $es_dest_hd_del_arbol = $es_dest_hd[$n[\'hd\']] ?? [];',
             '',
-            '- `dueno` en el terminal → apunta al `compartido_con_us_termX`',
-            '  del dueño.',
-            '- `soportes` en el dueño → contenedor (dato vacío) con los',
-            '  `publico` de cada soporte asignado',
-            '  (`soportes → publico_<soporte1>, publico_<soporte2>, ...`).',
-            '  **Permite varios soportes por dueño.** Reemplaza al enlace',
-            '  singular `soporte` desde v1.5piloto.81l. El nombre plural',
-            '  evita la colisión con el nodo real del soporte.',
-            '- `duenos` en el soporte → apunta al nodo real de cada dueño',
-            '  asignado. **Este es el enlace que abre la puerta del soporte',
-            '  hacia sus dueños.**',
-            '',
-            '**Nota asimétrica:** `soporte → duenos → us_duenoY` apunta al',
-            'nodo real (el soporte ve todo del dueño);',
-            '`dueno → soportes → publico_soporteX` apunta al `publico` (el',
-            'dueño solo ve datos públicos del soporte). La asimetría es',
-            'intencional.',
+            '    $primer = null;',
+            '    $candidatos = 0;',
+            '    foreach ($hijos as $hijo) {',
+            '        $id_h = $hijo->id();',
+            '        if (!isset($es_dest_hd_del_arbol[$id_h])) {',
+            '            $primer = $hijo;',
+            '            $candidatos++;',
+            '        }',
+            '    }',
         ],
     ],
 
     // ============================================================
-    // prompt_seguridad.md §4.3
+    // 3. Guard extra: no borrar hmi si hay hijos reales en el grafo
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_seguridad.md',
-        'descripcion' => 'prompt_seguridad.md §4.3: regla del camino mínimo',
+        'archivo' => 'Aplicacion/Reparacion/RepararArboles.php',
+        'descripcion' => 'RepararArboles.php: guard defensivo en "sin hijos"',
         'buscar' => [
-            '**Mal:** `dueno → soporte → us_soporteX` (apunta al nodo real',
-            'del soporte, expone `duenos` y desde ahí a otros dueños).',
-            '',
-            '**Bien:** `dueno → soporte → publico_soporteX` (apunta al',
-            '`publico` que solo tiene `nivel`, `nombre_real`, `email`).',
+            '    if (empty($hijos)) {',
+            '        if ($contenedor->adyacente($n[\'hmi\'])) {',
+            '            $contenedor->eliminar_adyacente($n[\'hmi\']);',
+            '            $cambios++;',
+            '            $detalles[] = "contenedor $id_cont: hmi borrado (sin hijos)";',
+            '        }',
+            '    } elseif ($candidatos === 0) {',
         ],
         'reemplazar' => [
-            '**Mal:** `dueno → soporte → us_soporteX` (apunta al nodo real',
-            'del soporte, expone `duenos` y desde ahí a otros dueños).',
-            '',
-            '**Bien:** `dueno → soportes → publico_soporteX` (contenedor',
-            '`soportes` con el `publico` de cada soporte como hijo; el',
-            '`publico` solo tiene `nivel`, `nombre_real`, `email`).',
+            '    if (empty($hijos)) {',
+            '        // Guard defensivo (v1.5piloto.81n): antes de borrar',
+            '        // el hmi, verificar que el contenedor realmente no',
+            '        // tenga hijos navegables. Si el precalcular falló',
+            '        // (mapa incompleto), no queremos borrar un hmi',
+            '        // que sí es válido. Se navega el hmi y se chequea',
+            '        // que el nodo destino exista y tenga p al contenedor.',
+            '        $hmi_actual = $contenedor->adyacente($n[\'hmi\']);',
+            '        $hmi_es_valido = false;',
+            '        if ($hmi_actual) {',
+            '            $p_del_hmi = $hmi_actual->adyacente($n[\'p\']);',
+            '            if ($p_del_hmi && $p_del_hmi->id() === $id_cont) {',
+            '                $hmi_es_valido = true;',
+            '            }',
+            '        }',
+            '        if ($hmi_es_valido) {',
+            '            $detalles[] = "contenedor $id_cont: hmi apunta a hijo con p correcto, no se borra (revisar precalcular)";',
+            '        } elseif ($hmi_actual) {',
+            '            $contenedor->eliminar_adyacente($n[\'hmi\']);',
+            '            $cambios++;',
+            '            $detalles[] = "contenedor $id_cont: hmi borrado (sin hijos, hmi apuntaba a nodo sin p)";',
+            '        }',
+            '    } elseif ($candidatos === 0) {',
         ],
     ],
 
     // ============================================================
-    // prompt_seguridad.md §5.5
+    // 4. Bump del módulo (solo @version, no toco código)
     // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_seguridad.md',
-        'descripcion' => 'prompt_seguridad.md §5.5: enlaces de permiso explícitos',
-        'buscar' => [
-            '- Soporte → dueño: `soporte → duenos → us_duenoY` (apunta al',
-            '  nodo real, porque el soporte ve todo del dueño).',
-            '- Dueño → soporte: `dueno → soporte → publico_soporteX` (apunta',
-            '  al público, porque el dueño solo ve datos públicos).',
-        ],
-        'reemplazar' => [
-            '- Soporte → dueño: `soporte → duenos → us_duenoY` (apunta al',
-            '  nodo real, porque el soporte ve todo del dueño).',
-            '- Dueño → soporte(s): `dueno → soportes → publico_soporteX`',
-            '  (contenedor, admite varios soportes; apunta al `publico`,',
-            '  porque el dueño solo ve datos públicos).',
-        ],
-    ],
-
-    // ============================================================
-    // prompt_seguridad.md §5.11: agregar lección 4
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_seguridad.md',
-        'descripcion' => 'prompt_seguridad.md §5.11: lección 4 (orden de llamadas)',
-        'buscar' => [
-            '**3. Un bug en un helper sugiere el mismo bug en sus',
-            'hermanos.** Cuando se detecta un patrón problemático',
-            '(por ejemplo, un filtro mal escrito), auditar los',
-            'demás helpers que usan el mismo patrón. En v79b, el',
-            'fix del filtro en `Venta.php` reveló el mismo bug',
-            'en `reparar_arboles.php`.',
-        ],
-        'reemplazar' => [
-            '**3. Un bug en un helper sugiere el mismo bug en sus',
-            'hermanos.** Cuando se detecta un patrón problemático',
-            '(por ejemplo, un filtro mal escrito), auditar los',
-            'demás helpers que usan el mismo patrón. En v79b, el',
-            'fix del filtro en `Venta.php` reveló el mismo bug',
-            'en `reparar_arboles.php`.',
-            '',
-            '**4. El orden de las llamadas importa cuando una crea',
-            'contenedores que la otra consume.** Caso v81l:',
-            '`_asignar_duenos_a_soporte` se llamaba antes de',
-            '`_asegurar_niveles_usuario`. El `publico` del soporte',
-            'todavía no existía, y el enlace `dueno → soporte` caía',
-            'al fallback (nodo real del soporte), causando la fuga',
-            'cruzada entre dueños. Fix: reordenar (niveles primero,',
-            'después asignar). Regla: antes de encadenar dos',
-            'operaciones sobre el mismo nodo, verificar cuál crea',
-            'los nodos que la otra consume, y ordenarlas en',
-            'consecuencia.',
-        ],
-    ],
-
-    // ============================================================
-    // prompt_seguridad.md §8.6: cierre de B3.3c
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_seguridad.md',
-        'descripcion' => 'prompt_seguridad.md §8.6: cierre de B3.3c',
-        'buscar' => [
-            '**Consecuencia:** con carga parcial, las 3 restantes',
-            'devuelven null o vacío si el solicitante no tiene `usuarios`',
-            'en memoria (dueño y soporte). Se resuelven cuando aparezca',
-            'dolor real o cuando implementemos iteradores con ID especial.',
-        ],
-        'reemplazar' => [
-            '**Consecuencia:** con carga parcial, las 3 restantes',
-            'devuelven null o vacío si el solicitante no tiene `usuarios`',
-            'en memoria (dueño y soporte). Se resuelven cuando aparezca',
-            'dolor real o cuando implementemos iteradores con ID especial.',
-            '',
-            '**Cierre de B3.3c (v1.5piloto.81j-81l).** Las 3 funciones',
-            'pendientes quedaron resueltas:',
-            '',
-            '- `obtener_cancelacion_por_id`: acepta `?string $nombre_dueno`',
-            '  y `?string $nombre_terminal` (v81j).',
-            '- `obtener_pasajero_por_dni`: la rama sin contexto navega',
-            '  `us_<dueño>` directo (v81j). Fix de privacidad: antes',
-            '  iteraba sobre todos los dueños y mezclaba ventas de',
-            '  distintos dueños cuando dos pasajeros compartían DNI.',
-            '- `_buscar_venta_por_id`: fallback defensivo, no aplica en la',
-            '  práctica (todos los llamadores del Enrutador pasan dueño o',
-            '  terminal). Pendiente anotado: `usuarios` como contenedor de',
-            '  nombres, para eliminar el fallback.',
-            '',
-            'Con eso, la Fase B del modelo topológico quedó completa.',
-            '',
-            '**Bug del frontend de ventas.js (v81k).** `ventas.js` no',
-            'mandaba `nombre_dueno` en 4 fetch (`ventas/obtener`,',
-            '`ventas/pagar_cupon`, `ventas/info_cancelacion`,',
-            '`ventas/cancelar`). Mismo patrón que el bug v81i de',
-            'rendiciones/liquidaciones. Nuevo helper',
-            '`_nombre_dueno_para_peticiones_vendidos()` en el frontend.',
-            '',
-            '**Rediseño `soportes` plural (v81l).** El enlace',
-            '`dueno → soporte → publico` singular se reemplazó por un',
-            'contenedor `dueno → soportes → publico_<soporte1>, ...`.',
-            'Causa raíz del fallback al nodo real: en `agregar_usuario`,',
-            '`_asignar_duenos_a_soporte` corría antes de',
-            '`_asegurar_niveles_usuario`, y el `publico` no existía',
-            'todavía. Ver §5.11 lección 4.',
-        ],
-    ],
-
-    // ============================================================
-    // prompt_piloto.md §4.2: agregar `soportes`
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/prompt_piloto.md',
-        'descripcion' => 'prompt_piloto.md §4.2: agregar soportes al nodo usuario',
-        'buscar' => [
-            '- `dueno` → enlace directo al Nodo Usuario dueño (solo terminal).',
-            '- `terminales` → contenedor (solo dueño): enlaces por nombre de terminal.',
-        ],
-        'reemplazar' => [
-            '- `dueno` → enlace directo al Nodo Usuario dueño (solo terminal).',
-            '- `soportes` → contenedor (solo dueño): los `publico` de cada',
-            '  soporte asignado. Permite varios soportes por dueño.',
-            '  Rediseño v1.5piloto.81l. Reemplaza al enlace singular',
-            '  `soporte`.',
-            '- `terminales` → contenedor (solo dueño): enlaces por nombre de terminal.',
-        ],
-    ],
-
-    // ============================================================
-    // plan_actual.md §1: última actualización
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual.md §1: última actualización a v81m',
-        'buscar' => [
-            '**Última actualización:** v1.5piloto.81i (cierre del arco',
-            'de los 4 módulos menores).',
-            '',
-            'Empresa.php y Vehiculo.php ya estaban adaptados',
-            '(v76u-v77v); Liquidacion.php y Rendicion.php se adaptaron',
-            'en v81h. El fix v81i (el frontend no mandaba',
-            '`nombre_dueno` en `rendiciones/obtener`,',
-            '`rendiciones/aceptar_ajuste` ni `liquidaciones/obtener`)',
-            'dejó la verificación manual y las 3 pruebas del plugin',
-            'en verde. B3.3c reducido a 3 helpers (antes el texto',
-            'decía "7", era un typo: eran 6; se adaptaron 3).',
-        ],
-        'reemplazar' => [
-            '**Última actualización:** v1.5piloto.81m (cierre de B3.3c',
-            '+ rediseño soportes plural).',
-            '',
-            'En v81j se adaptaron los 3 helpers de B3.3c. En v81k se',
-            'arregló el frontend de ventas.js (no mandaba `nombre_dueno`',
-            'en 4 fetch, mismo patrón que el bug v81i de rendiciones).',
-            'En v81l se rediseñó `soporte` singular → `soportes`',
-            'contenedor plural, y se reordenó `agregar_usuario` para que',
-            '`_asegurar_niveles_usuario` corra antes de',
-            '`_asignar_duenos_a_soporte` (causa raíz del enlace al nodo',
-            'real del soporte). En v81m se actualizaron los prompts.',
-            '**Con B3.3c cerrado, la Fase B del modelo topológico quedó',
-            'completa.**',
-        ],
-    ],
-
-    // ============================================================
-    // plan_actual.md §2: agregar arco cerrado
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual.md §2: nuevo arco cerrado B3.3c',
-        'buscar' => [
-            'Resumen de 1-2 líneas por arco. El detalle completo vive en',
-            'los prompts correspondientes o en los commits.',
-            '',
-            '- **Visualizador de grafo (v80n-v81g).** Nueva sub-pestaña',
-        ],
-        'reemplazar' => [
-            'Resumen de 1-2 líneas por arco. El detalle completo vive en',
-            'los prompts correspondientes o en los commits.',
-            '',
-            '- **B3.3c — 3 helpers que iteraban `usuarios` (v81j-v81m).**',
-            '  `obtener_cancelacion_por_id` acepta dueño/terminal.',
-            '  `obtener_pasajero_por_dni` navega `us_<dueño>` directo',
-            '  (fix de privacidad). Frontend de `ventas.js` manda',
-            '  `nombre_dueno` en 4 fetch (v81k). Rediseño `soporte`',
-            '  singular → `soportes` contenedor plural (v81l). **Fase B',
-            '  del modelo topológico completa.** Detalle en',
-            '  `prompt_seguridad.md` §8.6.',
-            '- **Visualizador de grafo (v80n-v81g).** Nueva sub-pestaña',
-        ],
-    ],
-
-    // ============================================================
-    // plan_actual.md §3: decisión en vigor sobre soportes
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual.md §3: decisión rediseño soportes',
-        'buscar' => [
-            '- **La seguridad emerge de la topología.** El bitmask lo',
-            '  propaga el framework, no la app. La app nunca asigna bits',
-            '  a mano.',
-        ],
-        'reemplazar' => [
-            '- **La seguridad emerge de la topología.** El bitmask lo',
-            '  propaga el framework, no la app. La app nunca asigna bits',
-            '  a mano.',
-            '- **Rediseño `soportes` plural (v1.5piloto.81l).** El dueño',
-            '  tiene un contenedor `soportes` (dato vacío) con los',
-            '  `publico` de cada soporte asignado como hijos. Reemplaza',
-            '  al enlace singular `soporte`. Permite varios soportes por',
-            '  dueño. El orden en `agregar_usuario` importa:',
-            '  `_asegurar_niveles_usuario` antes de',
-            '  `_asignar_duenos_a_soporte`.',
-        ],
-    ],
-
-    // ============================================================
-    // plan_actual.md §4.1: B3.3c cerrado
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual.md §4.1: cerrar B3.3c en pendientes',
-        'buscar' => [
-            '- **B3.3c restante (3 helpers).** `Venta.php`:',
-            '  `_buscar_venta_por_id` (fallback) y',
-            '  `obtener_cancelacion_por_id`. `Pasajero.php`:',
-            '  `obtener_pasajero_por_dni` (rama del historial de',
-            '  ventas). Postergado hasta que aparezca dolor real o',
-            '  hasta que el framework tenga iteradores con ID especial.',
-        ],
-        'reemplazar' => [
-            '- [x] **B3.3c — 3 helpers que iteraban `usuarios`** —',
-            '  CERRADO (v81j + v81k + v81l, ver §2). `_buscar_venta_por_id`',
-            '  queda como fallback defensivo (no aplica en la práctica);',
-            '  pendiente anotado para eliminar cuando `usuarios` sea',
-            '  contenedor de nombres. `obtener_cancelacion_por_id` y',
-            '  `obtener_pasajero_por_dni` adaptados al patrón',
-            '  `?string $nombre_dueno`. Rediseño `soporte` → `soportes`',
-            '  contenedor plural en v81l.',
-        ],
-    ],
-
-    // ============================================================
-    // plan_actual.md §5.1: tabla de fases
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual.md §5.1: marcar B3.3c cerrado en tabla',
-        'buscar' => [
-            '| **B3.3c** — 3 helpers que iteran `usuarios` | `_buscar_venta_por_id` (fallback), `obtener_cancelacion_por_id`, `obtener_pasajero_por_dni` (rama historial). | **Pendiente — próximo arco** |',
-        ],
-        'reemplazar' => [
-            '| **B3.3c** — 3 helpers que iteran `usuarios` | `_buscar_venta_por_id` (fallback defensivo), `obtener_cancelacion_por_id`, `obtener_pasajero_por_dni` (rama historial). | ✅ v81j-v81l |',
-        ],
-    ],
+    // (el runner hace el bump automático por $version_nueva)
 
 ];
 
