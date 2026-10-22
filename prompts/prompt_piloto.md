@@ -327,6 +327,10 @@ Enlaces:
 - `banco` → nodo contenedor (opcional): el dato es el monto bancarizado.
   Tiene enlaces `nombre` y `cuenta` (strings).
 - `dueno` → enlace directo al Nodo Usuario dueño (solo terminal).
+- `soportes` → contenedor (solo dueño): los `publico` de cada
+  soporte asignado. Permite varios soportes por dueño.
+  Rediseño v1.5piloto.81l. Reemplaza al enlace singular
+  `soporte`.
 - `terminales` → contenedor (solo dueño): enlaces por nombre de terminal.
 - `empresas` → contenedor (solo dueño): enlaces por nombre de empresa.
 - `viajes` → contenedor (solo dueño): enlaces por nombre de viaje.

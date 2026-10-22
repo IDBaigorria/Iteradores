@@ -9,7 +9,7 @@ Se actualiza cuando: se agrega un patrón nuevo de aislamiento, se
 descubre una fuga, se modifica el modelo de contextos, o se
 documenta un bug relevante.
 
-**Estado al cierre de v1.5piloto.81i:**
+**Estado al cierre de v1.5piloto.81m:**
 
 - La topología es la única fuente de verdad de la seguridad. Los
   chequeos por código (nivel, dueño asignado) siguen existiendo
@@ -193,15 +193,21 @@ Van directo en la raíz del usuario, no en un contenedor:
 
 - `dueno` en el terminal → apunta al `compartido_con_us_termX`
   del dueño.
-- `soporte` en el dueño → apunta al `publico` del soporte.
+- `soportes` en el dueño → contenedor (dato vacío) con los
+  `publico` de cada soporte asignado
+  (`soportes → publico_<soporte1>, publico_<soporte2>, ...`).
+  **Permite varios soportes por dueño.** Reemplaza al enlace
+  singular `soporte` desde v1.5piloto.81l. El nombre plural
+  evita la colisión con el nodo real del soporte.
 - `duenos` en el soporte → apunta al nodo real de cada dueño
   asignado. **Este es el enlace que abre la puerta del soporte
   hacia sus dueños.**
 
-**Nota asimétrica:** `soporte → dueno` apunta al nodo real (el
-soporte ve todo del dueño); `dueno → soporte` apunta al
-`publico` (el dueño solo ve datos públicos del soporte). La
-asimetría es intencional.
+**Nota asimétrica:** `soporte → duenos → us_duenoY` apunta al
+nodo real (el soporte ve todo del dueño);
+`dueno → soportes → publico_soporteX` apunta al `publico` (el
+dueño solo ve datos públicos del soporte). La asimetría es
+intencional.
 
 ---
 
@@ -225,8 +231,9 @@ no al más general.
 **Mal:** `dueno → soporte → us_soporteX` (apunta al nodo real
 del soporte, expone `duenos` y desde ahí a otros dueños).
 
-**Bien:** `dueno → soporte → publico_soporteX` (apunta al
-`publico` que solo tiene `nivel`, `nombre_real`, `email`).
+**Bien:** `dueno → soportes → publico_soporteX` (contenedor
+`soportes` con el `publico` de cada soporte como hijo; el
+`publico` solo tiene `nivel`, `nombre_real`, `email`).
 
 ### 4.3 Regla de la asimetría
 
@@ -361,8 +368,9 @@ Cuando un usuario "administra" a otro sin ser su par:
 
 - Soporte → dueño: `soporte → duenos → us_duenoY` (apunta al
   nodo real, porque el soporte ve todo del dueño).
-- Dueño → soporte: `dueno → soporte → publico_soporteX` (apunta
-  al público, porque el dueño solo ve datos públicos).
+- Dueño → soporte(s): `dueno → soportes → publico_soporteX`
+  (contenedor, admite varios soportes; apunta al `publico`,
+  porque el dueño solo ve datos públicos).
 
 ### 5.6 Árboles entrelazados
 
@@ -639,6 +647,18 @@ hermanos.** Cuando se detecta un patrón problemático
 demás helpers que usan el mismo patrón. En v79b, el
 fix del filtro en `Venta.php` reveló el mismo bug
 en `reparar_arboles.php`.
+
+**4. El orden de las llamadas importa cuando una crea
+contenedores que la otra consume.** Caso v81l:
+`_asignar_duenos_a_soporte` se llamaba antes de
+`_asegurar_niveles_usuario`. El `publico` del soporte
+todavía no existía, y el enlace `dueno → soporte` caía
+al fallback (nodo real del soporte), causando la fuga
+cruzada entre dueños. Fix: reordenar (niveles primero,
+después asignar). Regla: antes de encadenar dos
+operaciones sobre el mismo nodo, verificar cuál crea
+los nodos que la otra consume, y ordenarlas en
+consecuencia.
 
 ---
 
@@ -999,6 +1019,37 @@ patrón `?string $nombre_dueno`:
 devuelven null o vacío si el solicitante no tiene `usuarios`
 en memoria (dueño y soporte). Se resuelven cuando aparezca
 dolor real o cuando implementemos iteradores con ID especial.
+
+**Cierre de B3.3c (v1.5piloto.81j-81l).** Las 3 funciones
+pendientes quedaron resueltas:
+
+- `obtener_cancelacion_por_id`: acepta `?string $nombre_dueno`
+  y `?string $nombre_terminal` (v81j).
+- `obtener_pasajero_por_dni`: la rama sin contexto navega
+  `us_<dueño>` directo (v81j). Fix de privacidad: antes
+  iteraba sobre todos los dueños y mezclaba ventas de
+  distintos dueños cuando dos pasajeros compartían DNI.
+- `_buscar_venta_por_id`: fallback defensivo, no aplica en la
+  práctica (todos los llamadores del Enrutador pasan dueño o
+  terminal). Pendiente anotado: `usuarios` como contenedor de
+  nombres, para eliminar el fallback.
+
+Con eso, la Fase B del modelo topológico quedó completa.
+
+**Bug del frontend de ventas.js (v81k).** `ventas.js` no
+mandaba `nombre_dueno` en 4 fetch (`ventas/obtener`,
+`ventas/pagar_cupon`, `ventas/info_cancelacion`,
+`ventas/cancelar`). Mismo patrón que el bug v81i de
+rendiciones/liquidaciones. Nuevo helper
+`_nombre_dueno_para_peticiones_vendidos()` en el frontend.
+
+**Rediseño `soportes` plural (v81l).** El enlace
+`dueno → soporte → publico` singular se reemplazó por un
+contenedor `dueno → soportes → publico_<soporte1>, ...`.
+Causa raíz del fallback al nodo real: en `agregar_usuario`,
+`_asignar_duenos_a_soporte` corría antes de
+`_asegurar_niveles_usuario`, y el `publico` no existía
+todavía. Ver §5.11 lección 4.
 
 **Bug de frontend asociado (v81i).** El backend ya navegaba
 correctamente con `nombre_dueno`, pero el frontend del piloto

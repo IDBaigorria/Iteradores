@@ -27,17 +27,19 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.81i (cierre del arco
-de los 4 módulos menores).
+**Última actualización:** v1.5piloto.81m (cierre de B3.3c
++ rediseño soportes plural).
 
-Empresa.php y Vehiculo.php ya estaban adaptados
-(v76u-v77v); Liquidacion.php y Rendicion.php se adaptaron
-en v81h. El fix v81i (el frontend no mandaba
-`nombre_dueno` en `rendiciones/obtener`,
-`rendiciones/aceptar_ajuste` ni `liquidaciones/obtener`)
-dejó la verificación manual y las 3 pruebas del plugin
-en verde. B3.3c reducido a 3 helpers (antes el texto
-decía "7", era un typo: eran 6; se adaptaron 3).
+En v81j se adaptaron los 3 helpers de B3.3c. En v81k se
+arregló el frontend de ventas.js (no mandaba `nombre_dueno`
+en 4 fetch, mismo patrón que el bug v81i de rendiciones).
+En v81l se rediseñó `soporte` singular → `soportes`
+contenedor plural, y se reordenó `agregar_usuario` para que
+`_asegurar_niveles_usuario` corra antes de
+`_asignar_duenos_a_soporte` (causa raíz del enlace al nodo
+real del soporte). En v81m se actualizaron los prompts.
+**Con B3.3c cerrado, la Fase B del modelo topológico quedó
+completa.**
 
 **Antes (v81g):** cierre del arco del visualizador de
 grafo. Antes (v79o): cierre de la línea "grafo + plugin +
@@ -79,6 +81,14 @@ temáticas y la persistencia de corridas en su propio grafo
 Resumen de 1-2 líneas por arco. El detalle completo vive en
 los prompts correspondientes o en los commits.
 
+- **B3.3c — 3 helpers que iteraban `usuarios` (v81j-v81m).**
+  `obtener_cancelacion_por_id` acepta dueño/terminal.
+  `obtener_pasajero_por_dni` navega `us_<dueño>` directo
+  (fix de privacidad). Frontend de `ventas.js` manda
+  `nombre_dueno` en 4 fetch (v81k). Rediseño `soporte`
+  singular → `soportes` contenedor plural (v81l). **Fase B
+  del modelo topológico completa.** Detalle en
+  `prompt_seguridad.md` §8.6.
 - **Visualizador de grafo (v80n-v81g).** Nueva sub-pestaña
   Visual con SVG puro. Detalle en `prompt_piloto.md` §3.4.
   **Pendientes abiertos:** Fase 5 (persistencia con
@@ -120,6 +130,13 @@ de cada módulo viven en su prompt.
 - **La seguridad emerge de la topología.** El bitmask lo
   propaga el framework, no la app. La app nunca asigna bits
   a mano.
+- **Rediseño `soportes` plural (v1.5piloto.81l).** El dueño
+  tiene un contenedor `soportes` (dato vacío) con los
+  `publico` de cada soporte asignado como hijos. Reemplaza
+  al enlace singular `soporte`. Permite varios soportes por
+  dueño. El orden en `agregar_usuario` importa:
+  `_asegurar_niveles_usuario` antes de
+  `_asignar_duenos_a_soporte`.
 - **Carga parcial activa.** Toda operación POST con
   `nombre_solicitante` carga parcial con `[us_<sol>]`.
   Excepciones puntuales: gestión de usuarios, informes que
@@ -161,12 +178,14 @@ paréntesis.
   `rendiciones/aceptar_ajuste` ni `liquidaciones/obtener`
   (bug v81i); solo fallaba con soporte. Corregido en
   `rendiciones.js` y `liquidaciones.js`.
-- **B3.3c restante (3 helpers).** `Venta.php`:
-  `_buscar_venta_por_id` (fallback) y
-  `obtener_cancelacion_por_id`. `Pasajero.php`:
-  `obtener_pasajero_por_dni` (rama del historial de
-  ventas). Postergado hasta que aparezca dolor real o
-  hasta que el framework tenga iteradores con ID especial.
+- [x] **B3.3c — 3 helpers que iteraban `usuarios`** —
+  CERRADO (v81j + v81k + v81l, ver §2). `_buscar_venta_por_id`
+  queda como fallback defensivo (no aplica en la práctica);
+  pendiente anotado para eliminar cuando `usuarios` sea
+  contenedor de nombres. `obtener_cancelacion_por_id` y
+  `obtener_pasajero_por_dni` adaptados al patrón
+  `?string $nombre_dueno`. Rediseño `soporte` → `soportes`
+  contenedor plural en v81l.
 - **Auditar estados colgados:** reservas sin pasajero, DJ a
   medias, edición de viaje a mitad. Requiere relevamiento
   primero.
@@ -280,7 +299,7 @@ de la topología. Detalle de cada fase en
 | **B2.4** — Mantener compartidos vivos | Sincronización en cada operación de escritura. | ✅ v77q |
 | **B3.1** — Accesos viejos eliminados | `usuarios → dueño` → `us_<dueño>` en todos los módulos principales. | ✅ v77r |
 | **B3.3a-e** — Módulos menores adaptados | Liquidacion, Rendicion, Empresa, Vehiculo, y Vehiculo JS. | ✅ v77t-v77x + v81h |
-| **B3.3c** — 3 helpers que iteran `usuarios` | `_buscar_venta_por_id` (fallback), `obtener_cancelacion_por_id`, `obtener_pasajero_por_dni` (rama historial). | **Pendiente — próximo arco** |
+| **B3.3c** — 3 helpers que iteran `usuarios` | `_buscar_venta_por_id` (fallback defensivo), `obtener_cancelacion_por_id`, `obtener_pasajero_por_dni` (rama historial). | ✅ v81j-v81l |
 | **C** — Tipos como IDs especiales (opcional) | Roots explícitos `tipo_empresas`, `tipo_viajes`, etc. | Pendiente |
 | **D** — Carga parcial como optimización real | Guardado por delta. Bloqueada por framework Fase 4. | Bloqueada |
 
