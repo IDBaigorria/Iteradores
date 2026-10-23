@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.81j
+ * @version   1.5piloto.81p
  */
 
 // --- Utilidades base ----------------------------------
@@ -616,6 +616,80 @@ if (!$modo_parcial) {
             }
         }
     });
+}
+
+// ==== Auditoría topológica (v1.5piloto.81p) ====
+// Diagnóstico de solo lectura. Reporta aristas rotas,
+// nodos huérfanos, compartidos incompletos, etc.
+// No corrige nada.
+//
+// Uso: index.php?auditar_topologia=1&nombre_solicitante=<admin_o_soporte>
+//
+// En local se puede omitir nombre_solicitante (debug).
+// En pruebas y producción es obligatorio y debe ser
+// admin o soporte. El plugin arma la URL con el nombre
+// del usuario logueado.
+if (isset($_GET['auditar_topologia'])) {
+    header('Content-Type: application/json; charset=utf-8');
+
+    // Si el grafo quedó parcial, recargar total: la auditoría
+    // necesita ver el grafo completo.
+    if (Controlador::es_grafo_parcial()) {
+        $ok_recarga_aud = Controlador::cargar($nombre_app);
+        if ($ok_recarga_aud !== true) {
+            http_response_code(500);
+            echo json_encode([
+                'exito' => false,
+                'error' => 'No se pudo recargar el grafo completo para la auditoría.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+
+    $nombre_sol_aud = trim((string)($_GET['nombre_solicitante'] ?? ''));
+
+    if ($nombre_sol_aud === '') {
+        if (!Conf::LOCAL) {
+            http_response_code(403);
+            echo json_encode([
+                'exito' => false,
+                'error' => 'Falta nombre_solicitante. La auditoría requiere un usuario admin o soporte.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    } else {
+        $nodo_sol_aud = Nodo::nodo_por_id('us_' . $nombre_sol_aud);
+        if (!$nodo_sol_aud) {
+            http_response_code(403);
+            echo json_encode([
+                'exito' => false,
+                'error' => "Solicitante '$nombre_sol_aud' no encontrado.",
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $nivel_nodo_aud = $nodo_sol_aud->adyacente('nivel');
+        $nivel_aud = $nivel_nodo_aud ? (string)$nivel_nodo_aud->dato() : '';
+        if ($nivel_aud !== 'admin' && $nivel_aud !== 'soporte') {
+            http_response_code(403);
+            echo json_encode([
+                'exito' => false,
+                'error' => "Permiso denegado. Nivel '$nivel_aud' (se requiere admin o soporte).",
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+
+    $reporte_aud = Controlador::ejecutar_comando('app:auditar_topologia');
+    if (!is_array($reporte_aud)) {
+        http_response_code(500);
+        echo json_encode([
+            'exito' => false,
+            'error' => 'El comando app:auditar_topologia no devolvió un resultado válido.',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    echo json_encode($reporte_aud, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
 }
 
 // Manejo de impresión

@@ -8,7 +8,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.78z
- * @version   1.5piloto.78z
+ * @version   1.5piloto.81p
  */
 
 use Iteradores\Nodos\Nodo;
@@ -29,6 +29,16 @@ function registrar_comandos_reparacion(): void {
                 guardar_ambos(ConfiguracionApli::NOMBRE_APP);
             }
             return $res;
+        },
+        null,
+        false // disponible en todos los entornos
+    );
+
+    Controlador::registrar_comando(
+        'app:auditar_topologia',
+        function (string $token, array $args) {
+            require_once __DIR__ . '/Auditoria.php';
+            return auditar_topologia($token);
         },
         null,
         false // disponible en todos los entornos
