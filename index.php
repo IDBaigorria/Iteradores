@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.81p
+ * @version   1.5piloto.81s
  */
 
 // --- Utilidades base ----------------------------------
@@ -616,6 +616,84 @@ if (!$modo_parcial) {
             }
         }
     });
+}
+
+// ==== Eliminar huérfanos (v1.5piloto.81s) ====
+// Solo admin/soporte. Fuerza carga total para ver los
+// nodos de la DB que tienen contexto_mascara=0 (no
+// alcanzables desde ninguna raíz). La pestaña Grafo,
+// en carga parcial, no los ve.
+//
+// Uso: index.php?eliminar_huerfanos=1&nombre_solicitante=<admin_o_soporte>
+// En local se puede omitir nombre_solicitante.
+if (isset($_GET['eliminar_huerfanos'])) {
+    header('Content-Type: application/json; charset=utf-8');
+
+    // Si el grafo quedó parcial, recargar total.
+    if (Controlador::es_grafo_parcial()) {
+        $ok_recarga_h = Controlador::cargar($nombre_app);
+        if ($ok_recarga_h !== true) {
+            http_response_code(500);
+            echo json_encode([
+                'exito' => false,
+                'error' => 'No se pudo recargar el grafo completo para eliminar huérfanos.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+
+    $nombre_sol_h = trim((string)($_GET['nombre_solicitante'] ?? ''));
+    if ($nombre_sol_h === '') {
+        if (!Conf::LOCAL) {
+            http_response_code(403);
+            echo json_encode([
+                'exito' => false,
+                'error' => 'Falta nombre_solicitante.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    } else {
+        $nodo_sol_h = Nodo::nodo_por_id('us_' . $nombre_sol_h);
+        if (!$nodo_sol_h) {
+            http_response_code(403);
+            echo json_encode([
+                'exito' => false,
+                'error' => "Solicitante '$nombre_sol_h' no encontrado.",
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $nivel_nodo_h = $nodo_sol_h->adyacente('nivel');
+        $nivel_h = $nivel_nodo_h ? (string)$nivel_nodo_h->dato() : '';
+        if ($nivel_h !== 'admin' && $nivel_h !== 'soporte') {
+            http_response_code(403);
+            echo json_encode([
+                'exito' => false,
+                'error' => "Permiso denegado. Nivel '$nivel_h'.",
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+
+    $resultado_h = Controlador::ejecutar_comando('grafo:eliminar_huerfanos');
+    if (!is_array($resultado_h)) {
+        http_response_code(500);
+        echo json_encode([
+            'exito' => false,
+            'error' => 'El comando grafo:eliminar_huerfanos no devolvió resultado.',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $eliminados_h = (int)($resultado_h['eliminados'] ?? 0);
+    if ($eliminados_h > 0) {
+        guardar_ambos($nombre_app);
+    }
+    echo json_encode([
+        'exito' => true,
+        'eliminados' => $eliminados_h,
+        'total_huerfanos' => (int)($resultado_h['total_huerfanos'] ?? 0),
+        'guardado' => $eliminados_h > 0,
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
 }
 
 // ==== Auditoría topológica (v1.5piloto.81p) ====

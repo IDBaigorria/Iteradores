@@ -1,114 +1,117 @@
 <?php
 /**
- * Aplicador — Tanda C.1b: fix de falsos positivos restantes.
+ * Aplicador — Tanda C.2: endpoint ?eliminar_huerfanos=1.
  *
- * 1. _auditoria_hijos_sin_p: solo verificar que el hijo tenga
- *    el enlace p_<sufijo>. NO comparar contra el hermano
- *    anterior: en Arbol.php, p apunta al contenedor raíz,
- *    no al hermano anterior.
+ * Agrega un bloque en index.php (antes del bloque de auditoría)
+ * que:
+ *   1. Valida nivel (admin/soporte) por nombre_solicitante.
+ *   2. Fuerza carga total (para ver TODOS los nodos de la DB).
+ *   3. Ejecuta grafo:eliminar_huerfanos.
+ *   4. Devuelve JSON con { eliminados, total_huerfanos }.
  *
- * 2. _auditoria_terminal_dueno_real: solo reportar si el nodo
- *    ORIGEN tiene nivel === "terminal". Los nodos Cancelación,
- *    Rendición y Liquidación también tienen `dueno` (string),
- *    pero no son terminales.
+ * Motivo: la pestaña Grafo, operando en carga parcial, no ve
+ * los huérfanos (contexto_mascara=0, no matchean con ningún bit).
+ * El botón "Eliminar nodos basura" no los puede eliminar. Este
+ * endpoint es el que sí puede.
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.81r';
+$version_nueva = '1.5piloto.81s';
 
 $htmls_a_bumpear = ['aplicacion_GET.html'];
 
 $cambios = [
 
-// ============================================================
-// 1. Fix _auditoria_hijos_sin_p
-// ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Reparacion/Auditoria.php',
-    'descripcion' => 'hijos_sin_p: solo verificar existencia, no comparar',
+    'archivo' => 'index.php',
+    'descripcion' => 'Endpoint ?eliminar_huerfanos=1',
     'buscar' => [
-        '            if (!isset($estructura[$destino_id]["ady"][$p_enlace])) {',
-        '                $out[] = [',
-        '                    "tipo" => "hijo_sin_p",',
-        '                    "detalle" => "nodo $id -> \'$enlace\' -> $destino_id no tiene \'$p_enlace\'.",',
-        '                ];',
-        '            } elseif ((string)$estructura[$destino_id]["ady"][$p_enlace] !== (string)$id) {',
-        '                $out[] = [',
-        '                    "tipo" => "p_apunta_a_otro",',
-        '                    "detalle" => "nodo $destino_id tiene \'$p_enlace\' -> "',
-        '                               . $estructura[$destino_id]["ady"][$p_enlace]',
-        '                               . " en vez de a $id.",',
-        '                ];',
-        '            }',
+        '// ==== Auditoría topológica (v1.5piloto.81p) ====',
     ],
     'reemplazar' => [
-        '            // Solo verificar existencia. NO comparar contra el',
-        '            // hermano anterior: en Arbol.php, p apunta al',
-        '            // contenedor raíz, no al hermano anterior. La',
-        '            // verificacion de "p apunta a un contenedor" la hace',
-        '            // _auditoria_p_no_contenedor.',
-        '            if (!isset($estructura[$destino_id]["ady"][$p_enlace])) {',
-        '                $out[] = [',
-        '                    "tipo" => "hijo_sin_p",',
-        '                    "detalle" => "nodo $id -> \'$enlace\' -> $destino_id no tiene \'$p_enlace\'.",',
-        '                ];',
-        '            }',
-    ],
-],
-
-// ============================================================
-// 2. Fix _auditoria_terminal_dueno_real
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Reparacion/Auditoria.php',
-    'descripcion' => 'terminal_dueno_real: solo si nivel == terminal',
-    'buscar' => [
-        'function _auditoria_terminal_dueno_real(array $estructura): array {',
-        '    $out = [];',
-        '    foreach ($estructura as $id => $info) {',
-        '        if (!isset($info["ady"]["dueno"])) continue;',
-        '        $id_dueno = $info["ady"]["dueno"];',
-        '        if (!isset($estructura[$id_dueno])) continue;',
-        '        if (!isset($estructura[$id_dueno]["ady"]["_es_compartido"])) {',
-        '            $out[] = [',
-        '                "tipo" => "terminal_dueno_real",',
-        '                "detalle" => "nodo $id tiene \'dueno\' -> $id_dueno, que no tiene \'_es_compartido\'.",',
-        '            ];',
-        '        }',
-        '    }',
-        '    return $out;',
-        '}',
-    ],
-    'reemplazar' => [
-        'function _auditoria_terminal_dueno_real(array $estructura): array {',
-        '    $out = [];',
-        '    foreach ($estructura as $id => $info) {',
-        '        if (!isset($info["ady"]["dueno"])) continue;',
-        '        // Solo reportar si el origen es un terminal. Los',
-        '        // nodos Cancelacion, Rendicion y Liquidacion',
-        '        // tambien tienen `dueno` (string), pero no son',
-        '        // terminales. Se distinguen por `nivel`.',
-        '        if (!isset($info["ady"]["nivel"])) continue;',
-        '        $id_nivel = $info["ady"]["nivel"];',
-        '        if (!isset($estructura[$id_nivel])) continue;',
-        '        if ((string)$estructura[$id_nivel]["dato"] !== "terminal") continue;',
+        '// ==== Eliminar huérfanos (v1.5piloto.81s) ====',
+        '// Solo admin/soporte. Fuerza carga total para ver los',
+        '// nodos de la DB que tienen contexto_mascara=0 (no',
+        '// alcanzables desde ninguna raíz). La pestaña Grafo,',
+        '// en carga parcial, no los ve.',
+        '//',
+        '// Uso: index.php?eliminar_huerfanos=1&nombre_solicitante=<admin_o_soporte>',
+        '// En local se puede omitir nombre_solicitante.',
+        'if (isset($_GET[\'eliminar_huerfanos\'])) {',
+        '    header(\'Content-Type: application/json; charset=utf-8\');',
         '',
-        '        $id_dueno = $info["ady"]["dueno"];',
-        '        if (!isset($estructura[$id_dueno])) continue;',
-        '        if (!isset($estructura[$id_dueno]["ady"]["_es_compartido"])) {',
-        '            $out[] = [',
-        '                "tipo" => "terminal_dueno_real",',
-        '                "detalle" => "nodo $id (terminal) tiene \'dueno\' -> $id_dueno, que no tiene \'_es_compartido\'.",',
-        '            ];',
+        '    // Si el grafo quedó parcial, recargar total.',
+        '    if (Controlador::es_grafo_parcial()) {',
+        '        $ok_recarga_h = Controlador::cargar($nombre_app);',
+        '        if ($ok_recarga_h !== true) {',
+        '            http_response_code(500);',
+        '            echo json_encode([',
+        '                \'exito\' => false,',
+        '                \'error\' => \'No se pudo recargar el grafo completo para eliminar huérfanos.\',',
+        '            ], JSON_UNESCAPED_UNICODE);',
+        '            exit;',
         '        }',
         '    }',
-        '    return $out;',
+        '',
+        '    $nombre_sol_h = trim((string)($_GET[\'nombre_solicitante\'] ?? \'\'));',
+        '    if ($nombre_sol_h === \'\') {',
+        '        if (!Conf::LOCAL) {',
+        '            http_response_code(403);',
+        '            echo json_encode([',
+        '                \'exito\' => false,',
+        '                \'error\' => \'Falta nombre_solicitante.\',',
+        '            ], JSON_UNESCAPED_UNICODE);',
+        '            exit;',
+        '        }',
+        '    } else {',
+        '        $nodo_sol_h = Nodo::nodo_por_id(\'us_\' . $nombre_sol_h);',
+        '        if (!$nodo_sol_h) {',
+        '            http_response_code(403);',
+        '            echo json_encode([',
+        '                \'exito\' => false,',
+        '                \'error\' => "Solicitante \'$nombre_sol_h\' no encontrado.",',
+        '            ], JSON_UNESCAPED_UNICODE);',
+        '            exit;',
+        '        }',
+        '        $nivel_nodo_h = $nodo_sol_h->adyacente(\'nivel\');',
+        '        $nivel_h = $nivel_nodo_h ? (string)$nivel_nodo_h->dato() : \'\';',
+        '        if ($nivel_h !== \'admin\' && $nivel_h !== \'soporte\') {',
+        '            http_response_code(403);',
+        '            echo json_encode([',
+        '                \'exito\' => false,',
+        '                \'error\' => "Permiso denegado. Nivel \'$nivel_h\'.",',
+        '            ], JSON_UNESCAPED_UNICODE);',
+        '            exit;',
+        '        }',
+        '    }',
+        '',
+        '    $resultado_h = Controlador::ejecutar_comando(\'grafo:eliminar_huerfanos\');',
+        '    if (!is_array($resultado_h)) {',
+        '        http_response_code(500);',
+        '        echo json_encode([',
+        '            \'exito\' => false,',
+        '            \'error\' => \'El comando grafo:eliminar_huerfanos no devolvió resultado.\',',
+        '        ], JSON_UNESCAPED_UNICODE);',
+        '        exit;',
+        '    }',
+        '    $eliminados_h = (int)($resultado_h[\'eliminados\'] ?? 0);',
+        '    if ($eliminados_h > 0) {',
+        '        guardar_ambos($nombre_app);',
+        '    }',
+        '    echo json_encode([',
+        '        \'exito\' => true,',
+        '        \'eliminados\' => $eliminados_h,',
+        '        \'total_huerfanos\' => (int)($resultado_h[\'total_huerfanos\'] ?? 0),',
+        '        \'guardado\' => $eliminados_h > 0,',
+        '    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);',
+        '    exit;',
         '}',
+        '',
+        '// ==== Auditoría topológica (v1.5piloto.81p) ====',
     ],
 ],
 
