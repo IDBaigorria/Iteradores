@@ -1,60 +1,114 @@
 <?php
 /**
- * Aplicador — Tanda C.1: fix de falsos positivos de la auditoría.
+ * Aplicador — Tanda C.1b: fix de falsos positivos restantes.
  *
- * 1. _auditoria_hijos_sin_p: comparar (string)$id, no $id,
- *    porque las claves del foreach son int y los valores de
- *    los adyacentes son string. PHP: "1643" !== 1643.
+ * 1. _auditoria_hijos_sin_p: solo verificar que el hijo tenga
+ *    el enlace p_<sufijo>. NO comparar contra el hermano
+ *    anterior: en Arbol.php, p apunta al contenedor raíz,
+ *    no al hermano anterior.
  *
- * 2. _auditoria_ciclos_hd: castear $contenedor_id a string
- *    y comparar como string, mismo bug latente.
+ * 2. _auditoria_terminal_dueno_real: solo reportar si el nodo
+ *    ORIGEN tiene nivel === "terminal". Los nodos Cancelación,
+ *    Rendición y Liquidación también tienen `dueno` (string),
+ *    pero no son terminales.
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.81q';
+$version_nueva = '1.5piloto.81r';
 
 $htmls_a_bumpear = ['aplicacion_GET.html'];
 
 $cambios = [
 
 // ============================================================
-// 1. Fix p_apunta_a_otro
+// 1. Fix _auditoria_hijos_sin_p
 // ============================================================
 [
     'tipo' => 'reemplazar',
     'archivo' => 'Aplicacion/Reparacion/Auditoria.php',
-    'descripcion' => 'Fix p_apunta_a_otro: comparar como (string)$id',
+    'descripcion' => 'hijos_sin_p: solo verificar existencia, no comparar',
     'buscar' => [
-        '            } elseif ($estructura[$destino_id]["ady"][$p_enlace] !== $id) {',
+        '            if (!isset($estructura[$destino_id]["ady"][$p_enlace])) {',
+        '                $out[] = [',
+        '                    "tipo" => "hijo_sin_p",',
+        '                    "detalle" => "nodo $id -> \'$enlace\' -> $destino_id no tiene \'$p_enlace\'.",',
+        '                ];',
+        '            } elseif ((string)$estructura[$destino_id]["ady"][$p_enlace] !== (string)$id) {',
+        '                $out[] = [',
+        '                    "tipo" => "p_apunta_a_otro",',
+        '                    "detalle" => "nodo $destino_id tiene \'$p_enlace\' -> "',
+        '                               . $estructura[$destino_id]["ady"][$p_enlace]',
+        '                               . " en vez de a $id.",',
+        '                ];',
+        '            }',
     ],
     'reemplazar' => [
-        '            } elseif ((string)$estructura[$destino_id]["ady"][$p_enlace] !== (string)$id) {',
+        '            // Solo verificar existencia. NO comparar contra el',
+        '            // hermano anterior: en Arbol.php, p apunta al',
+        '            // contenedor raíz, no al hermano anterior. La',
+        '            // verificacion de "p apunta a un contenedor" la hace',
+        '            // _auditoria_p_no_contenedor.',
+        '            if (!isset($estructura[$destino_id]["ady"][$p_enlace])) {',
+        '                $out[] = [',
+        '                    "tipo" => "hijo_sin_p",',
+        '                    "detalle" => "nodo $id -> \'$enlace\' -> $destino_id no tiene \'$p_enlace\'.",',
+        '                ];',
+        '            }',
     ],
 ],
 
 // ============================================================
-// 2. Fix ciclos_hd
+// 2. Fix _auditoria_terminal_dueno_real
 // ============================================================
 [
     'tipo' => 'reemplazar',
     'archivo' => 'Aplicacion/Reparacion/Auditoria.php',
-    'descripcion' => 'Fix ciclos_hd: castear contenedor_id y comparar como string',
+    'descripcion' => 'terminal_dueno_real: solo si nivel == terminal',
     'buscar' => [
-        '            $contenedor_id = $id;',
-        '            $actual = $primer_id;',
-        '            $visitados = [];',
-        '            $pasos = 0;',
-        '            while ($actual && $actual !== $contenedor_id && $pasos < $max_pasos) {',
+        'function _auditoria_terminal_dueno_real(array $estructura): array {',
+        '    $out = [];',
+        '    foreach ($estructura as $id => $info) {',
+        '        if (!isset($info["ady"]["dueno"])) continue;',
+        '        $id_dueno = $info["ady"]["dueno"];',
+        '        if (!isset($estructura[$id_dueno])) continue;',
+        '        if (!isset($estructura[$id_dueno]["ady"]["_es_compartido"])) {',
+        '            $out[] = [',
+        '                "tipo" => "terminal_dueno_real",',
+        '                "detalle" => "nodo $id tiene \'dueno\' -> $id_dueno, que no tiene \'_es_compartido\'.",',
+        '            ];',
+        '        }',
+        '    }',
+        '    return $out;',
+        '}',
     ],
     'reemplazar' => [
-        '            $contenedor_id = (string)$id;',
-        '            $actual = $primer_id;',
-        '            $visitados = [];',
-        '            $pasos = 0;',
-        '            while ($actual && (string)$actual !== $contenedor_id && $pasos < $max_pasos) {',
+        'function _auditoria_terminal_dueno_real(array $estructura): array {',
+        '    $out = [];',
+        '    foreach ($estructura as $id => $info) {',
+        '        if (!isset($info["ady"]["dueno"])) continue;',
+        '        // Solo reportar si el origen es un terminal. Los',
+        '        // nodos Cancelacion, Rendicion y Liquidacion',
+        '        // tambien tienen `dueno` (string), pero no son',
+        '        // terminales. Se distinguen por `nivel`.',
+        '        if (!isset($info["ady"]["nivel"])) continue;',
+        '        $id_nivel = $info["ady"]["nivel"];',
+        '        if (!isset($estructura[$id_nivel])) continue;',
+        '        if ((string)$estructura[$id_nivel]["dato"] !== "terminal") continue;',
+        '',
+        '        $id_dueno = $info["ady"]["dueno"];',
+        '        if (!isset($estructura[$id_dueno])) continue;',
+        '        if (!isset($estructura[$id_dueno]["ady"]["_es_compartido"])) {',
+        '            $out[] = [',
+        '                "tipo" => "terminal_dueno_real",',
+        '                "detalle" => "nodo $id (terminal) tiene \'dueno\' -> $id_dueno, que no tiene \'_es_compartido\'.",',
+        '            ];',
+        '        }',
+        '    }',
+        '    return $out;',
+        '}',
     ],
 ],
 

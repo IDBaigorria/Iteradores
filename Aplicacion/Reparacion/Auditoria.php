@@ -15,7 +15,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.81p
- * @version   1.5piloto.81q
+ * @version   1.5piloto.81r
  */
 
 use Iteradores\Nodos\Nodo;
@@ -240,12 +240,21 @@ function _auditoria_terminal_dueno_real(array $estructura): array {
     $out = [];
     foreach ($estructura as $id => $info) {
         if (!isset($info["ady"]["dueno"])) continue;
+        // Solo reportar si el origen es un terminal. Los
+        // nodos Cancelacion, Rendicion y Liquidacion
+        // tambien tienen `dueno` (string), pero no son
+        // terminales. Se distinguen por `nivel`.
+        if (!isset($info["ady"]["nivel"])) continue;
+        $id_nivel = $info["ady"]["nivel"];
+        if (!isset($estructura[$id_nivel])) continue;
+        if ((string)$estructura[$id_nivel]["dato"] !== "terminal") continue;
+
         $id_dueno = $info["ady"]["dueno"];
         if (!isset($estructura[$id_dueno])) continue;
         if (!isset($estructura[$id_dueno]["ady"]["_es_compartido"])) {
             $out[] = [
                 "tipo" => "terminal_dueno_real",
-                "detalle" => "nodo $id tiene 'dueno' -> $id_dueno, que no tiene '_es_compartido'.",
+                "detalle" => "nodo $id (terminal) tiene 'dueno' -> $id_dueno, que no tiene '_es_compartido'.",
             ];
         }
     }
@@ -451,17 +460,15 @@ function _auditoria_hijos_sin_p(array $estructura): array {
             if ($sufijo === null) continue;
             if (!isset($estructura[$destino_id])) continue;
             $p_enlace = "p" . $sufijo;
+            // Solo verificar existencia. NO comparar contra el
+            // hermano anterior: en Arbol.php, p apunta al
+            // contenedor raíz, no al hermano anterior. La
+            // verificacion de "p apunta a un contenedor" la hace
+            // _auditoria_p_no_contenedor.
             if (!isset($estructura[$destino_id]["ady"][$p_enlace])) {
                 $out[] = [
                     "tipo" => "hijo_sin_p",
                     "detalle" => "nodo $id -> '$enlace' -> $destino_id no tiene '$p_enlace'.",
-                ];
-            } elseif ((string)$estructura[$destino_id]["ady"][$p_enlace] !== (string)$id) {
-                $out[] = [
-                    "tipo" => "p_apunta_a_otro",
-                    "detalle" => "nodo $destino_id tiene '$p_enlace' -> "
-                               . $estructura[$destino_id]["ady"][$p_enlace]
-                               . " en vez de a $id.",
                 ];
             }
         }
