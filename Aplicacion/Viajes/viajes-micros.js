@@ -1,6 +1,6 @@
 /**
  * Micros y terminales dentro de viajes.
- * @version 1.5piloto.77x
+ * @version 1.5piloto.82f
  */
 
 function renderizar_micros_viaje(micros) {
@@ -21,6 +21,7 @@ function renderizar_micros_viaje(micros) {
             <button class="btn btn-ver-pasaje" data-micro="${micro.nombre_micro}">${textoBoton}</button>
             ${usuario_actual.nivel !== 'terminal' ? `
                 <button class="btn btn-editar-monto" data-micro="${micro.nombre_micro}" data-monto="${micro.monto ?? '0'}">Editar monto</button>
+                ${(parseInt(micro.vendidos || 0) + parseInt(micro.reservados || 0)) > 0 ? `<button class="btn btn-migrar-pasajeros" data-micro="${micro.nombre_micro}">Migrar pasajeros a...</button>` : ''}
                 <button class="btn btn-eliminar-micro" data-micro="${micro.nombre_micro}">Quitar</button>
             ` : ''}
         `;
@@ -29,6 +30,8 @@ function renderizar_micros_viaje(micros) {
         div.querySelector('.btn-ver-pasaje').addEventListener('click', () => seleccionar_micro_viaje(micro.nombre_micro));
         const btnEditarMonto = div.querySelector('.btn-editar-monto');
         if (btnEditarMonto) btnEditarMonto.addEventListener('click', () => editar_monto_micro(micro.nombre_micro, micro.monto ?? '0'));
+        const btnMigrar = div.querySelector('.btn-migrar-pasajeros');
+        if (btnMigrar) btnMigrar.addEventListener('click', () => abrir_modal_migrar_pasajeros(micro.nombre_micro));
         const btnQuitar = div.querySelector('.btn-eliminar-micro');
         if (btnQuitar) btnQuitar.addEventListener('click', () => eliminar_micro(micro.nombre_micro));
     });
@@ -627,6 +630,209 @@ async function abrir_modal_opciones_terminal(nombre_terminal) {
             cerrar_modal_apilado();
         } else {
             mostrar_aviso(resultado.error || "Error al guardar opciones", 'error');
+        }
+    });
+}
+
+/**
+ * Abre el modal apilado para migrar los pasajeros (asientos
+ * vendidos y reservados) de un micro a otro vacío del mismo
+ * viaje.
+ *
+ * Se construye sobre el modal del detalle del viaje (que es
+ * genérico), por eso usa `abrir_modal_apilado`. El origen se
+ * pasa como parámetro. Los candidatos a destino son los otros
+ * micros cuyos contadores estén todos en cero.
+ *
+ * El backend valida todo igual (destino vacío, venta en curso,
+ * números coincidentes, etc.), así que si el frontend tiene
+ * contadores viejos no hay problema: el backend es la fuente
+ * de verdad.
+ *
+ * @param {string} nombre_micro_origen
+ * @since 1.5piloto.82f
+ */
+async function abrir_modal_migrar_pasajeros(nombre_micro_origen) {
+    if (!viaje_seleccionado) return;
+    const micros = viaje_seleccionado.micros || [];
+    const micro_origen = micros.find(m => m.nombre_micro === nombre_micro_origen);
+    if (!micro_origen) {
+        mostrar_aviso("Micro origen no encontrado", 'error');
+        return;
+    }
+
+    // Candidatos a destino: otros micros cuyos contadores estén
+    // todos en cero.
+    const candidatos = micros.filter(m => {
+        if (m.nombre_micro === nombre_micro_origen) return false;
+        const v = parseInt(m.vendidos || 0);
+        const r = parseInt(m.reservados || 0);
+        const s = parseInt(m.seleccionados || 0);
+        return v === 0 && r === 0 && s === 0;
+    });
+
+    const ocupados = parseInt(micro_origen.vendidos || 0) + parseInt(micro_origen.reservados || 0);
+    const nombre_visible_origen = `${micro_origen.nombre_empresa || micro_origen.empresa || ''} - ${micro_origen.nombre_vehiculo || micro_origen.patente || micro_origen.nombre_micro}`;
+
+    let html;
+    if (candidatos.length === 0) {
+        html = `
+            <p>No hay otros micros vacíos en este viaje. Agregá uno nuevo primero.</p>
+            <div class="actions" style="margin-top:12px;">
+                <button class="btn" id="migrar_cancelar">Cerrar</button>
+            </div>
+        `;
+    } else {
+        const opciones = candidatos.map(m => {
+            const nv = `${m.nombre_empresa || m.empresa || ''} - ${m.nombre_vehiculo || m.patente || m.nombre_micro}`;
+            return `<option value="${m.nombre_micro}">${nv}</option>`;
+        }).join('');
+
+        html = `
+            <p>Vas a mover <b>${ocupados} asiento${ocupados === 1 ? '' : 's'}</b> del micro <b>${nombre_visible_origen}</b> a otro micro vacío del mismo viaje.</p>
+            <div class="field">
+                <label for="migrar_select_destino">Micro destino:</label>
+                <select id="migrar_select_destino">${opciones}</select>
+            </div>
+            <div id="migrar_aviso_layout" class="small muted" style="display:none; margin-top:10px; padding:8px; background:#fff3cd; border:1px solid #ffc107; border-radius:4px;">
+                ⚠️ El micro destino tiene un layout distinto al origen. Los números de asiento se mantienen, pero la disposición física puede cambiar.
+            </div>
+            <div id="migrar_aviso_error" class="small" style="display:none; margin-top:10px; color:#c00;"></div>
+            <div class="actions" style="margin-top:12px;">
+                <button class="btn primary" id="migrar_confirmar">Confirmar</button>
+                <button class="btn" id="migrar_cancelar">Cancelar</button>
+            </div>
+        `;
+    }
+
+    abrir_modal_apilado(`Migrar pasajeros de ${nombre_visible_origen}`, html);
+    const contenedor = document.getElementById('modal_apilado_contenido');
+    if (!contenedor) return;
+
+    if (candidatos.length === 0) {
+        contenedor.querySelector('#migrar_cancelar').addEventListener('click', cerrar_modal_apilado);
+        return;
+    }
+
+    const nombre_dueno = obtener_nombre_dueno_actual();
+    let config_origen = null;
+    let config_destino_actual = null;
+    let destino_seleccionado = candidatos[0].nombre_micro;
+
+    const pedir_config = async (nombre_micro) => {
+        try {
+            const r = await fetch("index.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    accion: "viajes/obtener_micro",
+                    nombre_viaje: viaje_seleccionado.nombre_viaje,
+                    nombre_micro,
+                    nombre_dueno
+                })
+            });
+            const d = await r.json();
+            if (d.exito && d.micro) return d.micro.configuracion || null;
+        } catch (e) { /* silencio: es solo el aviso de layout */ }
+        return null;
+    };
+
+    const evaluar_layout = () => {
+        const aviso = contenedor.querySelector('#migrar_aviso_layout');
+        if (!aviso) return;
+        if (!config_origen || !config_destino_actual) {
+            aviso.style.display = 'none';
+            return;
+        }
+        const p_o = config_origen.pisos || [];
+        const p_d = config_destino_actual.pisos || [];
+        let distintos = p_o.length !== p_d.length;
+        if (!distintos) {
+            for (let i = 0; i < p_o.length; i++) {
+                if (p_o[i].filas !== p_d[i].filas || p_o[i].columnas !== p_d[i].columnas) {
+                    distintos = true;
+                    break;
+                }
+            }
+        }
+        aviso.style.display = distintos ? '' : 'none';
+    };
+
+    // Pedir config del origen y del primer destino en serie.
+    config_origen = await pedir_config(nombre_micro_origen);
+    config_destino_actual = await pedir_config(destino_seleccionado);
+    evaluar_layout();
+
+    const select = contenedor.querySelector('#migrar_select_destino');
+    select.addEventListener('change', async () => {
+        destino_seleccionado = select.value;
+        config_destino_actual = await pedir_config(destino_seleccionado);
+        evaluar_layout();
+    });
+
+    contenedor.querySelector('#migrar_cancelar').addEventListener('click', cerrar_modal_apilado);
+
+    contenedor.querySelector('#migrar_confirmar').addEventListener('click', async () => {
+        const error_div = contenedor.querySelector('#migrar_aviso_error');
+        error_div.style.display = 'none';
+
+        const confirmado = confirm(
+            `Vas a mover ${ocupados} asiento${ocupados === 1 ? '' : 's'} del micro "${nombre_visible_origen}" al micro "${destino_seleccionado}". ¿Continuar?`
+        );
+        if (!confirmado) return;
+
+        const btn = contenedor.querySelector('#migrar_confirmar');
+        btn.disabled = true;
+        btn.textContent = 'Migrando...';
+
+        try {
+            const r = await fetch("index.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    accion: "viajes/migrar_pasajeros",
+                    nombre_solicitante: usuario_actual.nombre_usuario,
+                    nombre_dueno,
+                    nombre_viaje: viaje_seleccionado.nombre_viaje,
+                    nombre_micro_origen,
+                    nombre_micro_destino: destino_seleccionado
+                })
+            });
+            const res = await r.json();
+            if (!res.exito) {
+                error_div.textContent = res.error || 'Error al migrar';
+                error_div.style.display = '';
+                btn.disabled = false;
+                btn.textContent = 'Confirmar';
+                return;
+            }
+
+            cerrar_modal_apilado();
+            const n = res.migrados;
+            const mensaje = `${n} asiento${n === 1 ? '' : 's'} migrado${n === 1 ? '' : 's'}.`;
+            mostrar_aviso(mensaje + (res.origen_vacio ? ' El micro origen quedó vacío.' : ''), 'exito');
+
+            // Refresco del panel de pasaje:
+            //   - origen abierto: cerrarlo (quedó vacío).
+            //   - destino abierto: cerrarlo, refrescar contadores
+            //     y reabrirlo (el croquis cambió: asientos que
+            //     eran libres ahora están vendidos).
+            //   - ninguno: solo refrescar contadores.
+            if (micro_seleccionado === nombre_micro_origen) {
+                cerrar_pasaje_micro();
+                await refrescar_contadores_viaje_actual();
+            } else if (micro_seleccionado === destino_seleccionado) {
+                cerrar_pasaje_micro();
+                await refrescar_contadores_viaje_actual();
+                await seleccionar_micro_viaje(destino_seleccionado);
+            } else {
+                await refrescar_contadores_viaje_actual();
+            }
+        } catch (e) {
+            error_div.textContent = 'Error de conexión: ' + e.message;
+            error_div.style.display = '';
+            btn.disabled = false;
+            btn.textContent = 'Confirmar';
         }
     });
 }

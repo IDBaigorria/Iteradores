@@ -27,8 +27,8 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.82e (Tanda 1 del arco de
-migración de pasajeros entre micros: backend. Ver §2 y §4.5).
+**Última actualización:** v1.5piloto.82f (Tanda 2 del arco de
+migración de pasajeros entre micros: frontend. Ver §2 y §4.5).
 
 **Antes (v1.5piloto.82d):** cierre del arco de cancelaciones en
 compartidos + bug §4.6 de persistencia silenciosa en hostings
@@ -311,9 +311,13 @@ Plan completo en `prompts/plan_migrar_micro.md`.
   `migrar_pasajeros_de_micro` en
   `Aplicacion/Viajes/ViajeMicros.php` + subacción
   `viajes/migrar_pasajeros` en `Aplicacion/Enrutador.php`.
-- **Tanda 2 (frontend): pendiente.** Botón "Migrar pasajeros"
-  en la tarjeta del micro + modal con select de destino +
-  wire-up del POST + refresco del detalle del viaje.
+- **Tanda 2 (frontend): cerrada en `1.5piloto.82f`.**
+  Botón "Migrar pasajeros a..." en la tarjeta del micro (solo
+  visible si el micro tiene asientos ocupados y el usuario
+  no es terminal) + modal apilado con select de micros
+  vacíos, aviso de layouts distintos, confirm() nativo y
+  refresco post-migración (cierra o refresca el panel de
+  pasaje según qué micro estaba abierto).
 - **Tanda 3 (tests + docs): pendiente.** 7 tests del plugin
   + actualización de `aplicacion_POST.php`,
   `prompt_piloto.md` §5.8 y §4.9, y este archivo.
