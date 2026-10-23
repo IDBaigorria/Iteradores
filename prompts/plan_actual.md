@@ -340,6 +340,18 @@ Reproducido en el servidor de pruebas (InfinityFree,
    idsuperestructura=... AND CAST(dato AS CHAR) LIKE
    'cancelacion_%'` antes y después del intento.
 
+**Herramienta de diagnóstico en desarrollo:**
+
+Para identificar el defecto de forma sistemática (sin
+depender de más logs manuales), hay un plan de auditoría
+topológica en `prompts/plan_auditar_topologia.md`. La
+primera tanda crea un endpoint `?auditar_topologia=1` en
+el piloto que devuelve un reporte con los defectos del
+grafo (aristas rotas, ventas sin árbol parametrizado,
+buzones con contenido, soporte singular legacy, nodos
+huérfanos). Ese endpoint es el paso siguiente para
+diagnosticar este bug.
+
 ## 5. PLAN GLOBAL — HOJA DE RUTA
 
 Mapa completo del proyecto. Se actualiza cuando una fase
