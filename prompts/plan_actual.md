@@ -27,9 +27,12 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.82d (cierre del arco de
-cancelaciones en compartidos + bug §4.6 de persistencia
-silenciosa en hostings compartidos).
+**Última actualización:** v1.5piloto.82e (Tanda 1 del arco de
+migración de pasajeros entre micros: backend. Ver §2 y §4.5).
+
+**Antes (v1.5piloto.82d):** cierre del arco de cancelaciones en
+compartidos + bug §4.6 de persistencia silenciosa en hostings
+compartidos.
 
 El arco de cancelaciones en compartidos y el bug §4.6
 quedaron resueltos. Estado en pruebas (InfinityFree):
@@ -92,6 +95,15 @@ temáticas y la persistencia de corridas en su propio grafo
 Resumen de 1-2 líneas por arco. El detalle completo vive en
 los prompts correspondientes o en los commits.
 
+- **Migración de pasajeros entre micros — Tanda 1
+  (v1.5piloto.82e).** Nueva función
+  `migrar_pasajeros_de_micro` en `ViajeMicros.php` +
+  subacción `viajes/migrar_pasajeros` en el Enrutador.
+  Mueve asientos vendidos/reservados de un micro a otro
+  dentro del mismo viaje, mapeando por número de asiento.
+  Todo o nada: si un chequeo previo falla, no se toca el
+  grafo. Frontend y tests pendientes (Tandas 2 y 3). Ver
+  `prompts/plan_migrar_micro.md`.
 - **Cancelaciones en compartidos + persistencia robusta
   (v81t-v82d).** Escritura/lectura simétricas para el árbol
   de cancelaciones (parametrizado en el compartido, default
@@ -290,6 +302,21 @@ Van todos juntos en una sesión del framework.
   (opcional). Hoy el patrón mide 40×40 user units fijo.
 
 ### 4.5. Próximas tandas sugeridas
+
+**Arco en curso: migración de pasajeros entre micros.**
+
+Plan completo en `prompts/plan_migrar_micro.md`.
+
+- **Tanda 1 (backend): cerrada en `1.5piloto.82e`.**
+  `migrar_pasajeros_de_micro` en
+  `Aplicacion/Viajes/ViajeMicros.php` + subacción
+  `viajes/migrar_pasajeros` en `Aplicacion/Enrutador.php`.
+- **Tanda 2 (frontend): pendiente.** Botón "Migrar pasajeros"
+  en la tarjeta del micro + modal con select de destino +
+  wire-up del POST + refresco del detalle del viaje.
+- **Tanda 3 (tests + docs): pendiente.** 7 tests del plugin
+  + actualización de `aplicacion_POST.php`,
+  `prompt_piloto.md` §5.8 y §4.9, y este archivo.
 
 **Foco inmediato: Piloto — calidad.**
 

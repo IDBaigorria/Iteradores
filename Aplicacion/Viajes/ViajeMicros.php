@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.78h
+ * @version   1.5piloto.82e
  */
 
 use Iteradores\Nodos\Nodo;
@@ -14,6 +14,10 @@ include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./Aplicacion/Compartidos.php");
+// Tanda 1 (v1.5piloto.82e): migración de pasajeros entre
+// micros. Venta.php arrastra ViajeAsientos.php (donde vive
+// _buscar_asiento_en_venta_persistente) y FuncionesAuxiliares.php.
+include_once("./Aplicacion/Ventas/Venta.php");
 
 /**
  * Clona la estructura completa de un vehículo original para asociarla a un viaje.
@@ -266,6 +270,303 @@ function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, str
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno, $nodo_contexto);
     guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     return ['exito' => true];
+}
+
+/**
+ * Migra los pasajeros (asientos vendidos y reservados) del
+ * micro origen al micro destino, dentro del mismo viaje.
+ *
+ * Reglas (cerradas en plan_migrar_micro.md §2):
+ *  - Mapeo por número de asiento. Si un asiento ocupado del
+ *    origen no existe en el destino (por número), falla.
+ *  - Todo o nada: si un chequeo previo falla, no se toca el grafo.
+ *  - Destino debe estar vacío: todos sus asientos en "libre" o
+ *    "no disponible".
+ *  - No venta en curso: si hay asientos "seleccionado" en algún
+ *    micro del viaje, falla.
+ *  - Estados migrados: "vendido" (conserva pasajero y venta) y
+ *    "reservado" (conserva reservado_por y, si tiene, pasajero).
+ *  - "no disponible" y "libre" del origen no se migran.
+ *  - Si el asiento destino ya viene "no disponible" y el origen
+ *    está ocupado en ese número, falla (conflicto real).
+ *  - Actualiza venta->micro y asiento-en-venta->asiento.
+ *  - Después de la migración, el origen queda sin asientos
+ *    ocupados (solo puede conservar "no disponible" y "libre").
+ *
+ * @param string    $nombre_dueno
+ * @param string    $nombre_viaje
+ * @param string    $nombre_micro_origen
+ * @param string    $nombre_micro_destino
+ * @param Nodo|null $nodo_contexto
+ * @return array
+ * @since 1.5piloto.82e
+ */
+function migrar_pasajeros_de_micro(
+    string $nombre_dueno,
+    string $nombre_viaje,
+    string $nombre_micro_origen,
+    string $nombre_micro_destino,
+    ?Nodo $nodo_contexto = null
+): array {
+    // 1. Resolver viaje.
+    $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
+    if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
+
+    $nodo_viaje = $nodo_viajes->adyacente($nombre_viaje);
+    if (!$nodo_viaje) return ['exito' => false, 'error' => 'Viaje no encontrado'];
+
+    $nodo_micros = $nodo_viaje->adyacente('micros');
+    if (!$nodo_micros) return ['exito' => false, 'error' => 'No hay micros en el viaje'];
+
+    // 2. Micro origen y destino.
+    if ($nombre_micro_origen === $nombre_micro_destino) {
+        return ['exito' => false, 'error' => 'El micro origen y destino son el mismo'];
+    }
+    $nodo_micro_origen = $nodo_micros->adyacente($nombre_micro_origen);
+    if (!$nodo_micro_origen) return ['exito' => false, 'error' => 'Micro origen no encontrado'];
+    $nodo_micro_destino = $nodo_micros->adyacente($nombre_micro_destino);
+    if (!$nodo_micro_destino) return ['exito' => false, 'error' => 'Micro destino no encontrado'];
+
+    // 3. Chequeos previos (todos antes de tocar el grafo).
+    // 3.1. No venta en curso.
+    if (_hay_asientos_seleccionados_en_viaje($nodo_micros)) {
+        return [
+            'exito' => false,
+            'error' => 'Hay una venta en curso (asientos seleccionados). Reiniciá la selección antes de migrar.',
+        ];
+    }
+
+    // 3.2. Recolectar asientos por número.
+    $asientos_origen = _recolectar_asientos_por_numero($nodo_micro_origen);
+    $asientos_destino = _recolectar_asientos_por_numero($nodo_micro_destino);
+
+    // 3.3. Destino vacío.
+    foreach ($asientos_destino as $num => $asiento) {
+        $estado = $asiento->adyacente('estado');
+        $estado_str = $estado ? $estado->dato() : 'libre';
+        if ($estado_str !== 'libre' && $estado_str !== 'no disponible') {
+            return [
+                'exito' => false,
+                'error' => 'El micro destino ya tiene asientos ocupados. Migrá a un micro vacío.',
+            ];
+        }
+    }
+
+    // 3.4. Recolectar asientos ocupados del origen.
+    $migraciones = [];
+    foreach ($asientos_origen as $num => $asiento) {
+        $estado = $asiento->adyacente('estado');
+        $estado_str = $estado ? $estado->dato() : 'libre';
+        if ($estado_str !== 'vendido' && $estado_str !== 'reservado') continue;
+        $migraciones[] = [
+            'numero'          => (string)$num,
+            'asiento_origen'  => $asiento,
+            'estado'          => $estado_str,
+            'pasajero'        => $asiento->adyacente('pasajero'),
+            'venta'           => $asiento->adyacente('venta'),
+            'reservado_por'   => $asiento->adyacente('reservado_por'),
+        ];
+    }
+
+    // 3.5. Capacidad suficiente.
+    $cant_ocupados_origen = count($migraciones);
+    $cant_destino = count($asientos_destino);
+    if ($cant_ocupados_origen > $cant_destino) {
+        return [
+            'exito' => false,
+            'error' => "El micro destino no tiene capacidad suficiente ($cant_destino asientos vs $cant_ocupados_origen ocupados)",
+        ];
+    }
+
+    // 3.6. Todos los números existen en destino Y no están "no disponible".
+    foreach ($migraciones as $m) {
+        if (!isset($asientos_destino[$m['numero']])) {
+            return [
+                'exito' => false,
+                'error' => "El micro destino no tiene el asiento {$m['numero']}. No se puede migrar.",
+            ];
+        }
+        $estado_destino = $asientos_destino[$m['numero']]->adyacente('estado');
+        $estado_destino_str = $estado_destino ? $estado_destino->dato() : 'libre';
+        if ($estado_destino_str === 'no disponible') {
+            return [
+                'exito' => false,
+                'error' => "El asiento {$m['numero']} del micro destino está marcado como no disponible. No se puede migrar.",
+            ];
+        }
+    }
+
+    // 4. Aplicación. try/catch por defensa: si algo falla acá,
+    //    el grafo en memoria queda modificado pero NO se persiste.
+    $vendidos = 0;
+    $reservados = 0;
+    $detalles = [];
+    $ventas_migradas = [];
+
+    try {
+        foreach ($migraciones as $m) {
+            $nodo_asiento_destino = $asientos_destino[$m['numero']];
+
+            // 4.1. Cambiar estado del destino.
+            $estado_destino = $nodo_asiento_destino->adyacente('estado');
+            if ($estado_destino) {
+                $estado_destino->_dato($m['estado']);
+            } else {
+                $nodo_asiento_destino->_adyacente_en(Nodo::crear_con_dato($m['estado']), 'estado');
+            }
+
+            // 4.2. Asignar pasajero si lo hay.
+            if ($m['pasajero']) {
+                $nodo_asiento_destino->_adyacente_en($m['pasajero'], 'pasajero', true);
+            }
+
+            // 4.3. Asignar venta o reservado_por según estado.
+            if ($m['estado'] === 'vendido') {
+                if ($m['venta']) {
+                    $nodo_asiento_destino->_adyacente_en($m['venta'], 'venta', true);
+
+                    // Actualizar venta->micro una sola vez por venta.
+                    $id_venta = (string)$m['venta']->dato();
+                    if ($id_venta !== '' && !isset($ventas_migradas[$id_venta])) {
+                        $m['venta']->_adyacente_en($nodo_micro_destino, 'micro', true);
+                        $ventas_migradas[$id_venta] = true;
+                    }
+
+                    // Actualizar asiento-en-venta persistente.
+                    $av_persistente = _buscar_asiento_en_venta_persistente($m['venta'], $m['asiento_origen']);
+                    if ($av_persistente) {
+                        $av_persistente->_adyacente_en($nodo_asiento_destino, 'asiento', true);
+                    }
+                }
+                $vendidos++;
+                $detalles[] = "Asiento {$m['numero']}: vendido -> vendido";
+            } else {
+                // Reservado.
+                if ($m['reservado_por']) {
+                    $nodo_asiento_destino->_adyacente_en($m['reservado_por'], 'reservado_por', true);
+                }
+                $reservados++;
+                $con_pasajero = $m['pasajero'] ? ' (con pasajero)' : ' (sin pasajero)';
+                $detalles[] = "Asiento {$m['numero']}: reservado{$con_pasajero} -> reservado";
+            }
+
+            // 4.4. Limpiar asiento origen.
+            $estado_origen = $m['asiento_origen']->adyacente('estado');
+            if ($estado_origen) $estado_origen->_dato('libre');
+            $m['asiento_origen']->eliminar_adyacente('pasajero');
+            $m['asiento_origen']->eliminar_adyacente('venta');
+            $m['asiento_origen']->eliminar_adyacente('reservado_por');
+            $m['asiento_origen']->eliminar_adyacente('seleccionado_por');
+        }
+    } catch (\Throwable $e) {
+        return [
+            'exito' => false,
+            'error' => 'Error durante la migración: ' . $e->getMessage() . '. No se guardó nada.',
+        ];
+    }
+
+    // 5. Post-migración: contadores.
+    actualizar_contadores_micro($nodo_micro_origen);
+    actualizar_contadores_micro($nodo_micro_destino);
+    actualizar_contadores_viaje($nombre_viaje, $nombre_dueno, $nodo_contexto);
+
+    // 6. ¿Origen vacío? (sin vendidos ni reservados).
+    $origen_vacio = true;
+    foreach ($asientos_origen as $asiento) {
+        $estado = $asiento->adyacente('estado');
+        $estado_str = $estado ? $estado->dato() : 'libre';
+        if ($estado_str === 'vendido' || $estado_str === 'reservado') {
+            $origen_vacio = false;
+            break;
+        }
+    }
+
+    // 7. Guardar.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("migrar_pasajeros_de_micro: guardar_ambos falló para viaje=$nombre_viaje origen=$nombre_micro_origen destino=$nombre_micro_destino");
+        return [
+            'exito' => false,
+            'error' => 'La migración se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
+
+    return [
+        'exito' => true,
+        'migrados' => $vendidos + $reservados,
+        'vendidos_migrados' => $vendidos,
+        'reservados_migrados' => $reservados,
+        'detalles' => $detalles,
+        'origen_vacio' => $origen_vacio,
+    ];
+}
+
+/**
+ * Devuelve true si algún micro del viaje tiene asientos en estado
+ * "seleccionado". Sirve para bloquear la migración cuando hay
+ * una venta en curso.
+ *
+ * @param Nodo $nodo_micros Contenedor `micros` del viaje.
+ * @return bool
+ * @since 1.5piloto.82e
+ */
+function _hay_asientos_seleccionados_en_viaje(Nodo $nodo_micros): bool {
+    foreach ((array)$nodo_micros->adyacentes() as $nodo_micro) {
+        $copia = $nodo_micro->adyacente('vehiculo_copia');
+        if (!$copia) continue;
+        $asientos = $copia->adyacente('asientos');
+        if (!$asientos) continue;
+        for ($i = 1; $i <= 2; $i++) {
+            $piso = $asientos->adyacente("piso_$i");
+            if (!$piso) continue;
+            $cabeza = $piso->adyacente('asientos');
+            if (!$cabeza) continue;
+            $actual = $cabeza->adyacente('primer');
+            $seg = 0;
+            while ($actual && $actual->id() !== $cabeza->id() && $seg < 200) {
+                $estado = $actual->adyacente('estado');
+                if ($estado && $estado->dato() === 'seleccionado') return true;
+                $actual = $actual->adyacente('siguiente');
+                $seg++;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Recolecta los asientos de un micro indexados por su número.
+ * Recorre los pisos 1 y 2 del vehiculo_copia. Si un número se
+ * repite entre pisos (no debería pasar por el chequeo de
+ * duplicados del frontend), el último gana.
+ *
+ * @param Nodo $nodo_micro
+ * @return array<string, Nodo>
+ * @since 1.5piloto.82e
+ */
+function _recolectar_asientos_por_numero(Nodo $nodo_micro): array {
+    $asientos = [];
+    $copia = $nodo_micro->adyacente('vehiculo_copia');
+    if (!$copia) return $asientos;
+    $nodo_asientos = $copia->adyacente('asientos');
+    if (!$nodo_asientos) return $asientos;
+    for ($i = 1; $i <= 2; $i++) {
+        $piso = $nodo_asientos->adyacente("piso_$i");
+        if (!$piso) continue;
+        $cabeza = $piso->adyacente('asientos');
+        if (!$cabeza) continue;
+        $actual = $cabeza->adyacente('primer');
+        $seg = 0;
+        while ($actual && $actual->id() !== $cabeza->id() && $seg < 200) {
+            $num = (string)$actual->dato();
+            if ($num !== '') {
+                $asientos[$num] = $actual;
+            }
+            $actual = $actual->adyacente('siguiente');
+            $seg++;
+        }
+    }
+    return $asientos;
 }
 
 /**

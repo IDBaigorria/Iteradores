@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.81j
+ * @version   1.5piloto.82e
  */
 
 use Iteradores\Nodos\Nodo;
@@ -801,6 +801,44 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     $nodo_contexto = _contexto_solicitante($nombre_solicitante);
                     $resultado = eliminar_micro_de_viaje($nombre_viaje, $nombre_micro, $nombre_dueno, $nodo_contexto);
                     responder_json($resultado);
+                    break;
+
+                case 'migrar_pasajeros':
+                    // Tanda 1 (v1.5piloto.82e): mueve los asientos
+                    // vendidos/reservados de un micro a otro dentro
+                    // del mismo viaje. Dueño/admin/soporte. Terminal no.
+                    $nombre_solicitante_mig = $post['nombre_solicitante'] ?? '';
+                    if ($nombre_solicitante_mig === '') {
+                        responder_json(['exito' => false, 'error' => 'Solicitante no especificado']);
+                    }
+                    $nodo_sol_mig = Nodo::nodo_por_id('us_' . $nombre_solicitante_mig);
+                    $nivel_mig = '';
+                    if ($nodo_sol_mig) {
+                        $nivel_mig = $nodo_sol_mig->adyacente('nivel') ? $nodo_sol_mig->adyacente('nivel')->dato() : '';
+                        if ($nivel_mig === '') {
+                            $pub_mig = $nodo_sol_mig->adyacente('publico');
+                            if ($pub_mig) $nivel_mig = $pub_mig->adyacente('nivel') ? $pub_mig->adyacente('nivel')->dato() : '';
+                        }
+                    }
+                    if (!in_array($nivel_mig, ['admin', 'soporte', 'dueno'], true)) {
+                        responder_json(['exito' => false, 'error' => 'Solo dueño, admin o soporte pueden migrar pasajeros']);
+                    }
+                    $nombre_dueno_mig = $post['nombre_dueno'] ?? '';
+                    $nombre_viaje_mig = $post['nombre_viaje'] ?? '';
+                    $nombre_micro_origen_mig = $post['nombre_micro_origen'] ?? '';
+                    $nombre_micro_destino_mig = $post['nombre_micro_destino'] ?? '';
+                    if (empty($nombre_dueno_mig) || empty($nombre_viaje_mig) || empty($nombre_micro_origen_mig) || empty($nombre_micro_destino_mig)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $nodo_contexto_mig = _contexto_solicitante($nombre_solicitante_mig);
+                    $resultado_mig = migrar_pasajeros_de_micro(
+                        $nombre_dueno_mig,
+                        $nombre_viaje_mig,
+                        $nombre_micro_origen_mig,
+                        $nombre_micro_destino_mig,
+                        $nodo_contexto_mig
+                    );
+                    responder_json($resultado_mig);
                     break;
 
                 case 'agregar_terminal':
