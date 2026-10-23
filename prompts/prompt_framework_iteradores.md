@@ -362,6 +362,58 @@ con los mismos fixes aplicados desde 1.5i.7b:
 **XML no se usa en el piloto.** Los fixes están aplicados por
 consistencia con JSON, para que el día que se use esté listo.
 
+### 6.7 Persistencia robusta en hostings compartidos
+
+Los hostings compartidos (InfinityFree, FreeHosting, etc.)
+imponen límites que rompen los supuestos clásicos de la
+persistencia. La versión 1.5i.8d-f agregó los siguientes
+mecanismos:
+
+**Singleton de conexión.** `PerdurarSuperestructuraStringSQL`
+guarda la conexión MySQLi del request en `static $_sql_singleton`.
+Todas las operaciones (cargar, guardar, cargar_parcial,
+guardar_parcial, listar_contextos, existe, eliminar) la
+reusan. Al terminar el script, PHP la cierra sola. Los
+`$sql->close()` se reemplazan por `_liberar_conexion_sql($sql)`,
+que es no-op.
+
+Motivo: hostings como InfinityFree limitan la cantidad de
+conexiones por minuto. El flujo de `cancelar_venta` abría 4-5
+conexiones (cargar + guardar_parcial + refrescos del
+frontend) y la 5ª o 6ª fallaba con "Access denied".
+
+**`mysqli_report(MYSQLI_REPORT_OFF)` al crear la conexión.**
+En PHP 8.4, `mysqli_report(MYSQLI_REPORT_STRICT)` es el
+default. Con strict activo, cualquier fallo de mysqli lanza
+excepción en lugar de devolver `false`. El `@` de PHP silencia
+warnings pero NO excepciones. Resultado: un `new \mysqli`
+fallido o un `ping()` fallido propagaba `Access denied` hasta
+`_guardar_con_filtro`, que lo capturaba como un error de
+"CREATE TEMPORARY TABLE". Desactivar `mysqli_report` devuelve
+la semántica clásica: `false` en fallo, y los try/catch
+existentes lo manejan.
+
+**`SELECT 1` en lugar de `mysqli_ping()`.** `ping()` está
+deprecado en PHP 8.4 y lanza excepción con strict activo. Se
+reemplaza por una query trivial envuelta en try/catch.
+
+**Sin `CREATE TEMPORARY TABLE`.** InfinityFree no le da el
+privilegio `CREATE TEMPORARY TABLES` al usuario de la DB.
+`_guardar_con_filtro` usaba una TEMPORARY TABLE para el
+DELETE de las filas cargadas. Se reemplaza por `IN (...)`
+directo. Con 1500 IDs (~10 bytes cada uno), la query pesa
+~15KB. Cabe en `max_allowed_packet` (10MB en pruebas).
+
+**`SET SESSION wait_timeout = 300`.** InfinityFree tiene 20s
+por defecto. Subirlo a 5 minutos da margen para guardados
+parciales largos. Si el hosting lo ignora, no rompe nada.
+
+**Check de `commit()`.** Antes, `commit()` se llamaba sin
+chequear el resultado. Si MySQL cerró la sesión a mitad,
+el commit fallaba silenciosamente y algunos nodos se
+persistían, otros no. Ahora se verifica el retorno (y se
+hace un `ping()` previo).
+
 ---
 
 ## 7. PATRONES DE CÓDIGO DEL FRAMEWORK
@@ -833,6 +885,30 @@ mueve, hay que decidir si el nodo se destruye o
 queda huérfano. Conecta con §11.2 (fuga de nodos
 huérfanos).
 
+### 11.6 Deuda de persistencia para el espejo JS
+
+Los cambios de persistencia de 1.5i.8d-f **no fueron
+espejados todavía** al proyecto `iteradoresJS/`. El espejo
+JS (`PerdurarSuperestructuraStringIndexedDB64.js`) no tiene:
+
+- Singleton de conexión. IndexedDB no tiene el concepto de
+  "conexión por request", pero el patrón de abrir/cerrar
+  transacciones por operación sí impacta en performance.
+  Un equivalente sería cachear la `IDBDatabase` abierta
+  entre operaciones.
+- Check de `commit()`. La transacción de IndexedDB se
+  resuelve vía `tx.oncomplete`, que sí se chequea. No
+  aplica.
+- `IN (...)` directo. IndexedDB no tiene SQL. No aplica.
+- `mysqli_report`, `SELECT 1`, `ping()`. No aplica.
+- `_hmi` idempotente. **Sí aplica.** El `miscelaneas/Arbol.js`
+  del espejo tiene la versión vieja de `_hmi`. El fix es
+  análogo: no-op si el hijo ya es hmi; limpiar `hd` residual
+  cuando el padre no tenía hmi.
+
+Prioridad: `_hmi` es la única deuda con impacto real. El
+resto son mejoras.
+
 ---
 
 ## 10. HISTORIAL DEL FRAMEWORK
@@ -1013,6 +1089,31 @@ huérfanos).
   guardador, no hay fuente para propagar. En la práctica
   no pasa: el que crea un nodo tiene a su padre en
   memoria.
+- **1.5i.8d**: extender `wait_timeout` a 300s + check de
+  commit + `_hmi` idempotente. `crear_conexion_sql` hace
+  `SET SESSION wait_timeout = 300` (mitiga hostings con
+  timeout corto). `_guardar_con_filtro` verifica `ping()`
+  antes del commit y chequea el retorno de `commit()`. En
+  `miscelaneas/Arbol.php`, `_hmi` se vuelve idempotente
+  (no-op si el hijo ya es hmi) y limpia el `hd` residual
+  del hijo cuando el padre no tenía hmi. Los fixes de
+  `_hmi` son la base del comando `app:reparar_cancelaciones_arboles`
+  del piloto (v1.5piloto.81v).
+- **1.5i.8e**: singleton de conexión + `mysqli_report(OFF)`
+  + `SELECT 1` en lugar de `ping()`. `crear_conexion_sql`
+  guarda la conexión en un static y la reusa. Se agrega
+  `_liberar_conexion_sql($sql)` no-op que reemplaza a
+  `$sql->close()`. Se desactiva `mysqli_report` (con
+  `MYSQLI_REPORT_STRICT` activo en PHP 8.4, cualquier fallo
+  de mysqli lanza excepción y el `@` no la atrapa).
+  `ping()` se reemplaza por `SELECT 1` envuelto en
+  try/catch (ping está deprecado en 8.4).
+- **1.5i.8f**: sin `CREATE TEMPORARY TABLE` en
+  `_guardar_con_filtro`. InfinityFree y hostings compartidos
+  no permiten `CREATE TEMPORARY TABLES`. Se reemplaza por
+  `IN (...)` directo en los DELETE de `nodo_contexto` y
+  `adyacente_contexto`. Con 1500 IDs (~10 bytes cada uno),
+  la query pesa ~15KB. Cabe en `max_allowed_packet` (10MB).
 
 **BUG PENDIENTE (framework).** El bug del viaje viejo que
 desaparece tras una operación del terminal (§1.5 del

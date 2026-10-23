@@ -442,6 +442,16 @@ Regla: los enlaces del árbol del contexto que verá el nodo
 marcado se **conservan**. Los del árbol del contexto que ya no
 lo verá (`hmi_<term>` etc.) se limpian.
 
+**Aplica también a cancelaciones (v1.5piloto.81t).** El
+patrón de árboles paralelos y soft delete coordinado también
+se usa para el árbol de cancelaciones. Cada compartido tiene
+su árbol de cancelaciones con nombres parametrizados
+(`hmi_<term>`), y el dueño tiene el suyo con nombres default.
+La cancelación creada por un terminal se inserta en el árbol
+del compartido con parámetro, y se encola en
+`pendientes_cancelaciones` para que el dueño la reinserte en
+su árbol con default. Ver `prompt_piloto.md` §5.17.
+
 ### 5.7 `_es_compartido` como marca
 
 Los compartidos llevan `_es_compartido → "1"`. Sirve para:
@@ -1099,6 +1109,70 @@ documentadas en `_contextos_para_operacion`:
 
 Los bugs §1.5 y §1.5.10, que aparecían solo con carga parcial
 activa, están resueltos en el framework 1.5i.8a-c.
+
+### 8.10 Persistencia silenciosa en hostings compartidos (bug §4.6)
+
+**Síntoma.** En hostings compartidos (InfinityFree), una
+cancelación desde un terminal respondía `exito: true` pero no
+se persistía. El asiento seguía vendido, la venta aparecía
+en el listado, la cancelación no se veía desde el dueño ni
+desde el terminal. En local, el mismo flujo funcionaba.
+
+**Causa raíz.** Múltiples capas:
+
+1. **`CREATE TEMPORARY TABLE` no permitida.** InfinityFree no
+   le da el privilegio `CREATE TEMPORARY TABLES` al usuario de
+   la DB. `_guardar_con_filtro` la usaba para el DELETE de las
+   filas cargadas y fallaba con "Access denied".
+
+2. **`mysqli_report` strict activo (PHP 8.4).** Con
+   `MYSQLI_REPORT_STRICT` (default en 8.4), cualquier fallo
+   de mysqli lanza excepción en lugar de devolver `false`. El
+   `@` silencia warnings pero no excepciones. El error de
+   `CREATE TEMPORARY TABLE` subía como excepción y se
+   propagaba hasta `_guardar_con_filtro`, que lo capturaba
+   como un "fallo CREATE TEMPORARY TABLE" (que era el
+   síntoma, no la causa).
+
+3. **Rate limit de conexiones.** El flujo de `cancelar_venta`
+   abría 4-5 conexiones (cargar_parcial + guardar_parcial +
+   refrescos del frontend). InfinityFree limita las conexiones
+   por minuto; la 5ª o 6ª fallaba con "Access denied".
+
+4. **`cancelar_venta` no chequeaba `guardar_ambos`.** Cuando
+   `guardar_parcial` fallaba, `cancelar_venta` igual respondía
+   `exito: true`. La UI decía "venta cancelada" pero la DB no
+   se actualizaba.
+
+**Fixes (saga C.6-C.10):**
+
+- C.6: `cancelar_venta` chequea `guardar_ambos`. Si falla,
+  `exito: false`.
+- C.7-C.8: singleton de conexión. Una sola conexión física
+  por request.
+- C.9-C.9b: `mysqli_report(OFF)` + `SELECT 1` en lugar de
+  `ping()`.
+- C.10: sin `CREATE TEMPORARY TABLE`. `IN (...)` directo.
+
+**Lecciones:**
+
+- **`@` no atrapa excepciones.** Solo warnings. En PHP 8.4,
+  con `mysqli_report` strict, cualquier fallo de mysqli es
+  excepción. Hay que usar `try/catch` o `mysqli_report(OFF)`.
+- **Los errores silenciosos son peores que los ruidosos.**
+  `cancelar_venta` decía "éxito" y el usuario pensaba que
+  funcionaba. Un `try/catch` con `exito: false` es más
+  honesto.
+- **Verificar la causa raíz, no el síntoma.** El primer fix
+  (C.6) apuntó al síntoma (guardar_ambos no chequeado). El
+  error seguía pero cambiaba de línea. Recién con C.10 se
+  resolvió de verdad.
+- **Los hostings compartidos tienen privilegios limitados.**
+  `CREATE TEMPORARY TABLES`, `SET SESSION wait_timeout`,
+  `mysqli_report` no son garantía. Cada uno hay que testearlo
+  en el hosting real.
+
+Ver también: `prompt_framework_iteradores.md` §6.7 y §11.6.
 
 ---
 

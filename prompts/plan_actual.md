@@ -27,46 +27,53 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.81o (fix de
-`reparar_arboles` + estado del bug de cancelación desde
-terminal post-migración).
+**Última actualización:** v1.5piloto.82d (cierre del arco de
+cancelaciones en compartidos + bug §4.6 de persistencia
+silenciosa en hostings compartidos).
 
-En v81j se adaptaron los 3 helpers de B3.3c. En v81k se
-arregló el frontend de ventas.js (no mandaba `nombre_dueno`
-en 4 fetch, mismo patrón que el bug v81i de rendiciones).
-En v81l se rediseñó `soporte` singular → `soportes`
-contenedor plural, y se reordenó `agregar_usuario` para que
-`_asegurar_niveles_usuario` corra antes de
-`_asignar_duenos_a_soporte`. En v81m se actualizaron los
-prompts. En v81n se corrigió `_reparar_arboles_precalcular`
-para que indexe por nombre de enlace (antes borraba el
-`hmi_<term>` de los compartidos, dejando ventas huérfanas).
-**Con B3.3c cerrado, la Fase B del modelo topológico quedó
-completa.** El bug de cancelación desde terminal
-post-migración está en investigación (ver §4.6).
+El arco de cancelaciones en compartidos y el bug §4.6
+quedaron resueltos. Estado en pruebas (InfinityFree):
 
-**Antes (v81g):** cierre del arco del visualizador de
-grafo. Antes (v79o): cierre de la línea "grafo + plugin +
-sistema de scripts". Carga parcial activa. La topología
-sigue siendo la fuente de la seguridad: el bitmask lo
-propaga el framework, no la app.
+  - guardar_total.ok:        true, 551ms
+  - guardar_parcial.ok:      true, 592ms
+  - Cancelación desde carmen2: persiste
+  - Auditoría topológica:    0 críticos / 0 errores / 0 warnings
+
+**Antes (v81o):** fix de `reparar_arboles` + cierre de
+B3.3c. **Antes (v81g):** cierre del arco del visualizador
+de grafo. **Antes (v79o):** cierre de la línea "grafo +
+plugin + sistema de scripts". Carga parcial activa. La
+topología sigue siendo la fuente de la seguridad: el bitmask
+lo propaga el framework, no la app.
 
 **Versiones:**
 
-- **Piloto:** `1.5piloto.81g`.
-- **Framework PHP:** `1.5i.8c` (SQL64). El archivo
-  `Controlador/Controlador.php` está en `1.5i.7s` por los
-  comandos del visualizador.
-- **Framework JS:** `V1.5i.8c` (IndexedDB64).
-- **Plugin de pruebas:** `v1.5plugin.8f`.
+- **Piloto:** `1.5piloto.82d`.
+- **Framework PHP:** `1.5i.8f` (SQL64, con singleton de
+  conexión, `mysqli_report(OFF)`, `SELECT 1` en lugar de
+  `ping()` y `IN (...)` en lugar de TEMPORARY TABLE). El
+  archivo `Controlador/Controlador.php` está en `1.5i.7s`
+  por los comandos del visualizador.
+- **Framework JS:** `V1.5i.8c` (IndexedDB64). **Deuda
+  pendiente:** espejar `_hmi` y los cambios de
+  persistencia (C.7-C.10) al espejo JS.
+- **Plugin de pruebas:** `v1.5plugin.9p`.
 
 **Dónde estamos parados:**
 
 El piloto tiene el modelo topológico completo (usuarios,
-compartidos, contextos, carga parcial) y el visualizador de
-grafo cerrado. La seguridad sigue emergiendo de la topología
-del grafo: el bitmask lo propaga el framework, no la app.
-No hay bugs abiertos de prioridad alta.
+compartidos, contextos, carga parcial), el visualizador de
+grafo cerrado, la auditoría topológica disponible
+(`?auditar_topologia=1`, comando `app:auditar_topologia`,
+botón en el plugin) y todas las reparaciones idempotentes
+(`?reparar_topologia=1`, `?reparar_arboles=1`,
+`?reparar_cancelaciones=1`, `?reparar_cancelaciones_arboles=1`,
+`?eliminar_huerfanos=1`). La seguridad sigue emergiendo de
+la topología del grafo: el bitmask lo propaga el framework,
+no la app.
+
+**Sin bugs abiertos de prioridad alta.** La deuda técnica
+del arco está consolidada en §4.7.
 
 La pestaña Grafo tiene dos sub-pestañas (Tabla y Visual), con
 Visual como default. La sub-pestaña Visual es un SVG puro con
@@ -85,15 +92,33 @@ temáticas y la persistencia de corridas en su propio grafo
 Resumen de 1-2 líneas por arco. El detalle completo vive en
 los prompts correspondientes o en los commits.
 
+- **Cancelaciones en compartidos + persistencia robusta
+  (v81t-v82d).** Escritura/lectura simétricas para el árbol
+  de cancelaciones (parametrizado en el compartido, default
+  en el dueño), cycle guard en lectura, `_hmi` idempotente
+  + comando de reconstrucción de cadenas con ciclos, check
+  de `guardar_ambos` en `cancelar_venta`, y saga de
+  persistencia: singleton de conexión, `mysqli_report(OFF)`,
+  `SELECT 1` en lugar de `ping()`, sin `CREATE TEMPORARY
+  TABLE` (usa `IN (...)` directo). Cierra el bug §4.6. Ver
+  §4.6, `prompt_seguridad.md` §8.10 y
+  `prompt_framework_iteradores.md` §6.7.
+- **Auditoría topológica (v81p-v81s).** Nuevo endpoint
+  `?auditar_topologia=1`, comando `app:auditar_topologia`,
+  botón en el plugin (`🔍 Auditar topología`). 14
+  verificaciones en 3 severidades. Reporte persistido en el
+  grafo `plugin_auditorias` con 1 nodo JSON por auditoría.
+  Endpoints complementarios: `?eliminar_huerfanos=1`,
+  `?reparar_cancelaciones=1`,
+  `?reparar_cancelaciones_arboles=1`. Ver
+  `prompt_piloto.md` §3.5 y `prompt_plugin_piloto.md` §12.
 - **Fix de `reparar_arboles` (v81n).** El precalcular
   indexa por nombre de enlace (`p`, `hd`, `p_<term>`,
   `hd_<term>`), no por nombre fijo. Antes, para un
   compartido, `$por_padre[$id_cont]` venía vacío y
   `_reparar_arbol` borraba el `hmi_<term>`. Eso rompía
   el árbol del compartido: las ventas viejas quedaban
-  huérfanas y el terminal solo veía las nuevas. Test de
-  aceptación: `?reparar_arboles=1` dos veces seguidas
-  debe dar `cambios: 0`.
+  huérfanas y el terminal solo veía las nuevas.
 - **B3.3c — 3 helpers que iteraban `usuarios` (v81j-v81m).**
   `obtener_cancelacion_por_id` acepta dueño/terminal.
   `obtener_pasajero_por_dni` navega `us_<dueño>` directo
@@ -117,18 +142,16 @@ los prompts correspondientes o en los commits.
   (`estado_pruebas`, `corrida_iniciada`, `corrida_terminada`).
   Detalle en `iteradoresJS/prompts/estructura_plugin.md` y
   en el prompt del plugin §9.
-- **Fase 2c (v80a-80e).** Migración del plugin a `_post` y
-  `post_accion`. Detalle en el prompt del plugin §9.
 - **Carga parcial (v78b-v79a).** Aplicada. La app ya usa
   `cargar_parcial`/`guardar_parcial` en los módulos
   principales. Detalle en `prompt_seguridad.md` §2-5.
-- **Modelo topológico (Fases A, B1-B3).** Aplicado. Queda
-  pendiente solo B3.3c. Detalle en `prompt_seguridad.md`
-  §5 y `prompt_piloto.md` §8.7.
-- **Framework SQL64 (1.5i.7k-8c).** Activo. Bugs §1.5,
+- **Modelo topológico (Fases A, B1-B3).** Aplicado. Detalle
+  en `prompt_seguridad.md` §5 y `prompt_piloto.md` §8.7.
+- **Framework SQL64 (1.5i.7k-8f).** Activo. Bugs §1.5,
   §1.5.7, §1.5.8, §1.5.10, §1.5.15 y §1.5.16 resueltos.
-  Detalle en `prompt_framework_iteradores.md` §11.4 y en
-  `prompt_seguridad.md` §8.
+  La versión 1.5i.8d-f agregó la persistencia robusta para
+  hostings compartidos. Detalle en
+  `prompt_framework_iteradores.md` §6.7 y §11.4.
 
 ---
 
@@ -157,18 +180,24 @@ de cada módulo viven en su prompt.
 - **Soft delete coordinado para nodos multi-contexto.** Un
   nodo con bits de varios contextos no puede ser destruido
   por uno solo. Se marca con autoenlace (`cancelada`) y lo
-  destruye el contexto que tenga la vista completa.
+  destruye el contexto que tenga la vista completa. Aplica
+  a ventas Y cancelaciones.
 - **Inserción diferida con buzones.** Un contexto que no
   puede insertar en el árbol del otro deja un aviso en un
   buzón del compartido. El otro lo drena en su próxima
-  carga.
+  carga. Aplica a ventas Y cancelaciones.
+- **Árboles paralelos para cancelaciones (v1.5piloto.81t).**
+  El árbol de cancelaciones del compartido usa nombres
+  parametrizados (`hmi_<term>`); el del dueño usa default.
+  Ver `prompt_piloto.md` §5.17.
 - **Comandos del framework vs de la app.** Los del framework
   (`grafo:*`, `comunicacion:*`, etc.) van en el
   `Controlador`. Los de la app van en `Aplicacion/`,
   registrados desde `index.php`.
 - **Espejo PHP ↔ JS.** Cualquier cambio al framework PHP se
   refleja en JS en la misma tanda, con dos scripts y dos
-  commits.
+  commits. **Deuda pendiente:** `_hmi` (C.4b) y persistencia
+  (C.7-C.10) todavía no están espejados.
 - **Cada cambio al piloto lleva su espejo de pruebas en el
   plugin.** Salvo excepción justificada (estilos, refactor
   sin cambio de comportamiento, herramientas de admin).
@@ -242,6 +271,10 @@ Van todos juntos en una sesión del framework.
 - **Iteradores con ID especial + ocupante** como raíces de
   subgrafo. Resolvería los 7 helpers de B3.3c. Ver
   `prompt_framework_iteradores.md` §11.5.
+- **Espejar `_hmi` a JS** (`iteradoresJS/miscelaneas/Arbol.js`).
+  El fix de C.4b está solo en PHP. Ver §4.7.
+- **Espejar C.7-C.10 a JS**
+  (`PerdurarSuperestructuraStringIndexedDB64.js`). Ver §4.7.
 
 ### 4.4. Visualizador de grafo (baja)
 
@@ -260,8 +293,8 @@ Van todos juntos en una sesión del framework.
 
 **Foco inmediato: Piloto — calidad.**
 
-Con el arco de los 4 módulos menores cerrado (v81h +
-v81i), el foco pasa a los pendientes de calidad del
+Con el arco de cancelaciones + persistencia robusta cerrado
+(v81t-v82d), el foco vuelve a los pendientes de calidad del
 piloto (§4.1). Candidatos, en orden tentativo a definir
 con el usuario:
 
@@ -274,11 +307,12 @@ con el usuario:
 3. **Deuda de seguridad en impresión.** Las URLs
    `?imprimir=1&tipo=...` no validan sesión ni permisos.
    Cualquiera con la URL ve los datos. Preexistente.
-4. **B3.3c restante (3 helpers).** Cuando aparezca dolor
-   real o lleguen los iteradores con ID especial.
 
 **Después, según prioridad:**
 
+- **Limpieza de deuda técnica del arco** (§4.7): endpoints
+  temporales, espejo JS de `_hmi`, `error_log` de
+  diagnóstico.
 - **Migrar persistencia de la pestaña activa del plugin**
   (`localStorage` → IndexedDB).
 - **Visualizador de grafo, Fase 5** (persistencia de
@@ -288,69 +322,93 @@ con el usuario:
   con ID especial.
 - **Diversificación por tipo de aplicación** (`tienda`).
 
+### 4.6. Bug cerrado: persistencia silenciosa en hostings compartidos
+
+**Estado:** cerrado en v1.5piloto.82d. No era un bug del
+flujo de cancelaciones, era persistencia fallida en
+hostings compartidos. Detalle completo de la causa raíz y
+los fixes en `prompt_seguridad.md` §8.10.
+
+**Síntoma.** En InfinityFree, una cancelación desde un
+terminal respondía `exito: true` pero no se persistía. En
+local, el mismo flujo funcionaba.
+
+**Causa raíz (4 capas):**
+
+1. **`CREATE TEMPORARY TABLE` no permitida.**
+   InfinityFree no le da el privilegio al usuario de la
+   DB. `_guardar_con_filtro` la usaba para el DELETE de
+   las filas cargadas y fallaba con "Access denied".
+2. **`mysqli_report` strict activo (PHP 8.4).**
+   Cualquier fallo de mysqli lanza excepción en lugar de
+   devolver `false`. El `@` silencia warnings pero no
+   excepciones.
+3. **Rate limit de conexiones.** El flujo de
+   `cancelar_venta` abría 4-5 conexiones por request.
+   InfinityFree limita las conexiones por minuto.
+4. **`cancelar_venta` no chequeaba `guardar_ambos`.**
+   Cuando `guardar_parcial` fallaba, la UI decía "venta
+   cancelada" igual.
+
+**Fixes (saga C.6-C.10):**
+
+- C.6 (v81w): `cancelar_venta` chequea `guardar_ambos`.
+  Si falla, `exito: false`.
+  `_reparar_ventas_canceladas_incompletas` detecta ventas
+  con cancelación pero sin autoenlace `cancelada`.
+- C.7-C.8 (v81z-82a): singleton de conexión. Una sola
+  conexión física por request.
+- C.9-C.9b (v82b-82c): `mysqli_report(OFF)` + `SELECT 1`
+  en lugar de `ping()`.
+- C.10 (v82d): sin `CREATE TEMPORARY TABLE`.
+  `IN (...)` directo.
+
+**Lecciones registradas en `prompt_seguridad.md` §8.10.**
+
+**Verificación en pruebas (post-fix):**
+
+  - guardar_total.ok:        true, 551ms
+  - guardar_parcial.ok:      true, 592ms
+  - Cancelación desde carmen2: persiste
+  - Auditoría topológica:    0 críticos / 0 errores / 0 warnings
+
+### 4.7. Deuda técnica del arco (baja)
+
+Pendientes generados por la línea v81p-v82d. Ninguno es
+bloqueante.
+
+- **Endpoints temporales de diagnóstico en index.php.**
+  - `?diag_persistencia=1` (C.6b).
+  - `?diagnostico_cancelaciones=1` (C.4a).
+  Ambos son seguros (solo admin/soporte, solo lectura),
+  pero no deben quedar en producción. Tanda chiquita de
+  limpieza.
+
+- **Espejar `_hmi` a JS.** El fix de C.4b (idempotente +
+  limpiar `hd` residual) está solo en
+  `miscelaneas/Arbol.php`. El espejo
+  `iteradoresJS/miscelaneas/Arbol.js` tiene la versión
+  vieja. No urgente porque el plugin no usa `_hmi` sobre
+  cancelaciones.
+
+- **Espejar C.7-C.10 a JS.**
+  `PerdurarSuperestructuraStringIndexedDB64.js` no tiene
+  singleton de conexión ni check de `commit()`. IndexedDB
+  no tiene el problema del `TEMPORARY TABLE` ni
+  `mysqli_report`, pero sí se beneficia del singleton
+  (menos transacciones). No urgente.
+
+- **`\ConfiguracionApli::VERSION_APP` devuelve "0.0.0"
+  en pruebas.** El diag lo muestra así. Probablemente el
+  `ConfiguracionApli.php` de pruebas no tiene
+  `VERSION_APP` configurada. Detalle menor.
+
+- **`error_log("[CREAR_CONEXION] version=82c, ...")` en
+  SQL base.** Era para diagnóstico. Ahora que se
+  confirmó que funciona, se puede quitar. Se va con
+  la limpieza de endpoints.
+
 ---
-
-### 4.6. Bug en investigación: cancelación desde terminal post-migración
-
-Cuando un terminal cancela una venta después de las
-migraciones (con `reparar_arboles` v81n aplicado), el
-backend responde `exito: true` con `id_cancelacion`, pero:
-
-- La cancelación **no se persiste** en la DB.
-- El asiento sigue vendido en `viajes/estado_asientos`.
-- `cancelaciones/listar` devuelve `[]`.
-
-Reproducido en el servidor de pruebas (InfinityFree,
-`wait_timeout = 20`). En local no se reproduce.
-
-**Hipótesis abiertas:**
-
-- **Frontend no dispara el `fetch ventas/cancelar`.** En
-  el log de la consola del navegador no aparece el bloque
-  `[fetch] index.php` con `body accion: "ventas/cancelar"`.
-  Falta confirmar si el `confirm()` del modal aparece al
-  clickear "Cancelar venta". Si no aparece, el listener
-  no está conectado.
-- **Árbol del compartido con `hmi` vs `hmi_<term>`
-  inconsistentes.** `construir_arboles_compartidos` arma
-  el árbol con nombres parametrizados. Pero
-  `_crear_nodo_cancelacion` inserta con `_hmi` default.
-  Si el contenedor ya tiene `hmi_secretaria_carmen`, el
-  `_hmi` default no lo toma en cuenta y la nueva queda
-  huérfana. `listar_cancelaciones_de_dueno` busca en `hmi`
-  default y devuelve `[]`.
-- **`guardar_parcial([us_carmen2])` falla silenciosamente.**
-  El subgrafo del terminal no es chico (~1000 nodos si
-  incluye pasajeros alias). En InfinityFree con
-  `wait_timeout = 20`, el guardado puede morir a mitad,
-  PHP no lo detecta, `guardar_parcial` retorna `true`
-  sin commitear. Descartable si el log del navegador no
-  muestra el fetch.
-
-**Cómo seguir:**
-
-1. Capturar `[fetch] ventas/cancelar` en la consola del
-   navegador. Si aparece con `exito: true` y el count SQL
-   de `cancelacion_%` no sube, es la hipótesis del
-   `guardar_parcial` o del árbol roto.
-2. Si el `confirm()` del modal no aparece al clickear
-   "Cancelar venta", es bug del frontend (listener
-   desconectado).
-3. Correr `SELECT COUNT(*) FROM nodo_contexto WHERE
-   idsuperestructura=... AND CAST(dato AS CHAR) LIKE
-   'cancelacion_%'` antes y después del intento.
-
-**Herramienta de diagnóstico en desarrollo:**
-
-Para identificar el defecto de forma sistemática (sin
-depender de más logs manuales), hay un plan de auditoría
-topológica en `prompts/plan_auditar_topologia.md`. La
-primera tanda crea un endpoint `?auditar_topologia=1` en
-el piloto que devuelve un reporte con los defectos del
-grafo (aristas rotas, ventas sin árbol parametrizado,
-buzones con contenido, soporte singular legacy, nodos
-huérfanos). Ese endpoint es el paso siguiente para
-diagnosticar este bug.
 
 ## 5. PLAN GLOBAL — HOJA DE RUTA
 
@@ -391,6 +449,7 @@ Plan de fases del framework. Detalle en
 | IndexedDB64 (espejo JS) | Misma API, base `HyS_ctx`. | ✅ V1.5i.7k |
 | `guardar_parcial` real (SQL64) | Filtro por `contexto_mask`. | ✅ 1.5i.7o |
 | Propagación de máscaras a nodos nuevos | `_guardar_con_filtro` con BFS por enlaces entrantes. | ✅ 1.5i.8c |
+| **Persistencia robusta en hostings compartidos** | Singleton de conexión, `mysqli_report(OFF)`, `SELECT 1`, `IN (...)` directo. | ✅ 1.5i.8d-f |
 | **JSON64 / XML64** con `guardar_parcial` | Fase 3 del framework. | Pendiente |
 | **`guardar_parcial` real por delta** | Delta real, no merge en memoria. Bloquea Fase D del piloto. | Pendiente |
 | **Dejar el Nodo limpio** | Mover `contexto_mascara` fuera del Nodo. Bloquea 256 contextos. | Pendiente |
@@ -428,7 +487,8 @@ Calidad, plugin y visualizador. Detalle en §4.
 
 ## 6. ARCO EN CURSO — 4 módulos menores al contexto del solicitante
 
-**Estado:** planificado. Sin código todavía.
+**Estado:** CERRADO en v81h-v81i. Detalle histórico en
+§6.4. Ver también §2.
 
 ### 6.1. Motivación
 
@@ -475,88 +535,11 @@ módulos que quedaron sin tocar.
 
 ### 6.4. Fases
 
-- [ ] **Fase 1 — Auditoría.** Leer los 4 archivos y el
-  Enrutador completos. Listar todos los
-  `nodo_por_id('usuarios')` y todos los casos donde un
-  `$nombre_dueno` no se usa para navegar directo.
-  Confirmar diagnósticos y ajustar si hay sorpresas.
-  *Solo lectura, sin código.*
-
+- [x] **Fase 1 — Auditoría.**
 - [x] **Fase 2 — Módulos + Enrutador.** (v81h)
-  **Alcance corregido tras la auditoría:** Empresa.php
-  y Vehiculo.php ya estaban adaptados (fases v76u-v77v).
-  Solo quedaban 3 funciones en Liquidacion.php y
-  Rendicion.php con el patrón viejo + las 3 subacciones
-  del Enrutador que las invocan sin `$nombre_dueno`.
-  *Archivos tocados:* `Aplicacion/Liquidaciones/Liquidacion.php`
-  (`obtener_liquidacion_por_id`),
-  `Aplicacion/Rendiciones/Rendicion.php`
-  (`obtener_rendicion_por_id` y `aceptar_ajuste_rendicion`),
-  `Aplicacion/Enrutador.php` (3 subacciones).
-  *Patrón:* `?string $nombre_dueno = null`. Si viene,
-  navega desde `us_<dueño>`. Si no, fallback al
-  recorrido completo (compatibilidad con Impresion.php,
-  que hace carga total).
-  *Bumps:* Liquidacion.php, Rendicion.php y Enrutador.php
-  a `1.5piloto.81h`.
-
-  **Bug encontrado en la verificación manual (v81i):**
-  el backend ya navegaba bien, pero el frontend no
-  mandaba `nombre_dueno` en `rendiciones/obtener`,
-  `rendiciones/aceptar_ajuste` ni `liquidaciones/obtener`.
-  Como el soporte no tiene `usuarios` en su carga
-  parcial, el fallback del backend devolvía null y el
-  modal decía "no encontrada". Fix: los 3 POST del
-  frontend agregan `nombre_dueno` vía
-  `obtener_nombre_dueno_rendiciones()` /
-  `obtener_nombre_dueno_liquidaciones()`. Con dueño y
-  admin ya funcionaba porque el backend devuelve el
-  nombre solo; el bug era exclusivo de soporte.
-
 - [x] **Fase 3 — Verificación manual.** (v81h + v81i)
-  - Login **dueño**: Rendiciones y Liquidaciones cargan
-    y el detalle abre. OK.
-  - Login **soporte**: tabla cargaba pero el detalle
-    decía "no encontrada" (bug v81i, ver §6.4).
-    Fix aplicado en el frontend. Verificado tras el fix.
-  - Login **admin**: no se rompió nada.
-
-- [ ] **Fase 4 — Pruebas del plugin (espejo).**
-  Tres pruebas mínimas:
-  - `rendiciones_listar_carga_parcial_dueno`: login
-    dueño, `rendiciones/listar`, verificar que devuelve
-    sin error.
-  - `liquidaciones_listar_carga_parcial_dueno`: idem.
-  - `empresas_listar_carga_parcial_soporte`: login
-    soporte, elegir un dueño asignado,
-    `empresas/listar`, verificar sin error.
-  *Archivo:* `iteradoresJS/Aplicacion/pruebas/`.
-  *Commit separado en el repo del plugin.*
-
-- [ ] **Fase 5 — Documentación.**
-  - `prompt_piloto.md` §5.11-5.12: si cambian firmas,
-    anotarlo.
-  - `plan_actual.md` §2: una línea con el arco cerrado.
-  - `prompt_seguridad.md` §8.6 (B3.3c): de los 7
-    helpers, quedan 3 sin adaptar (los de `Venta.php` y
-    la rama de historial de `Pasajero.php`).
-
-### 6.5. Pendientes que abre
-
-- **B3.3c se reduce:** de 7 helpers sin adaptar a 3
-  (`Venta.php`: `_buscar_venta_por_id` fallback y
-  `obtener_cancelacion_por_id`; `Pasajero.php`:
-  `obtener_pasajero_por_dni` rama del historial de
-  ventas).
-- **Verificación con soporte real:** hoy las pruebas del
-  plugin no cubren el caso "soporte opera sobre un dueño
-  asignado". Las 3 pruebas nuevas de la Fase 4 lo hacen
-  para Empresas. Si en el futuro aparecen más módulos con
-  este patrón, replicar.
-- **Falta de cobertura en rendiciones/liquidaciones
-  para soporte:** las pruebas de la Fase 4 cubren
-  `rendiciones/listar` y `liquidaciones/listar` con
-  dueño, pero no con soporte. Se puede agregar después.
+- [ ] **Fase 4 — Pruebas del plugin (espejo).** Pendiente.
+- [ ] **Fase 5 — Documentación.** Parcialmente hecho en D.1.
 
 ---
 
@@ -584,6 +567,136 @@ Reglas de oro que aplican a cualquier tanda nueva.
   que matchear exacto el archivo en disco.** Si un bloque
   falla, pedir el fragmento exacto al usuario antes de
   ajustarlo.
+- **En PHP 8.4, `mysqli_report(MYSQLI_REPORT_STRICT)` es el
+  default.** Cualquier fallo de mysqli lanza excepción. El
+  `@` no la atrapa. Usar `try/catch` o `mysqli_report(OFF)`.
+- **Hostings compartidos tienen privilegios limitados.**
+  `CREATE TEMPORARY TABLES`, `SET SESSION wait_timeout`,
+  `mysqli_report` no son garantía. Cada uno hay que
+  testearlo en el hosting real. Ver
+  `prompt_framework_iteradores.md` §6.7.
+
+---
+
+**Estado del proyecto al cierre:** v1.5piloto.82d
+(framework 1.5i.8f). El arco de cancelaciones en
+compartidos y el bug §4.6 (persistencia silenciosa en
+hostings compartidos) quedaron cerrados. SQL64 activo,
+topología admin/soporte, auditoría topológica disponible
+(`?auditar_topologia=1`, comando `app:auditar_topologia`,
+botón en el plugin). Todos los comandos de reparación
+idempotentes. Sin bugs abiertos de prioridad alta.
+
+**Deuda técnica del arco** en §4.7: endpoints temporales
+de diagnóstico, espejo `_hmi` a JS, espejo C.7-C.10 a JS,
+`VERSION_APP` en pruebas, `error_log` de diagnóstico.
+
+---
+
+## 8. NOTA DE CIERRE — v1.5piloto.82d
+
+Documento de retomada del arco "cancelaciones en compartidos
++ persistencia robusta en hostings compartidos". Se puede
+borrar cuando la próxima sesión haya revisado los pendientes.
+
+### 8.1 Estado verificado
+
+En pruebas (InfinityFree):
+
+  - guardar_total.ok:        true, 551ms
+  - guardar_parcial.ok:      true, 592ms
+  - Cancelación desde carmen2: persiste
+  - Auditoría topológica:    0 críticos / 0 errores / 0 warnings
+
+Sin bugs abiertos de prioridad alta.
+
+### 8.2 Pendientes por prioridad
+
+**Media (deuda del arco):**
+- Espejar `_hmi` a JS (`iteradoresJS/miscelaneas/Arbol.js`).
+- Espejar C.7-C.10 a JS (`PerdurarSuperestructuraStringIndexedDB64.js`).
+- Limpieza de endpoints temporales: `?diag_persistencia=1`,
+  `?diagnostico_cancelaciones=1`, `error_log(...)` en SQL base.
+- `\ConfiguracionApli::VERSION_APP` devuelve "0.0.0" en pruebas.
+
+**Baja (futuro):**
+- Framework Fase 3/4/5 (§5.2).
+- Iteradores con ID especial + ocupante (§5.2).
+- Auditar estados colgados (§4.1).
+- Deuda de seguridad en impresión (§4.1).
+- Fusionar las dos §11 de `prompt_plugin_piloto.md`.
+
+### 8.3 Aprendizajes clave (compactos)
+
+1. **PHP 8.4 rompe `mysqli_report` y `mysqli_ping`.**
+   `MYSQLI_REPORT_STRICT` es default: cualquier fallo lanza
+   excepción. El `@` no la atrapa. Usar `mysqli_report(OFF)`
+   + `SELECT 1` en lugar de `ping()`.
+
+2. **Hostings compartidos tienen privilegios limitados.**
+   `CREATE TEMPORARY TABLES`, `SET SESSION wait_timeout`,
+   rate limit de conexiones. Solución: singleton de conexión,
+   `IN (...)` directo, `SET SESSION wait_timeout = 300`.
+   **Testear siempre en el hosting real antes de dar un fix
+   por bueno.**
+
+3. **Los errores silenciosos son peores que los ruidosos.**
+   `cancelar_venta` no chequeaba `guardar_ambos`. Lección:
+   toda operación de escritura que pueda fallar debe
+   chequear el resultado y reportarlo.
+
+4. **Un bug que cambia de síntoma no significa que el fix
+   no sirvió.** §4.6 tuvo 4 capas de causa raíz. Cada fix
+   movió el error sin resolverlo. Cuando el síntoma cambia
+   pero persiste, hay una causa más profunda.
+
+5. **`_hmi` debe ser idempotente.** Antes de C.4b:
+   reinsertar un nodo que ya era el hmi generaba autoenlace
+   `hd → sí mismo` (ciclo). Fix: no-op si el hijo ya es el
+   hmi; limpiar `hd` residual cuando el padre no tenía hmi.
+
+6. **Cycle guard en lectura de cadenas.** Aunque `_hmi` esté
+   bien, un bug en otro lugar puede generar ciclos. Todo
+   `while ($actual && $seg < 2000)` que recorre una cadena
+   `hd`/`hd_<term>` debe trackear nodos visitados por id.
+   Aplica a cancelaciones hoy; auditar ventas, rendiciones,
+   liquidaciones en el futuro.
+
+7. **Soft delete coordinado también aplica a cancelaciones.**
+   El patrón de "árboles paralelos + buzón diferido" no era
+   solo para ventas.
+
+8. **Bloques `buscar` con estructura repetida necesitan
+   desambiguación.** El prompt del plugin tiene dos §11. Los
+   `buscar` deben anclar al header único, no al contenido
+   compartido.
+
+9. **Invertir en la herramienta de diagnóstico paga.**
+   `?auditar_topologia=1` encontró en 500ms lo que a ojo
+   hubiera costado horas.
+
+10. **Cuando el reporte de la auditoría tiene muchos items
+    de un mismo tipo, revisar la verificación antes de
+    asumir que hay muchos bugs.** Los 96 `p_apunta_a_otro`
+    y 7 `terminal_dueno_real` eran falsos positivos.
+
+### 8.4 Próximos pasos sugeridos
+
+1. Limpieza de endpoints temporales (§4.7).
+2. Espejo `_hmi` a JS.
+3. Auditar cycle guard en otros flujos (ventas,
+   rendiciones, liquidaciones).
+4. Fusionar las dos §11 de `prompt_plugin_piloto.md`.
+
+### 8.5 Archivo obsoleto
+
+`prompts/plan_auditar_topologia.md` quedó obsoleto. Su
+contenido está cubierto por:
+- §3.5 de `prompt_piloto.md` (auditoría).
+- §12 de `prompt_plugin_piloto.md` (botón del plugin).
+- §2 de este archivo (arco cerrado).
+
+Se puede borrar.
 
 ---
 

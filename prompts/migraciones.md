@@ -2,8 +2,8 @@
 
 Este archivo documenta la **secuencia exacta** de migraciones que
 hay que correr para migrar un grafo desde cero (o resetear y
-volver a migrar). Refleja el estado post-v1.5piloto.81n (fix de
-`reparar_arboles` + rediseño `soportes` plural).
+volver a migrar). Refleja el estado post-v1.5piloto.82d
+(cancelaciones en compartidos + persistencia robusta).
 
 Se actualiza cuando cambia la secuencia o el comportamiento de
 algún paso.
@@ -360,9 +360,81 @@ compartidos.
 
 ---
 
-## 4. Paso post-migración — drenar el buzón
+### Paso 10 — `index.php?reparar_cancelaciones=1`
 
-**Después del paso 9**, hacer **una** de estas cosas:
+**Qué hace.** Reinserta cancelaciones en ambos árboles: el
+parametrizado del compartido (`hmi_<term>`) y el default del
+dueño (`hmi`). También detecta y repara "ventas canceladas
+incompletas" (tienen cancelación pero no autoenlace `cancelada`,
+por un guardado parcial fallido). Idempotente. Es el paso 10 de
+la secuencia del plugin (v1.5plugin.9p).
+
+**Output esperado:**
+
+```
+Reparación de cancelaciones en compartidos
+==========================================
+
+Dueños procesados:      N
+Compartidos procesados: M
+Reinsertadas en dueño:  0
+Huérfanas detectadas:   0
+Reinsertadas en ambos:  0
+Ventas reparadas:       0
+Cambios totales:        0
+
+Listo.
+```
+
+- **Todo en `0`** → grafo consistente.
+- **Números > 0** → había cancelaciones huérfanas o ventas
+  canceladas incompletas. Es esperable la primera vez después
+  de un guardado parcial fallido (bug §4.6).
+
+**Test de aceptación:** correr este paso **dos veces seguidas**.
+La segunda debe reportar `Cambios totales: 0`.
+
+---
+
+### Paso 11 — `index.php?reparar_cancelaciones_arboles=1`
+
+**Qué hace.** Detecta ciclos en las cadenas `hd`/`hd_<term>` de
+los árboles de cancelaciones y reconstruye la cadena lineal.
+Idempotente. Es el paso 11 de la secuencia del plugin
+(v1.5plugin.9p).
+
+**Output esperado:**
+
+```
+Reparación de ciclos en árboles de cancelaciones
+=================================================
+
+Dueños procesados:       N
+Compartidos procesados:  M
+Árboles revisados:       K
+Árboles reconstruidos:   0
+Cambios totales:         0
+
+Listo.
+```
+
+- **Todo en `0`** → sin ciclos.
+- **`Árboles reconstruidos > 0`** → había ciclos (bug de
+  `_hmi` viejo, fix v81v). Con el fix, no debería aparecer
+  en un grafo nuevo.
+
+**Test de aceptación:** correr dos veces seguidas. La segunda
+debe reportar `Cambios totales: 0`.
+
+---
+
+## 4. Paso 12 — Drenar el buzón (post-migración)
+
+Es el paso 12 de la secuencia del plugin (v1.5plugin.9p).
+Se hace **después de los pasos 10 y 11** (reparaciones de
+cancelaciones).
+
+**Después de los pasos 10 y 11**, hacer **una** de estas cosas:
 
 **Opción A — entrar como dueño primero (recomendado):**
 
@@ -428,6 +500,8 @@ Con el grafo migrado y el buzón drenado:
      clickear "Ver detalle" (fix v81i + v81k).
 
 5. **`?reparar_arboles=1` dos veces:** segunda corrida en `0`.
+6. **`?reparar_cancelaciones=1` dos veces:** segunda corrida en `0`.
+7. **`?reparar_cancelaciones_arboles=1` dos veces:** segunda en `0`.
 
 ---
 
@@ -505,6 +579,46 @@ indexa por nombre de enlace (no por nombre fijo) y respeta
 `p_<term>` / `hd_<term>`. Con el fix, `?reparar_arboles=1` es
 seguro y el test de aceptación es "dos corridas seguidas → 0
 cambios".
+
+### 23/10/26
+Arco de cancelaciones en compartidos + persistencia robusta.
+
+Se agregaron 2 pasos nuevos entre `?reparar_arboles=1` y el
+drenado del buzón:
+- `?reparar_cancelaciones=1` — reinserta cancelaciones en
+  ambos árboles (compartido + dueño). También repara ventas
+  canceladas incompletas (tienen cancelación pero no
+  autoenlace `cancelada`, por un guardado parcial fallido).
+- `?reparar_cancelaciones_arboles=1` — detecta ciclos en las
+  cadenas `hd`/`hd_<term>` de cancelaciones y reconstruye
+  como cadena lineal.
+
+Secuencia final (12 pasos + drenado):
+
+```
+index.php?migrar_a_sql64=1
+index.php?migrar_usuarios_especiales=1
+index.php?migrar_niveles_usuario=1
+index.php?migrar_compartidos_terminal=1
+index.php?construir_arboles_compartidos=1
+index.php?repuntar_terminales_compartido=1
+index.php?migrar_topologia=1  (con advertencias v81l)
+index.php?reparar_topologia=1
+index.php?reparar_arboles=1
+index.php?reparar_cancelaciones=1
+index.php?reparar_cancelaciones_arboles=1
+(drenar buzón: login dueño → Vendidos → logout)
+```
+
+**Framework PHP 1.5i.8d-f:** persistencia robusta en hostings
+compartidos (singleton de conexión, mysqli_report(OFF),
+SELECT 1 en lugar de ping(), sin CREATE TEMPORARY TABLE).
+Ver `prompt_framework_iteradores.md` §6.7.
+
+**Bug §4.6:** cerrado. No era bug del flujo, era persistencia
+silenciosa en InfinityFree (4 capas: TEMPORARY TABLE no
+permitida + mysqli_report strict + rate limit de conexiones
++ `cancelar_venta` no chequeaba `guardar_ambos`).
 
 ### Pendiente (tanda B, próximamente)
 Rediseño de `Arbol.php` a "solo el último hijo tiene `p`". Implica

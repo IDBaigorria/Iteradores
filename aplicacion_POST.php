@@ -7,7 +7,7 @@
  * enrutador central de la aplicación, que despachará la acción solicitada
  * a los módulos correspondientes.
  *
- * ## Estructura de nodos actual (v1.5piloto.79o)
+ * ## Estructura de nodos actual (v1.5piloto.82d)
  *
  * ### Modelo de dos capas: viejo + nuevo coexisten
  *
@@ -1118,9 +1118,89 @@
  * flujos actuales (máximo 2 niveles: modal raíz → sub-modal). Si en el futuro se
  * necesita más profundidad, se puede convertir en pila sin cambiar la API pública.
  *
+ * ## Estado al cierre de v1.5piloto.82d (arco de cancelaciones
+ * + persistencia robusta)
+ *
+ * **Estructura de nodos:** sin cambios estructurales. La
+ * estructura documentada arriba (modelo por capas + espejo
+ * viejo + estructura vieja al final) sigue vigente. **No se
+ * borró nada de la estructura vieja**: se mantiene como
+ * referencia hasta que se pruebe en producción.
+ *
+ * **Cambios de comportamiento del arco v81t-82d:**
+ *
+ * 1. **Árbol de cancelaciones del compartido con nombres
+ *    parametrizados.**
+ *    - Escritura (`_crear_nodo_cancelacion` en Venta.php):
+ *      cuando el contexto es un compartido, inserta con
+ *      `hmi_<term>`/`hd_<term>`/`p_<term>`. Antes insertaba
+ *      con `hmi` default sobre el contenedor del compartido,
+ *      que lee con parametrizados. La cancelación quedaba en
+ *      el árbol pero no se encontraba al leer.
+ *    - Lectura (`listar_cancelaciones_de_dueno`,
+ *      `obtener_cancelacion_por_id`): usan
+ *      `_nombres_arbol_para_contexto` para elegir default vs
+ *      parametrizado. Antes leían siempre con `hmi`/`hd`.
+ *    - Buzón `pendientes_cancelaciones`: el terminal encola,
+ *      el dueño drena en su próxima carga. Sigue vigente.
+ *    - Cycle guard en lectura: trackear nodos visitados por
+ *      id. Defensa en profundidad contra ciclos residuales.
+ *
+ * 2. **`_hmi` idempotente** (miscelaneas/Arbol.php, v81v).
+ *    - No-op si el hijo ya es el hmi actual.
+ *    - Limpia `hd` residual cuando el padre no tenía hmi.
+ *    - Antes: reinsertar un nodo que ya era el hmi generaba
+ *      autoenlace `hd → sí mismo` (ciclo).
+ *
+ * 3. **Comandos de reparación nuevos.**
+ *    - `app:reparar_cancelaciones_compartidos`
+ *      (`?reparar_cancelaciones=1`): reinserta cancelaciones
+ *      en ambos árboles. También repara ventas canceladas
+ *      incompletas (tienen cancelación pero no autoenlace
+ *      `cancelada`).
+ *    - `app:reparar_cancelaciones_arboles`
+ *      (`?reparar_cancelaciones_arboles=1`): detecta ciclos
+ *      en las cadenas `hd`/`hd_<term>` y reconstruye como
+ *      cadena lineal.
+ *    - `app:auditar_topologia` (`?auditar_topologia=1`):
+ *      14 verificaciones topológicas en 3 severidades. Ver
+ *      `prompt_piloto.md` §3.5.
+ *    - `?eliminar_huerfanos=1`: elimina los nodos no
+ *      alcanzables desde raíces (fuerza carga total, la
+ *      pestaña Grafo en parcial no los ve).
+ *    - Todos idempotentes, todos admin/soporte.
+ *
+ * 4. **`cancelar_venta` chequea `guardar_ambos`.**
+ *    - Si falla, `exito: false` con mensaje. Antes respondía
+ *      "éxito" aunque la DB no se hubiera actualizado.
+ *
+ * **Bug §4.6: cerrado.** No era bug del flujo de
+ * cancelaciones, era persistencia silenciosa en InfinityFree.
+ * Causa raíz en 4 capas: `CREATE TEMPORARY TABLE` no
+ * permitida, `mysqli_report` strict en PHP 8.4, rate limit
+ * de conexiones, `cancelar_venta` no chequeaba
+ * `guardar_ambos`. Fixes en framework 1.5i.8d-f (singleton
+ * de conexión, `mysqli_report(OFF)`, `SELECT 1` en lugar de
+ * `ping()`, `IN (...)` directo). Ver `prompt_seguridad.md`
+ * §8.10 y `prompt_framework_iteradores.md` §6.7.
+ *
+ * **Migración del plugin:** secuencia de 12 pasos.
+ * Pasos 10 (`reparar_cancelaciones`) y 11
+ * (`reparar_cancelaciones_arboles`) agregados entre
+ * `reparar_arboles` y el drenado. Ver
+ * `miscelaneas/migraciones.md` y `prompt_plugin_piloto.md`
+ * §11.1.
+ *
+ * **Deuda de la estructura vieja:** el bloque "Sección
+ * eliminada del docblock viejo" sigue al pie de la letra.
+ * Se eliminará cuando la batería de pruebas del plugin
+ * valide la topología nueva en producción. Hasta entonces,
+ * sigue siendo la referencia para entender el modelo
+ * pre-B1.
+ *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.79p
+ * @version   1.5piloto.82d
  */
 
 // El framework y los módulos de la aplicación ya fueron cargados en index.php.

@@ -287,12 +287,81 @@ Nueva desde v80n. SVG puro, sin librerías.
   referencias entrantes (O(N) por click).
 - `grafo:listar` carga todo el grafo en memoria y filtra en
   PHP.
+- **La pestaña Grafo opera en carga parcial** (con
+  `nombre_solicitante`), así que no ve los nodos con
+  `contexto_mascara=0` (huérfanos). Para eliminarlos, usar el
+  endpoint `?eliminar_huerfanos=1` (fuerza carga total). Ver
+  §3.5.
 - `grafo:vecindario` también carga todo el grafo en memoria
   (BFS sobre la estructura completa), pero el resultado que
   devuelve está acotado por `niveles` y `max_nodos`.
 - `_grafo_inferir_tipo` es heurística; devuelve `?` cuando no
   puede inferir. El frontend completa con inferencia por
   enlace entrante.
+
+### 3.5 Auditoría topológica del grafo
+
+Desde v1.5piloto.81p, hay un endpoint de solo lectura que
+recorre el grafo y reporta problemas topológicos. No modifica
+nada. Es la herramienta de diagnóstico para los bugs
+estructurales (aristas rotas, huérfanos, compartidos
+incompletos, ciclos, buzones con contenido).
+
+**Endpoint:** `?auditar_topologia=1&nombre_solicitante=<admin_o_soporte>`
+(mismo criterio que `grafo:*`: solo admin/soporte; en local se
+puede omitir el nombre).
+
+**Comando:** `app:auditar_topologia`, registrado en
+`Aplicacion/Reparacion/Comandos.php`.
+
+**Implementación:** `Aplicacion/Reparacion/Auditoria.php`, con
+14 verificaciones divididas en 3 severidades:
+
+Críticos:
+- `arista_rota`: aristas de `adyacente_contexto` cuyo origen o
+  destino no existe en `nodo_contexto`.
+- `nodo_mascara_cero`: nodos con `contexto_mascara = 0` sin
+  `id_especial` (no se cargan en parcial).
+- `admin_inexistente` / `admin_sin_usuarios`: chequeo del
+  `us_Administrador`.
+- `terminal_dueno_real`: terminales cuyo `dueno` apunta al nodo
+  real del dueño (no al compartido).
+- `compartido_sin_marca` / `compartido_sin_ventas` /
+  `compartido_sin_cancelaciones`: compartidos incompletos.
+
+Errores:
+- `venta_sin_param` / `venta_sin_p_default`: ventas en el
+  árbol del compartido sin el `p_<term>` o `p` correspondiente.
+- `buzon_con_contenido`: buzones `pendientes_ventas` /
+  `pendientes_cancelaciones` con elementos sin drenar.
+- `soporte_singular_legacy`: nodos con `soporte` (singular).
+- `soporte_sin_publico`: soportes sin `publico`.
+
+Warnings:
+- `huerfano`: nodos no alcanzables desde ningún ID especial.
+- `hijo_sin_p` / `p_apunta_a_otro`: cadenas de árbol
+  incompletas.
+- `p_a_no_contenedor`: `p` apuntando a un nodo que no tiene
+  `hmi`.
+- `ciclo_hd` / `cadena_hd_muy_larga`: ciclos en las cadenas
+  `hd`/`hd_<term>`.
+
+**Plugin:** el botón "🔍 Auditar topología" del popup del
+plugin corre el endpoint y muestra el reporte. Ver
+`iteradoresJS/prompts/prompt_plugin_piloto.md` §11.
+
+**Reparaciones complementarias.** Los fixes topológicos se
+hacen con estos endpoints (todos admin, carga total forzada,
+idempotentes):
+- `?eliminar_huerfanos=1` (v1.5piloto.81s): elimina los nodos
+  no alcanzables desde raíces. La pestaña Grafo opera en carga
+  parcial y no los ve, por eso el endpoint fuerza carga total.
+- `?reparar_cancelaciones=1` (v1.5piloto.81t): reinserta
+  cancelaciones en ambos árboles (parametrizado + default).
+- `?reparar_cancelaciones_arboles=1` (v1.5piloto.81v):
+  reconstruye cadenas de cancelaciones con ciclos.
+- `?reparar_topologia=1`, `?reparar_arboles=1`: reparaciones
+  existentes (v78n, v78z).
 
 ---
 
@@ -715,6 +784,54 @@ Los comandos de la app viven en `Aplicacion/Migraciones/`
   `grafo:crear_niveles_usuario`) son deuda técnica: hay
   que moverlos a la app cuando se pueda.
 
+### 5.17 Cancelaciones en compartidos
+
+El árbol de cancelaciones del piloto tiene dos copias (mismo
+nodo físico, dos juegos de enlaces) cuando el terminal cancela
+una venta:
+
+- **Árbol del compartido** (nombres parametrizados):
+  `compartido_con_<term> → cancelaciones → hmi_<term>`.
+- **Árbol del dueño** (nombres default): `us_<dueno> →
+  cancelaciones → hmi`.
+
+Cuando un terminal cancela, la cancelación se inserta en el
+árbol del compartido con nombres parametrizados, y se encola
+en `pendientes_cancelaciones`. El dueño la procesa en su
+próxima carga (Vendidos o Cancelaciones) y la inserta en su
+propio árbol con nombres default. Es el mismo patrón de
+"árboles paralelos" + "buzón diferido" que las ventas. Ver
+`prompt_seguridad.md` §5.6.
+
+**Escritura** (`_crear_nodo_cancelacion` en Venta.php):
+- Si el contexto es un compartido (terminal):
+  `_hmi($contenedor, $nodo_canc, $nombres_parametrizados)`.
+  Además, `_encolar_en_buzon(...)`.
+- Si el contexto es el dueño (o admin):
+  `_hmi($contenedor, $nodo_canc)` con nombres default.
+
+**Lectura** (`listar_cancelaciones_de_dueno`,
+`obtener_cancelacion_por_id`):
+- Usar `_nombres_arbol_para_contexto($nodo_contexto,
+  $nombre_terminal)` para elegir los nombres correctos.
+- Cycle guard: trackear nodos visitados por id. Si la cadena
+  tiene un ciclo (bug de `_hmi`), cortar en lugar de iterar
+  2000 veces.
+
+**Reparaciones:**
+- `app:reparar_cancelaciones_compartidos` (v81t): reinserta
+  cancelaciones en ambos árboles. También repara ventas
+  canceladas incompletas (tienen cancelación pero no
+  autoenlace `cancelada`, por un guardado parcial fallido).
+  Endpoint `?reparar_cancelaciones=1`.
+- `app:reparar_cancelaciones_arboles` (v81v): detecta ciclos
+  en `hd`/`hd_<term>` y reconstruye la cadena lineal.
+  Endpoint `?reparar_cancelaciones_arboles=1`.
+
+**Migración del plugin:** los dos comandos se corren como
+pasos 11 y 12 de la secuencia de migraciones (ver
+`prompt_plugin_piloto.md` §11.1).
+
 ---
 
 ## 6. FRONTEND
@@ -777,6 +894,35 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 
 ## 7. HISTORIAL DE VERSIONES (resumen)
 
+- **v81t-v82d** (línea de cancelaciones en compartidos +
+  persistencia robusta en hostings compartidos): ver §3.5,
+  §5.17 y la sección del bug §4.6 en `prompt_seguridad.md`.
+  La saga completa:
+  - 81t: escritura/lectura simétricas de cancelaciones
+    (árbol parametrizado para el compartido, default para
+    el dueño). Comando `app:reparar_cancelaciones_compartidos`
+    y endpoint `?reparar_cancelaciones=1`.
+  - 81u: cycle guard en lectura de cancelaciones
+    (visitados por id). Sin esto, un ciclo en `hd` generaba
+    2000 iteraciones y el modal mostraba la cancelación
+    repetida cientos de veces.
+  - 81v: `_hmi` idempotente + comando
+    `app:reparar_cancelaciones_arboles` para reconstruir
+    cadenas con ciclos. Endpoint
+    `?reparar_cancelaciones_arboles=1`.
+  - 81w: `cancelar_venta` chequea `guardar_ambos`;
+    `_reparar_ventas_canceladas_incompletas` detecta ventas
+    con cancelación pero sin autoenlace `cancelada`.
+  - 81x, 81y: endpoint temporal `?diag_persistencia=1` y
+    fix del endpoint (usar `Nodo::cantidad_de_nodos()` en
+    lugar de `Controlador::$token`; capturar errores con
+    `ob_start` en lugar de `Controlador::errores()`, que
+    no existe).
+  - 81z, 82a, 82b, 82c, 82d: saga de persistencia.
+    Singleton de conexión (82a), `mysqli_report(OFF)`
+    (82c), `SELECT 1` en lugar de `ping()` (82c), sin
+    `CREATE TEMPORARY TABLE` (82d). Resuelve el bug §4.6
+    (guardado parcial fallido en InfinityFree).
 - **v80n-v81g** (línea del visualizador de grafo): ver
   §3.4 y `prompts/plan_actual.md` §2. Nueva sub-pestaña
   Visual con SVG puro. Layouts Grilla y Forzar, pan/zoom,
@@ -2269,6 +2415,20 @@ eliminar):**
 **Regla de oro:** si un nodo se desenlaza sin destruirse,
 primero preguntar "¿tiene otra referencia entrante?". Si la
 respuesta es no, hay que destruirlo.
+
+**Reparación de cancelaciones (v1.5piloto.81t-81v).** Como
+parte de la línea de cancelaciones en compartidos, hay dos
+comandos de reparación que corren en la migración del plugin
+(pasos 11 y 12):
+- `app:reparar_cancelaciones_compartidos`: reinserta
+  cancelaciones en ambos árboles (parametrizado para el
+  compartido, default para el dueño). También repara ventas
+  canceladas incompletas (tienen cancelación pero no
+  autoenlace `cancelada`, por un guardado parcial fallido).
+- `app:reparar_cancelaciones_arboles`: detecta ciclos en
+  las cadenas `hd`/`hd_<term>` y reconstruye como cadena
+  lineal.
+Ambos son idempotentes y no peligrosos. Ver §3.5 y §5.17.
 
 ### 8.7 Plan de contextos y carga parcial
 
