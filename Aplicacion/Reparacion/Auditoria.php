@@ -15,7 +15,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.81p
- * @version   1.5piloto.81p
+ * @version   1.5piloto.81q
  */
 
 use Iteradores\Nodos\Nodo;
@@ -456,7 +456,7 @@ function _auditoria_hijos_sin_p(array $estructura): array {
                     "tipo" => "hijo_sin_p",
                     "detalle" => "nodo $id -> '$enlace' -> $destino_id no tiene '$p_enlace'.",
                 ];
-            } elseif ($estructura[$destino_id]["ady"][$p_enlace] !== $id) {
+            } elseif ((string)$estructura[$destino_id]["ady"][$p_enlace] !== (string)$id) {
                 $out[] = [
                     "tipo" => "p_apunta_a_otro",
                     "detalle" => "nodo $destino_id tiene '$p_enlace' -> "
@@ -513,11 +513,11 @@ function _auditoria_ciclos_hd(array $estructura): array {
             }
             if ($sufijo === null) continue;
             $hd_enlace = "hd" . $sufijo;
-            $contenedor_id = $id;
+            $contenedor_id = (string)$id;
             $actual = $primer_id;
             $visitados = [];
             $pasos = 0;
-            while ($actual && $actual !== $contenedor_id && $pasos < $max_pasos) {
+            while ($actual && (string)$actual !== $contenedor_id && $pasos < $max_pasos) {
                 if (isset($visitados[$actual])) {
                     $out[] = [
                         "tipo" => "ciclo_hd",
