@@ -1,195 +1,160 @@
 <?php
 /**
- * Aplicador — v81n: fix urgente de reparar_arboles.
+ * Aplicador — actualización de plan_actual.md al estado v1.5piloto.81o.
  *
- * Bug: _reparar_arboles_precalcular indexaba por `p` y `hd`
- * default, ignorando los enlaces parametrizados (p_<term>,
- * hd_<term>). Para un compartido (con árbol parametrizado),
- * $por_padre[$id_cont] daba vacío, y _reparar_arbol
- * interpretaba "contenedor sin hijos" y borraba el
- * hmi_<term>. Eso rompía el árbol del compartido: las ventas
- * viejas quedaban huérfanas y el terminal solo veía las
- * nuevas.
- *
- * Fix: indexar por nombre de enlace (no por nombre fijo),
- * y consultar por el enlace correcto según $nombres.
- *
- * Uso (raíz del proyecto): php aplicar_cambios.php
+ * Uso (raíz del proyecto PHP, iteradores/codigo.worktrees/v1.5i/):
+ *   php aplicar_cambios.php
  */
 
-$modo_estricto = true;
+$modo_estricto = false;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.81n';
-$htmls_a_bumpear = ['aplicacion_GET.html'];
+$version_nueva = '';
+$htmls_a_bumpear = [];
 
 $cambios = [
 
     // ============================================================
-    // 1. _reparar_arboles_precalcular: indexar por enlace
+    // 1. plan_actual.md §1: estado actual
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Reparacion/RepararArboles.php',
-        'descripcion' => 'RepararArboles.php: precalcular indexa por enlace',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual.md §1: estado a v81o',
         'buscar' => [
-            'function _reparar_arboles_precalcular(string $token): array {',
-            '    $por_padre = [];',
-            '    $es_dest_hd = [];',
-            '    Nodo::por_cada_nodo_ejecutar(',
-            '        $token,',
-            '        function ($nodo) use (&$por_padre, &$es_dest_hd) {',
-            '            $ady = (array)$nodo->adyacentes();',
-            '            if (isset($ady[\'p\'])) {',
-            '                $id_padre = $ady[\'p\']->id();',
-            '                $por_padre[$id_padre][] = $nodo;',
-            '            }',
-            '            if (isset($ady[\'hd\'])) {',
-            '                $es_dest_hd[$ady[\'hd\']->id()] = true;',
-            '            }',
-            '        },',
-            '        null',
-            '    );',
-            '    return [\'por_padre\' => $por_padre, \'es_dest_hd\' => $es_dest_hd];',
-            '}',
+            '**Última actualización:** v1.5piloto.81m (cierre de B3.3c',
+            '+ rediseño soportes plural).',
+            '',
+            'En v81j se adaptaron los 3 helpers de B3.3c. En v81k se',
+            'arregló el frontend de ventas.js (no mandaba `nombre_dueno`',
+            'en 4 fetch, mismo patrón que el bug v81i de rendiciones).',
+            'En v81l se rediseñó `soporte` singular → `soportes`',
+            'contenedor plural, y se reordenó `agregar_usuario` para que',
+            '`_asegurar_niveles_usuario` corra antes de',
+            '`_asignar_duenos_a_soporte` (causa raíz del enlace al nodo',
+            'real del soporte). En v81m se actualizaron los prompts.',
+            '**Con B3.3c cerrado, la Fase B del modelo topológico quedó',
+            'completa.**',
         ],
         'reemplazar' => [
-            'function _reparar_arboles_precalcular(string $token): array {',
-            '    // v1.5piloto.81n: indexar por nombre de enlace, no por',
-            '    // nombre fijo. Los compartidos usan p_<term> y hd_<term>;',
-            '    // con el indexado viejo, $por_padre[$id_cont] daba vacío',
-            '    // para esos contenedores y _reparar_arbol los trataba',
-            '    // como "sin hijos", borrando el hmi_<term> del compartido.',
-            '    //',
-            '    // Estructura:',
-            '    //   $por_padre[$enlace_p][$id_padre] = [Nodo, ...]',
-            '    //   $es_dest_hd[$enlace_hd][$id_nodo] = true',
-            '    // donde $enlace_p / $enlace_hd pueden ser "p"/"hd"',
-            '    // o "p_<term>"/"hd_<term>".',
-            '    $por_padre = [];',
-            '    $es_dest_hd = [];',
-            '    Nodo::por_cada_nodo_ejecutar(',
-            '        $token,',
-            '        function ($nodo) use (&$por_padre, &$es_dest_hd) {',
-            '            $ady = (array)$nodo->adyacentes();',
-            '            foreach ($ady as $enlace => $destino) {',
-            '                $enlace = (string)$enlace;',
-            '                if ($enlace === \'p\' || strpos($enlace, \'p_\') === 0) {',
-            '                    $por_padre[$enlace][$destino->id()][] = $nodo;',
-            '                }',
-            '                if ($enlace === \'hd\' || strpos($enlace, \'hd_\') === 0) {',
-            '                    $es_dest_hd[$enlace][$destino->id()] = true;',
-            '                }',
-            '            }',
-            '        },',
-            '        null',
-            '    );',
-            '    return [\'por_padre\' => $por_padre, \'es_dest_hd\' => $es_dest_hd];',
-            '}',
+            '**Última actualización:** v1.5piloto.81o (fix de',
+            '`reparar_arboles` + estado del bug de cancelación desde',
+            'terminal post-migración).',
+            '',
+            'En v81j se adaptaron los 3 helpers de B3.3c. En v81k se',
+            'arregló el frontend de ventas.js (no mandaba `nombre_dueno`',
+            'en 4 fetch, mismo patrón que el bug v81i de rendiciones).',
+            'En v81l se rediseñó `soporte` singular → `soportes`',
+            'contenedor plural, y se reordenó `agregar_usuario` para que',
+            '`_asegurar_niveles_usuario` corra antes de',
+            '`_asignar_duenos_a_soporte`. En v81m se actualizaron los',
+            'prompts. En v81n se corrigió `_reparar_arboles_precalcular`',
+            'para que indexe por nombre de enlace (antes borraba el',
+            '`hmi_<term>` de los compartidos, dejando ventas huérfanas).',
+            '**Con B3.3c cerrado, la Fase B del modelo topológico quedó',
+            'completa.** El bug de cancelación desde terminal',
+            'post-migración está en investigación (ver §4.6).',
         ],
     ],
 
     // ============================================================
-    // 2. _reparar_arbol: consultar con $n['p'] y $n['hd']
+    // 2. plan_actual.md §2: arcos cerrados (agregar v81n)
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Reparacion/RepararArboles.php',
-        'descripcion' => 'RepararArboles.php: _reparar_arbol consulta por enlace',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual.md §2: agregar arco v81n',
         'buscar' => [
-            'function _reparar_arbol(Nodo $contenedor, ?array $nombres, array $por_padre, array $es_dest_hd): array {',
-            '    $n = _arbol_nombres($nombres);',
-            '    $id_cont = $contenedor->id();',
-            '    $cambios = 0;',
-            '    $detalles = [];',
+            'Resumen de 1-2 líneas por arco. El detalle completo vive en',
+            'los prompts correspondientes o en los commits.',
             '',
-            '    $hijos = $por_padre[$id_cont] ?? [];',
-            '',
-            '    $primer = null;',
-            '    $candidatos = 0;',
-            '    foreach ($hijos as $hijo) {',
-            '        $id_h = $hijo->id();',
-            '        if (!isset($es_dest_hd[$id_h])) {',
-            '            $primer = $hijo;',
-            '            $candidatos++;',
-            '        }',
-            '    }',
+            '- **B3.3c — 3 helpers que iteraban `usuarios` (v81j-v81m).**',
         ],
         'reemplazar' => [
-            'function _reparar_arbol(Nodo $contenedor, ?array $nombres, array $por_padre, array $es_dest_hd): array {',
-            '    $n = _arbol_nombres($nombres);',
-            '    $id_cont = $contenedor->id();',
-            '    $cambios = 0;',
-            '    $detalles = [];',
+            'Resumen de 1-2 líneas por arco. El detalle completo vive en',
+            'los prompts correspondientes o en los commits.',
             '',
-            '    // v1.5piloto.81n: consultar por el enlace concreto del',
-            '    // árbol (default o parametrizado), no por nombre fijo.',
-            '    $hijos = $por_padre[$n[\'p\']][$id_cont] ?? [];',
-            '    $es_dest_hd_del_arbol = $es_dest_hd[$n[\'hd\']] ?? [];',
-            '',
-            '    $primer = null;',
-            '    $candidatos = 0;',
-            '    foreach ($hijos as $hijo) {',
-            '        $id_h = $hijo->id();',
-            '        if (!isset($es_dest_hd_del_arbol[$id_h])) {',
-            '            $primer = $hijo;',
-            '            $candidatos++;',
-            '        }',
-            '    }',
+            '- **Fix de `reparar_arboles` (v81n).** El precalcular',
+            '  indexa por nombre de enlace (`p`, `hd`, `p_<term>`,',
+            '  `hd_<term>`), no por nombre fijo. Antes, para un',
+            '  compartido, `$por_padre[$id_cont]` venía vacío y',
+            '  `_reparar_arbol` borraba el `hmi_<term>`. Eso rompía',
+            '  el árbol del compartido: las ventas viejas quedaban',
+            '  huérfanas y el terminal solo veía las nuevas. Test de',
+            '  aceptación: `?reparar_arboles=1` dos veces seguidas',
+            '  debe dar `cambios: 0`.',
+            '- **B3.3c — 3 helpers que iteraban `usuarios` (v81j-v81m).**',
         ],
     ],
 
     // ============================================================
-    // 3. Guard extra: no borrar hmi si hay hijos reales en el grafo
+    // 3. plan_actual.md: agregar §4.6 (bug en investigación)
     // ============================================================
     [
         'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Reparacion/RepararArboles.php',
-        'descripcion' => 'RepararArboles.php: guard defensivo en "sin hijos"',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => 'plan_actual.md §4.6: bug en investigación',
         'buscar' => [
-            '    if (empty($hijos)) {',
-            '        if ($contenedor->adyacente($n[\'hmi\'])) {',
-            '            $contenedor->eliminar_adyacente($n[\'hmi\']);',
-            '            $cambios++;',
-            '            $detalles[] = "contenedor $id_cont: hmi borrado (sin hijos)";',
-            '        }',
-            '    } elseif ($candidatos === 0) {',
+            '## 5. PLAN GLOBAL — HOJA DE RUTA',
         ],
         'reemplazar' => [
-            '    if (empty($hijos)) {',
-            '        // Guard defensivo (v1.5piloto.81n): antes de borrar',
-            '        // el hmi, verificar que el contenedor realmente no',
-            '        // tenga hijos navegables. Si el precalcular falló',
-            '        // (mapa incompleto), no queremos borrar un hmi',
-            '        // que sí es válido. Se navega el hmi y se chequea',
-            '        // que el nodo destino exista y tenga p al contenedor.',
-            '        $hmi_actual = $contenedor->adyacente($n[\'hmi\']);',
-            '        $hmi_es_valido = false;',
-            '        if ($hmi_actual) {',
-            '            $p_del_hmi = $hmi_actual->adyacente($n[\'p\']);',
-            '            if ($p_del_hmi && $p_del_hmi->id() === $id_cont) {',
-            '                $hmi_es_valido = true;',
-            '            }',
-            '        }',
-            '        if ($hmi_es_valido) {',
-            '            $detalles[] = "contenedor $id_cont: hmi apunta a hijo con p correcto, no se borra (revisar precalcular)";',
-            '        } elseif ($hmi_actual) {',
-            '            $contenedor->eliminar_adyacente($n[\'hmi\']);',
-            '            $cambios++;',
-            '            $detalles[] = "contenedor $id_cont: hmi borrado (sin hijos, hmi apuntaba a nodo sin p)";',
-            '        }',
-            '    } elseif ($candidatos === 0) {',
+            '### 4.6. Bug en investigación: cancelación desde terminal post-migración',
+            '',
+            'Cuando un terminal cancela una venta después de las',
+            'migraciones (con `reparar_arboles` v81n aplicado), el',
+            'backend responde `exito: true` con `id_cancelacion`, pero:',
+            '',
+            '- La cancelación **no se persiste** en la DB.',
+            '- El asiento sigue vendido en `viajes/estado_asientos`.',
+            '- `cancelaciones/listar` devuelve `[]`.',
+            '',
+            'Reproducido en el servidor de pruebas (InfinityFree,',
+            '`wait_timeout = 20`). En local no se reproduce.',
+            '',
+            '**Hipótesis abiertas:**',
+            '',
+            '- **Frontend no dispara el `fetch ventas/cancelar`.** En',
+            '  el log de la consola del navegador no aparece el bloque',
+            '  `[fetch] index.php` con `body accion: "ventas/cancelar"`.',
+            '  Falta confirmar si el `confirm()` del modal aparece al',
+            '  clickear "Cancelar venta". Si no aparece, el listener',
+            '  no está conectado.',
+            '- **Árbol del compartido con `hmi` vs `hmi_<term>`',
+            '  inconsistentes.** `construir_arboles_compartidos` arma',
+            '  el árbol con nombres parametrizados. Pero',
+            '  `_crear_nodo_cancelacion` inserta con `_hmi` default.',
+            '  Si el contenedor ya tiene `hmi_secretaria_carmen`, el',
+            '  `_hmi` default no lo toma en cuenta y la nueva queda',
+            '  huérfana. `listar_cancelaciones_de_dueno` busca en `hmi`',
+            '  default y devuelve `[]`.',
+            '- **`guardar_parcial([us_carmen2])` falla silenciosamente.**',
+            '  El subgrafo del terminal no es chico (~1000 nodos si',
+            '  incluye pasajeros alias). En InfinityFree con',
+            '  `wait_timeout = 20`, el guardado puede morir a mitad,',
+            '  PHP no lo detecta, `guardar_parcial` retorna `true`',
+            '  sin commitear. Descartable si el log del navegador no',
+            '  muestra el fetch.',
+            '',
+            '**Cómo seguir:**',
+            '',
+            '1. Capturar `[fetch] ventas/cancelar` en la consola del',
+            '   navegador. Si aparece con `exito: true` y el count SQL',
+            '   de `cancelacion_%` no sube, es la hipótesis del',
+            '   `guardar_parcial` o del árbol roto.',
+            '2. Si el `confirm()` del modal no aparece al clickear',
+            '   "Cancelar venta", es bug del frontend (listener',
+            '   desconectado).',
+            '3. Correr `SELECT COUNT(*) FROM nodo_contexto WHERE',
+            '   idsuperestructura=... AND CAST(dato AS CHAR) LIKE',
+            '   \'cancelacion_%\'` antes y después del intento.',
+            '',
+            '## 5. PLAN GLOBAL — HOJA DE RUTA',
         ],
     ],
-
-    // ============================================================
-    // 4. Bump del módulo (solo @version, no toco código)
-    // ============================================================
-    // (el runner hace el bump automático por $version_nueva)
 
 ];
 
 // ============================================================
-// Runner v2
+// Runner v2 (corregido: escribe cambios parciales en no estricto)
 // ============================================================
 
 echo "=== Aplicador ===\n\n";
@@ -204,55 +169,42 @@ function contar_ocurrencias(string $c, string $b): int {
     return $n;
 }
 
-if (!isset($htmls_a_bumpear) || !is_array($htmls_a_bumpear)) {
-    $htmls_a_bumpear = ['aplicacion_GET.html'];
-}
+if (!isset($htmls_a_bumpear) || !is_array($htmls_a_bumpear)) $htmls_a_bumpear = [];
 if (!isset($version_nueva)) $version_nueva = '';
 $version_nueva = trim((string)$version_nueva);
 $bumpear = ($version_nueva !== '');
 
-$creaciones = [];
-$eliminaciones = [];
-$reemplazos_por_archivo = [];
-
+$creaciones = []; $eliminaciones = []; $reemplazos_por_archivo = [];
 foreach ($cambios as $cambio) {
     $tipo = $cambio['tipo'] ?? 'reemplazar';
     if ($tipo === 'crear') { $creaciones[] = $cambio; continue; }
     if ($tipo === 'eliminar') { $eliminaciones[] = $cambio; continue; }
-    if (!isset($cambio['archivo']) || !isset($cambio['buscar']) || !isset($cambio['reemplazar'])) {
-        echo "[FALLO] Cambio mal formado.\n"; exit(1);
-    }
+    if (!isset($cambio['buscar']) || !isset($cambio['reemplazar'])) continue;
     $reemplazos_por_archivo[$cambio['archivo']][] = $cambio;
 }
 
-$total_reemplazos = 0;
-foreach ($reemplazos_por_archivo as $l) $total_reemplazos += count($l);
 echo "[INFO] " . count($reemplazos_por_archivo) . " archivo(s) a reemplazar, "
     . count($creaciones) . " a crear, " . count($eliminaciones) . " a eliminar.\n\n";
 
-$archivos_a_escribir = [];
-$bloques_ok = 0;
-$bloques_fallidos = [];
+$archivos_a_escribir = []; $bloques_ok = 0; $bloques_fallidos = [];
 
 foreach ($reemplazos_por_archivo as $archivo_rel => $lista) {
     $ruta_abs = $raiz_proyecto . '/' . $archivo_rel;
     if (!file_exists($ruta_abs)) { $bloques_fallidos[] = "Archivo no encontrado: $archivo_rel"; continue; }
     $contenido_original = file_get_contents($ruta_abs);
-    if ($contenido_original === false) { $bloques_fallidos[] = "No se pudo leer: $archivo_rel"; continue; }
     $eol = detectar_eol($contenido_original);
     $contenido = normalizar_a_unix($contenido_original);
     $contenido_antes = $contenido;
-    $hubo_error = false;
     foreach ($lista as $cambio) {
         $buscar_str = implode("\n", $cambio['buscar']);
         $reemplazar_str = implode("\n", $cambio['reemplazar']);
         $n = contar_ocurrencias($contenido, $buscar_str);
-        if ($n === 0) { $bloques_fallidos[] = "$archivo_rel: no encontrado - {$cambio['descripcion']}"; $hubo_error = true; continue; }
-        if ($n > 1) { $bloques_fallidos[] = "$archivo_rel: ambiguo ($n) - {$cambio['descripcion']}"; $hubo_error = true; continue; }
+        if ($n === 0) { $bloques_fallidos[] = "$archivo_rel: no encontrado - {$cambio['descripcion']}"; continue; }
+        if ($n > 1) { $bloques_fallidos[] = "$archivo_rel: ambiguo ($n) - {$cambio['descripcion']}"; continue; }
         $contenido = str_replace($buscar_str, $reemplazar_str, $contenido);
         $bloques_ok++;
     }
-    if (!$hubo_error && $contenido !== $contenido_antes) {
+    if ($contenido !== $contenido_antes) {
         $archivos_a_escribir[$ruta_abs] = [$contenido, $eol];
     }
 }
@@ -263,125 +215,19 @@ if ($modo_estricto && !empty($bloques_fallidos)) {
     exit(1);
 }
 
-$archivos_bump_php_js = [];
-$archivos_bump_js_css = [];
-foreach ($archivos_a_escribir as $ruta_abs => $info) {
-    $rel = substr($ruta_abs, strlen($raiz_proyecto) + 1);
-    $ext = strtolower(pathinfo($ruta_abs, PATHINFO_EXTENSION));
-    if ($ext === 'php' || $ext === 'js') $archivos_bump_php_js[] = $rel;
-    if ($ext === 'js' || $ext === 'css') $archivos_bump_js_css[] = $rel;
-}
-foreach ($creaciones as $cr) {
-    $ext = strtolower(pathinfo($cr['archivo'], PATHINFO_EXTENSION));
-    if ($ext === 'php' || $ext === 'js') $archivos_bump_php_js[] = $cr['archivo'];
-    if ($ext === 'js' || $ext === 'css') $archivos_bump_js_css[] = $cr['archivo'];
-}
-
-$bumps_atversion = 0;
-$bumps_qv = 0;
-$bumps_detalle = [];
-$info_bumps = [];
-
-if ($bumpear) {
-    foreach (array_unique($archivos_bump_php_js) as $archivo_rel) {
-        $ruta_abs = $raiz_proyecto . '/' . $archivo_rel;
-        if (!file_exists($ruta_abs)) continue;
-        if (isset($archivos_a_escribir[$ruta_abs])) {
-            list($contenido, $eol) = $archivos_a_escribir[$ruta_abs];
-        } else {
-            $contenido_original = file_get_contents($ruta_abs);
-            $eol = detectar_eol($contenido_original);
-            $contenido = normalizar_a_unix($contenido_original);
-        }
-        $patron = '/(\*\s+@version\s+)(\S+)/';
-        $viejo = '';
-        $nuevo = preg_replace_callback($patron, function($m) use ($version_nueva, &$viejo) {
-            $viejo = $m[2];
-            return $m[1] . $version_nueva;
-        }, $contenido, 1, $count);
-        if ($count === 0) { $info_bumps[] = "$archivo_rel (sin @version)"; continue; }
-        if ($viejo === $version_nueva) { continue; }
-        $archivos_a_escribir[$ruta_abs] = [normalizar_a_unix($nuevo), $eol];
-        $bumps_atversion++;
-        $bumps_detalle[] = "$archivo_rel  @version $viejo → $version_nueva";
-    }
-
-    foreach ($htmls_a_bumpear as $html_rel) {
-        $html_abs = $raiz_proyecto . '/' . $html_rel;
-        if (!file_exists($html_abs)) { $info_bumps[] = "$html_rel (no encontrado)"; continue; }
-        if (isset($archivos_a_escribir[$html_abs])) {
-            list($html, $eol) = $archivos_a_escribir[$html_abs];
-        } else {
-            $html_orig = file_get_contents($html_abs);
-            $eol = detectar_eol($html_orig);
-            $html = normalizar_a_unix($html_orig);
-        }
-        $html_antes = $html;
-        foreach (array_unique($archivos_bump_js_css) as $archivo_rel) {
-            $base = basename($archivo_rel);
-            $base_esc = preg_quote($base, '/');
-            $patron = '/(' . $base_esc . '\?v=)([^"\'\s>]+)/';
-            $viejo_qv = '';
-            $html = preg_replace_callback($patron, function($m) use ($version_nueva, &$viejo_qv) {
-                $viejo_qv = $m[2];
-                return $m[1] . $version_nueva;
-            }, $html, 1, $c_qv);
-            if ($c_qv > 0 && $viejo_qv !== $version_nueva) {
-                $bumps_qv++;
-                $bumps_detalle[] = "$html_rel  $base ?v= $viejo_qv → $version_nueva";
-            }
-        }
-        if ($html !== $html_antes) {
-            $archivos_a_escribir[$html_abs] = [normalizar_a_unix($html), $eol];
-        }
-    }
-}
-
 $archivos_escritos = 0;
 foreach ($archivos_a_escribir as $ruta_abs => $info) {
     list($contenido_unix, $eol) = $info;
-    $contenido_final = normalizar_a_original($contenido_unix, $eol);
-    if (file_put_contents($ruta_abs, $contenido_final) === false) {
-        echo "[FALLO] No se pudo escribir: " . substr($ruta_abs, strlen($raiz_proyecto) + 1) . "\n";
-        continue;
+    if (file_put_contents($ruta_abs, normalizar_a_original($contenido_unix, $eol)) === false) {
+        echo "[FALLO] No se pudo escribir: " . substr($ruta_abs, strlen($raiz_proyecto) + 1) . "\n"; continue;
     }
     $archivos_escritos++;
     echo "[OK] " . substr($ruta_abs, strlen($raiz_proyecto) + 1) . "\n";
 }
 
-foreach ($creaciones as $creacion) {
-    $ruta_abs = $raiz_proyecto . '/' . $creacion['archivo'];
-    $dir_destino = dirname($ruta_abs);
-    if (!is_dir($dir_destino)) mkdir($dir_destino, 0777, true);
-    $contenido_nuevo = implode("\n", $creacion['contenido']);
-    $ya_existia = file_exists($ruta_abs);
-    if (file_put_contents($ruta_abs, $contenido_nuevo) === false) {
-        echo "[FALLO] No se pudo crear: {$creacion['archivo']}\n"; continue;
-    }
-    $accion = $ya_existia ? 'sobrescrito' : 'creado';
-    echo "[OK] {$creacion['archivo']} ($accion)\n";
-}
-
-foreach ($eliminaciones as $elim) {
-    $ruta_abs = $raiz_proyecto . '/' . $elim['archivo'];
-    if (!file_exists($ruta_abs)) { echo "[INFO] " . $elim['archivo'] . " no existía.\n"; continue; }
-    if (unlink($ruta_abs)) echo "[OK] " . $elim['archivo'] . " (eliminado)\n";
-    else echo "[FALLO] No se pudo eliminar: " . $elim['archivo'] . "\n";
-}
-
-if ($bumpear && (!empty($bumps_detalle) || !empty($info_bumps))) {
-    echo "\n--- Bumps ---\n";
-    foreach ($bumps_detalle as $d) echo "[BUMP] $d\n";
-    foreach ($info_bumps as $i) echo "[INFO] $i\n";
-}
-
 echo "\n=== Resumen ===\n";
 echo "Bloques aplicados: $bloques_ok\n";
 echo "Archivos escritos: $archivos_escritos\n";
-if ($bumpear) {
-    echo "Bumps @version:    $bumps_atversion\n";
-    echo "Bumps ?v=:         $bumps_qv\n";
-}
 if (!empty($bloques_fallidos)) {
     echo "Fallos: " . count($bloques_fallidos) . "\n";
     foreach ($bloques_fallidos as $f) echo "  - $f\n";

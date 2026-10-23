@@ -27,8 +27,9 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.81m (cierre de B3.3c
-+ rediseño soportes plural).
+**Última actualización:** v1.5piloto.81o (fix de
+`reparar_arboles` + estado del bug de cancelación desde
+terminal post-migración).
 
 En v81j se adaptaron los 3 helpers de B3.3c. En v81k se
 arregló el frontend de ventas.js (no mandaba `nombre_dueno`
@@ -36,10 +37,13 @@ en 4 fetch, mismo patrón que el bug v81i de rendiciones).
 En v81l se rediseñó `soporte` singular → `soportes`
 contenedor plural, y se reordenó `agregar_usuario` para que
 `_asegurar_niveles_usuario` corra antes de
-`_asignar_duenos_a_soporte` (causa raíz del enlace al nodo
-real del soporte). En v81m se actualizaron los prompts.
+`_asignar_duenos_a_soporte`. En v81m se actualizaron los
+prompts. En v81n se corrigió `_reparar_arboles_precalcular`
+para que indexe por nombre de enlace (antes borraba el
+`hmi_<term>` de los compartidos, dejando ventas huérfanas).
 **Con B3.3c cerrado, la Fase B del modelo topológico quedó
-completa.**
+completa.** El bug de cancelación desde terminal
+post-migración está en investigación (ver §4.6).
 
 **Antes (v81g):** cierre del arco del visualizador de
 grafo. Antes (v79o): cierre de la línea "grafo + plugin +
@@ -81,6 +85,15 @@ temáticas y la persistencia de corridas en su propio grafo
 Resumen de 1-2 líneas por arco. El detalle completo vive en
 los prompts correspondientes o en los commits.
 
+- **Fix de `reparar_arboles` (v81n).** El precalcular
+  indexa por nombre de enlace (`p`, `hd`, `p_<term>`,
+  `hd_<term>`), no por nombre fijo. Antes, para un
+  compartido, `$por_padre[$id_cont]` venía vacío y
+  `_reparar_arbol` borraba el `hmi_<term>`. Eso rompía
+  el árbol del compartido: las ventas viejas quedaban
+  huérfanas y el terminal solo veía las nuevas. Test de
+  aceptación: `?reparar_arboles=1` dos veces seguidas
+  debe dar `cambios: 0`.
 - **B3.3c — 3 helpers que iteraban `usuarios` (v81j-v81m).**
   `obtener_cancelacion_por_id` acepta dueño/terminal.
   `obtener_pasajero_por_dni` navega `us_<dueño>` directo
@@ -276,6 +289,56 @@ con el usuario:
 - **Diversificación por tipo de aplicación** (`tienda`).
 
 ---
+
+### 4.6. Bug en investigación: cancelación desde terminal post-migración
+
+Cuando un terminal cancela una venta después de las
+migraciones (con `reparar_arboles` v81n aplicado), el
+backend responde `exito: true` con `id_cancelacion`, pero:
+
+- La cancelación **no se persiste** en la DB.
+- El asiento sigue vendido en `viajes/estado_asientos`.
+- `cancelaciones/listar` devuelve `[]`.
+
+Reproducido en el servidor de pruebas (InfinityFree,
+`wait_timeout = 20`). En local no se reproduce.
+
+**Hipótesis abiertas:**
+
+- **Frontend no dispara el `fetch ventas/cancelar`.** En
+  el log de la consola del navegador no aparece el bloque
+  `[fetch] index.php` con `body accion: "ventas/cancelar"`.
+  Falta confirmar si el `confirm()` del modal aparece al
+  clickear "Cancelar venta". Si no aparece, el listener
+  no está conectado.
+- **Árbol del compartido con `hmi` vs `hmi_<term>`
+  inconsistentes.** `construir_arboles_compartidos` arma
+  el árbol con nombres parametrizados. Pero
+  `_crear_nodo_cancelacion` inserta con `_hmi` default.
+  Si el contenedor ya tiene `hmi_secretaria_carmen`, el
+  `_hmi` default no lo toma en cuenta y la nueva queda
+  huérfana. `listar_cancelaciones_de_dueno` busca en `hmi`
+  default y devuelve `[]`.
+- **`guardar_parcial([us_carmen2])` falla silenciosamente.**
+  El subgrafo del terminal no es chico (~1000 nodos si
+  incluye pasajeros alias). En InfinityFree con
+  `wait_timeout = 20`, el guardado puede morir a mitad,
+  PHP no lo detecta, `guardar_parcial` retorna `true`
+  sin commitear. Descartable si el log del navegador no
+  muestra el fetch.
+
+**Cómo seguir:**
+
+1. Capturar `[fetch] ventas/cancelar` en la consola del
+   navegador. Si aparece con `exito: true` y el count SQL
+   de `cancelacion_%` no sube, es la hipótesis del
+   `guardar_parcial` o del árbol roto.
+2. Si el `confirm()` del modal no aparece al clickear
+   "Cancelar venta", es bug del frontend (listener
+   desconectado).
+3. Correr `SELECT COUNT(*) FROM nodo_contexto WHERE
+   idsuperestructura=... AND CAST(dato AS CHAR) LIKE
+   'cancelacion_%'` antes y después del intento.
 
 ## 5. PLAN GLOBAL — HOJA DE RUTA
 
