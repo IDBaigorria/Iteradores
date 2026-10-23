@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.81y
+ * @version   1.5piloto.82i
  */
 
 // --- Utilidades base ----------------------------------
@@ -1064,7 +1064,8 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
             $_GET['viaje'] ?? '',
             $_GET['micro'] ?? '',
             $_GET['fila'] ?? '',
-            $_GET['columna'] ?? ''
+            $_GET['columna'] ?? '',
+            $_GET['piso'] ?? null
         );
         exit;
     }

@@ -27,8 +27,10 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.82h (fix del croquis
-multi-piso + selección por piso. Ver §2 y §4.5).
+**Última actualización:** v1.5piloto.82i (piso en los
+flujos que faltaban: cambiar de asiento desde Clientes,
+impresión de pasaje_reserva y croquis impreso del micro.
+Ver §2 y §4.5).
 
 **Antes (v1.5piloto.82d):** cierre del arco de cancelaciones en
 compartidos + bug §4.6 de persistencia silenciosa en hostings
@@ -109,6 +111,19 @@ los prompts correspondientes o en los commits.
   de "cambiar de asiento desde la pestaña Clientes"
   (`pasajeros.js`) no pasa `piso`; queda con el bug hasta
   que se adapte.
+- **Piso en los flujos que faltaban (v1.5piloto.82i).**
+  Cierre de los pendientes de la Tanda del croquis (v82h).
+  `formatear_venta_completa` ahora incluye `piso` en cada
+  asiento (precalculando un mapa `id_asiento → piso` una
+  sola vez por venta). `pasajeros.js` pasa `asientoInfo.piso`
+  a `abrir_modal_cambiar_asiento`. `imprimir_pasaje_reserva`
+  acepta `?string $piso` y matchea por `(piso, fila, columna)`;
+  `index.php` lo lee del GET. `imprimir_croquis_micro` usa
+  clave `piso-fila-columna` en el mapa de pasajeros, así el
+  croquis impreso del micro de 2 pisos ya no pierde los
+  pasajeros de las filas 1-3 del piso 2. `viajes-asientos.js`
+  pasa `piso` a la impresión desde reservar/asignar/cambiar.
+  **Sin pendientes del bug de piso.**
 - **Migración de pasajeros entre micros — Tanda 1
   (v1.5piloto.82e).** Nueva función
   `migrar_pasajeros_de_micro` en `ViajeMicros.php` +

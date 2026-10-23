@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.81j
+ * @version   1.5piloto.82i
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -47,7 +47,7 @@ function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = 
  * @param string $fila
  * @param string $columna
  */
-function imprimir_pasaje_reserva(string $nombre_dueno, string $nombre_viaje, string $nombre_micro, string $fila, string $columna): void {
+function imprimir_pasaje_reserva(string $nombre_dueno, string $nombre_viaje, string $nombre_micro, string $fila, string $columna, ?string $piso = null): void {
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno);
     if (!$nodo_viajes) { echo "Dueño no encontrado"; return; }
 
@@ -63,14 +63,17 @@ function imprimir_pasaje_reserva(string $nombre_dueno, string $nombre_viaje, str
     $nodo_copia = $nodo_micro->adyacente('vehiculo_copia');
     if (!$nodo_copia) { echo "No existe copia del vehículo"; return; }
 
-    // Buscar el asiento por fila/columna
+    // Buscar el asiento por (piso, fila, columna). Si $piso viene
+    // null, comportamiento anterior (compatibilidad con URLs viejas).
+    // Fix v1.5piloto.82i.
     $nodo_asiento = null;
     $nodo_asientos = $nodo_copia->adyacente('asientos');
     if ($nodo_asientos) {
         for ($i = 1; $i <= 2; $i++) {
-            $piso = $nodo_asientos->adyacente("piso_$i");
-            if (!$piso) continue;
-            $cabeza = $piso->adyacente('asientos');
+            if ($piso !== null && $piso !== '' && (string)$i !== (string)$piso) continue;
+            $nodo_piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$nodo_piso) continue;
+            $cabeza = $nodo_piso->adyacente('asientos');
             if (!$cabeza) continue;
             $actual = $cabeza->adyacente('primer');
             while ($actual && $actual->id() !== $cabeza->id()) {
@@ -1694,11 +1697,13 @@ function imprimir_croquis_micro(string $nombre_dueno, string $nombre_viaje, stri
     $nombre_micro_visible = $nodo_copia->adyacente('nombre') ? $nodo_copia->adyacente('nombre')->dato() : '';
     $patente = $nodo_copia->dato();
 
-    // Mapa de pasajeros por fila-columna para lookup rápido.
+    // Mapa de pasajeros por (piso, fila, columna) para lookup rápido.
+    // Fix v1.5piloto.82i: clave con piso para no pisar asientos de
+    // pisos distintos con la misma (fila, columna).
     $pasajeros = _recolectar_asientos_con_pasajero_de_micro($nodo_micro);
-    $por_fc = [];
+    $por_pfc = [];
     foreach ($pasajeros as $p) {
-        $por_fc[$p['fila'] . '-' . $p['columna']] = $p;
+        $por_pfc[$p['piso'] . '-' . $p['fila'] . '-' . $p['columna']] = $p;
     }
 
     $logo_ruta = './Aplicacion/LogoPeque.png';
@@ -1842,7 +1847,7 @@ function imprimir_croquis_micro(string $nombre_dueno, string $nombre_viaje, stri
                     $clase_seat .= ' libre';
                 }
 
-                $info_pas = $por_fc[$clave_fc] ?? null;
+                $info_pas = $por_pfc[$i . '-' . $clave_fc] ?? null;
 
                 echo '<div class="' . $clase_seat . '">';
                 echo '<div class="num">' . htmlspecialchars($numero) . '</div>';

@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.81w
+ * @version   1.5piloto.82i
  */
 
 
@@ -983,6 +983,33 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
         ];
     }
 
+    // Fix v1.5piloto.82i: precalcular mapa id_asiento => piso.
+    // Necesario para desambiguar asientos de pisos distintos con
+    // la misma (fila, columna) en formatear_venta_completa.
+    $nodo_micro_para_piso = $nodo_venta->adyacente('micro');
+    $mapa_piso_asientos = [];
+    if ($nodo_micro_para_piso) {
+        $nodo_copia_mapa = $nodo_micro_para_piso->adyacente('vehiculo_copia');
+        if ($nodo_copia_mapa) {
+            $nodo_asientos_mapa = $nodo_copia_mapa->adyacente('asientos');
+            if ($nodo_asientos_mapa) {
+                for ($i_piso_mapa = 1; $i_piso_mapa <= 2; $i_piso_mapa++) {
+                    $piso_mapa = $nodo_asientos_mapa->adyacente("piso_$i_piso_mapa");
+                    if (!$piso_mapa) continue;
+                    $cabeza_mapa = $piso_mapa->adyacente('asientos');
+                    if (!$cabeza_mapa) continue;
+                    $actual_mapa = $cabeza_mapa->adyacente('primer');
+                    $seg_mapa = 0;
+                    while ($actual_mapa && $actual_mapa->id() !== $cabeza_mapa->id() && $seg_mapa < 200) {
+                        $mapa_piso_asientos[(string)$actual_mapa->id()] = (string)$i_piso_mapa;
+                        $actual_mapa = $actual_mapa->adyacente('siguiente');
+                        $seg_mapa++;
+                    }
+                }
+            }
+        }
+    }
+
     // Asientos
     $asientos = [];
     $cabeza_asientos = $nodo_venta->adyacente('asientos');
@@ -996,6 +1023,7 @@ function formatear_venta_completa(Nodo $nodo_venta): array {
             $nodo_hora_sb = $actual->adyacente('hora_subida_bajada');
             $asiento_info = [
                 'numero' => $nodo_asiento_real ? $nodo_asiento_real->dato() : '',
+                'piso' => $nodo_asiento_real ? ($mapa_piso_asientos[(string)$nodo_asiento_real->id()] ?? '') : '',
                 'fila' => $nodo_asiento_real && $nodo_asiento_real->adyacente('fila') ? $nodo_asiento_real->adyacente('fila')->dato() : '',
                 'columna' => $nodo_asiento_real && $nodo_asiento_real->adyacente('columna') ? $nodo_asiento_real->adyacente('columna')->dato() : '',
                 'punto_subida_bajada' => $nodo_punto_sb ? $nodo_punto_sb->dato() : null,

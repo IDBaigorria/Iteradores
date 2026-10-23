@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.82h
+ * @version 1.5piloto.82i
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -691,7 +691,8 @@ function abrir_modal_reservar_asiento(piso, fila, columna) {
                     nombre_micro_reserva,
                     fila,
                     columna,
-                    asiento.numero
+                    asiento.numero,
+                    piso
                 );
             }
         } else {
@@ -790,7 +791,8 @@ function abrir_modal_asignar_pasajero(piso, fila, columna) {
                 nombre_micro_asig,
                 fila,
                 columna,
-                asiento.numero
+                asiento.numero,
+                piso
             );
         } else {
             mostrar_aviso(resultado.error || "No se pudo asignar", 'error');
@@ -859,7 +861,7 @@ function ver_pasaje_asiento(piso, fila, columna) {
         </div>`;
     } else {
         html += `<div class="actions" style="margin-top:15px;">
-            <button class="btn primary" id="btn_imprimir_pasaje_asiento" data-modo="reserva" data-dueno="${nd}" data-viaje="${nv}" data-micro="${nm}" data-fila="${fila}" data-columna="${columna}">Imprimir pasaje</button>
+            <button class="btn primary" id="btn_imprimir_pasaje_asiento" data-modo="reserva" data-dueno="${nd}" data-viaje="${nv}" data-micro="${nm}" data-fila="${fila}" data-columna="${columna}" data-piso="${piso || ''}">Imprimir pasaje</button>
             ${btn_cambiar_html}
             <button class="btn" id="btn_cerrar_ver_pasaje">Cerrar</button>
         </div>`;
@@ -881,14 +883,16 @@ function ver_pasaje_asiento(piso, fila, columna) {
                 const nm = this.dataset.micro;
                 const fila = this.dataset.fila;
                 const columna = this.dataset.columna;
-                window.open(
-                    `index.php?imprimir=1&tipo=pasaje_reserva`
+                const piso = this.dataset.piso;
+                let url = `index.php?imprimir=1&tipo=pasaje_reserva`
                     + `&dueno=${encodeURIComponent(nd)}`
                     + `&viaje=${encodeURIComponent(nv)}`
                     + `&micro=${encodeURIComponent(nm)}`
-                    + `&fila=${fila}&columna=${columna}`,
-                    '_blank'
-                );
+                    + `&fila=${fila}&columna=${columna}`;
+                if (piso !== null && piso !== undefined && piso !== '') {
+                    url += `&piso=${encodeURIComponent(piso)}`;
+                }
+                window.open(url, '_blank');
             }
         });
     }
@@ -939,7 +943,7 @@ function ver_compra_asiento(venta_id) {
  * @param {string} columna
  * @param {string|number} numero_asiento
  */
-function mostrar_modal_chico_impresion_reserva(nombre_dueno, nombre_viaje, nombre_micro, fila, columna, numero_asiento) {
+function mostrar_modal_chico_impresion_reserva(nombre_dueno, nombre_viaje, nombre_micro, fila, columna, numero_asiento, piso = null) {
     const contenedor = document.getElementById('modal_chico_impresion_reserva');
     const titulo = document.getElementById('modal_chico_impresion_reserva_titulo');
     const btnImprimir = document.getElementById('btn_modal_chico_imprimir_reserva');
@@ -949,12 +953,15 @@ function mostrar_modal_chico_impresion_reserva(nombre_dueno, nombre_viaje, nombr
     titulo.textContent = `Asiento ${numero_asiento} reservado para el equipo`;
 
     btnImprimir.onclick = () => {
-        const url = `index.php?imprimir=1&tipo=pasaje_reserva`
+        let url = `index.php?imprimir=1&tipo=pasaje_reserva`
             + `&dueno=${encodeURIComponent(nombre_dueno)}`
             + `&viaje=${encodeURIComponent(nombre_viaje)}`
             + `&micro=${encodeURIComponent(nombre_micro)}`
             + `&fila=${encodeURIComponent(fila)}`
             + `&columna=${encodeURIComponent(columna)}`;
+        if (piso !== null && piso !== undefined && piso !== '') {
+            url += `&piso=${encodeURIComponent(piso)}`;
+        }
         window.open(url, '_blank');
     };
 
@@ -1641,6 +1648,7 @@ async function _confirmar_cambiar_asiento() {
                 destino_fila: d.destino.fila,
                 destino_columna: d.destino.columna,
                 destino_numero: d.destino.numero,
+                destino_piso: d.destino.piso || '',
                 pasajero_dni: d.origen_pasajero_dni
             };
 
@@ -1681,7 +1689,8 @@ async function _confirmar_cambiar_asiento() {
                         snap.micro,
                         snap.destino_fila,
                         snap.destino_columna,
-                        snap.destino_numero
+                        snap.destino_numero,
+                        snap.destino_piso
                     );
                 }
             }
