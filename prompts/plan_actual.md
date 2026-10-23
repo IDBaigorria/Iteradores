@@ -27,8 +27,8 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.82f (Tanda 2 del arco de
-migración de pasajeros entre micros: frontend. Ver §2 y §4.5).
+**Última actualización:** v1.5piloto.82h (fix del croquis
+multi-piso + selección por piso. Ver §2 y §4.5).
 
 **Antes (v1.5piloto.82d):** cierre del arco de cancelaciones en
 compartidos + bug §4.6 de persistencia silenciosa en hostings
@@ -95,6 +95,20 @@ temáticas y la persistencia de corridas en su propio grafo
 Resumen de 1-2 líneas por arco. El detalle completo vive en
 los prompts correspondientes o en los commits.
 
+- **Fix del croquis multi-piso (v1.5piloto.82h).** El croquis
+  y todas las acciones de asiento matcheaban por
+  `(fila, columna)` sin `piso`. En un micro con pisos que
+  comparten filas/columnas (ej. piso 1 filas 1-3, piso 2
+  filas 1-12), los asientos del piso 1 pisaban visualmente a
+  los del piso 2 en las mismas coordenadas. Fix: `piso` en
+  `obtener_estados_asientos_micro` y en todos los matcheos
+  del frontend + backend. Las 5 acciones de asiento y
+  `cambiar_asiento_pasaje` aceptan `?string $piso = null`
+  (o `piso_vieja`/`piso_nueva`) y matchean por
+  `(piso, fila, columna)` si viene. **Pendiente:** el flujo
+  de "cambiar de asiento desde la pestaña Clientes"
+  (`pasajeros.js`) no pasa `piso`; queda con el bug hasta
+  que se adapte.
 - **Migración de pasajeros entre micros — Tanda 1
   (v1.5piloto.82e).** Nueva función
   `migrar_pasajeros_de_micro` en `ViajeMicros.php` +

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.79h
+ * @version   1.5piloto.82h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -155,7 +155,7 @@ function _dni_asignado_en_viaje(string $nombre_dueno, string $nombre_viaje, stri
  * @param array  $datos_pasajero Datos opcionales del pasajero (mismo formato que en venta).
  * @return array
  */
-function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, array $datos_pasajero = [], ?Nodo $nodo_contexto = null): array {
+function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, array $datos_pasajero = [], ?Nodo $nodo_contexto = null, ?string $piso = null): array {
     // Fase B2.2.3 (v76t): contexto opcional.
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
@@ -176,9 +176,10 @@ function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, stri
     $nodo_asientos = $nodo_copia->adyacente('asientos');
     if ($nodo_asientos) {
         for ($i = 1; $i <= 2; $i++) {
-            $piso = $nodo_asientos->adyacente("piso_$i");
-            if (!$piso) continue;
-            $cabeza = $piso->adyacente('asientos');
+            if ($piso !== null && $piso !== '' && (string)$i !== (string)$piso) continue;
+            $nodo_piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$nodo_piso) continue;
+            $cabeza = $nodo_piso->adyacente('asientos');
             if (!$cabeza) continue;
             $actual = $cabeza->adyacente('primer');
             while ($actual && $actual->id() !== $cabeza->id()) {
@@ -276,7 +277,7 @@ function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, stri
  * @param array  $datos_pasajero
  * @return array
  */
-function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, array $datos_pasajero, ?Nodo $nodo_contexto = null): array {
+function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, array $datos_pasajero, ?Nodo $nodo_contexto = null, ?string $piso = null): array {
     // Fase B2.2.3 (v76t): contexto opcional.
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
@@ -297,9 +298,10 @@ function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, 
     $nodo_asientos = $nodo_copia->adyacente('asientos');
     if ($nodo_asientos) {
         for ($i = 1; $i <= 2; $i++) {
-            $piso = $nodo_asientos->adyacente("piso_$i");
-            if (!$piso) continue;
-            $cabeza = $piso->adyacente('asientos');
+            if ($piso !== null && $piso !== '' && (string)$i !== (string)$piso) continue;
+            $nodo_piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$nodo_piso) continue;
+            $cabeza = $nodo_piso->adyacente('asientos');
             if (!$cabeza) continue;
             $actual = $cabeza->adyacente('primer');
             while ($actual && $actual->id() !== $cabeza->id()) {
@@ -370,7 +372,7 @@ function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, 
  * A partir de v1.5piloto.38 también elimina el enlace `pasajero` si existía,
  * dejando el asiento limpio para un futuro uso.
  */
-function liberar_reserva_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, ?Nodo $nodo_contexto = null): array {
+function liberar_reserva_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, ?Nodo $nodo_contexto = null, ?string $piso = null): array {
     // Fase B2.2.3 (v76t): contexto opcional.
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
     if (!$nodo_viajes) return ['exito' => false, 'error' => 'Dueño no encontrado'];
@@ -391,9 +393,10 @@ function liberar_reserva_asiento_micro(string $nombre_viaje, string $nombre_micr
     $nodo_asientos = $nodo_copia->adyacente('asientos');
     if ($nodo_asientos) {
         for ($i = 1; $i <= 2; $i++) {
-            $piso = $nodo_asientos->adyacente("piso_$i");
-            if (!$piso) continue;
-            $cabeza = $piso->adyacente('asientos');
+            if ($piso !== null && $piso !== '' && (string)$i !== (string)$piso) continue;
+            $nodo_piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$nodo_piso) continue;
+            $cabeza = $nodo_piso->adyacente('asientos');
             if (!$cabeza) continue;
             $actual = $cabeza->adyacente('primer');
             while ($actual && $actual->id() !== $cabeza->id()) {
@@ -486,6 +489,10 @@ function obtener_estados_asientos_micro(string $nombre_viaje, string $nombre_mic
                 }
 
                 $asiento_info = [
+                    // Fix v1.5piloto.82h: piso. Necesario para
+                    // desambiguar asientos de pisos distintos con
+                    // la misma (fila, columna).
+                    'piso' => (string)$i,
                     'fila' => $fila ? $fila->dato() : '',
                     'columna' => $columna ? $columna->dato() : '',
                     'numero' => $actual->dato(),
@@ -550,7 +557,7 @@ function obtener_estados_asientos_micro(string $nombre_viaje, string $nombre_mic
 /**
  * Selecciona un asiento para una terminal.
  */
-function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, string $nombre_terminal): array {
+function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, string $nombre_terminal, ?string $piso = null): array {
     // Fase B2.2.3 (v76t): el terminal navega por su contexto
     // (hoy el nodo del dueño, tras B2.3 el compartido).
     $nodo_contexto = _contexto_terminal($nombre_terminal);
@@ -577,9 +584,10 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
     $nodo_asientos = $nodo_copia->adyacente('asientos');
     if ($nodo_asientos) {
         for ($i = 1; $i <= 2; $i++) {
-            $piso = $nodo_asientos->adyacente("piso_$i");
-            if (!$piso) continue;
-            $cabeza = $piso->adyacente('asientos');
+            if ($piso !== null && $piso !== '' && (string)$i !== (string)$piso) continue;
+            $nodo_piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$nodo_piso) continue;
+            $cabeza = $nodo_piso->adyacente('asientos');
             if (!$cabeza) continue;
             $actual = $cabeza->adyacente('primer');
             while ($actual && $actual->id() !== $cabeza->id()) {
@@ -712,7 +720,7 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
 /**
  * Deselecciona un asiento previamente seleccionado por la terminal.
  */
-function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, string $nombre_terminal): array {
+function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, string $fila, string $columna, string $nombre_dueno, string $nombre_terminal, ?string $piso = null): array {
     // Fase B2.2.3 (v76t): el terminal navega por su contexto.
     $nodo_contexto = _contexto_terminal($nombre_terminal);
     $nodo_viajes = obtener_contenedor_viajes_dueno($nombre_dueno, $nodo_contexto);
@@ -734,9 +742,10 @@ function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro,
     $nodo_asientos = $nodo_copia->adyacente('asientos');
     if ($nodo_asientos) {
         for ($i = 1; $i <= 2; $i++) {
-            $piso = $nodo_asientos->adyacente("piso_$i");
-            if (!$piso) continue;
-            $cabeza = $piso->adyacente('asientos');
+            if ($piso !== null && $piso !== '' && (string)$i !== (string)$piso) continue;
+            $nodo_piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$nodo_piso) continue;
+            $cabeza = $nodo_piso->adyacente('asientos');
             if (!$cabeza) continue;
             $actual = $cabeza->adyacente('primer');
             while ($actual && $actual->id() !== $cabeza->id()) {
@@ -869,7 +878,9 @@ function cambiar_asiento_pasaje(
     string $nombre_dueno,
     string $nombre_solicitante,
     bool $dejar_reservado_viejo = false,
-    ?Nodo $nodo_contexto = null
+    ?Nodo $nodo_contexto = null,
+    ?string $piso_vieja = null,
+    ?string $piso_nueva = null
 ): array {
     if ($nombre_viaje === '' || $nombre_micro === '' || $nombre_dueno === '' || $nombre_solicitante === '') {
         return ['exito' => false, 'error' => 'Parámetros incompletos'];
@@ -897,9 +908,10 @@ function cambiar_asiento_pasaje(
     $nodo_asientos = $nodo_copia->adyacente('asientos');
     if ($nodo_asientos) {
         for ($i = 1; $i <= 2; $i++) {
-            $piso = $nodo_asientos->adyacente("piso_$i");
-            if (!$piso) continue;
-            $cabeza = $piso->adyacente('asientos');
+            $piso_actual_num = (string)$i;
+            $nodo_piso = $nodo_asientos->adyacente("piso_$i");
+            if (!$nodo_piso) continue;
+            $cabeza = $nodo_piso->adyacente('asientos');
             if (!$cabeza) continue;
             $actual = $cabeza->adyacente('primer');
             $seg = 0;
@@ -907,8 +919,10 @@ function cambiar_asiento_pasaje(
                 $f = $actual->adyacente('fila');
                 $c = $actual->adyacente('columna');
                 if ($f && $c) {
-                    if ($f->dato() === $fila_vieja && $c->dato() === $columna_vieja) $nodo_asiento_viejo = $actual;
-                    if ($f->dato() === $fila_nueva && $c->dato() === $columna_nueva) $nodo_asiento_nuevo = $actual;
+                    $match_piso_viejo = ($piso_vieja === null || $piso_vieja === '' || $piso_actual_num === (string)$piso_vieja);
+                    $match_piso_nuevo = ($piso_nueva === null || $piso_nueva === '' || $piso_actual_num === (string)$piso_nueva);
+                    if ($match_piso_viejo && $f->dato() === $fila_vieja && $c->dato() === $columna_vieja) $nodo_asiento_viejo = $actual;
+                    if ($match_piso_nuevo && $f->dato() === $fila_nueva && $c->dato() === $columna_nueva) $nodo_asiento_nuevo = $actual;
                 }
                 $actual = $actual->adyacente('siguiente');
                 $seg++;

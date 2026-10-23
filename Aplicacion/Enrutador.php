@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.82e
+ * @version   1.5piloto.82h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -914,7 +914,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno) || empty($nombre_terminal)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = seleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal);
+                    $piso = $post['piso'] ?? null;
+                    $resultado = seleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal, $piso);
                     responder_json($resultado);
                     break;
 
@@ -928,7 +929,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if (empty($nombre_viaje) || empty($nombre_micro) || empty($fila) || empty($columna) || empty($nombre_dueno) || empty($nombre_terminal)) {
                         responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
                     }
-                    $resultado = deseleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal);
+                    $piso = $post['piso'] ?? null;
+                    $resultado = deseleccionar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nombre_terminal, $piso);
                     responder_json($resultado);
                     break;
 
@@ -964,7 +966,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     // Fase B2.3.5b.2: contexto del solicitante.
                     $nodo_contexto = _contexto_solicitante($nombre_solicitante);
-                    $resultado = reservar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $datos_pasajero, $nodo_contexto);
+                    $piso = $post['piso'] ?? null;
+                    $resultado = reservar_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $datos_pasajero, $nodo_contexto, $piso);
                     responder_json($resultado);
                     break;
                     
@@ -984,7 +987,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     // Fase B2.3.5b.2: contexto del solicitante.
                     $nodo_contexto = _contexto_solicitante($nombre_solicitante);
-                    $resultado = asignar_pasajero_a_reserva($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $datos_pasajero, $nodo_contexto);
+                    $piso = $post['piso'] ?? null;
+                    $resultado = asignar_pasajero_a_reserva($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $datos_pasajero, $nodo_contexto, $piso);
                     responder_json($resultado);
                     break;
 
@@ -999,7 +1003,8 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     // Fase B2.3.5b.2: contexto del solicitante.
                     $nodo_contexto = _contexto_solicitante($nombre_solicitante);
-                    $resultado = liberar_reserva_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nodo_contexto);
+                    $piso = $post['piso'] ?? null;
+                    $resultado = liberar_reserva_asiento_micro($nombre_viaje, $nombre_micro, $fila, $columna, $nombre_dueno, $nodo_contexto, $piso);
                     responder_json($resultado);
                     break;
 
@@ -1018,13 +1023,17 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     // Fase B2.3.5b.2: contexto del solicitante.
                     $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $piso_vieja = $post['piso_vieja'] ?? null;
+                    $piso_nueva = $post['piso_nueva'] ?? null;
                     $resultado = cambiar_asiento_pasaje(
                         $nombre_viaje, $nombre_micro,
                         $fila_vieja, $columna_vieja,
                         $fila_nueva, $columna_nueva,
                         $nombre_dueno, $nombre_solicitante,
                         $dejar_reservado_viejo,
-                        $nodo_contexto
+                        $nodo_contexto,
+                        $piso_vieja,
+                        $piso_nueva
                     );
                     responder_json($resultado);
                     break;

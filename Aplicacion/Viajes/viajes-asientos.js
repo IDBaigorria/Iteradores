@@ -1,6 +1,6 @@
 /***
  * Asientos y pasaje del micro.
- * @version 1.5piloto.79e
+ * @version 1.5piloto.82h
  */
 
 // Modo actual del panel #info_asiento_viaje.
@@ -18,6 +18,22 @@ function obtener_dueno_viaje_seleccionado() {
         return viaje_seleccionado.dueno;
     }
     return obtener_nombre_dueno_actual();
+}
+
+/**
+ * Busca un asiento en un array de estados por (piso, fila, columna).
+ * Si `piso` viene vacío o undefined, cae a (fila, columna) —
+ * comportamiento anterior (compatibilidad con flujos viejos).
+ *
+ * Fix v1.5piloto.82h: un micro con pisos distintos puede tener
+ * asientos con la misma (fila, columna) en pisos distintos. Sin
+ * piso, el .find() matchea el del primer piso.
+ */
+function _buscar_asiento_en_estados(estados, piso, fila, columna) {
+    if (piso !== null && piso !== undefined && piso !== '') {
+        return estados.find(e => String(e.piso) === String(piso) && e.fila === fila && e.columna === columna);
+    }
+    return estados.find(e => e.fila === fila && e.columna === columna);
 }
 
 /**
@@ -137,9 +153,10 @@ function ocultar_cartel_inactividad() {
 function actualizar_colores_asientos(estados) {
     const asientosDOM = document.querySelectorAll('#croquis_pasaje_micro .seat');
     asientosDOM.forEach(seat => {
+        const piso = seat.dataset.piso;
         const fila = seat.dataset.fila;
         const columna = seat.dataset.columna;
-        const estadoObj = estados.find(e => e.fila === fila && e.columna === columna);
+        const estadoObj = _buscar_asiento_en_estados(estados, piso, fila, columna);
         if (estadoObj) {
             seat.classList.remove('seat-libre', 'seat-seleccionado', 'seat-seleccionado-propio', 'seat-vendido', 'seat-no-disponible', 'seat-reservado');
             if (estadoObj.estado === 'seleccionado') {
@@ -161,7 +178,7 @@ function actualizar_colores_asientos(estados) {
     mostrar_boton_confirmar_venta();
 }
 
-async function seleccionar_asiento_pasaje(fila, columna) {
+async function seleccionar_asiento_pasaje(piso, fila, columna) {
     if (!micro_seleccionado || !viaje_seleccionado) return;
     if (operacion_asiento_en_curso) return;
 
@@ -181,6 +198,7 @@ async function seleccionar_asiento_pasaje(fila, columna) {
                 accion: "viajes/seleccionar_asiento",
                 nombre_viaje: viaje_seleccionado.nombre_viaje,
                 nombre_micro: nombre_micro,
+                piso: (piso !== null && piso !== undefined) ? String(piso) : '',
                 fila,
                 columna,
                 nombre_dueno,
@@ -190,7 +208,7 @@ async function seleccionar_asiento_pasaje(fila, columna) {
         const resultado = await respuesta.json();
 
         if (resultado.exito) {
-            const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            const asiento = _buscar_asiento_en_estados(estados_asientos_actuales, piso, fila, columna);
             if (asiento) {
                 asiento.estado = 'seleccionado';
                 asiento.seleccionado_por = nombre_terminal;
@@ -199,7 +217,7 @@ async function seleccionar_asiento_pasaje(fila, columna) {
             refrescar_info_asientos_propios(true);
             mostrar_aviso("Asiento seleccionado", 'exito');
         } else {
-            const estado_actual = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            const estado_actual = _buscar_asiento_en_estados(estados_asientos_actuales, piso, fila, columna);
             if (estado_actual && estado_actual.estado === 'seleccionado' && estado_actual.seleccionado_por === nombre_terminal) {
                 mostrar_aviso("Asiento seleccionado", 'exito');
             } else {
@@ -219,7 +237,7 @@ async function seleccionar_asiento_pasaje(fila, columna) {
     }
 }
 
-async function deseleccionar_asiento_pasaje(fila, columna) {
+async function deseleccionar_asiento_pasaje(piso, fila, columna) {
     if (!micro_seleccionado || !viaje_seleccionado) return;
     if (operacion_asiento_en_curso) return;
     if (_venta_en_curso()) {
@@ -243,6 +261,7 @@ async function deseleccionar_asiento_pasaje(fila, columna) {
                 accion: "viajes/deseleccionar_asiento",
                 nombre_viaje: viaje_seleccionado.nombre_viaje,
                 nombre_micro: nombre_micro,
+                piso: (piso !== null && piso !== undefined) ? String(piso) : '',
                 fila,
                 columna,
                 nombre_dueno,
@@ -252,7 +271,7 @@ async function deseleccionar_asiento_pasaje(fila, columna) {
         const resultado = await respuesta.json();
 
         if (resultado.exito) {
-            const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            const asiento = _buscar_asiento_en_estados(estados_asientos_actuales, piso, fila, columna);
             if (asiento) {
                 asiento.estado = 'libre';
                 asiento.seleccionado_por = null;
@@ -326,6 +345,7 @@ async function _deseleccionar_todos_los_propios_interno() {
                         accion: "viajes/deseleccionar_asiento",
                         nombre_viaje: viaje_seleccionado.nombre_viaje,
                         nombre_micro: nombre_micro,
+                        piso: asiento.piso || '',
                         fila: asiento.fila,
                         columna: asiento.columna,
                         nombre_dueno: nombre_dueno,
@@ -345,6 +365,7 @@ async function _deseleccionar_todos_los_propios_interno() {
                         accion: "viajes/liberar_reserva_asiento",
                         nombre_viaje: viaje_seleccionado.nombre_viaje,
                         nombre_micro: nombre_micro,
+                        piso: asiento.piso || '',
                         fila: asiento.fila,
                         columna: asiento.columna,
                         nombre_dueno: nombre_dueno
@@ -439,25 +460,26 @@ function construir_html_tarjeta_asiento(asiento) {
     // siguen activos.
     const bloqueo_venta = _venta_en_curso() ? ' disabled' : '';
 
+    const piso_attr = ` data-piso="${asiento.piso || ''}"`;
     if (es_dueno_o_admin && asiento.estado === 'libre') {
-        botones.push(`<button class="btn primary btn-reservar-asiento"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}">Reservar para equipo</button>`);
+        botones.push(`<button class="btn primary btn-reservar-asiento"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}"${piso_attr}>Reservar para equipo</button>`);
     }
 
     if (es_terminal && es_propio) {
-        botones.push(`<button class="btn danger btn-liberar-seleccion"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}">Liberar</button>`);
+        botones.push(`<button class="btn danger btn-liberar-seleccion"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}"${piso_attr}>Liberar</button>`);
     }
 
     if (es_dueno_o_admin && asiento.estado === 'reservado' && !asiento.tiene_pasajero) {
-        botones.push(`<button class="btn primary btn-asignar-pasajero"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}">Asignar pasajero</button>`);
+        botones.push(`<button class="btn primary btn-asignar-pasajero"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}"${piso_attr}>Asignar pasajero</button>`);
     }
 
     if (es_dueno_o_admin && asiento.estado === 'reservado') {
-        botones.push(`<button class="btn danger btn-liberar-reserva"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}">Liberar reserva</button>`);
+        botones.push(`<button class="btn danger btn-liberar-reserva"${bloqueo_venta} data-fila="${asiento.fila}" data-columna="${asiento.columna}"${piso_attr}>Liberar reserva</button>`);
     }
 
     // Ver pasaje: disponible en reservado con pasajero o vendido
     if ((asiento.estado === 'reservado' && asiento.tiene_pasajero) || asiento.estado === 'vendido') {
-        botones.push(`<button class="btn btn-ver-pasaje-asiento" data-fila="${asiento.fila}" data-columna="${asiento.columna}">Ver pasaje</button>`);
+        botones.push(`<button class="btn btn-ver-pasaje-asiento" data-fila="${asiento.fila}" data-columna="${asiento.columna}"${piso_attr}>Ver pasaje</button>`);
     }
 
     // Ver compra: dueño y admin lo ven siempre; la terminal solo si ella
@@ -507,19 +529,19 @@ function renderizar_tarjetas_asientos(asientos, titulo, modo) {
 
     // Listeners de botones
     panel.querySelectorAll('.btn-reservar-asiento').forEach(btn => {
-        btn.addEventListener('click', () => abrir_modal_reservar_asiento(btn.dataset.fila, btn.dataset.columna));
+        btn.addEventListener('click', () => abrir_modal_reservar_asiento(btn.dataset.piso, btn.dataset.fila, btn.dataset.columna));
     });
     panel.querySelectorAll('.btn-liberar-seleccion').forEach(btn => {
-        btn.addEventListener('click', () => deseleccionar_asiento_pasaje(btn.dataset.fila, btn.dataset.columna));
+        btn.addEventListener('click', () => deseleccionar_asiento_pasaje(btn.dataset.piso, btn.dataset.fila, btn.dataset.columna));
     });
     panel.querySelectorAll('.btn-asignar-pasajero').forEach(btn => {
-        btn.addEventListener('click', () => abrir_modal_asignar_pasajero(btn.dataset.fila, btn.dataset.columna));
+        btn.addEventListener('click', () => abrir_modal_asignar_pasajero(btn.dataset.piso, btn.dataset.fila, btn.dataset.columna));
     });
     panel.querySelectorAll('.btn-liberar-reserva').forEach(btn => {
-        btn.addEventListener('click', () => liberar_reserva_equipo(btn.dataset.fila, btn.dataset.columna));
+        btn.addEventListener('click', () => liberar_reserva_equipo(btn.dataset.piso, btn.dataset.fila, btn.dataset.columna));
     });
     panel.querySelectorAll('.btn-ver-pasaje-asiento').forEach(btn => {
-        btn.addEventListener('click', () => ver_pasaje_asiento(btn.dataset.fila, btn.dataset.columna));
+        btn.addEventListener('click', () => ver_pasaje_asiento(btn.dataset.piso, btn.dataset.fila, btn.dataset.columna));
     });
     panel.querySelectorAll('.btn-ver-compra-asiento').forEach(btn => {
         btn.addEventListener('click', () => ver_compra_asiento(btn.dataset.ventaId));
@@ -569,12 +591,12 @@ function mostrar_info_asiento(asiento) {
  * Abre el modal de reserva de un asiento libre para dueño/admin.
  * Incluye un checkbox para asignar los datos del pasajero en el mismo paso.
  */
-function abrir_modal_reservar_asiento(fila, columna) {
+function abrir_modal_reservar_asiento(piso, fila, columna) {
     if (_venta_en_curso()) {
         mostrar_aviso('Hay una venta en curso. Termínala o cancelala antes de reservar un asiento.', 'error');
         return;
     }
-    const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+    const asiento = _buscar_asiento_en_estados(estados_asientos_actuales, piso, fila, columna);
     if (!asiento) {
         mostrar_aviso("Asiento no encontrado", 'error');
         return;
@@ -632,6 +654,7 @@ function abrir_modal_reservar_asiento(fila, columna) {
             accion: "viajes/reservar_asiento",
             nombre_viaje: viaje_seleccionado.nombre_viaje,
             nombre_micro: micro_seleccionado,
+            piso: (piso !== null && piso !== undefined) ? String(piso) : '',
             fila,
             columna,
             nombre_dueno
@@ -686,12 +709,12 @@ function abrir_modal_reservar_asiento(fila, columna) {
  *  - Tras el éxito, se vuelva al detalle del viaje y se muestre el modal
  *    chico de impresión por encima.
  */
-function abrir_modal_asignar_pasajero(fila, columna) {
+function abrir_modal_asignar_pasajero(piso, fila, columna) {
     if (_venta_en_curso()) {
         mostrar_aviso('Hay una venta en curso. Termínala o cancelala antes de asignar un pasajero.', 'error');
         return;
     }
-    const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+    const asiento = _buscar_asiento_en_estados(estados_asientos_actuales, piso, fila, columna);
     if (!asiento) {
         mostrar_aviso("Asiento no encontrado", 'error');
         return;
@@ -742,6 +765,7 @@ function abrir_modal_asignar_pasajero(fila, columna) {
                 accion: "viajes/asignar_pasajero_reserva",
                 nombre_viaje: nombre_viaje_asig,
                 nombre_micro: nombre_micro_asig,
+                piso: (piso !== null && piso !== undefined) ? String(piso) : '',
                 fila,
                 columna,
                 nombre_dueno,
@@ -778,8 +802,8 @@ function abrir_modal_asignar_pasajero(fila, columna) {
  * Muestra el modal con los datos del pasajero de un asiento (reservado con
  * pasajero o vendido). No muestra ficha de salud ni opción de imprimir.
  */
-function ver_pasaje_asiento(fila, columna) {
-    const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+function ver_pasaje_asiento(piso, fila, columna) {
+    const asiento = _buscar_asiento_en_estados(estados_asientos_actuales, piso, fila, columna);
     if (!asiento) {
         mostrar_aviso("Asiento no encontrado", 'error');
         return;
@@ -873,7 +897,7 @@ function ver_pasaje_asiento(fila, columna) {
     const btnCambiar = document.getElementById('btn_cambiar_asiento_pasaje');
     if (btnCambiar) {
         btnCambiar.addEventListener('click', () => {
-            abrir_modal_cambiar_asiento(nd, nv, nm, fila, columna);
+            abrir_modal_cambiar_asiento(nd, nv, nm, fila, columna, null, piso);
         });
     }
 
@@ -945,7 +969,7 @@ function mostrar_modal_chico_impresion_reserva(nombre_dueno, nombre_viaje, nombr
  * Liberar reserva de un asiento. Si tiene pasajero asignado, avisa que
  * se va a perder la asignación antes de continuar.
  */
-async function liberar_reserva_equipo(fila, columna) {
+async function liberar_reserva_equipo(piso, fila, columna) {
     if (!micro_seleccionado || !viaje_seleccionado) return;
     if (operacion_asiento_en_curso) return;
     if (_venta_en_curso()) {
@@ -953,7 +977,7 @@ async function liberar_reserva_equipo(fila, columna) {
         return;
     }
 
-    const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+    const asiento = _buscar_asiento_en_estados(estados_asientos_actuales, piso, fila, columna);
     if (!asiento) {
         mostrar_aviso("Asiento no encontrado", 'error');
         return;
@@ -978,6 +1002,7 @@ async function liberar_reserva_equipo(fila, columna) {
                 accion: "viajes/liberar_reserva_asiento",
                 nombre_viaje: viaje_seleccionado.nombre_viaje,
                 nombre_micro: nombre_micro,
+                piso: (piso !== null && piso !== undefined) ? String(piso) : '',
                 fila,
                 columna,
                 nombre_dueno
@@ -986,7 +1011,7 @@ async function liberar_reserva_equipo(fila, columna) {
         const resultado = await respuesta.json();
         if (resultado.exito) {
             mostrar_aviso("Reserva liberada correctamente", 'exito');
-            const asientoLocal = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            const asientoLocal = _buscar_asiento_en_estados(estados_asientos_actuales, piso, fila, columna);
             if (asientoLocal) {
                 asientoLocal.estado = 'libre';
                 asientoLocal.reservado_por = null;
@@ -1016,7 +1041,7 @@ async function liberar_reserva_equipo(fila, columna) {
  * mantiene por compatibilidad interna por si se usa programáticamente.
  * El flujo interactivo ahora pasa por abrir_modal_reservar_asiento.
  */
-async function reservar_asiento_equipo(fila, columna) {
+async function reservar_asiento_equipo(piso, fila, columna) {
     if (!micro_seleccionado || !viaje_seleccionado) return;
     if (operacion_asiento_en_curso) return;
     operacion_asiento_en_curso = true;
@@ -1032,6 +1057,7 @@ async function reservar_asiento_equipo(fila, columna) {
                 accion: "viajes/reservar_asiento",
                 nombre_viaje: viaje_seleccionado.nombre_viaje,
                 nombre_micro: nombre_micro,
+                piso: (piso !== null && piso !== undefined) ? String(piso) : '',
                 fila,
                 columna,
                 nombre_dueno
@@ -1040,7 +1066,7 @@ async function reservar_asiento_equipo(fila, columna) {
         const resultado = await respuesta.json();
         if (resultado.exito) {
             mostrar_aviso("Asiento reservado para el equipo", 'exito');
-            const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            const asiento = _buscar_asiento_en_estados(estados_asientos_actuales, piso, fila, columna);
             if (asiento) {
                 asiento.estado = 'reservado';
                 asiento.reservado_por = nombre_dueno;
@@ -1105,6 +1131,7 @@ function renderizar_pasaje_micro(micro) {
                         const seat = document.createElement('div');
                         seat.className = `seat seat-${asiento.estado}`;
                         seat.textContent = String(asiento.numero).padStart(2, '0');
+                        seat.dataset.piso = String(index + 1);
                         seat.dataset.fila = asiento.fila;
                         seat.dataset.columna = asiento.columna;
                         seat.dataset.numero = asiento.numero;
@@ -1127,9 +1154,10 @@ function renderizar_pasaje_micro(micro) {
             if (venta_form_abierto || operacion_asiento_en_curso) return;
             const seat = event.target.closest('.seat');
             if (!seat) return;
+            const piso = seat.dataset.piso;
             const fila = seat.dataset.fila;
             const columna = seat.dataset.columna;
-            const asiento = estados_asientos_actuales.find(e => e.fila === fila && e.columna === columna);
+            const asiento = _buscar_asiento_en_estados(estados_asientos_actuales, piso, fila, columna);
             if (!asiento) return;
 
             const es_terminal = usuario_actual.nivel === 'terminal';
@@ -1151,9 +1179,9 @@ function renderizar_pasaje_micro(micro) {
                     return;
                 }
                 if (asiento.estado === 'libre') {
-                    seleccionar_asiento_pasaje(fila, columna);
+                    seleccionar_asiento_pasaje(piso, fila, columna);
                 } else if (asiento.estado === 'seleccionado' && asiento.seleccionado_por === usuario_actual.nombre_usuario) {
-                    deseleccionar_asiento_pasaje(fila, columna);
+                    deseleccionar_asiento_pasaje(piso, fila, columna);
                 }
             }
         };
@@ -1377,7 +1405,7 @@ function _es_destino_valido(a, estado_origen, es_terminal) {
  * @param {string} fila_origen
  * @param {string} columna_origen
  */
-async function abrir_modal_cambiar_asiento(nombre_dueno, nombre_viaje, nombre_micro, fila_origen, columna_origen, on_exito) {
+async function abrir_modal_cambiar_asiento(nombre_dueno, nombre_viaje, nombre_micro, fila_origen, columna_origen, on_exito, piso_origen = null) {
     if (_venta_en_curso()) {
         mostrar_aviso('Hay una venta en curso. Termínala o cancelala antes de cambiar un asiento.', 'error');
         return;
@@ -1433,7 +1461,7 @@ async function abrir_modal_cambiar_asiento(nombre_dueno, nombre_viaje, nombre_mi
         return;
     }
 
-    const origen = estados.find(a => String(a.fila) === String(fila_origen) && String(a.columna) === String(columna_origen));
+    const origen = _buscar_asiento_en_estados(estados, piso_origen, String(fila_origen), String(columna_origen));
     if (!origen) {
         mostrar_aviso('No se encontró el asiento actual', 'error');
         return;
@@ -1450,6 +1478,7 @@ async function abrir_modal_cambiar_asiento(nombre_dueno, nombre_viaje, nombre_mi
         dueno: nombre_dueno,
         viaje: nombre_viaje,
         micro: nombre_micro,
+        origen_piso: (piso_origen !== null && piso_origen !== undefined) ? String(piso_origen) : '',
         origen_fila: String(fila_origen),
         origen_columna: String(columna_origen),
         origen_numero: origen.numero,
@@ -1478,16 +1507,17 @@ async function abrir_modal_cambiar_asiento(nombre_dueno, nombre_viaje, nombre_mi
                 for (let c = 1; c <= piso.columnas; c++) {
                     const a = piso.asientos.find(x => parseInt(x.fila) === f && parseInt(x.columna) === c);
                     if (a) {
-                        const a_estado = estados.find(e => String(e.fila) === String(a.fila) && String(e.columna) === String(a.columna));
+                        const piso_num = String(index + 1);
+                        const a_estado = _buscar_asiento_en_estados(estados, piso_num, String(a.fila), String(a.columna));
                         const a_estado_str = a_estado ? a_estado.estado : 'libre';
                         const a_tiene_pas = a_estado ? (a_estado.tiene_pasajero === true) : false;
-                        const es_origen = (String(a.fila) === String(fila_origen) && String(a.columna) === String(columna_origen));
+                        const es_origen = (String(a.fila) === String(fila_origen) && String(a.columna) === String(columna_origen) && (piso_origen === null || piso_origen === undefined || piso_origen === '' || String(piso_origen) === piso_num));
                         const valido = !es_origen && _es_destino_valido({ estado: a_estado_str, tiene_pasajero: a_tiene_pas }, origen.estado, es_terminal);
                         const clases = ['seat', `seat-${a_estado_str}`];
                         if (es_origen) clases.push('seat-origen');
                         if (!valido && !es_origen) clases.push('seat-deshabilitado');
                         if (valido) clases.push('seat-elegible');
-                        croquis_html += `<div class="${clases.join(' ')}" data-fila="${a.fila}" data-columna="${a.columna}" data-numero="${a.numero}" data-valido="${valido ? '1' : '0'}" data-origen="${es_origen ? '1' : '0'}">${String(a.numero).padStart(2, '0')}</div>`;
+                        croquis_html += `<div class="${clases.join(' ')}" data-piso="${piso_num}" data-fila="${a.fila}" data-columna="${a.columna}" data-numero="${a.numero}" data-valido="${valido ? '1' : '0'}" data-origen="${es_origen ? '1' : '0'}">${String(a.numero).padStart(2, '0')}</div>`;
                     } else {
                         croquis_html += '<div class="aisle"></div>';
                     }
@@ -1539,6 +1569,7 @@ async function abrir_modal_cambiar_asiento(nombre_dueno, nombre_viaje, nombre_mi
             seat.classList.add('seat-elegido');
             if (cambiar_asiento_datos_modal) {
                 cambiar_asiento_datos_modal.destino = {
+                    piso: seat.dataset.piso || '',
                     fila: seat.dataset.fila,
                     columna: seat.dataset.columna,
                     numero: seat.dataset.numero
@@ -1585,6 +1616,8 @@ async function _confirmar_cambiar_asiento() {
                 accion: "viajes/cambiar_asiento",
                 nombre_viaje: d.viaje,
                 nombre_micro: d.micro,
+                piso_vieja: d.origen_piso || '',
+                piso_nueva: d.destino.piso || '',
                 fila_vieja: d.origen_fila,
                 columna_vieja: d.origen_columna,
                 fila_nueva: d.destino.fila,
