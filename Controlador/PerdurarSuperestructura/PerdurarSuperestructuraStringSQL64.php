@@ -13,62 +13,15 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStrin
 /**
  * Persistencia SQL con soporte de contextos (hasta 64).
  *
- * Hereda de PerdurarSuperestructuraStringSQL. Usa tres
- * tablas nuevas (nodo_contexto, adyacente_contexto,
- * contexto) y deja las tablas nodo/adyacente intactas, así
- * los dos métodos (SQL y SQL64) coexisten sin pisarse.
- *
- * Los contextos son los IDs especiales del grafo. Cada
- * nodo lleva un entero `contexto_mascara` con los bits de
- * sus contextos alcanzantes.
- *
- * ## Esquema (v1.5i.8a)
- *
- * `nodo_contexto` identifica cada nodo por `id_fila`
- * (auto-increment, estable entre requests). La columna
- * `id_especial` guarda el ID especial del framework cuando
- * el nodo lo tiene (NULL para los numéricos, que son
- * efímeros).
- *
- * `adyacente_contexto` referencia sus dos extremos por
- * `idnodo_fila` / `idadyacente_fila`, no por los IDs del
- * framework. Así el guardado parcial puede borrar
- * quirúrgicamente las filas del subgrafo cargado sin tocar
- * las de otros subgrafos.
- *
- * ## Mapa en memoria
- *
- * `$_mapa_id_a_fila[$nombre][$id_nodo_framework] = $id_fila`
- * se llena al cargar y se consulta al guardar parcial.
- * Resuelve el problema de los IDs numéricos efímeros:
- * aunque el framework cambie el ID de un nodo entre
- * cargas, la fila de la DB es siempre la misma.
- *
- * ## Estrategia de guardado
- *
- * En los dos modos (total y parcial) se pisa con DELETE
- * primero. Por eso NUNCA se hace UPDATE: siempre INSERT.
- * Los nodos que ya tenían `id_fila` (están en el mapa) se
- * insertan con ese `id_fila` explícito, para preservar la
- * identidad. Los nuevos van con auto-increment.
+ * v1.5piloto.82d: sin CREATE TEMPORARY TABLE. InfinityFree
+ * no permite ese privilegio. Se usa IN (...) directo.
  *
  * @author Ignacio David Baigorria
- * @version 1.5i.8c
+ * @version 1.5piloto.82d
  * @since 1.5i.7k
  */
 class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQL implements PerdurarSuperestructuraConContexto {
 
-    /**
-     * Mapa [idsuperestructura => [id_nodo_framework => id_fila]].
-     *
-     * Los IDs numéricos del framework son efímeros: cambian
-     * entre cargas. Los `id_fila` de la tabla son estables.
-     * Este mapa los relaciona dentro de una misma request: se
-     * llena al cargar y se consulta al guardar parcial.
-     *
-     * @var array<string, array<string, int>>
-     * @since 1.5i.8a
-     */
     protected static array $_mapa_id_a_fila = [];
 
     protected static function crear_tablas_sql($sql) {
@@ -116,28 +69,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         return self::_guardar_con_filtro($nombre, 0);
     }
 
-    /**
-     * Implementación común de guardar y guardar_parcial.
-     *
-     * Con $mascara_filtro === 0 reemplaza toda la
-     * superestructura (comportamiento de guardar).
-     *
-     * Con $mascara_filtro !== 0 hace un guardado quirúrgico
-     * usando $_mapa_id_a_fila:
-     *   - DELETE de aristas: solo las que tienen sus DOS
-     *     extremos entre las filas cargadas.
-     *   - DELETE de nodos: solo las filas cargadas.
-     *   - INSERT de nodos: con id_fila explícito si estaban
-     *     en el mapa, auto si son nuevos.
-     *   - INSERT de aristas: solo entre nodos cargados.
-     *
-     * @param string $nombre
-     * @param int    $mascara_filtro 0 = guardar todo.
-     * @return bool
-     * @since 1.5i.7o
-     * @version 1.5i.8b
-     */
-    static private function _guardar_con_filtro($nombre, int $mascara_filtro) {
+    static private function _guardar_con_filtro($nombre, int $mascara_filtro, array $contextos = []) {
         if (!Nodo::hay_nodos_en_superestructura()) {
             self::_error("SQL64::guardar: no hay nodos.");
             return false;
@@ -148,16 +80,33 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             return false;
         }
 
+        if ($mascara_filtro === -1) {
+            $bits_registrados = self::_cargar_contextos_registrados($sql, $nombre);
+            if ($bits_registrados === null) {
+                static::_liberar_conexion_sql($sql);
+                return false;
+            }
+            $mascara_calculada = 0;
+            foreach ($contextos as $ctx) {
+                $ctx_str = (string)$ctx;
+                if (!isset($bits_registrados[$ctx_str])) {
+                    self::_error("SQL64::guardar_parcial: contexto '" . $ctx_str . "' no registrado en '" . $nombre . "'.");
+                    static::_liberar_conexion_sql($sql);
+                    return false;
+                }
+                $mascara_calculada |= (1 << (int)$bits_registrados[$ctx_str]);
+            }
+            $mascara_filtro = $mascara_calculada;
+        }
+
         $mf_parcial = (int)$mascara_filtro;
 
         $mascaras = self::_calcular_y_registrar_contextos($sql, $nombre);
         if ($mascaras === null) {
-            $sql->close();
+            static::_liberar_conexion_sql($sql);
             return false;
         }
 
-        // Con filtro, unir las máscaras del BFS con las que el
-        // nodo ya tenía en memoria (fijadas al cargar).
         if ($mf_parcial !== 0) {
             Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use (&$mascaras) {
                 $id = $nodo->id();
@@ -167,34 +116,13 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             });
         }
 
-        // Snapshot del mapa actual (IDs del framework -> id_fila).
-        // Los que están acá fueron cargados de la DB. Los que no
-        // fueron creados durante esta request.
         $mapa_previo = self::$_mapa_id_a_fila[$nombre] ?? [];
 
-        // Propagar máscaras a nodos nuevos (los que no están en
-        // el mapa previo, o sea que no vinieron de la DB) a
-        // partir de sus enlaces entrantes desde nodos ya
-        // cargados o ya propagados.
-        //
-        // Un nodo nuevo no tiene `m_previa`, pero hereda la
-        // unión de las máscaras de sus vecinos. Iterar hasta
-        // punto fijo para propagar por cadenas de nodos nuevos.
-        // En la práctica son pocas iteraciones (profundidad del
-        // subárbol nuevo). Fix v1.5i.8c.
-        //
-        // Limitación conocida: si un nodo nuevo se enlaza solo
-        // desde nodos que están en la DB pero no en memoria
-        // del guardador, no hay fuente para propagar. En la
-        // práctica no pasa: el que crea un nodo siempre tiene
-        // a su padre en memoria.
         if ($mf_parcial !== 0 && !empty($mapa_previo)) {
             $nuevos = [];
             Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use (&$nuevos, $mapa_previo) {
                 $id = $nodo->id();
-                if (!isset($mapa_previo[$id])) {
-                    $nuevos[$id] = true;
-                }
+                if (!isset($mapa_previo[$id])) { $nuevos[$id] = true; }
             });
             if (!empty($nuevos)) {
                 $cambio = true;
@@ -213,10 +141,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                             if (!isset($nuevos[$id_dest])) continue;
                             $m_dest = (int)($mascaras[$id_dest] ?? 0);
                             $m_nueva = $m_dest | $m_origen;
-                            if ($m_nueva !== $m_dest) {
-                                $mascaras[$id_dest] = $m_nueva;
-                                $cambio = true;
-                            }
+                            if ($m_nueva !== $m_dest) { $mascaras[$id_dest] = $m_nueva; $cambio = true; }
                         }
                     });
                 }
@@ -234,54 +159,35 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             $mf = (int)$mascara_filtro;
 
             if ($mf === 0) {
-                // Guardado total: reemplaza todo.
                 if (!$sql->query("DELETE FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "';")) {
                     throw new \RuntimeException("SQL64::guardar: fallo DELETE adyacente_contexto: " . $sql->error);
                 }
                 if (!$sql->query("DELETE FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "';")) {
                     throw new \RuntimeException("SQL64::guardar: fallo DELETE nodo_contexto: " . $sql->error);
                 }
-                // Los id_fila viejos ya no sirven: el próximo
-                // INSERT va a generar ids nuevos por auto-increment.
                 self::$_mapa_id_a_fila[$nombre] = [];
                 $mapa_previo = [];
             } elseif (!empty($filas_cargadas)) {
-                // Guardado parcial: solo las filas cargadas.
-                if (!$sql->query("CREATE TEMPORARY TABLE IF NOT EXISTS _sql64_filas (id BIGINT UNSIGNED PRIMARY KEY) ENGINE=MEMORY")) {
-                    throw new \RuntimeException("SQL64::guardar: fallo CREATE TEMPORARY TABLE: " . $sql->error);
-                }
-                if (!$sql->query("DELETE FROM _sql64_filas")) {
-                    throw new \RuntimeException("SQL64::guardar: fallo limpiar TEMPORARY TABLE: " . $sql->error);
-                }
-                foreach (array_chunk($filas_cargadas, 500) as $chunk) {
-                    $values = [];
-                    foreach ($chunk as $fid) {
-                        $values[] = "(" . (int)$fid . ")";
-                    }
-                    if (!$sql->query("INSERT INTO _sql64_filas (id) VALUES " . implode(",", $values) . ";")) {
-                        throw new \RuntimeException("SQL64::guardar: fallo INSERT TEMPORARY TABLE: " . $sql->error);
-                    }
-                }
+                // Fix 1.5piloto.82d: sin CREATE TEMPORARY TABLE.
+                // InfinityFree no permite ese privilegio. Usamos
+                // IN (...) directo con todos los ids. El grafo
+                // típico tiene 1000-2000 nodos, ~20KB de IDs.
+                // Cabe en max_allowed_packet (10MB).
+                $ids_in = implode(",", array_map("intval", $filas_cargadas));
 
                 $q_del_ady = "DELETE FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
-                           . " AND idnodo_fila IN (SELECT id FROM _sql64_filas)"
-                           . " AND idadyacente_fila IN (SELECT id FROM _sql64_filas);";
+                           . " AND idnodo_fila IN (" . $ids_in . ")"
+                           . " AND idadyacente_fila IN (" . $ids_in . ");";
                 if (!$sql->query($q_del_ady)) {
                     throw new \RuntimeException("SQL64::guardar: fallo DELETE adyacente_contexto: " . $sql->error);
                 }
                 $q_del_nod = "DELETE FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
-                           . " AND id_fila IN (SELECT id FROM _sql64_filas);";
+                           . " AND id_fila IN (" . $ids_in . ");";
                 if (!$sql->query($q_del_nod)) {
                     throw new \RuntimeException("SQL64::guardar: fallo DELETE nodo_contexto: " . $sql->error);
                 }
-
-                $sql->query("DROP TEMPORARY TABLE IF EXISTS _sql64_filas");
             }
 
-            // INSERT de nodos: uno por uno, para capturar
-            // insert_id() sin ambigüedad. Si el nodo estaba en
-            // el mapa previo, se inserta con su id_fila
-            // explícito (preserva identidad). Si no, auto.
             $ids_a_insertar = [];
             Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras, $mf, &$ids_a_insertar) {
                 $id = $nodo->id();
@@ -299,14 +205,11 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                 $dato_escapado = is_null($dato) ? "" : $sql->real_escape_string((string)$dato);
                 $id_especial = Nodo::es_id_especial($id_nodo) ? $sql->real_escape_string((string)$id_nodo) : null;
                 $id_especial_sql = is_null($id_especial) ? "NULL" : "'" . $id_especial . "'";
-
                 if (isset($mapa_previo[$id_nodo])) {
-                    // Reinsertar con el id_fila original.
                     $id_fila = (int)$mapa_previo[$id_nodo];
                     $q = "INSERT INTO nodo_contexto (id_fila, idsuperestructura, id_especial, dato, contexto_mascara) VALUES ("
                        . $id_fila . ", '" . $nombre_escapado . "', " . $id_especial_sql . ", '" . $dato_escapado . "', " . $mascara . ");";
                 } else {
-                    // Nodo nuevo: auto-increment.
                     $q = "INSERT INTO nodo_contexto (idsuperestructura, id_especial, dato, contexto_mascara) VALUES ("
                        . "'" . $nombre_escapado . "', " . $id_especial_sql . ", '" . $dato_escapado . "', " . $mascara . ");";
                 }
@@ -314,15 +217,12 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                     throw new \RuntimeException("SQL64::guardar: fallo INSERT nodo_contexto: " . $sql->error);
                 }
                 if (!isset($mapa_previo[$id_nodo])) {
-                    $nuevo_id_fila = (int)$sql->insert_id;
-                    self::$_mapa_id_a_fila[$nombre][$id_nodo] = $nuevo_id_fila;
+                    self::$_mapa_id_a_fila[$nombre][$id_nodo] = (int)$sql->insert_id;
                 } else {
                     self::$_mapa_id_a_fila[$nombre][$id_nodo] = $mapa_previo[$id_nodo];
                 }
             }
 
-            // INSERT de aristas: solo entre nodos que están en el
-            // mapa final (los cargados + los recién insertados).
             $mapa_final = self::$_mapa_id_a_fila[$nombre] ?? [];
             $filas_aristas = [];
             Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras, $mf, $mapa_final, &$filas_aristas) {
@@ -371,13 +271,18 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                 }
             }
 
-            $sql->commit();
-            $sql->close();
+            if (!$sql->ping()) {
+                throw new \RuntimeException("SQL64::guardar: conexión perdida antes del commit.");
+            }
+            if (!$sql->commit()) {
+                throw new \RuntimeException("SQL64::guardar: commit falló: " . $sql->error);
+            }
+            static::_liberar_conexion_sql($sql);
             return true;
         } catch (\Throwable $e) {
-            $sql->rollback();
+            @$sql->rollback();
             self::_error($e->getMessage());
-            $sql->close();
+            static::_liberar_conexion_sql($sql);
             return false;
         }
     }
@@ -396,11 +301,11 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         $nombre_escapado = $sql->real_escape_string((string)$nombre);
         $equivalencias = array();
         $ok = self::_cargar_nodos_con_mascara($sql, $nombre, $nombre_escapado, $equivalencias, false);
-        if ($ok === null) { $sql->close(); return null; }
-        if ($ok === false) { $sql->close(); return false; }
+        if ($ok === null) { static::_liberar_conexion_sql($sql); return null; }
+        if ($ok === false) { static::_liberar_conexion_sql($sql); return false; }
         $ok2 = self::_cargar_adyacentes_contexto($sql, $nombre_escapado, $equivalencias);
-        if ($ok2 === false) { $sql->close(); return null; }
-        $sql->close();
+        if ($ok2 === false) { static::_liberar_conexion_sql($sql); return null; }
+        static::_liberar_conexion_sql($sql);
         return true;
     }
 
@@ -416,44 +321,30 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             return null;
         }
         $nombre_escapado = $sql->real_escape_string((string)$nombre);
-
         $bits_registrados = self::_cargar_contextos_registrados($sql, $nombre);
-        if ($bits_registrados === null) {
-            $sql->close();
-            return null;
-        }
+        if ($bits_registrados === null) { static::_liberar_conexion_sql($sql); return null; }
         $mascara_pedida = 0;
         foreach ($contextos as $ctx) {
             $ctx_str = (string)$ctx;
             if (!isset($bits_registrados[$ctx_str])) {
                 self::_error("SQL64::cargar_parcial: contexto '" . $ctx_str . "' no registrado en '" . $nombre . "'.");
-                $sql->close();
+                static::_liberar_conexion_sql($sql);
                 return false;
             }
             $mascara_pedida |= (1 << (int)$bits_registrados[$ctx_str]);
         }
-
         $q = "SELECT * FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "'"
            . " AND (contexto_mascara & " . (int)$mascara_pedida . ") != 0;";
         $equivalencias = array();
         $ok = self::_cargar_nodos_con_mascara($sql, $nombre, $nombre_escapado, $equivalencias, true, $q);
-        if ($ok === null) { $sql->close(); return null; }
-        if ($ok === false) { $sql->close(); return false; }
+        if ($ok === null) { static::_liberar_conexion_sql($sql); return null; }
+        if ($ok === false) { static::_liberar_conexion_sql($sql); return false; }
         $ok2 = self::_cargar_adyacentes_contexto($sql, $nombre_escapado, $equivalencias);
-        if ($ok2 === false) { $sql->close(); return null; }
-        $sql->close();
+        if ($ok2 === false) { static::_liberar_conexion_sql($sql); return null; }
+        static::_liberar_conexion_sql($sql);
         return true;
     }
 
-    /**
-     * Guarda solo el subgrafo en memoria filtrando por
-     * contextos. Ver _guardar_con_filtro para la lógica.
-     *
-     * @param string   $nombre
-     * @param string[] $contextos
-     * @return bool
-     * @since 1.5i.7o
-     */
     static public function guardar_parcial($nombre, array $contextos): bool {
         if (!is_string($nombre)) {
             self::_error("SQL64::guardar_parcial: el nombre no es string.");
@@ -463,31 +354,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             self::_error("SQL64::guardar_parcial: no se especificaron contextos.");
             return false;
         }
-
-        $sql = self::crear_conexion_sql();
-        if (!$sql) {
-            self::_error("SQL64::guardar_parcial: no se pudo crear conexión.");
-            return false;
-        }
-        $bits_registrados = self::_cargar_contextos_registrados($sql, $nombre);
-        if ($bits_registrados === null) {
-            $sql->close();
-            return false;
-        }
-
-        $mascara_pedida = 0;
-        foreach ($contextos as $ctx) {
-            $ctx_str = (string)$ctx;
-            if (!isset($bits_registrados[$ctx_str])) {
-                self::_error("SQL64::guardar_parcial: contexto '" . $ctx_str . "' no registrado en '" . $nombre . "'.");
-                $sql->close();
-                return false;
-            }
-            $mascara_pedida |= (1 << (int)$bits_registrados[$ctx_str]);
-        }
-        $sql->close();
-
-        return self::_guardar_con_filtro($nombre, $mascara_pedida);
+        return self::_guardar_con_filtro($nombre, -1, $contextos);
     }
 
     static public function listar_contextos($nombre): ?array {
@@ -503,7 +370,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         $nombre_escapado = $sql->real_escape_string((string)$nombre);
         if (!$res = $sql->query("SELECT nombre FROM contexto WHERE idsuperestructura='" . $nombre_escapado . "' ORDER BY bit;")) {
             self::_error("SQL64::listar_contextos: fallo SELECT: " . $sql->error);
-            $sql->close();
+            static::_liberar_conexion_sql($sql);
             return null;
         }
         $nombres = [];
@@ -512,7 +379,7 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             $nombres[] = (string)$fila["nombre"];
             $fila = $res->fetch_assoc();
         }
-        $sql->close();
+        static::_liberar_conexion_sql($sql);
         return $nombres;
     }
 
@@ -535,12 +402,12 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         foreach ($qs as $q) {
             if (!$sql->query($q)) {
                 self::_error("SQL64::eliminar: fallo DELETE: " . $sql->error);
-                $sql->close();
+                static::_liberar_conexion_sql($sql);
                 return null;
             }
         }
         unset(self::$_mapa_id_a_fila[$nombre]);
-        $sql->close();
+        static::_liberar_conexion_sql($sql);
         return true;
     }
 
@@ -557,11 +424,11 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         $nombre_escapado = $sql->real_escape_string((string)$nombre);
         if (!$rcontar = $sql->query("SELECT COUNT(*) FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "';")) {
             self::_error("SQL64::existe: fallo SELECT: " . $sql->error);
-            $sql->close();
+            static::_liberar_conexion_sql($sql);
             return null;
         }
         $cant = $rcontar->fetch_assoc()['COUNT(*)'];
-        $sql->close();
+        static::_liberar_conexion_sql($sql);
         return $cant > 0;
     }
 
@@ -584,19 +451,13 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         $especiales = [];
         Nodo::por_cada_nodo_ejecutar(static::$token, function($nodo) use (&$especiales) {
             $id = $nodo->id();
-            if (!is_numeric($id)) {
-                $especiales[] = (string)$id;
-            }
+            if (!is_numeric($id)) { $especiales[] = (string)$id; }
         });
         sort($especiales, SORT_STRING);
-
         $bit_por_contexto = self::_cargar_contextos_registrados($sql, $nombre);
         if ($bit_por_contexto === null) return null;
         $siguiente_bit = 0;
-        foreach ($bit_por_contexto as $b) {
-            if ($b >= $siguiente_bit) $siguiente_bit = $b + 1;
-        }
-
+        foreach ($bit_por_contexto as $b) { if ($b >= $siguiente_bit) $siguiente_bit = $b + 1; }
         $nombre_escapado = $sql->real_escape_string((string)$nombre);
         foreach ($especiales as $id) {
             if (!isset($bit_por_contexto[$id])) {
@@ -615,7 +476,6 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                 $siguiente_bit++;
             }
         }
-
         $mascaras = [];
         $cola = [];
         foreach ($especiales as $id) {
@@ -642,20 +502,6 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         return $mascaras;
     }
 
-    /**
-     * Carga nodos desde nodo_contexto. Llena $_mapa_id_a_fila
-     * (id_nodo_framework => id_fila) y $equivalencias
-     * (id_fila => id_nodo_framework) para resolver aristas.
-     *
-     * @param \mysqli $sql
-     * @param string  $nombre
-     * @param string  $nombre_escapado
-     * @param array   $equivalencias  Por referencia.
-     * @param bool    $solo_filtrados
-     * @param string  $q              Query cuando $solo_filtrados.
-     * @return bool|null
-     * @version 1.5i.8a
-     */
     private static function _cargar_nodos_con_mascara($sql, $nombre, $nombre_escapado, &$equivalencias, bool $solo_filtrados, string $q = ''): bool|null {
         if (!$solo_filtrados) {
             $q = "SELECT * FROM nodo_contexto WHERE idsuperestructura='" . $nombre_escapado . "';";
@@ -696,17 +542,6 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
         return true;
     }
 
-    /**
-     * Carga aristas desde adyacente_contexto. Resuelve ambos
-     * extremos por id_fila usando $equivalencias
-     * (id_fila => id_nodo_framework).
-     *
-     * @param \mysqli $sql
-     * @param string  $nombre_escapado
-     * @param array   $equivalencias
-     * @return bool|null
-     * @version 1.5i.8a
-     */
     private static function _cargar_adyacentes_contexto($sql, $nombre_escapado, $equivalencias): bool|null {
         if (!$adyacentes = $sql->query("SELECT idnodo_fila, enlace, idadyacente_fila FROM adyacente_contexto WHERE idsuperestructura='" . $nombre_escapado . "';")) {
             self::_error("SQL64: fallo SELECT adyacentes: " . $sql->error);

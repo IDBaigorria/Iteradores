@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.79c
+ * @version   1.5piloto.81v
  */
 
 use Iteradores\Nodos\Nodo;
@@ -115,9 +115,24 @@ function _arbol_nombres(?array $nombres): array {
 function _hmi(Nodo $padre, Nodo $hijo, ?array $nombres = null): void {
     $n = _arbol_nombres($nombres);
     $antiguo_hmi = $padre->adyacente($n['hmi']);
+
+    // Fix 1.5piloto.81v: idempotente y sin ciclos.
+    // Si el hijo ya es el hmi actual, no-op. Antes se dejaba
+    // al hijo con hd hacia sí mismo (autoenlace), lo que
+    // generaba ciclos al recorrer.
+    if ($antiguo_hmi && $antiguo_hmi->id() === $hijo->id()) {
+        return;
+    }
+
     if ($antiguo_hmi) {
-        // El nuevo hijo toma al antiguo hmi como su hermano derecho (reemplaza si existía)
+        // El nuevo hijo toma al antiguo hmi como su hermano derecho.
         $hijo->_adyacente_en($antiguo_hmi, $n['hd'], true);
+    } else {
+        // Fix 1.5piloto.81v: si el padre no tenía hmi y el hijo
+        // traía un hd residual (por haber estado en otra cadena),
+        // limpiarlo. Antes quedaba apuntando a un nodo de otra
+        // cadena y formaba un ciclo.
+        $hijo->eliminar_adyacente($n['hd']);
     }
     // Reemplazar el hmi del padre con el nuevo hijo
     $padre->_adyacente_en($hijo, $n['hmi'], true);

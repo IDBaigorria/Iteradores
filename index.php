@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.81s
+ * @version   1.5piloto.81y
  */
 
 // --- Utilidades base ----------------------------------
@@ -516,6 +516,42 @@ if (isset($_GET['reparar_arboles'])) {
     exit;
 }
 
+// ==== Reparación de cancelaciones en compartidos (v1.5piloto.81t) ====
+// Reinserta en ambos árboles las cancelaciones que quedaron
+// colgadas solo de un lado (bug de v76x: construir_arboles_compartidos
+// no las agregó al árbol del dueño; _crear_nodo_cancelacion no las
+// insertaba con nombres parametrizados).
+// Idempotente.
+// Uso: index.php?reparar_cancelaciones=1
+if (isset($_GET['reparar_cancelaciones'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = Controlador::ejecutar_comando('app:reparar_cancelaciones_compartidos');
+
+    if (!is_array($res)) {
+        echo "ERROR: el comando app:reparar_cancelaciones_compartidos no devolvió resultado.\n";
+        exit;
+    }
+
+    echo "Reparación de cancelaciones en compartidos\n";
+    echo "==========================================\n\n";
+    echo "Dueños procesados:      " . $res['duenos'] . "\n";
+    echo "Compartidos procesados: " . $res['compartidos'] . "\n";
+    echo "Reinsertadas en dueño:  " . $res['reinsertadas_dueno'] . "\n";
+    echo "Huérfanas detectadas:   " . $res['huerfanas_detectadas'] . "\n";
+    echo "Reinsertadas en ambos:  " . $res['reinsertadas_ambos'] . "\n";
+    echo "Ventas reparadas:       " . ($res['ventas_reparadas'] ?? 0) . "\n";
+    echo "Cambios totales:        " . $res['cambios'] . "\n";
+    echo "\nDetalles:\n";
+    foreach ($res['detalles'] as $d) {
+        echo "  - $d\n";
+    }
+    if ($res['cambios'] > 0) {
+        echo "\nGuardado.\n";
+    }
+    echo "\nListo.\n";
+    exit;
+}
+
 // ==== Migración topológica (v78f) ====
 // 1. Crea el enlace us_Administrador → usuarios.
 // 2. Asegura publico en cada soporte.
@@ -618,6 +654,39 @@ if (!$modo_parcial) {
     });
 }
 
+// ==== Reparación de ciclos en árboles de cancelaciones (v1.5piloto.81v) ====
+// Recorre cada árbol de cancelaciones (default del dueño y
+// parametrizados de los compartidos). Si detecta ciclo,
+// desenlaza y reconstruye como cadena lineal.
+// Idempotente.
+// Uso: index.php?reparar_cancelaciones_arboles=1
+if (isset($_GET['reparar_cancelaciones_arboles'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+    $res = Controlador::ejecutar_comando('app:reparar_cancelaciones_arboles');
+
+    if (!is_array($res)) {
+        echo "ERROR: el comando app:reparar_cancelaciones_arboles no devolvió resultado.\n";
+        exit;
+    }
+
+    echo "Reparación de ciclos en árboles de cancelaciones\n";
+    echo "=================================================\n\n";
+    echo "Dueños procesados:       " . $res['duenos'] . "\n";
+    echo "Compartidos procesados:  " . $res['compartidos'] . "\n";
+    echo "Árboles revisados:       " . $res['arboles_revisados'] . "\n";
+    echo "Árboles reconstruidos:   " . $res['arboles_reconstruidos'] . "\n";
+    echo "Cambios totales:         " . $res['cambios'] . "\n";
+    echo "\nDetalles:\n";
+    foreach ($res['detalles'] as $d) {
+        echo "  - $d\n";
+    }
+    if ($res['cambios'] > 0) {
+        echo "\nGuardado.\n";
+    }
+    echo "\nListo.\n";
+    exit;
+}
+
 // ==== Eliminar huérfanos (v1.5piloto.81s) ====
 // Solo admin/soporte. Fuerza carga total para ver los
 // nodos de la DB que tienen contexto_mascara=0 (no
@@ -696,6 +765,137 @@ if (isset($_GET['eliminar_huerfanos'])) {
     exit;
 }
 
+// ==== Diagnóstico de persistencia (v1.5piloto.81x, temporal) ====
+// Mide wait_timeout, prueba guardar (total y parcial), y
+// devuelve el error completo si falla. Solo admin/soporte.
+// Borrar después de diagnosticar.
+if (isset($_GET['diag_persistencia'])) {
+    header('Content-Type: application/json; charset=utf-8');
+
+    $nombre_sol_d = trim((string)($_GET['nombre_solicitante'] ?? ''));
+    if ($nombre_sol_d !== '' && !Conf::LOCAL) {
+        $nodo_sol_d = Nodo::nodo_por_id('us_' . $nombre_sol_d);
+        $nivel_d = $nodo_sol_d && $nodo_sol_d->adyacente('nivel') ? (string)$nodo_sol_d->adyacente('nivel')->dato() : '';
+        if ($nivel_d !== 'admin' && $nivel_d !== 'soporte') {
+            http_response_code(403);
+            echo json_encode(['exito' => false, 'error' => "Nivel '$nivel_d' sin permiso."], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+
+    // Conexión de solo lectura para ver el wait_timeout global.
+    $diag = [];
+    try {
+        $sql_diag = new \mysqli(Conf::SUPERESTRUCTURA_HOST_SQL, Conf::SUPERESTRUCTURA_USUARIO_SQL, Conf::SUPERESTRUCTURA_CONTRASENA_SQL, Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL);
+        if ($sql_diag->connect_errno) {
+            $diag['conexion_directa'] = ['ok' => false, 'error' => $sql_diag->connect_error];
+        } else {
+            $diag['conexion_directa'] = ['ok' => true];
+            $sql_diag->set_charset('utf8mb4');
+
+            $diag['wait_timeout_antes'] = _diag_wait_timeout($sql_diag);
+            $ok_set = @$sql_diag->query("SET SESSION wait_timeout = 300");
+            $diag['set_wait_timeout_ok'] = (bool)$ok_set;
+            $diag['set_wait_timeout_error'] = $ok_set ? null : $sql_diag->error;
+            $diag['wait_timeout_despues'] = _diag_wait_timeout($sql_diag);
+
+            // Info general de la sesión.
+            $r = $sql_diag->query("SELECT @@max_allowed_packet AS mp, @@version AS v, @@sql_mode AS sm");
+            if ($r) {
+                $f = $r->fetch_assoc();
+                $diag['max_allowed_packet'] = $f['mp'];
+                $diag['mysql_version'] = $f['v'];
+                $diag['sql_mode'] = $f['sm'];
+            }
+
+            $sql_diag->close();
+        }
+    } catch (Throwable $e) {
+        $diag['conexion_directa'] = ['ok' => false, 'error' => $e->getMessage()];
+    }
+
+    // Forzar carga total para probar el guardado.
+    if (Controlador::es_grafo_parcial()) {
+        Controlador::cargar($nombre_app);
+    }
+
+    // Snapshot de nodos en memoria.
+    // Fix 1.5piloto.81y: cantidad_de_nodos() es el único
+    // método público que no requiere token. por_cada_nodo_ejecutar
+    // necesita el token, que es protected en Controlador.
+    $nodos_total = Nodo::cantidad_de_nodos();
+    $diag['nodos_en_memoria'] = $nodos_total;
+    $diag['aristas_en_memoria'] = null; // no medido
+
+    // Probar guardar total (midiendo).
+    $inicio = microtime(true);
+    $ok_total = false;
+    $err_total = null;
+    try {
+        $ok_total = Controlador::guardar($nombre_app);
+        if (!$ok_total) {
+            // Fix 1.5piloto.81y: no existe Controlador::errores().
+            // Capturar el output de imprimir_errores() con ob_start.
+            ob_start();
+            Controlador::imprimir_errores();
+            $err_total = trim(ob_get_clean());
+            if ($err_total === '') $err_total = 'guardar() devolvió false (sin detalle)';
+        }
+    } catch (Throwable $e) {
+        $err_total = $e->getMessage();
+    }
+    $diag['guardar_total'] = [
+        'ok' => $ok_total,
+        'duracion_ms' => (int)((microtime(true) - $inicio) * 1000),
+        'error' => $err_total,
+    ];
+
+    // Probar guardar_parcial con [us_<admin>] (midiendo).
+    $admin = \ConfiguracionApli::NOMBRE_ADMIN;
+    $ok_parcial = false;
+    $err_parcial = null;
+    if ($nodos_total > 0) {
+        try {
+            Controlador::cargar($nombre_app);
+            Controlador::cargar_parcial($nombre_app, ['us_' . $admin]);
+            $inicio = microtime(true);
+            $ok_parcial = Controlador::guardar_parcial($nombre_app, ['us_' . $admin]);
+            if (!$ok_parcial) {
+                ob_start();
+                Controlador::imprimir_errores();
+                $err_parcial = trim(ob_get_clean());
+                if ($err_parcial === '') $err_parcial = 'guardar_parcial() devolvió false (sin detalle)';
+            }
+            $diag['guardar_parcial'] = [
+                'ok' => $ok_parcial,
+                'contextos' => ['us_' . $admin],
+                'duracion_ms' => (int)((microtime(true) - $inicio) * 1000),
+                'error' => $err_parcial,
+            ];
+        } catch (Throwable $e) {
+            $diag['guardar_parcial'] = ['ok' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    // Recargar total para dejar el grafo en estado consistente.
+    Controlador::cargar($nombre_app);
+
+    $diag['version_app'] = \ConfiguracionApli::VERSION_APP;
+    $diag['es_local'] = Conf::LOCAL;
+    echo json_encode(['exito' => true, 'diag' => $diag], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}
+
+/**
+ * Lee wait_timeout de la sesión actual.
+ */
+function _diag_wait_timeout(\mysqli $sql): ?int {
+    $r = $sql->query("SHOW SESSION VARIABLES LIKE 'wait_timeout'");
+    if (!$r) return null;
+    $f = $r->fetch_assoc();
+    return $f ? (int)$f['Value'] : null;
+}
+
 // ==== Auditoría topológica (v1.5piloto.81p) ====
 // Diagnóstico de solo lectura. Reporta aristas rotas,
 // nodos huérfanos, compartidos incompletos, etc.
@@ -769,7 +969,80 @@ if (isset($_GET['auditar_topologia'])) {
     echo json_encode($reporte_aud, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     exit;
 }
+// ==== Diagnóstico de cancelaciones (temporal, v1.5piloto.81u) ====
+if (isset($_GET['diagnostico_cancelaciones'])) {
+    header('Content-Type: application/json; charset=utf-8');
 
+    if (Controlador::es_grafo_parcial()) {
+        Controlador::cargar($nombre_app);
+    }
+
+    $out = [];
+
+    // Dueño
+    $nombre_dueno = 'Parroquia_del_Carmen';
+    $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+    if ($nodo_dueno) {
+        $cont = $nodo_dueno->adyacente('cancelaciones');
+        if ($cont) {
+            $lista = [];
+            $actual = hmi($cont);
+            $seg = 0;
+            $visitados = [];
+            while ($actual && $seg < 50) {
+                $id = (string)$actual->id();
+                $lista[] = [
+                    'id_framework' => $id,
+                    'dato' => (string)$actual->dato(),
+                    'repetido' => isset($visitados[$id]),
+                ];
+                $visitados[$id] = true;
+                $actual = hd($actual);
+                $seg++;
+            }
+            $out['dueno_' . $nombre_dueno] = [
+                'id_contenedor' => (string)$cont->id(),
+                'total_iteraciones' => $seg,
+                'lista' => $lista,
+            ];
+        }
+    }
+
+    // Terminal Lujan
+    $nombre_term = 'Secretaria_Lujan';
+    $nodo_term = Nodo::nodo_por_id('us_' . $nombre_term);
+    if ($nodo_term) {
+        $nodo_comp = $nodo_term->adyacente('dueno');
+        if ($nodo_comp && $nodo_comp->adyacente('_es_compartido')) {
+            $cont = $nodo_comp->adyacente('cancelaciones');
+            if ($cont) {
+                $lista = [];
+                $actual = hmi($cont, ['hmi' => 'hmi_' . $nombre_term, 'hd' => 'hd_' . $nombre_term, 'p' => 'p_' . $nombre_term]);
+                $seg = 0;
+                $visitados = [];
+                while ($actual && $seg < 50) {
+                    $id = (string)$actual->id();
+                    $lista[] = [
+                        'id_framework' => $id,
+                        'dato' => (string)$actual->dato(),
+                        'repetido' => isset($visitados[$id]),
+                    ];
+                    $visitados[$id] = true;
+                    $actual = hd($actual, ['hmi' => 'hmi_' . $nombre_term, 'hd' => 'hd_' . $nombre_term, 'p' => 'p_' . $nombre_term]);
+                    $seg++;
+                }
+                $out['terminal_' . $nombre_term] = [
+                    'id_contenedor' => (string)$cont->id(),
+                    'total_iteraciones' => $seg,
+                    'lista' => $lista,
+                ];
+            }
+        }
+    }
+
+    echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}
 // Manejo de impresión
 if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
     require_once __DIR__ . '/Aplicacion/Impresion/Impresion.php';

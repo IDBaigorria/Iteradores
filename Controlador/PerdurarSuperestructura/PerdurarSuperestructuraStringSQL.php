@@ -11,622 +11,443 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php"
 
 /**
  * Clase PerdurarSuperestructuraStringSQL
- * 
- * @version 1.5i.7k
+ *
+ * @version 1.5piloto.82c
  *
  * @author Ignacio David Baigorria
  *
- * 
- * @extends Objeto
- * 
- * @description
- * Clase responsable de la persistencia de la superestructura en una base de datos SQL.
- * Se encarga de crear la conexión, la base de datos y las tablas necesarias
- * para almacenar los nodos y enlaces que conforman la estructura.
- * 
- * @history
- * - 23/06/2012: Comienza proceso de refactorización según decisiones de la v1.0  
- * - 19/07/2013: Se agregan métodos para eliminar enlaces y nodos.  
- * - 20/07/2013: Implementación de guardado y carga de superestructuras.  
- * - 28/12/2016: Cambio de nomenclatura y versión estable.  
- * - 07/01/2017–03/06/2017: Mejoras en los métodos de eliminación y corrección de errores.  
- * - 25/08/2025: Simplificación de queries y unificación de la configuración SQL.  
- * - 01/09/2025: Se añade método `eliminar_sql()`.  
- * 
  * @notes
- * Esta clase ha evolucionado significativamente desde las versiones iniciales.
- * Se mantuvo compatibilidad con versiones anteriores hasta completar la transición
- * a PHP 7+ y codificación UTF-8 completa en base de datos (utf8mb4).
+ * Desde v1.5piloto.82c usa mysqli_report(MYSQLI_REPORT_OFF)
+ * al principio de crear_conexion_sql. En PHP 8.4, con
+ * mysqli_report(MYSQLI_REPORT_STRICT) activo (default),
+ * cualquier fallo de mysqli lanza excepción. Eso rompe
+ * el flujo silenciosamente. Desactivar mysqli_report hace
+ * que mysqli vuelva a la semántica clásica (devuelve false).
  */
 class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperestructura
 {
 
-    /**
-     * @var string Token de seguridad recibido de la clase Nodo.
-     */
     protected static string $token = '';
 
-    /**
-     * Recibe el token de seguridad desde la clase Controlador
-     *
-     * @param string $token Token de seguridad proporcionado por Nodo.
-     * @return void
-     */
+    protected static ?\mysqli $_sql_singleton = null;
+
     public static function recibir_token(string $token): void {
         static::$token = $token;
     }
-    /**
-     * Crea y devuelve una conexión MySQLi válida para la superestructura.
-     * 
-     * @usecase Establecer conexión con el servidor y preparar la base de datos.
-     * 
-     * @preconditions
-     * - Las constantes de configuración (host, usuario, contraseña y base de datos)
-     *   deben estar definidas en la clase Conf.
-     * 
-     * @return \mysqli|null Retorna el objeto de conexión SQL si tuvo éxito, o null en caso de error.
-     * 
-     * @postconditions
-     * - La base de datos y las tablas necesarias quedan creadas y seleccionadas.
-     * 
-     * @notes
-     * Si la conexión es local, primero crea la base de datos.
-     * Si es remota, asume que ya existe.
-     * Fuerza la codificación a utf8mb4 para compatibilidad total.
-     */
-	static protected function crear_conexion_sql()
-	{
-		//echo "</br>host: ".Conf::SUPERESTRUCTURA_HOST_SQL;
-        //echo "</br>usuario: ".Conf::SUPERESTRUCTURA_USUARIO_SQL;
-        //echo "</br>contra: ".Conf::SUPERESTRUCTURA_CONTRASENA_SQL;
-        //echo "</br>nombreBD: ". Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL;
-		if (Conf::LOCAL) {
-			if ($sql = new \mysqli(Conf::SUPERESTRUCTURA_HOST_SQL, Conf::SUPERESTRUCTURA_USUARIO_SQL, Conf::SUPERESTRUCTURA_CONTRASENA_SQL)) {
-				static::crear_base_de_datos_sql($sql);
-				$sql->select_db(Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL);
-				static::crear_tablas_sql($sql);
-				//return $sql;
-			} else {
-				self::_error("no se pudo conectar a la base de datos");
-				return null;
-			}
-		} else {
-			if ($sql = new \mysqli(Conf::SUPERESTRUCTURA_HOST_SQL, Conf::SUPERESTRUCTURA_USUARIO_SQL, Conf::SUPERESTRUCTURA_CONTRASENA_SQL, Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL)) {
-				//self::crear_base_de_datos_sql($sql)
-				//$sql->select_db(Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL);
-				static::crear_tablas_sql($sql);
-				//return $sql;
-			} else {
-				self::_error("no se pudo conectar a la base de datos");
-				return null;
-			}
-		}
-		$charset = $sql->character_set_name();
-		if ($charset != "utf8mb4") {
-			$sql->set_charset("utf8mb4");
-		}
-		//echo $charset;
-		return $sql;
-	}
 
-    /**
-     * Crea la base de datos si no existe.
-     * 
-     * @usecase Inicializa la base de datos definida en las constantes de configuración.
-     * 
-     * @preconditions Debe existir una conexión válida a MySQL.
-     * 
-     * @param \mysqli $sql Conexión activa al servidor MySQL.
-     * 
-     * @return bool `true` si la base de datos fue creada o ya existía, `false` en caso de error.
-     * 
-     * @postconditions La base de datos queda disponible para seleccionar y utilizar.
-     */
-	static protected function crear_base_de_datos_sql($sql)
-	{
-		//echo "KKKKKKKKKKKKKKKKKKLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLKKKgKKKKKKKKKKKLLLLLLLLLLLLL";
-		if ($sql->query("CREATE DATABASE IF NOT EXISTS " . Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL)) {
-			return true;
-		} else {
-			self::_error("no se pudo crear la base de datos");
-			return false;
-		}
-	}
+    static protected function crear_conexion_sql()
+    {
+        // Fix 1.5piloto.82c: mysqli_report OFF. En PHP 8.4
+        // mysqli lanza excepción por default en fallos. Eso
+        // hace que un simple ping() o new \mysqli en fallo
+        // propague una excepción hasta el guardado. Desactivarlo
+        // devuelve la semántica clásica: false en fallo.
+        mysqli_report(MYSQLI_REPORT_OFF);
 
-    /**
-     * Crea las tablas necesarias para la persistencia de la superestructura.
-     * 
-     * @usecase Genera las tablas `nodo` y `adyacente` si aún no existen.
-     * 
-     * @preconditions Debe existir una base de datos seleccionada en la conexión SQL.
-     * 
-     * @param \mysqli $sql Conexión activa a la base de datos.
-     * 
-     * @return bool `true` si las tablas fueron creadas correctamente, `false` en caso de error.
-     * 
-     * @postconditions Asegura la existencia de las tablas requeridas para almacenar nodos y enlaces.
-     */
-	static protected function crear_tablas_sql($sql)
-	{
-		/*if (!mysql_select_db("superestructura")){
-			PerdurarSuperestructuraString::_error("no se pudo seleccuinar la base de datos en crearTablas");
-		}*/
-		if (
-			!$sql->query("CREATE TABLE IF NOT EXISTS nodo (
-    						idsuperestructura VARCHAR(50) NOT NULL,
-    						idnodo 			VARCHAR(50) NOT NULL,
-    						dato 			BLOB,
-    						PRIMARY KEY (idsuperestructura, idnodo)
-						) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
-		) {
-			self::_error("no se pudo crear la tabla nodo");
-			return false;
-		}
-		if (
-			!$sql->query("CREATE TABLE IF NOT EXISTS adyacente (
-    						idsuperestructura VARCHAR(50) NOT NULL,
-    						idnodo           VARCHAR(50) NOT NULL,
-   							enlace           VARCHAR(100) NOT NULL,
-    						idadyacente      VARCHAR(50) NOT NULL,
-    						PRIMARY KEY (idsuperestructura, idnodo, enlace, idadyacente)
-						) DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;")
-		) {
-			self::_error("no se pudo crear la tabla adyacente");
-			return false;
-		}
-		return true;
-	}
-  	/**
-     * Crea la consulta SQL para insertar nodos.
-     * 
-     * @usecase Construye consulta de inserción para nodos en la base de datos.
-     * 
-     * @param string $nombre Identificador de la superestructura en la base de datos.
-     * 
-     * @return string Consulta SQL lista para ejecutar.
-     * 
-     * @notes Genera una consulta INSERT con todos los nodos de la superestructura actual.
-     */
-	static private function crear_consulta_insertar_sql($sql, $nombre)
-	{
-		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
-			return $nodo->dato();
-		}, null);
+        // Log de versión para diagnóstico (aparece en error_log).
+        error_log("[CREAR_CONEXION] version=82c, singleton=" . (self::$_sql_singleton ? "vivo" : "nulo"));
 
-		if (empty($datos)) {
-			return '';
-		}
+        // Reusar la conexión si sigue viva.
+        if (self::$_sql_singleton !== null) {
+            $ping_ok = false;
+            try {
+                $r_ping = @self::$_sql_singleton->query("SELECT 1");
+                if ($r_ping) {
+                    $r_ping->free();
+                    $ping_ok = true;
+                }
+            } catch (\Throwable $e) {
+                $ping_ok = false;
+            }
+            if ($ping_ok) {
+                return self::$_sql_singleton;
+            }
+            try { @self::$_sql_singleton->close(); } catch (\Throwable $e) { /* ignorar */ }
+            self::$_sql_singleton = null;
+        }
 
-		$consulta = "INSERT INTO nodo (idsuperestructura, idnodo, dato) values";
-		$separador = " ";
-		$primero = true;
+        // Crear la conexión.
+        try {
+            if (Conf::LOCAL) {
+                $sql = @new \mysqli(Conf::SUPERESTRUCTURA_HOST_SQL, Conf::SUPERESTRUCTURA_USUARIO_SQL, Conf::SUPERESTRUCTURA_CONTRASENA_SQL);
+            } else {
+                $sql = @new \mysqli(Conf::SUPERESTRUCTURA_HOST_SQL, Conf::SUPERESTRUCTURA_USUARIO_SQL, Conf::SUPERESTRUCTURA_CONTRASENA_SQL, Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL);
+            }
+        } catch (\Throwable $e) {
+            self::_error("excepción al crear conexión: " . $e->getMessage());
+            return null;
+        }
 
-		foreach ($datos as $id => $dato) {
-			if (!is_string($dato) && !is_null($dato) && !is_int($dato)) {
-				$dato = null;
-			}
-			$id_escapado = mysqli_real_escape_string($sql, (string)$id);
-			$dato_escapado = is_null($dato) ? '' : mysqli_real_escape_string($sql, (string)$dato);
-			$consulta .= $separador . "('" . $nombre . "','" . $id_escapado . "','" . $dato_escapado . "')";
-			if ($primero) {
-				$primero = false;
-				$separador = ", ";
-			}
-		}
-		$consulta .= ";";
-		return $consulta;
-	}
-    /**
-     * Crea la consulta SQL para insertar enlaces.
-     * 
-     * @usecase Construye consulta de inserción para relaciones adyacentes en la base de datos.
-     * 
-     * @param string $nombre Identificador de la superestructura en la base de datos.
-     * 
-     * @return string Consulta SQL lista para ejecutar.
-     * 
-     * @notes Genera una consulta INSERT con todas las relaciones adyacentes de la superestructura.
-     */
-	static private function crear_consulta_insertar2_sql($sql, $nombre)
-	{
-		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
-			return $nodo->por_cada_adyacente_ejecutar(function ($nodo) {
-				return $nodo->id();
-			});
-		});
+        if (!$sql || $sql->connect_errno) {
+            $msg = $sql ? $sql->connect_error : "mysqli devolvió false/null";
+            self::_error("no se pudo conectar a la base de datos: " . $msg);
+            return null;
+        }
 
-		if (empty($datos)) {
-			return '';
-		}
+        if (Conf::LOCAL) {
+            static::crear_base_de_datos_sql($sql);
+            $sql->select_db(Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL);
+            static::crear_tablas_sql($sql);
+        } else {
+            static::crear_tablas_sql($sql);
+        }
 
-		$hubo_alguno = false;
-		foreach ($datos as $arreglo) {
-			if (is_array($arreglo) && !empty($arreglo)) {
-				$hubo_alguno = true;
-				break;
-			}
-		}
-		if (!$hubo_alguno) {
-			return '';
-		}
+        $charset = $sql->character_set_name();
+        if ($charset != "utf8mb4") {
+            $sql->set_charset("utf8mb4");
+        }
+        @$sql->query("SET SESSION wait_timeout = 300");
+        try { @$sql->rollback(); } catch (\Throwable $e) { /* ignorar */ }
 
-		$consulta = 'INSERT INTO adyacente (idsuperestructura, idnodo, enlace, idadyacente) values';
-		$separador = " ";
-		$primero = true;
+        self::$_sql_singleton = $sql;
+        return $sql;
+    }
 
-		foreach ($datos as $idnodo => $arreglo) {
-			if (is_array($arreglo)) {
-				foreach ($arreglo as $enlace => $idadyacente) {
-					$idnodo_escapado = mysqli_real_escape_string($sql, (string)$idnodo);
-					$enlace_escapado = mysqli_real_escape_string($sql, (string)$enlace);
-					$idadyacente_escapado = mysqli_real_escape_string($sql, (string)$idadyacente);
-					$consulta .= $separador . "('" . $nombre . "','" . $idnodo_escapado . "','" . $enlace_escapado . "','" . $idadyacente_escapado . "')";
-					if ($primero) {
-						$primero = false;
-						$separador = ", ";
-					}
-				}
-			}
-		}
-		$consulta .= ';';
-		return $consulta;
-	}
-    /**
-     * Guarda la superestructura en la base de datos.
-     * 
-	 * @interface PerdurarSuperestructura
-	 * 
-     * @usecase Persistir toda la superestructura en SQL.
-     * 
-     * @preconditions Debe existir al menos un nodo en la superestructura.
-     * 
-     * @param string $nombre Identificador único para guardar la superestructura.
-     * 
-     * @return bool `true` si la operación fue exitosa, `false` en caso contrario.
-     * 
-     * @notes 
-     * - Elimina cualquier versión previa con el mismo nombre
-     * - Ejecuta inserciones tanto para nodos como para enlaces
-     */
-	static public function guardar($nombre)
-	{
-		if (!Nodo::hay_nodos_en_superestructura()) {
-			self::_error("error en guardar, no existe ningun nodo en la superestructura");
-			return false;
-		}
-		$sql = self::crear_conexion_sql();
-		if (!$sql) {
-			self::_error("guardar: no se pudo crear la conexion");
-			return false;
-		}
+    static protected function _liberar_conexion_sql($sql): void {
+        // No-op: la conexión es singleton. Se cierra al
+        // terminar el request o cuando crear_conexion_sql
+        // detecte que ya no responde.
+    }
 
-		// Transacción: o se reemplaza el grafo entero, o no se toca nada.
-		$sql->begin_transaction();
-		try {
-			$nombre_escapado = $sql->real_escape_string((string)$nombre);
-			if (!$sql->query("DELETE FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
-				throw new \RuntimeException("guardar: fallo DELETE en nodo: " . $sql->error);
-			}
-			if (!$sql->query("DELETE FROM `adyacente` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
-				throw new \RuntimeException("guardar: fallo DELETE en adyacente: " . $sql->error);
-			}
+    static protected function crear_base_de_datos_sql($sql)
+    {
+        if ($sql->query("CREATE DATABASE IF NOT EXISTS " . Conf::SUPERESTRUCTURA_NOMBRE_BD_SQL)) {
+            return true;
+        } else {
+            self::_error("no se pudo crear la base de datos");
+            return false;
+        }
+    }
 
-			$chunks_nodos = self::crear_chunks_insertar_nodos($sql, $nombre);
-			foreach ($chunks_nodos as $consulta) {
-				if (!$sql->query($consulta)) {
-					throw new \RuntimeException("guardar: fallo INSERT en nodo: " . $sql->error);
-				}
-			}
+    static protected function crear_tablas_sql($sql)
+    {
+        if (
+            !$sql->query("CREATE TABLE IF NOT EXISTS nodo (
+                            idsuperestructura VARCHAR(50) NOT NULL,
+                            idnodo           VARCHAR(50) NOT NULL,
+                            dato             BLOB,
+                            PRIMARY KEY (idsuperestructura, idnodo)
+                        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+        ) {
+            self::_error("no se pudo crear la tabla nodo");
+            return false;
+        }
+        if (
+            !$sql->query("CREATE TABLE IF NOT EXISTS adyacente (
+                            idsuperestructura VARCHAR(50) NOT NULL,
+                            idnodo           VARCHAR(50) NOT NULL,
+                            enlace           VARCHAR(100) NOT NULL,
+                            idadyacente      VARCHAR(50) NOT NULL,
+                            PRIMARY KEY (idsuperestructura, idnodo, enlace, idadyacente)
+                        ) DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;")
+        ) {
+            self::_error("no se pudo crear la tabla adyacente");
+            return false;
+        }
+        return true;
+    }
 
-			$chunks_ady = self::crear_chunks_insertar_adyacentes($sql, $nombre);
-			foreach ($chunks_ady as $consulta) {
-				if (!$sql->query($consulta)) {
-					throw new \RuntimeException("guardar: fallo INSERT en adyacente: " . $sql->error);
-				}
-			}
+    static private function crear_consulta_insertar_sql($sql, $nombre)
+    {
+        $datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
+            return $nodo->dato();
+        }, null);
+        if (empty($datos)) return '';
+        $consulta = "INSERT INTO nodo (idsuperestructura, idnodo, dato) values";
+        $separador = " ";
+        $primero = true;
+        foreach ($datos as $id => $dato) {
+            if (!is_string($dato) && !is_null($dato) && !is_int($dato)) $dato = null;
+            $id_escapado = mysqli_real_escape_string($sql, (string)$id);
+            $dato_escapado = is_null($dato) ? '' : mysqli_real_escape_string($sql, (string)$dato);
+            $consulta .= $separador . "('" . $nombre . "','" . $id_escapado . "','" . $dato_escapado . "')";
+            if ($primero) { $primero = false; $separador = ", "; }
+        }
+        $consulta .= ";";
+        return $consulta;
+    }
 
-			$sql->commit();
-			$sql->close();
-			return true;
-		} catch (\Throwable $e) {
-			$sql->rollback();
-			self::_error($e->getMessage());
-			$sql->close();
-			return false;
-		}
-	}
+    static private function crear_consulta_insertar2_sql($sql, $nombre)
+    {
+        $datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
+            return $nodo->por_cada_adyacente_ejecutar(function ($nodo) {
+                return $nodo->id();
+            });
+        });
+        if (empty($datos)) return '';
+        $hubo_alguno = false;
+        foreach ($datos as $arreglo) {
+            if (is_array($arreglo) && !empty($arreglo)) { $hubo_alguno = true; break; }
+        }
+        if (!$hubo_alguno) return '';
+        $consulta = 'INSERT INTO adyacente (idsuperestructura, idnodo, enlace, idadyacente) values';
+        $separador = " ";
+        $primero = true;
+        foreach ($datos as $idnodo => $arreglo) {
+            if (is_array($arreglo)) {
+                foreach ($arreglo as $enlace => $idadyacente) {
+                    $idnodo_escapado = mysqli_real_escape_string($sql, (string)$idnodo);
+                    $enlace_escapado = mysqli_real_escape_string($sql, (string)$enlace);
+                    $idadyacente_escapado = mysqli_real_escape_string($sql, (string)$idadyacente);
+                    $consulta .= $separador . "('" . $nombre . "','" . $idnodo_escapado . "','" . $enlace_escapado . "','" . $idadyacente_escapado . "')";
+                    if ($primero) { $primero = false; $separador = ", "; }
+                }
+            }
+        }
+        $consulta .= ';';
+        return $consulta;
+    }
 
-    /**
-     * Arma los chunks de INSERT para la tabla nodo.
-     *
-     * Cada chunk es una query independiente de hasta ~200 KB, para
-     * no acercarse a `max_allowed_packet` (que en XAMPP es 1 MB).
-     *
-     * @param \mysqli $sql Conexion activa.
-     * @param string  $nombre Nombre de la superestructura.
-     * @return array Lista de queries listas para ejecutar.
-     */
-	static private function crear_chunks_insertar_nodos($sql, $nombre): array
-	{
-		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
-			return $nodo->dato();
-		}, null);
+    static public function guardar($nombre)
+    {
+        if (!Nodo::hay_nodos_en_superestructura()) {
+            self::_error("error en guardar, no existe ningun nodo en la superestructura");
+            return false;
+        }
+        $sql = self::crear_conexion_sql();
+        if (!$sql) {
+            self::_error("guardar: no se pudo crear la conexion");
+            return false;
+        }
+        $sql->begin_transaction();
+        try {
+            $nombre_escapado = $sql->real_escape_string((string)$nombre);
+            if (!$sql->query("DELETE FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+                throw new \RuntimeException("guardar: fallo DELETE en nodo: " . $sql->error);
+            }
+            if (!$sql->query("DELETE FROM `adyacente` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+                throw new \RuntimeException("guardar: fallo DELETE en adyacente: " . $sql->error);
+            }
+            $chunks_nodos = self::crear_chunks_insertar_nodos($sql, $nombre);
+            foreach ($chunks_nodos as $consulta) {
+                if (!$sql->query($consulta)) {
+                    throw new \RuntimeException("guardar: fallo INSERT en nodo: " . $sql->error);
+                }
+            }
+            $chunks_ady = self::crear_chunks_insertar_adyacentes($sql, $nombre);
+            foreach ($chunks_ady as $consulta) {
+                if (!$sql->query($consulta)) {
+                    throw new \RuntimeException("guardar: fallo INSERT en adyacente: " . $sql->error);
+                }
+            }
+            $sql->commit();
+            static::_liberar_conexion_sql($sql);
+            return true;
+        } catch (\Throwable $e) {
+            @$sql->rollback();
+            self::_error($e->getMessage());
+            static::_liberar_conexion_sql($sql);
+            return false;
+        }
+    }
 
-		if (empty($datos)) return [];
+    static private function crear_chunks_insertar_nodos($sql, $nombre): array
+    {
+        $datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
+            return $nodo->dato();
+        }, null);
+        if (empty($datos)) return [];
+        $nombre_escapado = $sql->real_escape_string((string)$nombre);
+        $limite_bytes = 200 * 1024;
+        $chunks = [];
+        $lote = [];
+        $tamano_lote = 0;
+        foreach ($datos as $id => $dato) {
+            if (!is_string($dato) && !is_null($dato) && !is_int($dato)) $dato = null;
+            $id_escapado = $sql->real_escape_string((string)$id);
+            $dato_escapado = is_null($dato) ? '' : $sql->real_escape_string((string)$dato);
+            $fila = "('" . $nombre_escapado . "','" . $id_escapado . "','" . $dato_escapado . "')";
+            $tamano_fila = strlen($fila) + 2;
+            if (!empty($lote) && ($tamano_lote + $tamano_fila) > $limite_bytes) {
+                $chunks[] = "INSERT INTO nodo (idsuperestructura, idnodo, dato) VALUES " . implode(", ", $lote) . ";";
+                $lote = [];
+                $tamano_lote = 0;
+            }
+            $lote[] = $fila;
+            $tamano_lote += $tamano_fila;
+        }
+        if (!empty($lote)) {
+            $chunks[] = "INSERT INTO nodo (idsuperestructura, idnodo, dato) VALUES " . implode(", ", $lote) . ";";
+        }
+        return $chunks;
+    }
 
-		$nombre_escapado = $sql->real_escape_string((string)$nombre);
-		$limite_bytes = 200 * 1024;
-		$chunks = [];
-		$lote = [];
-		$tamano_lote = 0;
+    static private function crear_chunks_insertar_adyacentes($sql, $nombre): array
+    {
+        $datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
+            $enlaces = [];
+            $ady = $nodo->adyacentes();
+            if (is_array($ady)) {
+                foreach ($ady as $enlace => $adyacente) {
+                    $enlaces[$enlace] = $adyacente->id();
+                }
+            }
+            return $enlaces;
+        });
+        if (empty($datos)) return [];
+        $nombre_escapado = $sql->real_escape_string((string)$nombre);
+        $limite_bytes = 200 * 1024;
+        $chunks = [];
+        $lote = [];
+        $tamano_lote = 0;
+        foreach ($datos as $idnodo => $arreglo) {
+            if (!is_array($arreglo) || empty($arreglo)) continue;
+            foreach ($arreglo as $enlace => $idady) {
+                $idnodo_escapado = $sql->real_escape_string((string)$idnodo);
+                $enlace_escapado = $sql->real_escape_string((string)$enlace);
+                $idady_escapado = $sql->real_escape_string((string)$idady);
+                $fila = "('" . $nombre_escapado . "','" . $idnodo_escapado . "','" . $enlace_escapado . "','" . $idady_escapado . "')";
+                $tamano_fila = strlen($fila) + 2;
+                if (!empty($lote) && ($tamano_lote + $tamano_fila) > $limite_bytes) {
+                    $chunks[] = "INSERT INTO adyacente (idsuperestructura, idnodo, enlace, idadyacente) VALUES " . implode(", ", $lote) . ";";
+                    $lote = [];
+                    $tamano_lote = 0;
+                }
+                $lote[] = $fila;
+                $tamano_lote += $tamano_fila;
+            }
+        }
+        if (!empty($lote)) {
+            $chunks[] = "INSERT INTO adyacente (idsuperestructura, idnodo, enlace, idadyacente) VALUES " . implode(", ", $lote) . ";";
+        }
+        return $chunks;
+    }
 
-		foreach ($datos as $id => $dato) {
-			if (!is_string($dato) && !is_null($dato) && !is_int($dato)) {
-				$dato = null;
-			}
-			$id_escapado = $sql->real_escape_string((string)$id);
-			$dato_escapado = is_null($dato) ? '' : $sql->real_escape_string((string)$dato);
-			$fila = "('" . $nombre_escapado . "','" . $id_escapado . "','" . $dato_escapado . "')";
-			$tamano_fila = strlen($fila) + 2;
+    static public function eliminar($nombre): bool|null
+    {
+        if (!is_string($nombre)) {
+            self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre), el identificador pasado como parametro no es un string");
+            return null;
+        }
+        $sql = self::crear_conexion_sql();
+        if (!$sql) {
+            self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) no se pudo crear la conexion");
+            return null;
+        }
+        $nombre_escapado = $sql->real_escape_string((string)$nombre);
+        if (!$rcontar = $sql->query("SELECT COUNT(*) FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+            self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) error intentado ver si la superestructura existe");
+            static::_liberar_conexion_sql($sql);
+            return null;
+        }
+        $cant = $rcontar->fetch_assoc()['COUNT(*)'];
+        $r = false;
+        if ($cant > 0) {
+            if (!$sql->query("DELETE FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+                self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) fallo DELETE en nodo: " . $sql->error);
+                static::_liberar_conexion_sql($sql);
+                return null;
+            }
+            if (!$sql->query("DELETE FROM `adyacente` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+                self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) fallo DELETE en adyacente: " . $sql->error);
+                static::_liberar_conexion_sql($sql);
+                return null;
+            }
+            $r = true;
+        } else {
+            self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) no existe superestructura con ese nombre");
+        }
+        static::_liberar_conexion_sql($sql);
+        return $r;
+    }
 
-			if (!empty($lote) && ($tamano_lote + $tamano_fila) > $limite_bytes) {
-				$chunks[] = "INSERT INTO nodo (idsuperestructura, idnodo, dato) VALUES " . implode(", ", $lote) . ";";
-				$lote = [];
-				$tamano_lote = 0;
-			}
-			$lote[] = $fila;
-			$tamano_lote += $tamano_fila;
-		}
-		if (!empty($lote)) {
-			$chunks[] = "INSERT INTO nodo (idsuperestructura, idnodo, dato) VALUES " . implode(", ", $lote) . ";";
-		}
-		return $chunks;
-	}
+    static public function cargar($nombre): bool|null
+    {
+        if (!is_string($nombre)) {
+            self::_error("PerdurarSuperestructuraString::cargar(nombre), el identificador pasado como parametro no es un string");
+            return false;
+        }
+        $sql = self::crear_conexion_sql();
+        if (!$sql) {
+            self::_error("PerdurarSuperestructuraString::cargar(nombre) no se pudo crear la conexion");
+            return null;
+        }
+        $nombre_escapado = $sql->real_escape_string((string)$nombre);
+        if (!$nodos = $sql->query("SELECT * FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+            self::_error("PerdurarSuperestructuraString::cargar(nombre) no se pudo cargar, no cargo nada");
+            static::_liberar_conexion_sql($sql);
+            return null;
+        }
+        $nodo = $nodos->fetch_assoc();
+        if (!$nodo) {
+            self::_alerta("alerta al cargar, no existe superestructura con el identificador pasado como parametro");
+            static::_liberar_conexion_sql($sql);
+            return false;
+        }
+        $equivalencias = array();
+        while ($nodo != null) {
+            $id = $nodo["idnodo"];
+            if (Nodo::es_id_especial($id)) {
+                if (!$naux = Nodo::nodo_por_id($id)) {
+                    Nodo::crear_con_dato_e_id($nodo["dato"], $id);
+                } else {
+                    $naux->_dato($nodo["dato"]);
+                }
+            } else {
+                $idnuevo = Nodo::crear_con_dato($nodo["dato"])->id();
+                $equivalencias[$id] = $idnuevo;
+            }
+            $nodo = $nodos->fetch_assoc();
+        }
+        if (!$adyacentes = $sql->query("SELECT * FROM `adyacente` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+            self::_error("PerdurarSuperestructuraString::cargar(nombre) no se pudieron cargar los adyacentes: " . $sql->error);
+            static::_liberar_conexion_sql($sql);
+            return null;
+        }
+        $adyacente = $adyacentes->fetch_assoc();
+        while ($adyacente != null) {
+            $idnod = $adyacente["idnodo"];
+            if (!Nodo::es_id_especial($idnod)) {
+                if (!isset($equivalencias[$idnod])) {
+                    self::_error("No se encontró equivalencia para idnodo=$idnod");
+                    $adyacente = $adyacentes->fetch_assoc();
+                    continue;
+                }
+                $idnod = $equivalencias[$idnod];
+            }
+            $nodo = Nodo::nodo_por_id($idnod);
+            $idady = $adyacente["idadyacente"];
+            if (!Nodo::es_id_especial($idady)) {
+                if (!isset($equivalencias[$idady])) {
+                    self::_error("No se encontró equivalencia para idadyacente=$idady");
+                    $adyacente = $adyacentes->fetch_assoc();
+                    continue;
+                }
+                $idady = $equivalencias[$idady];
+            }
+            $nodoady = Nodo::nodo_por_id($idady);
+            if (!$nodo || !$nodoady) {
+                self::_error("No se pudo reconstruir el enlace: idnodo=$idnod, idadyacente=$idady, enlace={$adyacente['enlace']}");
+                $adyacente = $adyacentes->fetch_assoc();
+                continue;
+            }
+            $nodo->_adyacente_en($nodoady, $adyacente["enlace"]);
+            $adyacente = $adyacentes->fetch_assoc();
+        }
+        static::_liberar_conexion_sql($sql);
+        return true;
+    }
 
-    /**
-     * Arma los chunks de INSERT para la tabla adyacente.
-     *
-     * @param \mysqli $sql Conexion activa.
-     * @param string  $nombre Nombre de la superestructura.
-     * @return array Lista de queries listas para ejecutar.
-     */
-	static private function crear_chunks_insertar_adyacentes($sql, $nombre): array
-	{
-		$datos = Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) {
-			$enlaces = [];
-			// Usamos adyacentes() en lugar de por_cada_adyacente_ejecutar
-			// porque el primero devuelve [] sin alerta cuando el nodo no
-			// tiene adyacentes. El segundo emite una alerta por cada nodo
-			// sin adyacentes, lo que llena la lista de alertas con ruido
-			// (alineado con el espejo JS desde V1.5i.7).
-			$ady = $nodo->adyacentes();
-			if (is_array($ady)) {
-				foreach ($ady as $enlace => $adyacente) {
-					$enlaces[$enlace] = $adyacente->id();
-				}
-			}
-			return $enlaces;
-		});
-
-		if (empty($datos)) return [];
-
-		$nombre_escapado = $sql->real_escape_string((string)$nombre);
-		$limite_bytes = 200 * 1024;
-		$chunks = [];
-		$lote = [];
-		$tamano_lote = 0;
-
-		foreach ($datos as $idnodo => $arreglo) {
-			if (!is_array($arreglo) || empty($arreglo)) continue;
-			foreach ($arreglo as $enlace => $idady) {
-				$idnodo_escapado = $sql->real_escape_string((string)$idnodo);
-				$enlace_escapado = $sql->real_escape_string((string)$enlace);
-				$idady_escapado = $sql->real_escape_string((string)$idady);
-				$fila = "('" . $nombre_escapado . "','" . $idnodo_escapado . "','" . $enlace_escapado . "','" . $idady_escapado . "')";
-				$tamano_fila = strlen($fila) + 2;
-
-				if (!empty($lote) && ($tamano_lote + $tamano_fila) > $limite_bytes) {
-					$chunks[] = "INSERT INTO adyacente (idsuperestructura, idnodo, enlace, idadyacente) VALUES " . implode(", ", $lote) . ";";
-					$lote = [];
-					$tamano_lote = 0;
-				}
-				$lote[] = $fila;
-				$tamano_lote += $tamano_fila;
-			}
-		}
-		if (!empty($lote)) {
-			$chunks[] = "INSERT INTO adyacente (idsuperestructura, idnodo, enlace, idadyacente) VALUES " . implode(", ", $lote) . ";";
-		}
-		return $chunks;
-	}
-    /**
-     * Elimina una superestructura de la base de datos.
-     * 
-	 * @interface PerdurarSuperestructura
-	 * 
-     * @usecase Remover una superestructura persistida por nombre.
-     * 
-     * @preconditions Debe existir una superestructura guardada con el nombre especificado.
-     * 
-     * @param string $nombre Identificador de la superestructura a eliminar.
-     * 
-     * @return bool|null `true` si fue eliminada, `false` si no existía, `null` en caso de error.
-     * 
-     * @postconditions La superestructura con ese nombre queda eliminada de la BD.
-     */
-	static public function eliminar($nombre): bool|null
-	{
-		if (!is_string($nombre)) {
-			self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre), el identificador pasado como parametro no es un string");
-			return null;
-		}
-		$sql = self::crear_conexion_sql();
-		if (!$sql) {
-			self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) no se pudo crear la conexion");
-			return null;
-		}
-		$nombre_escapado = $sql->real_escape_string((string)$nombre);
-		if (!$rcontar = $sql->query("SELECT COUNT(*) FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
-			self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) error intentado ver si la superestructura existe");
-			$sql->close();
-			return null;
-		}
-		$cant = $rcontar->fetch_assoc()['COUNT(*)'];
-		$r = false;
-		if ($cant > 0) {
-			if (!$sql->query("DELETE FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
-				self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) fallo DELETE en nodo: " . $sql->error);
-				$sql->close();
-				return null;
-			}
-			if (!$sql->query("DELETE FROM `adyacente` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
-				self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) fallo DELETE en adyacente: " . $sql->error);
-				$sql->close();
-				return null;
-			}
-			$r = true;
-		} else {
-			self::_error("PerdurarSuperestructuraString::eliminar_sql(nombre) no existe superestructura con ese nombre");			
-		}
-		$sql->close();
-		return $r;
-	}
-    /**
-     * Carga una superestructura desde la base de datos.
-     * 
-	 * @interface PerdurarSuperestructura
-	 * 
-     * @usecase Recuperar una superestructura persistida por nombre.
-     * 
-     * @preconditions Debe existir una superestructura guardada con el nombre especificado.
-     * 
-     * @param string $nombre Identificador de la superestructura a cargar.
-     * 
-     * @return bool|null `true` si la carga fue exitosa, `false` si no existe, `null` en caso de error.
-     * 
-     * @postconditions La superestructura queda cargada en memoria.
-     * 
-     * @notes Maneja equivalencias de IDs y reconstruye las relaciones entre nodos.
-     */
-	static public function cargar($nombre): bool|null
-	{
-		if (!is_string($nombre)) {
-			self::_error("PerdurarSuperestructuraString::cargar(nombre), el identificador pasado como parametro no es un string");
-			return false;
-		}
-		$sql = self::crear_conexion_sql();
-		if (!$sql) {
-			self::_error("PerdurarSuperestructuraString::cargar(nombre) no se pudo crear la conexion");
-			return null;
-		}
-		$nombre_escapado = $sql->real_escape_string((string)$nombre);
-
-		if (!$nodos = $sql->query("SELECT * FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
-			self::_error("PerdurarSuperestructuraString::cargar(nombre) no se pudo cargar, no cargo nada");
-			$sql->close();
-			return null;
-		}
-		$nodo = $nodos->fetch_assoc();
-		if (!$nodo) {
-			self::_alerta("alerta al cargar, no existe superestructura con el identificador pasado como parametro");
-			$sql->close();
-			return false;
-		}
-
-		// La superestructura ya fue vaciada por el Controlador
-		$equivalencias = array();
-		while ($nodo != null) {
-			$id = $nodo["idnodo"];
-			if (Nodo::es_id_especial($id)) {
-				if (!$naux = Nodo::nodo_por_id($id)) {
-					Nodo::crear_con_dato_e_id($nodo["dato"], $id);
-				} else {
-					$naux->_dato($nodo["dato"]);
-				}
-			} else {
-				$idnuevo = Nodo::crear_con_dato($nodo["dato"])->id();
-				$equivalencias[$id] = $idnuevo;
-			}
-			$nodo = $nodos->fetch_assoc();
-		}
-
-		if (!$adyacentes = $sql->query("SELECT * FROM `adyacente` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
-			self::_error("PerdurarSuperestructuraString::cargar(nombre) no se pudieron cargar los adyacentes: " . $sql->error);
-			$sql->close();
-			return null;
-		}
-
-		$adyacente = $adyacentes->fetch_assoc();
-		while ($adyacente != null) {
-			$idnod = $adyacente["idnodo"];
-			if (!Nodo::es_id_especial($idnod)) {
-				if (!isset($equivalencias[$idnod])) {
-					self::_error("No se encontró equivalencia para idnodo=$idnod");
-					$adyacente = $adyacentes->fetch_assoc();
-					continue;
-				}
-				$idnod = $equivalencias[$idnod];
-			}
-
-			$nodo = Nodo::nodo_por_id($idnod);
-
-			$idady = $adyacente["idadyacente"];
-			if (!Nodo::es_id_especial($idady)) {
-				if (!isset($equivalencias[$idady])) {
-					self::_error("No se encontró equivalencia para idadyacente=$idady");
-					$adyacente = $adyacentes->fetch_assoc();
-					continue;
-				}
-				$idady = $equivalencias[$idady];
-			}
-
-			$nodoady = Nodo::nodo_por_id($idady);
-
-			if (!$nodo || !$nodoady) {
-				self::_error("No se pudo reconstruir el enlace: idnodo=$idnod, idadyacente=$idady, enlace={$adyacente['enlace']}");
-				$adyacente = $adyacentes->fetch_assoc();
-				continue;
-			}
-
-			$nodo->_adyacente_en($nodoady, $adyacente["enlace"]);
-
-			$adyacente = $adyacentes->fetch_assoc();
-		}
-		$sql->close();
-		return true;
-	}
-    /**
-     * Verifica la existencia de una superestructura en la base de datos.
-     * 
-	 * @interface PerdurarSuperestructura
-	 * 
-     * @usecase Consultar si existe una superestructura persistida por nombre.
-     * 
-     * @param string $nombre Identificador de la superestructura a verificar.
-     * 
-     * @return bool|null `true` si existe, `false` si no existe, `null` en caso de error.
-     */
-	static public function existe($nombre): bool|null
-	{
-		if (!is_string($nombre)) {
-			self::_error("PerdurarSuperestructuraString::existe_sql(nombre), el identificador pasado como parametro no es un string");
-			return null;
-		}
-		$sql = self::crear_conexion_sql();
-		if (!$sql) {
-			self::_error("PerdurarSuperestructuraString::existe_sql(nombre) no se pudo crear la conexion");
-			return null;
-		}
-		$nombre_escapado = $sql->real_escape_string((string)$nombre);
-
-		if (!$rcontar = $sql->query("SELECT COUNT(*) FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
-			self::_error("PerdurarSuperestructuraString::existe_sql(nombre) no se pudo contar");
-			$sql->close();
-			return null;
-		}
-		$cant = $rcontar->fetch_assoc()['COUNT(*)'];
-		$sql->close();
-		return $cant > 0;
-	}
+    static public function existe($nombre): bool|null
+    {
+        if (!is_string($nombre)) {
+            self::_error("PerdurarSuperestructuraString::existe_sql(nombre), el identificador pasado como parametro no es un string");
+            return null;
+        }
+        $sql = self::crear_conexion_sql();
+        if (!$sql) {
+            self::_error("PerdurarSuperestructuraString::existe_sql(nombre) no se pudo crear la conexion");
+            return null;
+        }
+        $nombre_escapado = $sql->real_escape_string((string)$nombre);
+        if (!$rcontar = $sql->query("SELECT COUNT(*) FROM `nodo` WHERE `idsuperestructura`='" . $nombre_escapado . "';")) {
+            self::_error("PerdurarSuperestructuraString::existe_sql(nombre) no se pudo contar");
+            static::_liberar_conexion_sql($sql);
+            return null;
+        }
+        $cant = $rcontar->fetch_assoc()['COUNT(*)'];
+        static::_liberar_conexion_sql($sql);
+        return $cant > 0;
+    }
 }
 ?>

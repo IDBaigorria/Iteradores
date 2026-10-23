@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.81j
+ * @version   1.5piloto.81w
  */
 
 
@@ -1753,7 +1753,18 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
         Nodo::eliminar($nodo_venta);
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.81w: chequear el resultado del guardado.
+    // Antes se ignoraba y el backend respondía "éxito" aunque
+    // la DB no se hubiera actualizado (bug §4.6 en hostings
+    // lentos con wait_timeout corto).
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("cancelar_venta: guardar_ambos falló para id_venta=$id_venta");
+        return [
+            'exito' => false,
+            'error' => 'La cancelación se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor (wait_timeout, conexión) o intentá de nuevo.',
+        ];
+    }
 
     $dev_ef_total = $desglose['en_terminal_efectivo'] + $desglose['rendido_efectivo'];
     $dev_ba_total = $desglose['en_terminal_banco'] + $desglose['rendido_banco'];
@@ -2597,14 +2608,32 @@ function _existe_cancelacion(Nodo $contenedor, string $id): bool {
  * @return string
  */
 function _crear_nodo_cancelacion(string $nombre_dueno, string $id_venta, string $motivo, Nodo $nodo_venta, array $desglose, array $cubierto, int $asientos_liberados, ?Nodo $nodo_contexto = null): string {
-    // Fase 1c.2: si viene contexto (terminal → compartido),
-    // agregar la cancelación en el contenedor `cancelaciones`
-    // del compartido. Si no, en el del dueño real.
-    // Nota: en producción convendría insertar en AMBOS árboles
-    // (paralelos) cuando la cancelación la hace un terminal.
-    // Se anota para una tanda futura.
+    // Fase 1c.2 + fix 1.5piloto.81t: determinar el contenedor
+    // y los nombres de enlace según el contexto.
+    //   - Terminal (compartido): insertar con hmi_<term>,
+    //     hd_<term>, p_<term>. El buzón drena al dueño.
+    //   - Dueño/admin: insertar con hmi/hd/p default.
     $nodo_dueno = $nodo_contexto ?: Nodo::nodo_por_id('us_' . $nombre_dueno);
     if (!$nodo_dueno) return '';
+
+    $es_compartido = ($nodo_contexto !== null && $nodo_contexto->adyacente('_es_compartido'));
+    $nombres = null;
+    if ($es_compartido) {
+        $nombre_term = _nombre_terminal_de_compartido($nodo_contexto);
+        if ($nombre_term === '') {
+            // Sin nombre del terminal no se puede parametrizar.
+            // Fallback: dueño real con nombres default.
+            $nodo_dueno = Nodo::nodo_por_id('us_' . $nombre_dueno);
+            if (!$nodo_dueno) return '';
+            $es_compartido = false;
+        } else {
+            $nombres = [
+                'p'   => 'p_'   . $nombre_term,
+                'hd'  => 'hd_'  . $nombre_term,
+                'hmi' => 'hmi_' . $nombre_term,
+            ];
+        }
+    }
 
     $contenedor = $nodo_dueno->adyacente('cancelaciones');
     if (!$contenedor) {
@@ -2676,14 +2705,16 @@ function _crear_nodo_cancelacion(string $nombre_dueno, string $id_venta, string 
 
     $nodo_canc->_adyacente_en(Nodo::crear_con_dato((string)$asientos_liberados), 'asientos_liberados');
 
-    _hmi($contenedor, $nodo_canc);
+    _hmi($contenedor, $nodo_canc, $nombres);
 
     // Si el contexto es un compartido (lo invocó un
     // terminal), dejar aviso en el buzón del compartido.
-    // El dueño procesará el buzón en su próxima carga.
+    // El dueño procesará el buzón en su próxima carga
+    // y lo insertará con hmi/hd/p default. Ambos juegos
+    // de enlaces coexisten en el mismo nodo físico.
     // El bitmask lo propaga el framework al guardar
     // parcial (v1.5i.8c). Bug §1.5.10.
-    if ($nodo_contexto !== null && $nodo_contexto->adyacente('_es_compartido')) {
+    if ($es_compartido && $nombres !== null) {
         _encolar_en_buzon($nodo_contexto, 'pendientes_cancelaciones', $id_cancelacion, $nodo_canc);
     }
 
@@ -2763,14 +2794,21 @@ function obtener_cancelacion_por_id(string $id_cancelacion, ?string $nombre_duen
         if (!$nodo_ctx) return null;
         $cont = $nodo_ctx->adyacente('cancelaciones');
         if (!$cont) return null;
-        $actual = hmi($cont);
+        // Fix 1.5piloto.81t: leer con nombres parametrizados.
+        $nombres = _nombres_arbol_para_contexto($nodo_ctx, $nombre_terminal);
+        // Fix 1.5piloto.81u: cycle guard.
+        $visitados = [];
+        $actual = hmi($cont, $nombres);
         $seg = 0;
         while ($actual && $seg < 2000) {
             $seg++;
+            $id_actual = (string)$actual->id();
+            if (isset($visitados[$id_actual])) break;
+            $visitados[$id_actual] = true;
             if ($actual->dato() === $id_cancelacion) {
                 return formatear_cancelacion_completa($actual);
             }
-            $actual = hd($actual);
+            $actual = hd($actual, $nombres);
         }
         return null;
     }
@@ -2781,10 +2819,15 @@ function obtener_cancelacion_por_id(string $id_cancelacion, ?string $nombre_duen
         if (!$nodo_dueno) return null;
         $cont = $nodo_dueno->adyacente('cancelaciones');
         if (!$cont) return null;
+        // Fix 1.5piloto.81u: cycle guard.
+        $visitados = [];
         $actual = hmi($cont);
         $seg = 0;
         while ($actual && $seg < 2000) {
             $seg++;
+            $id_actual = (string)$actual->id();
+            if (isset($visitados[$id_actual])) break;
+            $visitados[$id_actual] = true;
             if ($actual->dato() === $id_cancelacion) {
                 return formatear_cancelacion_completa($actual);
             }
@@ -2801,10 +2844,15 @@ function obtener_cancelacion_por_id(string $id_cancelacion, ?string $nombre_duen
         if (!$nivel || $nivel->dato() !== 'dueno') continue;
         $cont = $nodo_dueno->adyacente('cancelaciones');
         if (!$cont) continue;
+        // Fix 1.5piloto.81u: cycle guard.
+        $visitados = [];
         $actual = hmi($cont);
         $seg = 0;
         while ($actual && $seg < 2000) {
             $seg++;
+            $id_actual = (string)$actual->id();
+            if (isset($visitados[$id_actual])) break;
+            $visitados[$id_actual] = true;
             if ($actual->dato() === $id_cancelacion) {
                 return formatear_cancelacion_completa($actual);
             }
@@ -2925,19 +2973,30 @@ function listar_cancelaciones_de_dueno(string $nombre_dueno, array $filtros = []
     if (!$cont) return [];
 
     $f_terminal = trim((string)($filtros['terminal'] ?? ''));
+    // Fix 1.5piloto.81t: los compartidos usan nombres
+    // parametrizados (hmi_<term>/hd_<term>/p_<term>). El
+    // árbol del dueño usa default.
+    $nombres = _nombres_arbol_para_contexto($nodo_contexto, $f_terminal);
 
+    // Fix 1.5piloto.81u: cycle guard. La migración C.4 pudo
+    // haber generado ciclos en hd/hd_<term>. Trackear nodos
+    // visitados por id para no repetir.
     $cancelaciones = [];
-    $actual = hmi($cont);
+    $visitados = [];
+    $actual = hmi($cont, $nombres);
     $seg = 0;
     while ($actual && $seg < 2000) {
         $seg++;
+        $id_actual = (string)$actual->id();
+        if (isset($visitados[$id_actual])) break;
+        $visitados[$id_actual] = true;
         $formateada = formatear_cancelacion_completa($actual);
         if ($f_terminal !== '' && ($formateada['terminal'] ?? '') !== $f_terminal) {
-            $actual = hd($actual);
+            $actual = hd($actual, $nombres);
             continue;
         }
         $cancelaciones[] = $formateada;
-        $actual = hd($actual);
+        $actual = hd($actual, $nombres);
     }
     return $cancelaciones;
 }
