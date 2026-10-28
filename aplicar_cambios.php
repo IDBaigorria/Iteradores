@@ -1,603 +1,275 @@
 <?php
 /**
- * Aplicador — Tanda 4: piso en los flujos que faltan.
+ * Aplicador — Fase 0 del plan de diagnóstico del bug del guardado
+ * parcial (§4.7). Solo documentación. No toca código.
  *
- * Motivo: después del fix del croquis (v1.5piloto.82h), quedaron
- * tres flujos que todavía matchean por (fila, columna) sin piso:
- *  - Cambiar de asiento desde la pestaña Clientes (pasajeros.js).
- *  - Imprimir pasaje de reserva (pasaje_reserva).
- *  - Croquis impreso del micro (imprimir_croquis_micro).
- *
- * Fix: agregar `piso` a `formatear_venta_completa` (Venta.php),
- * pasarlo en los 3 flujos, y hacer que `imprimir_pasaje_reserva`
- * e `imprimir_croquis_micro` matcheen por (piso, fila, columna).
+ * Cambios:
+ * 1. plan_actual.md: header §1, congelar §4.5, agregar §4.7
+ *    (bug crítico + plan de 6 fases), renombrar deuda técnica
+ *    a §4.8, actualizar "Estado del proyecto al cierre".
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.82i';
+$version_nueva = '1.5piloto.83a';
 
-$htmls_a_bumpear = ['aplicacion_GET.html'];
+$htmls_a_bumpear = [];
 
 $cambios = [
 
 // ============================================================
-// 1. Venta.php — precalcular mapa id_asiento => piso
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Ventas/Venta.php',
-    'descripcion' => 'formatear_venta_completa: precalcular mapa id_asiento => piso',
-    'buscar' => [
-        '    // Asientos',
-        '    $asientos = [];',
-        '    $cabeza_asientos = $nodo_venta->adyacente(\'asientos\');',
-    ],
-    'reemplazar' => [
-        '    // Fix v1.5piloto.82i: precalcular mapa id_asiento => piso.',
-        '    // Necesario para desambiguar asientos de pisos distintos con',
-        '    // la misma (fila, columna) en formatear_venta_completa.',
-        '    $nodo_micro_para_piso = $nodo_venta->adyacente(\'micro\');',
-        '    $mapa_piso_asientos = [];',
-        '    if ($nodo_micro_para_piso) {',
-        '        $nodo_copia_mapa = $nodo_micro_para_piso->adyacente(\'vehiculo_copia\');',
-        '        if ($nodo_copia_mapa) {',
-        '            $nodo_asientos_mapa = $nodo_copia_mapa->adyacente(\'asientos\');',
-        '            if ($nodo_asientos_mapa) {',
-        '                for ($i_piso_mapa = 1; $i_piso_mapa <= 2; $i_piso_mapa++) {',
-        '                    $piso_mapa = $nodo_asientos_mapa->adyacente("piso_$i_piso_mapa");',
-        '                    if (!$piso_mapa) continue;',
-        '                    $cabeza_mapa = $piso_mapa->adyacente(\'asientos\');',
-        '                    if (!$cabeza_mapa) continue;',
-        '                    $actual_mapa = $cabeza_mapa->adyacente(\'primer\');',
-        '                    $seg_mapa = 0;',
-        '                    while ($actual_mapa && $actual_mapa->id() !== $cabeza_mapa->id() && $seg_mapa < 200) {',
-        '                        $mapa_piso_asientos[(string)$actual_mapa->id()] = (string)$i_piso_mapa;',
-        '                        $actual_mapa = $actual_mapa->adyacente(\'siguiente\');',
-        '                        $seg_mapa++;',
-        '                    }',
-        '                }',
-        '            }',
-        '        }',
-        '    }',
-        '',
-        '    // Asientos',
-        '    $asientos = [];',
-        '    $cabeza_asientos = $nodo_venta->adyacente(\'asientos\');',
-    ],
-],
-
-// ============================================================
-// 2. Venta.php — agregar 'piso' al asiento_info
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Ventas/Venta.php',
-    'descripcion' => 'formatear_venta_completa: agregar piso al asiento_info',
-    'buscar' => [
-        '            $asiento_info = [',
-        '                \'numero\' => $nodo_asiento_real ? $nodo_asiento_real->dato() : \'\',',
-        '                \'fila\' => $nodo_asiento_real && $nodo_asiento_real->adyacente(\'fila\') ? $nodo_asiento_real->adyacente(\'fila\')->dato() : \'\',',
-        '                \'columna\' => $nodo_asiento_real && $nodo_asiento_real->adyacente(\'columna\') ? $nodo_asiento_real->adyacente(\'columna\')->dato() : \'\',',
-        '                \'punto_subida_bajada\' => $nodo_punto_sb ? $nodo_punto_sb->dato() : null,',
-        '                \'hora_subida_bajada\' => $nodo_hora_sb ? $nodo_hora_sb->dato() : null,',
-        '            ];',
-    ],
-    'reemplazar' => [
-        '            $asiento_info = [',
-        '                \'numero\' => $nodo_asiento_real ? $nodo_asiento_real->dato() : \'\',',
-        '                \'piso\' => $nodo_asiento_real ? ($mapa_piso_asientos[(string)$nodo_asiento_real->id()] ?? \'\') : \'\',',
-        '                \'fila\' => $nodo_asiento_real && $nodo_asiento_real->adyacente(\'fila\') ? $nodo_asiento_real->adyacente(\'fila\')->dato() : \'\',',
-        '                \'columna\' => $nodo_asiento_real && $nodo_asiento_real->adyacente(\'columna\') ? $nodo_asiento_real->adyacente(\'columna\')->dato() : \'\',',
-        '                \'punto_subida_bajada\' => $nodo_punto_sb ? $nodo_punto_sb->dato() : null,',
-        '                \'hora_subida_bajada\' => $nodo_hora_sb ? $nodo_hora_sb->dato() : null,',
-        '            ];',
-    ],
-],
-
-// ============================================================
-// 3. Impresion.php — imprimir_pasaje_reserva: firma con piso
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Impresion/Impresion.php',
-    'descripcion' => 'imprimir_pasaje_reserva: firma con piso',
-    'buscar' => [
-        'function imprimir_pasaje_reserva(string $nombre_dueno, string $nombre_viaje, string $nombre_micro, string $fila, string $columna): void {',
-    ],
-    'reemplazar' => [
-        'function imprimir_pasaje_reserva(string $nombre_dueno, string $nombre_viaje, string $nombre_micro, string $fila, string $columna, ?string $piso = null): void {',
-    ],
-],
-
-// ============================================================
-// 4. Impresion.php — imprimir_pasaje_reserva: matcheo por piso
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Impresion/Impresion.php',
-    'descripcion' => 'imprimir_pasaje_reserva: matcheo por piso',
-    'buscar' => [
-        '    // Buscar el asiento por fila/columna',
-        '    $nodo_asiento = null;',
-        '    $nodo_asientos = $nodo_copia->adyacente(\'asientos\');',
-        '    if ($nodo_asientos) {',
-        '        for ($i = 1; $i <= 2; $i++) {',
-        '            $piso = $nodo_asientos->adyacente("piso_$i");',
-        '            if (!$piso) continue;',
-        '            $cabeza = $piso->adyacente(\'asientos\');',
-        '            if (!$cabeza) continue;',
-        '            $actual = $cabeza->adyacente(\'primer\');',
-        '            while ($actual && $actual->id() !== $cabeza->id()) {',
-        '                $f = $actual->adyacente(\'fila\');',
-        '                $c = $actual->adyacente(\'columna\');',
-        '                if ($f && $c && $f->dato() === $fila && $c->dato() === $columna) {',
-        '                    $nodo_asiento = $actual;',
-        '                    break 2;',
-        '                }',
-        '                $actual = $actual->adyacente(\'siguiente\');',
-        '            }',
-        '        }',
-        '    }',
-    ],
-    'reemplazar' => [
-        '    // Buscar el asiento por (piso, fila, columna). Si $piso viene',
-        '    // null, comportamiento anterior (compatibilidad con URLs viejas).',
-        '    // Fix v1.5piloto.82i.',
-        '    $nodo_asiento = null;',
-        '    $nodo_asientos = $nodo_copia->adyacente(\'asientos\');',
-        '    if ($nodo_asientos) {',
-        '        for ($i = 1; $i <= 2; $i++) {',
-        '            if ($piso !== null && $piso !== \'\' && (string)$i !== (string)$piso) continue;',
-        '            $nodo_piso = $nodo_asientos->adyacente("piso_$i");',
-        '            if (!$nodo_piso) continue;',
-        '            $cabeza = $nodo_piso->adyacente(\'asientos\');',
-        '            if (!$cabeza) continue;',
-        '            $actual = $cabeza->adyacente(\'primer\');',
-        '            while ($actual && $actual->id() !== $cabeza->id()) {',
-        '                $f = $actual->adyacente(\'fila\');',
-        '                $c = $actual->adyacente(\'columna\');',
-        '                if ($f && $c && $f->dato() === $fila && $c->dato() === $columna) {',
-        '                    $nodo_asiento = $actual;',
-        '                    break 2;',
-        '                }',
-        '                $actual = $actual->adyacente(\'siguiente\');',
-        '            }',
-        '        }',
-        '    }',
-    ],
-],
-
-// ============================================================
-// 5. Impresion.php — imprimir_croquis_micro: mapa con piso
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Impresion/Impresion.php',
-    'descripcion' => 'imprimir_croquis_micro: mapa de pasajeros con piso',
-    'buscar' => [
-        '    // Mapa de pasajeros por fila-columna para lookup rápido.',
-        '    $pasajeros = _recolectar_asientos_con_pasajero_de_micro($nodo_micro);',
-        '    $por_fc = [];',
-        '    foreach ($pasajeros as $p) {',
-        '        $por_fc[$p[\'fila\'] . \'-\' . $p[\'columna\']] = $p;',
-        '    }',
-    ],
-    'reemplazar' => [
-        '    // Mapa de pasajeros por (piso, fila, columna) para lookup rápido.',
-        '    // Fix v1.5piloto.82i: clave con piso para no pisar asientos de',
-        '    // pisos distintos con la misma (fila, columna).',
-        '    $pasajeros = _recolectar_asientos_con_pasajero_de_micro($nodo_micro);',
-        '    $por_pfc = [];',
-        '    foreach ($pasajeros as $p) {',
-        '        $por_pfc[$p[\'piso\'] . \'-\' . $p[\'fila\'] . \'-\' . $p[\'columna\']] = $p;',
-        '    }',
-    ],
-],
-
-// ============================================================
-// 6. Impresion.php — imprimir_croquis_micro: lookup con piso
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Impresion/Impresion.php',
-    'descripcion' => 'imprimir_croquis_micro: lookup con piso',
-    'buscar' => [
-        '                $info_pas = $por_fc[$clave_fc] ?? null;',
-    ],
-    'reemplazar' => [
-        '                $info_pas = $por_pfc[$i . \'-\' . $clave_fc] ?? null;',
-    ],
-],
-
-// ============================================================
-// 7. pasajeros.js — pasar asientoInfo.piso a cambiar_asiento
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/pasajeros.js',
-    'descripcion' => 'ver_detalle_pasaje_individual: pasar piso a cambiar_asiento',
-    'buscar' => [
-        '            abrir_modal_cambiar_asiento(',
-        '                nombre_dueno,',
-        '                venta.viaje,',
-        '                nombre_micro_real,',
-        '                asientoInfo.fila,',
-        '                asientoInfo.columna,',
-        '                (info) => {',
-        '                    // v77d: re-abrir el detalle con el asiento',
-        '                    // nuevo. El modal apilado ya está cerrado,',
-        '                    // así que el modal genérico se actualiza',
-        '                    // con los datos frescos del backend.',
-        '                    if (info && info.destino_numero) {',
-        '                        ver_detalle_pasaje_individual(',
-        '                            venta.id_venta,',
-        '                            pasajero.dni,',
-        '                            info.destino_numero',
-        '                        );',
-        '                    }',
-        '                }',
-        '            );',
-    ],
-    'reemplazar' => [
-        '            abrir_modal_cambiar_asiento(',
-        '                nombre_dueno,',
-        '                venta.viaje,',
-        '                nombre_micro_real,',
-        '                asientoInfo.fila,',
-        '                asientoInfo.columna,',
-        '                (info) => {',
-        '                    // v77d: re-abrir el detalle con el asiento',
-        '                    // nuevo. El modal apilado ya está cerrado,',
-        '                    // así que el modal genérico se actualiza',
-        '                    // con los datos frescos del backend.',
-        '                    if (info && info.destino_numero) {',
-        '                        ver_detalle_pasaje_individual(',
-        '                            venta.id_venta,',
-        '                            pasajero.dni,',
-        '                            info.destino_numero',
-        '                        );',
-        '                    }',
-        '                },',
-        '                asientoInfo.piso',
-        '            );',
-    ],
-],
-
-// ============================================================
-// 8. viajes-asientos.js — mostrar_modal_chico_impresion_reserva:
-//    aceptar piso y agregarlo a la URL
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-    'descripcion' => 'mostrar_modal_chico_impresion_reserva: firma con piso',
-    'buscar' => [
-        'function mostrar_modal_chico_impresion_reserva(nombre_dueno, nombre_viaje, nombre_micro, fila, columna, numero_asiento) {',
-    ],
-    'reemplazar' => [
-        'function mostrar_modal_chico_impresion_reserva(nombre_dueno, nombre_viaje, nombre_micro, fila, columna, numero_asiento, piso = null) {',
-    ],
-],
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-    'descripcion' => 'mostrar_modal_chico_impresion_reserva: URL con piso',
-    'buscar' => [
-        '    btnImprimir.onclick = () => {',
-        '        const url = `index.php?imprimir=1&tipo=pasaje_reserva`',
-        '            + `&dueno=${encodeURIComponent(nombre_dueno)}`',
-        '            + `&viaje=${encodeURIComponent(nombre_viaje)}`',
-        '            + `&micro=${encodeURIComponent(nombre_micro)}`',
-        '            + `&fila=${encodeURIComponent(fila)}`',
-        '            + `&columna=${encodeURIComponent(columna)}`;',
-        '        window.open(url, \'_blank\');',
-        '    };',
-    ],
-    'reemplazar' => [
-        '    btnImprimir.onclick = () => {',
-        '        let url = `index.php?imprimir=1&tipo=pasaje_reserva`',
-        '            + `&dueno=${encodeURIComponent(nombre_dueno)}`',
-        '            + `&viaje=${encodeURIComponent(nombre_viaje)}`',
-        '            + `&micro=${encodeURIComponent(nombre_micro)}`',
-        '            + `&fila=${encodeURIComponent(fila)}`',
-        '            + `&columna=${encodeURIComponent(columna)}`;',
-        '        if (piso !== null && piso !== undefined && piso !== \'\') {',
-        '            url += `&piso=${encodeURIComponent(piso)}`;',
-        '        }',
-        '        window.open(url, \'_blank\');',
-        '    };',
-    ],
-],
-
-// ============================================================
-// 9. viajes-asientos.js — llamada desde
-//    abrir_modal_reservar_asiento: pasar piso
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-    'descripcion' => 'abrir_modal_reservar_asiento: pasar piso a la impresión',
-    'buscar' => [
-        '            if (datos_pasajero) {',
-        '                mostrar_modal_chico_impresion_reserva(',
-        '                    nombre_dueno_reserva,',
-        '                    nombre_viaje_reserva,',
-        '                    nombre_micro_reserva,',
-        '                    fila,',
-        '                    columna,',
-        '                    asiento.numero',
-        '                );',
-        '            }',
-    ],
-    'reemplazar' => [
-        '            if (datos_pasajero) {',
-        '                mostrar_modal_chico_impresion_reserva(',
-        '                    nombre_dueno_reserva,',
-        '                    nombre_viaje_reserva,',
-        '                    nombre_micro_reserva,',
-        '                    fila,',
-        '                    columna,',
-        '                    asiento.numero,',
-        '                    piso',
-        '                );',
-        '            }',
-    ],
-],
-
-// ============================================================
-// 10. viajes-asientos.js — llamada desde
-//     abrir_modal_asignar_pasajero: pasar piso
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-    'descripcion' => 'abrir_modal_asignar_pasajero: pasar piso a la impresión',
-    'buscar' => [
-        '            mostrar_modal_chico_impresion_reserva(',
-        '                nombre_dueno,',
-        '                nombre_viaje_asig,',
-        '                nombre_micro_asig,',
-        '                fila,',
-        '                columna,',
-        '                asiento.numero',
-        '            );',
-    ],
-    'reemplazar' => [
-        '            mostrar_modal_chico_impresion_reserva(',
-        '                nombre_dueno,',
-        '                nombre_viaje_asig,',
-        '                nombre_micro_asig,',
-        '                fila,',
-        '                columna,',
-        '                asiento.numero,',
-        '                piso',
-        '            );',
-    ],
-],
-
-// ============================================================
-// 11. viajes-asientos.js — ver_pasaje_asiento: botón con
-//     data-piso
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-    'descripcion' => 'ver_pasaje_asiento: botón imprimir con data-piso',
-    'buscar' => [
-        '        html += `<div class="actions" style="margin-top:15px;">',
-        '            <button class="btn primary" id="btn_imprimir_pasaje_asiento" data-modo="reserva" data-dueno="${nd}" data-viaje="${nv}" data-micro="${nm}" data-fila="${fila}" data-columna="${columna}">Imprimir pasaje</button>',
-        '            ${btn_cambiar_html}',
-        '            <button class="btn" id="btn_cerrar_ver_pasaje">Cerrar</button>',
-        '        </div>`;',
-    ],
-    'reemplazar' => [
-        '        html += `<div class="actions" style="margin-top:15px;">',
-        '            <button class="btn primary" id="btn_imprimir_pasaje_asiento" data-modo="reserva" data-dueno="${nd}" data-viaje="${nv}" data-micro="${nm}" data-fila="${fila}" data-columna="${columna}" data-piso="${piso || \'\'}">Imprimir pasaje</button>',
-        '            ${btn_cambiar_html}',
-        '            <button class="btn" id="btn_cerrar_ver_pasaje">Cerrar</button>',
-        '        </div>`;',
-    ],
-],
-
-// ============================================================
-// 12. viajes-asientos.js — ver_pasaje_asiento: listener
-//     con piso
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-    'descripcion' => 'ver_pasaje_asiento: URL con piso',
-    'buscar' => [
-        '            } else {',
-        '                const nd = this.dataset.dueno;',
-        '                const nv = this.dataset.viaje;',
-        '                const nm = this.dataset.micro;',
-        '                const fila = this.dataset.fila;',
-        '                const columna = this.dataset.columna;',
-        '                window.open(',
-        '                    `index.php?imprimir=1&tipo=pasaje_reserva`',
-        '                    + `&dueno=${encodeURIComponent(nd)}`',
-        '                    + `&viaje=${encodeURIComponent(nv)}`',
-        '                    + `&micro=${encodeURIComponent(nm)}`',
-        '                    + `&fila=${fila}&columna=${columna}`,',
-        '                    \'_blank\'',
-        '                );',
-        '            }',
-    ],
-    'reemplazar' => [
-        '            } else {',
-        '                const nd = this.dataset.dueno;',
-        '                const nv = this.dataset.viaje;',
-        '                const nm = this.dataset.micro;',
-        '                const fila = this.dataset.fila;',
-        '                const columna = this.dataset.columna;',
-        '                const piso = this.dataset.piso;',
-        '                let url = `index.php?imprimir=1&tipo=pasaje_reserva`',
-        '                    + `&dueno=${encodeURIComponent(nd)}`',
-        '                    + `&viaje=${encodeURIComponent(nv)}`',
-        '                    + `&micro=${encodeURIComponent(nm)}`',
-        '                    + `&fila=${fila}&columna=${columna}`;',
-        '                if (piso !== null && piso !== undefined && piso !== \'\') {',
-        '                    url += `&piso=${encodeURIComponent(piso)}`;',
-        '                }',
-        '                window.open(url, \'_blank\');',
-        '            }',
-    ],
-],
-
-// ============================================================
-// 13. viajes-asientos.js — _confirmar_cambiar_asiento:
-//     snapshot con destino_piso
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-    'descripcion' => '_confirmar_cambiar_asiento: snapshot con destino_piso',
-    'buscar' => [
-        '            const snap = {',
-        '                estado: d.origen_estado,',
-        '                dueno: d.dueno,',
-        '                viaje: d.viaje,',
-        '                micro: d.micro,',
-        '                destino_fila: d.destino.fila,',
-        '                destino_columna: d.destino.columna,',
-        '                destino_numero: d.destino.numero,',
-        '                pasajero_dni: d.origen_pasajero_dni',
-        '            };',
-    ],
-    'reemplazar' => [
-        '            const snap = {',
-        '                estado: d.origen_estado,',
-        '                dueno: d.dueno,',
-        '                viaje: d.viaje,',
-        '                micro: d.micro,',
-        '                destino_fila: d.destino.fila,',
-        '                destino_columna: d.destino.columna,',
-        '                destino_numero: d.destino.numero,',
-        '                destino_piso: d.destino.piso || \'\',',
-        '                pasajero_dni: d.origen_pasajero_dni',
-        '            };',
-    ],
-],
-
-// ============================================================
-// 14. viajes-asientos.js — _confirmar_cambiar_asiento:
-//     pasar destino_piso a la impresión
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/viajes-asientos.js',
-    'descripcion' => '_confirmar_cambiar_asiento: pasar destino_piso',
-    'buscar' => [
-        '            } else if (snap.estado === \'reservado\') {',
-        '                if (typeof mostrar_modal_chico_impresion_reserva === \'function\') {',
-        '                    mostrar_modal_chico_impresion_reserva(',
-        '                        snap.dueno,',
-        '                        snap.viaje,',
-        '                        snap.micro,',
-        '                        snap.destino_fila,',
-        '                        snap.destino_columna,',
-        '                        snap.destino_numero',
-        '                    );',
-        '                }',
-        '            }',
-    ],
-    'reemplazar' => [
-        '            } else if (snap.estado === \'reservado\') {',
-        '                if (typeof mostrar_modal_chico_impresion_reserva === \'function\') {',
-        '                    mostrar_modal_chico_impresion_reserva(',
-        '                        snap.dueno,',
-        '                        snap.viaje,',
-        '                        snap.micro,',
-        '                        snap.destino_fila,',
-        '                        snap.destino_columna,',
-        '                        snap.destino_numero,',
-        '                        snap.destino_piso',
-        '                    );',
-        '                }',
-        '            }',
-    ],
-],
-
-// ============================================================
-// 15. index.php — pasaje_reserva: pasar $_GET['piso']
-// ============================================================
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'index.php',
-    'descripcion' => 'pasaje_reserva: pasar piso desde el GET',
-    'buscar' => [
-        '    if ($tipo === \'pasaje_reserva\') {',
-        '        imprimir_pasaje_reserva(',
-        '            $_GET[\'dueno\'] ?? \'\',',
-        '            $_GET[\'viaje\'] ?? \'\',',
-        '            $_GET[\'micro\'] ?? \'\',',
-        '            $_GET[\'fila\'] ?? \'\',',
-        '            $_GET[\'columna\'] ?? \'\'',
-        '        );',
-        '        exit;',
-        '    }',
-    ],
-    'reemplazar' => [
-        '    if ($tipo === \'pasaje_reserva\') {',
-        '        imprimir_pasaje_reserva(',
-        '            $_GET[\'dueno\'] ?? \'\',',
-        '            $_GET[\'viaje\'] ?? \'\',',
-        '            $_GET[\'micro\'] ?? \'\',',
-        '            $_GET[\'fila\'] ?? \'\',',
-        '            $_GET[\'columna\'] ?? \'\',',
-        '            $_GET[\'piso\'] ?? null',
-        '        );',
-        '        exit;',
-        '    }',
-    ],
-],
-
-// ============================================================
-// 16. plan_actual.md — registrar la Tanda 4
+// 1. Header de §1
 // ============================================================
 [
     'tipo' => 'reemplazar',
     'archivo' => 'prompts/plan_actual.md',
-    'descripcion' => 'plan_actual: Tanda 4 (piso en flujos que faltan)',
+    'descripcion' => 'Header §1: versión 83a + bug §4.7',
     'buscar' => [
-        '- **Migración de pasajeros entre micros — Tanda 1',
-        '  (v1.5piloto.82e).** Nueva función',
-    ],
-    'reemplazar' => [
-        '- **Piso en los flujos que faltaban (v1.5piloto.82i).**',
-        '  Cierre de los pendientes de la Tanda del croquis (v82h).',
-        '  `formatear_venta_completa` ahora incluye `piso` en cada',
-        '  asiento (precalculando un mapa `id_asiento → piso` una',
-        '  sola vez por venta). `pasajeros.js` pasa `asientoInfo.piso`',
-        '  a `abrir_modal_cambiar_asiento`. `imprimir_pasaje_reserva`',
-        '  acepta `?string $piso` y matchea por `(piso, fila, columna)`;',
-        '  `index.php` lo lee del GET. `imprimir_croquis_micro` usa',
-        '  clave `piso-fila-columna` en el mapa de pasajeros, así el',
-        '  croquis impreso del micro de 2 pisos ya no pierde los',
-        '  pasajeros de las filas 1-3 del piso 2. `viajes-asientos.js`',
-        '  pasa `piso` a la impresión desde reservar/asignar/cambiar.',
-        '  **Sin pendientes del bug de piso.**',
-        '- **Migración de pasajeros entre micros — Tanda 1',
-        '  (v1.5piloto.82e).** Nueva función',
-    ],
-],
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'prompts/plan_actual.md',
-    'descripcion' => 'plan_actual: versión del cierre',
-    'buscar' => [
-        '**Última actualización:** v1.5piloto.82h (fix del croquis',
-        'multi-piso + selección por piso. Ver §2 y §4.5).',
-    ],
-    'reemplazar' => [
         '**Última actualización:** v1.5piloto.82i (piso en los',
         'flujos que faltaban: cambiar de asiento desde Clientes,',
         'impresión de pasaje_reserva y croquis impreso del micro.',
         'Ver §2 y §4.5).',
+        '',
+        '**Antes (v1.5piloto.82d):** cierre del arco de cancelaciones en',
+        'compartidos + bug §4.6 de persistencia silenciosa en hostings',
+        'compartidos.',
+    ],
+    'reemplazar' => [
+        '**Última actualización:** v1.5piloto.83a (Fase 0 del',
+        'diagnóstico del bug crítico §4.7: corrupción del grafo',
+        'por guardado parcial. Solo documentación. No toca código).',
+        '',
+        '**Antes (v1.5piloto.82i):** piso en los flujos que faltaban',
+        '(cambiar de asiento desde Clientes, impresión de',
+        'pasaje_reserva y croquis impreso del micro). Ver §2.',
+        '',
+        '**Antes (v1.5piloto.82d):** cierre del arco de cancelaciones en',
+        'compartidos + bug §4.6 de persistencia silenciosa en hostings',
+        'compartidos.',
+    ],
+],
+
+// ============================================================
+// 2. §4.5: congelar el arco de migración
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/plan_actual.md',
+    'descripcion' => '§4.5: pausar el arco de migración por el bug §4.7',
+    'buscar' => [
+        '**Arco en curso: migración de pasajeros entre micros.**',
+        '',
+        'Plan completo en `prompts/plan_migrar_micro.md`.',
+        '',
+        '- **Tanda 1 (backend): cerrada en `1.5piloto.82e`.**',
+        '  `migrar_pasajeros_de_micro` en',
+        '  `Aplicacion/Viajes/ViajeMicros.php` + subacción',
+        '  `viajes/migrar_pasajeros` en `Aplicacion/Enrutador.php`.',
+        '- **Tanda 2 (frontend): cerrada en `1.5piloto.82f`.**',
+        '  Botón "Migrar pasajeros a..." en la tarjeta del micro (solo',
+        '  visible si el micro tiene asientos ocupados y el usuario',
+        '  no es terminal) + modal apilado con select de micros',
+        '  vacíos, aviso de layouts distintos, confirm() nativo y',
+        '  refresco post-migración (cierra o refresca el panel de',
+        '  pasaje según qué micro estaba abierto).',
+        '- **Tanda 3 (tests + docs): pendiente.** 7 tests del plugin',
+        '  + actualización de `aplicacion_POST.php`,',
+        '  `prompt_piloto.md` §5.8 y §4.9, y este archivo.',
+    ],
+    'reemplazar' => [
+        '**Arco en curso: migración de pasajeros entre micros.**',
+        '**ESTADO: EN PAUSA** hasta que el bug del guardado',
+        'parcial (§4.7) esté diagnosticado y blindado.',
+        '',
+        'Plan completo en `prompts/plan_migrar_micro.md`.',
+        '',
+        '- **Tanda 1 (backend): cerrada en `1.5piloto.82e`.**',
+        '  `migrar_pasajeros_de_micro` en',
+        '  `Aplicacion/Viajes/ViajeMicros.php` + subacción',
+        '  `viajes/migrar_pasajeros` en `Aplicacion/Enrutador.php`.',
+        '  **Aplicada en producción antes de conocer el bug',
+        '  §4.7.** No fue la causa del bug, pero la secuencia',
+        '  agregar micro → migrar → eliminar micro viejo → pagar',
+        '  cupón lo disparó. La base se restauró desde backup y',
+        '  se aplicaron las reparaciones idempotentes.',
+        '- **Tanda 2 (frontend): cerrada en `1.5piloto.82f`.**',
+        '  Botón "Migrar pasajeros a..." en la tarjeta del micro (solo',
+        '  visible si el micro tiene asientos ocupados y el usuario',
+        '  no es terminal) + modal apilado con select de micros',
+        '  vacíos, aviso de layouts distintos, confirm() nativo y',
+        '  refresco post-migración (cierra o refresca el panel de',
+        '  pasaje según qué micro estaba abierto).',
+        '- **Tanda 3 (tests + docs): pendiente.** 7 tests del plugin',
+        '  + actualización de `aplicacion_POST.php`,',
+        '  `prompt_piloto.md` §5.8 y §4.9, y este archivo.',
+        '',
+        '**La migración NO vuelve a producción** hasta que el',
+        'guardado parcial esté blindado (Fases 4 y 6 de §4.7).',
+    ],
+],
+
+// ============================================================
+// 3. §4.7: bug crítico + plan de 6 fases.
+//    (La deuda técnica del arco pasa a §4.8.)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/plan_actual.md',
+    'descripcion' => '§4.7: bug crítico del guardado parcial + plan de 6 fases',
+    'buscar' => [
+        '### 4.7. Deuda técnica del arco (baja)',
+        '',
+        'Pendientes generados por la línea v81p-v82d. Ninguno es',
+        'bloqueante.',
+    ],
+    'reemplazar' => [
+        '### 4.7. Bug crítico abierto: corrupción del grafo por guardado parcial',
+        '',
+        '**Estado:** abierto. Fase 0 cerrada (este documento).',
+        '',
+        '**Síntoma.** Después de una secuencia de operaciones',
+        '(agregar micro de 2 pisos → migrar pasajeros del micro',
+        'viejo al nuevo → eliminar micro viejo → pagar cupón), el',
+        'viaje desaparece de la lista del dueño. La terminal',
+        'también deja de verlo. El header del dueño muestra',
+        '"terminal" en lugar de "dueño".',
+        '',
+        '**Causa raíz (parcial, en investigación).**',
+        '`_guardar_con_filtro` (en',
+        '`PerdurarSuperestructuraStringSQL64.php`) es un',
+        'DELETE+INSERT que filtra por máscara. Cuando el grafo',
+        'tiene aristas que cruzan el borde (origen en el filtro,',
+        'destino fuera), las aristas pueden quedar huérfanas y los',
+        'nodos con máscara 0 no se persisten. La Fase 4 del',
+        'framework (§11.4 del prompt del framework) documenta que',
+        'el guardado parcial real por delta no está implementado.',
+        'El bug estaba latente desde antes de C.10 (el parche de',
+        '`IN (...)` no es la causa); la secuencia específica lo',
+        'disparó.',
+        '',
+        '**Evidencia en la DB (antes de restaurar):**',
+        '- `us_Parroquia_del_Carmen` con máscara `16` (solo bit 4,',
+        '  el dueño). Le faltaban los bits 0-3 (aplicacion,',
+        '  admin, usuarios, sesiones).',
+        '- El viaje `166694` huérfano: nadie lo apuntaba desde el',
+        '  contenedor `viajes` del dueño.',
+        '- `contexto_mascara = 0` en 1817 nodos.',
+        '- Header del dueño con "terminal": perdió el enlace',
+        '  `nivel`.',
+        '- `id_fila` del dueño cambiados entre requests',
+        '  (`165810` → `190041`): duplicados por guardado parcial.',
+        '',
+        '**Estado post-restauración (v1.5piloto.82i):**',
+        '- Backup SQL viejo (`nodo` + `adyacente`) restaurado.',
+        '- `?migrar_a_sql64=1` corrido.',
+        '- `?reparar_topologia=1`, `?reparar_arboles=1`,',
+        '  `?reparar_cancelaciones=1`,',
+        '  `?reparar_cancelaciones_arboles=1` corridos.',
+        '- Verificación: dueño con máscara `116` (bits 2, 4, 5,',
+        '  6). Solo 3 nodos huérfanos (residuos históricos, no',
+        '  miles). App funcionando.',
+        '',
+        '**Plan de diagnóstico y blindaje (6 fases).**',
+        '',
+        '**Fase 0 — Anotar el plan y congelar producción.**',
+        '- [x] Registrar este bug en `plan_actual.md`.',
+        '- Reglas operativas mientras esté abierto:',
+        '  - No aplicar migración de pasajeros.',
+        '  - No aplicar Tanda 4 del arco de piso (v82i).',
+        '  - Operación normal (vender, cancelar, pagar cupones)',
+        '    permitida. Si una operación deja el viaje huérfano,',
+        '    NO repetirla; anotar la secuencia exacta.',
+        '',
+        '**Fase 1 — Blindaje (red de seguridad).**',
+        '- Modificar `_guardar_con_filtro` para que falle con',
+        '  `rollback` si:',
+        '  - Un nodo del grafo no queda persistido.',
+        '  - Un nodo pierde bits de máscara respecto del estado',
+        '    anterior en DB.',
+        '  - El conteo de aristas en DB < conteo en grafo.',
+        '- Costo: 2-3 SELECT extra por guardado parcial. Con',
+        '  ~10k nodos, +1-2 segundos.',
+        '- Beneficio: si el bug vuelve a pasar, falla con error',
+        '  en lugar de corromper en silencio.',
+        '',
+        '**Fase 2 — Logging de diagnóstico.**',
+        '- Flag `Conf::DEBUG_PERSISTENCIA`.',
+        '- Log en `error_log`:',
+        '  - Cuántos nodos en memoria, en `$mapa_previo`, nuevos.',
+        '  - Nodos nuevos y su máscara calculada.',
+        '  - Nodos con máscara 0 (los que se saltan del INSERT).',
+        '  - Aristas a insertar, cuántas se saltan por destino',
+        '    fuera de máscara.',
+        '  - Aristas preexistentes que cruzan el borde y no se',
+        '    reinsertan.',
+        '- Se activa con `Conf::DEBUG_PERSISTENCIA = true` o',
+        '  `?debug_persistencia=1`.',
+        '',
+        '**Fase 3 — Reproducir el bug en local.**',
+        '- Con el backup restaurado + migración + log activo.',
+        '- Secuencia: agregar micro → migrar → eliminar micro',
+        '  viejo → pagar cupón.',
+        '- Leer el log y aislar el punto exacto de corrupción.',
+        '',
+        '**Fase 4 — Fix real.**',
+        '- Depende del diagnóstico:',
+        '  - Si es "nodo nuevo con máscara 0 no se inserta": fix',
+        '    es calcular la máscara en el INSERT, no confiar en',
+        '    el BFS previo. O no saltar nodos con máscara 0 si',
+        '    son alcanzables desde un nodo insertado.',
+        '  - Si es "arista que cruza el borde no se reinserta":',
+        '    fix es reinsertar aristas aunque el destino no esté',
+        '    en `$mapa_final`, apuntando al `id_fila` previo.',
+        '  - Si es otro: depende.',
+        '- Aplicar el fix en PHP y espejar a JS en la misma',
+        '  tanda (dos scripts, dos commits).',
+        '',
+        '**Fase 5 — Tanda 4 del arco de piso (v82i).**',
+        '- Después del blindaje y el fix. Independiente del bug',
+        '  §4.7. Se aplica cuando el guardado parcial esté',
+        '  blindado.',
+        '',
+        '**Fase 6 — Migración de pasajeros a producción.**',
+        '- Después de la Fase 4. Con el blindaje activo y el fix',
+        '  aplicado.',
+        '- Probarla primero en un viaje de prueba, no en',
+        '  producción.',
+        '',
+        '### 4.8. Deuda técnica del arco (baja)',
+        '',
+        'Pendientes generados por la línea v81p-v82d. Ninguno es',
+        'bloqueante.',
+    ],
+],
+
+// ============================================================
+// 4. Estado del proyecto al cierre (al final del archivo)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/plan_actual.md',
+    'descripcion' => 'Estado del proyecto al cierre: v83a + bug §4.7',
+    'buscar' => [
+        '**Estado del proyecto al cierre:** v1.5piloto.82d',
+        '(framework 1.5i.8f). El arco de cancelaciones en',
+        'compartidos y el bug §4.6 (persistencia silenciosa en',
+        'hostings compartidos) quedaron cerrados. SQL64 activo,',
+        'topología admin/soporte, auditoría topológica disponible',
+        '(`?auditar_topologia=1`, comando `app:auditar_topologia`,',
+        'botón en el plugin). Todos los comandos de reparación',
+        'idempotentes. Sin bugs abiertos de prioridad alta.',
+    ],
+    'reemplazar' => [
+        '**Estado del proyecto al cierre:** v1.5piloto.83a',
+        '(framework 1.5i.8f). **Bug crítico abierto:** corrupción',
+        'del grafo por guardado parcial (§4.7). Base restaurada',
+        'desde backup + reparaciones idempotentes. Plan de',
+        'diagnóstico y blindaje de 6 fases en curso. SQL64',
+        'activo, topología admin/soporte, auditoría topológica',
+        'disponible. **La migración de pasajeros queda en pausa**',
+        'hasta que el bug §4.7 esté resuelto.',
     ],
 ],
 

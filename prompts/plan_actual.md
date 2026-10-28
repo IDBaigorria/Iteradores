@@ -27,10 +27,13 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.82i (piso en los
-flujos que faltaban: cambiar de asiento desde Clientes,
-impresión de pasaje_reserva y croquis impreso del micro.
-Ver §2 y §4.5).
+**Última actualización:** v1.5piloto.83a (Fase 0 del
+diagnóstico del bug crítico §4.7: corrupción del grafo
+por guardado parcial. Solo documentación. No toca código).
+
+**Antes (v1.5piloto.82i):** piso en los flujos que faltaban
+(cambiar de asiento desde Clientes, impresión de
+pasaje_reserva y croquis impreso del micro). Ver §2.
 
 **Antes (v1.5piloto.82d):** cierre del arco de cancelaciones en
 compartidos + bug §4.6 de persistencia silenciosa en hostings
@@ -333,6 +336,8 @@ Van todos juntos en una sesión del framework.
 ### 4.5. Próximas tandas sugeridas
 
 **Arco en curso: migración de pasajeros entre micros.**
+**ESTADO: EN PAUSA** hasta que el bug del guardado
+parcial (§4.7) esté diagnosticado y blindado.
 
 Plan completo en `prompts/plan_migrar_micro.md`.
 
@@ -340,6 +345,11 @@ Plan completo en `prompts/plan_migrar_micro.md`.
   `migrar_pasajeros_de_micro` en
   `Aplicacion/Viajes/ViajeMicros.php` + subacción
   `viajes/migrar_pasajeros` en `Aplicacion/Enrutador.php`.
+  **Aplicada en producción antes de conocer el bug
+  §4.7.** No fue la causa del bug, pero la secuencia
+  agregar micro → migrar → eliminar micro viejo → pagar
+  cupón lo disparó. La base se restauró desde backup y
+  se aplicaron las reparaciones idempotentes.
 - **Tanda 2 (frontend): cerrada en `1.5piloto.82f`.**
   Botón "Migrar pasajeros a..." en la tarjeta del micro (solo
   visible si el micro tiene asientos ocupados y el usuario
@@ -350,6 +360,9 @@ Plan completo en `prompts/plan_migrar_micro.md`.
 - **Tanda 3 (tests + docs): pendiente.** 7 tests del plugin
   + actualización de `aplicacion_POST.php`,
   `prompt_piloto.md` §5.8 y §4.9, y este archivo.
+
+**La migración NO vuelve a producción** hasta que el
+guardado parcial esté blindado (Fases 4 y 6 de §4.7).
 
 **Foco inmediato: Piloto — calidad.**
 
@@ -432,7 +445,119 @@ local, el mismo flujo funcionaba.
   - Cancelación desde carmen2: persiste
   - Auditoría topológica:    0 críticos / 0 errores / 0 warnings
 
-### 4.7. Deuda técnica del arco (baja)
+### 4.7. Bug crítico abierto: corrupción del grafo por guardado parcial
+
+**Estado:** abierto. Fase 0 cerrada (este documento).
+
+**Síntoma.** Después de una secuencia de operaciones
+(agregar micro de 2 pisos → migrar pasajeros del micro
+viejo al nuevo → eliminar micro viejo → pagar cupón), el
+viaje desaparece de la lista del dueño. La terminal
+también deja de verlo. El header del dueño muestra
+"terminal" en lugar de "dueño".
+
+**Causa raíz (parcial, en investigación).**
+`_guardar_con_filtro` (en
+`PerdurarSuperestructuraStringSQL64.php`) es un
+DELETE+INSERT que filtra por máscara. Cuando el grafo
+tiene aristas que cruzan el borde (origen en el filtro,
+destino fuera), las aristas pueden quedar huérfanas y los
+nodos con máscara 0 no se persisten. La Fase 4 del
+framework (§11.4 del prompt del framework) documenta que
+el guardado parcial real por delta no está implementado.
+El bug estaba latente desde antes de C.10 (el parche de
+`IN (...)` no es la causa); la secuencia específica lo
+disparó.
+
+**Evidencia en la DB (antes de restaurar):**
+- `us_Parroquia_del_Carmen` con máscara `16` (solo bit 4,
+  el dueño). Le faltaban los bits 0-3 (aplicacion,
+  admin, usuarios, sesiones).
+- El viaje `166694` huérfano: nadie lo apuntaba desde el
+  contenedor `viajes` del dueño.
+- `contexto_mascara = 0` en 1817 nodos.
+- Header del dueño con "terminal": perdió el enlace
+  `nivel`.
+- `id_fila` del dueño cambiados entre requests
+  (`165810` → `190041`): duplicados por guardado parcial.
+
+**Estado post-restauración (v1.5piloto.82i):**
+- Backup SQL viejo (`nodo` + `adyacente`) restaurado.
+- `?migrar_a_sql64=1` corrido.
+- `?reparar_topologia=1`, `?reparar_arboles=1`,
+  `?reparar_cancelaciones=1`,
+  `?reparar_cancelaciones_arboles=1` corridos.
+- Verificación: dueño con máscara `116` (bits 2, 4, 5,
+  6). Solo 3 nodos huérfanos (residuos históricos, no
+  miles). App funcionando.
+
+**Plan de diagnóstico y blindaje (6 fases).**
+
+**Fase 0 — Anotar el plan y congelar producción.**
+- [x] Registrar este bug en `plan_actual.md`.
+- Reglas operativas mientras esté abierto:
+  - No aplicar migración de pasajeros.
+  - No aplicar Tanda 4 del arco de piso (v82i).
+  - Operación normal (vender, cancelar, pagar cupones)
+    permitida. Si una operación deja el viaje huérfano,
+    NO repetirla; anotar la secuencia exacta.
+
+**Fase 1 — Blindaje (red de seguridad).**
+- Modificar `_guardar_con_filtro` para que falle con
+  `rollback` si:
+  - Un nodo del grafo no queda persistido.
+  - Un nodo pierde bits de máscara respecto del estado
+    anterior en DB.
+  - El conteo de aristas en DB < conteo en grafo.
+- Costo: 2-3 SELECT extra por guardado parcial. Con
+  ~10k nodos, +1-2 segundos.
+- Beneficio: si el bug vuelve a pasar, falla con error
+  en lugar de corromper en silencio.
+
+**Fase 2 — Logging de diagnóstico.**
+- Flag `Conf::DEBUG_PERSISTENCIA`.
+- Log en `error_log`:
+  - Cuántos nodos en memoria, en `$mapa_previo`, nuevos.
+  - Nodos nuevos y su máscara calculada.
+  - Nodos con máscara 0 (los que se saltan del INSERT).
+  - Aristas a insertar, cuántas se saltan por destino
+    fuera de máscara.
+  - Aristas preexistentes que cruzan el borde y no se
+    reinsertan.
+- Se activa con `Conf::DEBUG_PERSISTENCIA = true` o
+  `?debug_persistencia=1`.
+
+**Fase 3 — Reproducir el bug en local.**
+- Con el backup restaurado + migración + log activo.
+- Secuencia: agregar micro → migrar → eliminar micro
+  viejo → pagar cupón.
+- Leer el log y aislar el punto exacto de corrupción.
+
+**Fase 4 — Fix real.**
+- Depende del diagnóstico:
+  - Si es "nodo nuevo con máscara 0 no se inserta": fix
+    es calcular la máscara en el INSERT, no confiar en
+    el BFS previo. O no saltar nodos con máscara 0 si
+    son alcanzables desde un nodo insertado.
+  - Si es "arista que cruza el borde no se reinserta":
+    fix es reinsertar aristas aunque el destino no esté
+    en `$mapa_final`, apuntando al `id_fila` previo.
+  - Si es otro: depende.
+- Aplicar el fix en PHP y espejar a JS en la misma
+  tanda (dos scripts, dos commits).
+
+**Fase 5 — Tanda 4 del arco de piso (v82i).**
+- Después del blindaje y el fix. Independiente del bug
+  §4.7. Se aplica cuando el guardado parcial esté
+  blindado.
+
+**Fase 6 — Migración de pasajeros a producción.**
+- Después de la Fase 4. Con el blindaje activo y el fix
+  aplicado.
+- Probarla primero en un viaje de prueba, no en
+  producción.
+
+### 4.8. Deuda técnica del arco (baja)
 
 Pendientes generados por la línea v81p-v82d. Ninguno es
 bloqueante.
@@ -638,14 +763,14 @@ Reglas de oro que aplican a cualquier tanda nueva.
 
 ---
 
-**Estado del proyecto al cierre:** v1.5piloto.82d
-(framework 1.5i.8f). El arco de cancelaciones en
-compartidos y el bug §4.6 (persistencia silenciosa en
-hostings compartidos) quedaron cerrados. SQL64 activo,
-topología admin/soporte, auditoría topológica disponible
-(`?auditar_topologia=1`, comando `app:auditar_topologia`,
-botón en el plugin). Todos los comandos de reparación
-idempotentes. Sin bugs abiertos de prioridad alta.
+**Estado del proyecto al cierre:** v1.5piloto.83a
+(framework 1.5i.8f). **Bug crítico abierto:** corrupción
+del grafo por guardado parcial (§4.7). Base restaurada
+desde backup + reparaciones idempotentes. Plan de
+diagnóstico y blindaje de 6 fases en curso. SQL64
+activo, topología admin/soporte, auditoría topológica
+disponible. **La migración de pasajeros queda en pausa**
+hasta que el bug §4.7 esté resuelto.
 
 **Deuda técnica del arco** en §4.7: endpoints temporales
 de diagnóstico, espejo `_hmi` a JS, espejo C.7-C.10 a JS,
