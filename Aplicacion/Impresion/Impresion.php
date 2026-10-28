@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.16
- * @version   1.5piloto.82i
+ * @version   1.5piloto.83e
  */
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
@@ -16,10 +16,15 @@ include_once("./miscelaneas/Arbol.php");
 include_once("./Aplicacion/Ventas/Venta.php");
 include_once("./Aplicacion/Rendiciones/Rendicion.php");
 include_once("./Aplicacion/Liquidaciones/Liquidacion.php");
-function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = '', string $numero_cupon = '', ?string $nombre_dueno = null): void {
+function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = '', string $numero_cupon = '', ?string $nombre_dueno = null, ?string $nombre_terminal = null): void {
     // Fase 1c.2: pasar el dueño si viene, para buscar la venta en
     // su contexto (carga parcial desde el flujo de impresión).
-    $venta = obtener_venta_por_id($id_venta, null, $nombre_dueno);
+    // Fix v1.5piloto.83e: pasar también nombre_terminal. Sin esto,
+    // un terminal no puede imprimir sus propias ventas (que viven
+    // en el árbol del compartido, no en el default del dueño).
+    // Con nombre_terminal, obtener_venta_por_id navega el contexto
+    // del terminal vía _contexto_terminal + _nombres_arbol_para_contexto.
+    $venta = obtener_venta_por_id($id_venta, $nombre_terminal, $nombre_dueno);
     if (!$venta) {
         echo "Venta no encontrada";
         return;

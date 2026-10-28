@@ -1,130 +1,230 @@
 <?php
 /**
- * Aplicador — Fase 3 del bug §4.7: chequeo de guardar_ambos
- * en confirmar_venta_actual y pagar_cupon_venta.
+ * Aplicador — Impresión de ventas para terminal (v1.5piloto.83e).
  *
- * Motivo: ambos flujos llaman `guardar_ambos` sin chequear el
- * resultado. Cuando el guardado parcial falla (por ejemplo, por
- * el blindaje de 1.5i.7t o por el bug real §4.7), el backend
- * devuelve `exito: true` igual. El frontend muestra "Venta
- * confirmada" con la DB intacta. El asiento sigue "seleccionado"
- * en el croquis (por el polling) e "Imprimir pasaje" devuelve
- * "venta no encontrada".
+ * Motivo: las URLs de impresión (tipo=pasajes, tipo=cupon) llevan
+ * `id_venta` y `nombre_dueno`, pero NO `nombre_terminal`. En el
+ * backend, `generar_impresion` → `obtener_venta_por_id($id, null,
+ * $nombre_dueno)` busca la venta en el árbol default del dueño.
+ * Una venta hecha por un terminal vive en el árbol parametrizado
+ * del compartido (`hmi_<term>`, etc.), no en el default del
+ * dueño. Resultado: "Venta no encontrada" para terminal, funciona
+ * para dueño (porque su árbol es el default).
  *
- * Fix: patrón C.6 (aplicado en cancelar_venta en v81w).
- * Chequear `guardar_ambos`; si falla, devolver `exito: false`
- * con error específico. El caller (frontend) muestra el error
- * y NO muestra el modal post-venta.
+ * Fix:
+ * - `Impresion.php`: `generar_impresion` acepta `?string
+ *   $nombre_terminal` y lo pasa a `obtener_venta_por_id`.
+ * - `index.php`: rama `imprimir=1` lee `$_GET['nombre_terminal']`
+ *   y lo pasa.
+ * - `ventas.js`: 3 URLs (post-venta pasajes, post-venta cupón,
+ *   cuponera cupón imprimir) agregan `nombre_terminal` si el
+ *   usuario es terminal.
+ * - `pasajeros.js`: 2 URLs (imprimir todos los pasajes, imprimir
+ *   pasaje individual) agregan `nombre_terminal` si el usuario es
+ *   terminal.
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.83d';
+$version_nueva = '1.5piloto.83e';
 
 $htmls_a_bumpear = ['aplicacion_GET.html'];
 
 $cambios = [
 
 // ============================================================
-// 1. Venta.php — confirmar_venta_actual: chequear guardar_ambos
+// 1. Impresion.php — generar_impresion acepta nombre_terminal
 // ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Ventas/Venta.php',
-    'descripcion' => 'confirmar_venta_actual: chequear guardar_ambos',
+    'archivo' => 'Aplicacion/Impresion/Impresion.php',
+    'descripcion' => 'generar_impresion: aceptar nombre_terminal',
     'buscar' => [
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '',
-        '    return [',
-        '        \'exito\' => true,',
-        '        \'id_venta\' => $id_venta,',
-        '        \'total\' => (string)$total,',
-        '        \'pagado\' => (string)$monto_pagado,',
-        '        \'cuotas_restantes\' => (string)$cuotas_restantes,',
-        '        \'asientos\' => count($asientos_seleccionados),',
-        '    ];',
+        'function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = \'\', string $numero_cupon = \'\', ?string $nombre_dueno = null): void {',
+        '    // Fase 1c.2: pasar el dueño si viene, para buscar la venta en',
+        '    // su contexto (carga parcial desde el flujo de impresión).',
+        '    $venta = obtener_venta_por_id($id_venta, null, $nombre_dueno);',
     ],
     'reemplazar' => [
-        '    // Fix 1.5piloto.83d: chequear el resultado del guardado.',
-        '    // Antes se ignoraba y el backend respondía "éxito" aunque',
-        '    // la DB no se hubiera actualizado. El usuario veía "Venta',
-        '    // confirmada" con el asiento todavía "seleccionado" en el',
-        '    // croquis (por el polling) y "venta no encontrada" al',
-        '    // intentar imprimir el pasaje. Patrón C.6 (aplicado en',
-        '    // cancelar_venta en v81w).',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("confirmar_venta_actual: guardar_ambos falló para id_venta=$id_venta");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'La venta se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '',
-        '    return [',
-        '        \'exito\' => true,',
-        '        \'id_venta\' => $id_venta,',
-        '        \'total\' => (string)$total,',
-        '        \'pagado\' => (string)$monto_pagado,',
-        '        \'cuotas_restantes\' => (string)$cuotas_restantes,',
-        '        \'asientos\' => count($asientos_seleccionados),',
-        '    ];',
+        'function generar_impresion(string $tipo, string $id_venta, string $dni_filtro = \'\', string $numero_cupon = \'\', ?string $nombre_dueno = null, ?string $nombre_terminal = null): void {',
+        '    // Fase 1c.2: pasar el dueño si viene, para buscar la venta en',
+        '    // su contexto (carga parcial desde el flujo de impresión).',
+        '    // Fix v1.5piloto.83e: pasar también nombre_terminal. Sin esto,',
+        '    // un terminal no puede imprimir sus propias ventas (que viven',
+        '    // en el árbol del compartido, no en el default del dueño).',
+        '    // Con nombre_terminal, obtener_venta_por_id navega el contexto',
+        '    // del terminal vía _contexto_terminal + _nombres_arbol_para_contexto.',
+        '    $venta = obtener_venta_por_id($id_venta, $nombre_terminal, $nombre_dueno);',
     ],
 ],
 
 // ============================================================
-// 2. Venta.php — pagar_cupon_venta: chequear guardar_ambos
+// 2. index.php — rama imprimir=1 pasa nombre_terminal
 // ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Ventas/Venta.php',
-    'descripcion' => 'pagar_cupon_venta: chequear guardar_ambos',
+    'archivo' => 'index.php',
+    'descripcion' => 'index.php: pasar nombre_terminal a generar_impresion',
     'buscar' => [
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '',
-        '    return [',
-        '        \'exito\' => true,',
-        '        \'venta\' => formatear_venta_completa($nodo_venta),',
-        '    ];',
+        '    $dni_filtro = $_GET[\'dni\'] ?? \'\';',
+        '    $numero_cupon = $_GET[\'numero_cupon\'] ?? \'\';',
+        '    // Fase 1c.2: pasar el dueño si viene en el GET, para que',
+        '    // la búsqueda de la venta use su contexto en carga parcial.',
+        '    generar_impresion($tipo, $_GET[\'id_venta\'] ?? \'\', $dni_filtro, $numero_cupon, $_GET[\'dueno\'] ?? \'\');',
+        '    exit;',
     ],
     'reemplazar' => [
-        '    // Fix 1.5piloto.83d: chequear el resultado del guardado.',
-        '    // Mismo patrón que confirmar_venta_actual y',
-        '    // cancelar_venta. Si el guardado parcial falla, la DB no',
-        '    // se actualiza pero el backend respondía "éxito" igual.',
-        '    // El usuario veía "Cupón pagado" con el estado viejo.',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("pagar_cupon_venta: guardar_ambos falló para id_venta=$id_venta numero_cupon=$numero_cupon");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'El pago del cupón se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '',
-        '    return [',
-        '        \'exito\' => true,',
-        '        \'venta\' => formatear_venta_completa($nodo_venta),',
-        '    ];',
+        '    $dni_filtro = $_GET[\'dni\'] ?? \'\';',
+        '    $numero_cupon = $_GET[\'numero_cupon\'] ?? \'\';',
+        '    // Fase 1c.2: pasar el dueño si viene en el GET, para que',
+        '    // la búsqueda de la venta use su contexto en carga parcial.',
+        '    // Fix v1.5piloto.83e: pasar también nombre_terminal. Sin esto,',
+        '    // el terminal no puede imprimir sus propias ventas (viven en',
+        '    // el árbol del compartido, no en el default del dueño).',
+        '    generar_impresion(',
+        '        $tipo,',
+        '        $_GET[\'id_venta\'] ?? \'\',',
+        '        $dni_filtro,',
+        '        $numero_cupon,',
+        '        $_GET[\'dueno\'] ?? \'\',',
+        '        $_GET[\'nombre_terminal\'] ?? null',
+        '    );',
+        '    exit;',
     ],
 ],
 
 // ============================================================
-// 3. plan_actual.md: header a v83d
+// 3. ventas.js — mostrar_opciones_impresion (post-venta)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/ventas.js',
+    'descripcion' => 'mostrar_opciones_impresion: nombre_terminal en URLs',
+    'buscar' => [
+        'function mostrar_opciones_impresion(id_venta) {',
+        '    const contenedor = $("#opciones_impresion");',
+        '    if (!contenedor) return;',
+        '    contenedor.classList.remove("hidden");',
+        '    $("#btn_imprimir_pasajes").onclick = () => {',
+        '        window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id_venta}`, \'_blank\');',
+        '    };',
+        '    // El cupón post-venta corresponde siempre al primer pago de la venta,',
+        '    // que es el cupón 1.',
+        '    $("#btn_imprimir_cupon").onclick = () => {',
+        '        window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${id_venta}&numero_cupon=1`, \'_blank\');',
+        '    };',
+    ],
+    'reemplazar' => [
+        'function mostrar_opciones_impresion(id_venta) {',
+        '    const contenedor = $("#opciones_impresion");',
+        '    if (!contenedor) return;',
+        '    contenedor.classList.remove("hidden");',
+        '    // Fix v1.5piloto.83e: si el usuario es terminal, agregar',
+        '    // nombre_terminal a las URLs de impresión. Sin esto, el',
+        '    // backend busca la venta en el árbol default del dueño y',
+        '    // no la encuentra (la venta del terminal vive en el árbol',
+        '    // del compartido).',
+        '    const terminal_qs = (usuario_actual && usuario_actual.nivel === \'terminal\')',
+        '        ? `&nombre_terminal=${encodeURIComponent(usuario_actual.nombre_usuario)}`',
+        '        : \'\';',
+        '    $("#btn_imprimir_pasajes").onclick = () => {',
+        '        window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id_venta}${terminal_qs}`, \'_blank\');',
+        '    };',
+        '    // El cupón post-venta corresponde siempre al primer pago de la venta,',
+        '    // que es el cupón 1.',
+        '    $("#btn_imprimir_cupon").onclick = () => {',
+        '        window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${id_venta}&numero_cupon=1${terminal_qs}`, \'_blank\');',
+        '    };',
+    ],
+],
+
+// ============================================================
+// 4. ventas.js — _renderizar_cuponera_en_modal (botón imprimir cupón)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/ventas.js',
+    'descripcion' => '_renderizar_cuponera_en_modal: nombre_terminal en URL',
+    'buscar' => [
+        '            if (accion === \'imprimir\') {',
+        '                window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${venta.id_venta}&numero_cupon=${numero}`, \'_blank\');',
+        '            } else if (accion === \'pagar\') {',
+    ],
+    'reemplazar' => [
+        '            if (accion === \'imprimir\') {',
+        '                // Fix v1.5piloto.83e: nombre_terminal si el usuario es',
+        '                // terminal (la venta vive en el árbol del compartido).',
+        '                const terminal_qs = (usuario_actual && usuario_actual.nivel === \'terminal\')',
+        '                    ? `&nombre_terminal=${encodeURIComponent(usuario_actual.nombre_usuario)}`',
+        '                    : \'\';',
+        '                window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${venta.id_venta}&numero_cupon=${numero}${terminal_qs}`, \'_blank\');',
+        '            } else if (accion === \'pagar\') {',
+    ],
+],
+
+// ============================================================
+// 5. pasajeros.js — ver_pasajes_pasajero (imprimir todos)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/pasajeros.js',
+    'descripcion' => 'ver_pasajes_pasajero: nombre_terminal en urlImprimirTodos',
+    'buscar' => [
+        '            // Botón imprimir todos (siempre visible)',
+        '            const urlImprimirTodos = v.es_comprador',
+        '                ? `index.php?imprimir=1&tipo=pasajes&id_venta=${v.compra.id_venta}`',
+        '                : `index.php?imprimir=1&tipo=pasajes&id_venta=${v.compra.id_venta}&dni=${p.dni}`;',
+    ],
+    'reemplazar' => [
+        '            // Botón imprimir todos (siempre visible)',
+        '            // Fix v1.5piloto.83e: nombre_terminal si el usuario es',
+        '            // terminal (la venta vive en el árbol del compartido).',
+        '            const terminal_qs = (usuario_actual && usuario_actual.nivel === \'terminal\')',
+        '                ? `&nombre_terminal=${encodeURIComponent(usuario_actual.nombre_usuario)}`',
+        '                : \'\';',
+        '            const urlImprimirTodos = v.es_comprador',
+        '                ? `index.php?imprimir=1&tipo=pasajes&id_venta=${v.compra.id_venta}${terminal_qs}`',
+        '                : `index.php?imprimir=1&tipo=pasajes&id_venta=${v.compra.id_venta}&dni=${p.dni}${terminal_qs}`;',
+    ],
+],
+
+// ============================================================
+// 6. pasajeros.js — ver_detalle_pasaje_individual (imprimir individual)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/pasajeros.js',
+    'descripcion' => 'ver_detalle_pasaje_individual: nombre_terminal en URL',
+    'buscar' => [
+        '    document.querySelector(\'.imprimir_pasaje_individual\').addEventListener(\'click\', function() {',
+        '        const id = this.dataset.id;',
+        '        const dni = this.dataset.dni;',
+        '        window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id}&dni=${dni}`, \'_blank\');',
+        '    });',
+    ],
+    'reemplazar' => [
+        '    document.querySelector(\'.imprimir_pasaje_individual\').addEventListener(\'click\', function() {',
+        '        const id = this.dataset.id;',
+        '        const dni = this.dataset.dni;',
+        '        // Fix v1.5piloto.83e: nombre_terminal si el usuario es terminal.',
+        '        const terminal_qs = (usuario_actual && usuario_actual.nivel === \'terminal\')',
+        '            ? `&nombre_terminal=${encodeURIComponent(usuario_actual.nombre_usuario)}`',
+        '            : \'\';',
+        '        window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id}&dni=${dni}${terminal_qs}`, \'_blank\');',
+        '    });',
+    ],
+],
+
+// ============================================================
+// 7. plan_actual.md — header y Fase 3
 // ============================================================
 [
     'tipo' => 'reemplazar',
     'archivo' => 'prompts/plan_actual.md',
-    'descripcion' => 'plan_actual: header a v83d',
+    'descripcion' => 'plan_actual: header a v83e',
     'buscar' => [
-        '**Última actualización:** v1.5piloto.83c (Fase 3 del',
-        'bug §4.7: primer ciclo con blindaje detectó un falso',
-        'positivo en la verificación de máscaras. El bug real NO',
-        'se reprodujo. Fix del falso positivo en 1.5i.7u).',
-    ],
-    'reemplazar' => [
         '**Última actualización:** v1.5piloto.83d (Fase 3 del',
         'bug §4.7: fix del falso positivo en 1.5i.7u. Detectado',
         'que `confirmar_venta_actual` y `pagar_cupon_venta` no',
@@ -132,47 +232,55 @@ $cambios = [
         'intacta. Chequeos aplicados. Deuda: ~15 flujos más con',
         'el mismo patrón, tanda aparte).',
     ],
+    'reemplazar' => [
+        '**Última actualización:** v1.5piloto.83e (Fase 3 del',
+        'bug §4.7, cierre del flujo de venta en micro de 2 pisos.',
+        'Fix de impresión de ventas para terminal: las URLs no',
+        'llevaban `nombre_terminal`, así que `obtener_venta_por_id`',
+        'buscaba en el árbol default del dueño y no encontraba la',
+        'venta del compartido. Aplicado en las 5 URLs del frontend',
+        'y en `generar_impresion` / `index.php`).',
+    ],
 ],
-
-// ============================================================
-// 4. plan_actual.md: nota en Fase 3
-// ============================================================
 [
     'tipo' => 'reemplazar',
     'archivo' => 'prompts/plan_actual.md',
-    'descripcion' => 'plan_actual: nota del segundo bug y fix',
+    'descripcion' => 'plan_actual: Fase 3 con bug de impresión',
     'buscar' => [
-        '  ahora sí el log va a mostrar el punto exacto.',
-    ],
-    'reemplazar' => [
-        '  ahora sí el log va a mostrar el punto exacto.',
-        '- **Segundo bug detectado (1.5piloto.83d):**',
-        '  `confirmar_venta_actual` y `pagar_cupon_venta`',
-        '  llamaban `guardar_ambos` **sin chequear el',
-        '  resultado**. Cuando el guardado parcial fallaba (por',
-        '  el falso positivo del blindaje), el backend devolvía',
-        '  `exito: true` igual. El frontend mostraba "Venta',
-        '  confirmada" con la DB intacta. El asiento seguía',
-        '  "seleccionado" en el croquis (por el polling) y',
-        '  "Imprimir pasaje" devolvía "venta no encontrada".',
-        '  **Fix:** patrón C.6. Chequear `guardar_ambos`; si',
-        '  falla, devolver `exito: false` con error específico',
-        '  ("La venta se procesó en memoria pero no se pudo',
-        '  guardar en la base de datos. Revisá el log del',
-        '  servidor o intentá de nuevo.").',
-        '- **Deuda técnica (tanda aparte):** ~15 flujos más',
-        '  llaman `guardar_ambos` sin chequear.',
-        '  `reservar_asiento_micro`, `asignar_pasajero_a_reserva`,',
-        '  `liberar_reserva_asiento_micro`, `seleccionar_asiento_micro`,',
-        '  `deseleccionar_asiento_micro`, `cambiar_asiento_pasaje`,',
-        '  `agregar_micro_a_viaje`, `eliminar_micro_de_viaje`,',
-        '  `actualizar_monto_micro`, `eliminar_viaje`,',
-        '  `crear_pasajero`, `actualizar_pasajero`,',
-        '  `eliminar_pasajero`,',
-        '  `eliminar_declaracion_jurada_pasajero`,',
         '  `subir_declaracion_jurada_pasajero`. Todos tienen el',
         '  mismo síntoma: "éxito" sin persistir. Hacer después',
         '  de cerrar §4.7.',
+    ],
+    'reemplazar' => [
+        '  `subir_declaracion_jurada_pasajero`. Todos tienen el',
+        '  mismo síntoma: "éxito" sin persistir. Hacer después',
+        '  de cerrar §4.7.',
+        '- **Tercer bug detectado (1.5piloto.83e):** impresión de',
+        '  ventas para terminal. Las URLs `?imprimir=1&tipo=pasajes`',
+        '  y `tipo=cupon` llevaban `id_venta` y `nombre_dueno` pero',
+        '  NO `nombre_terminal`. `generar_impresion` llamaba',
+        '  `obtener_venta_por_id($id, null, $nombre_dueno)`, que',
+        '  busca en el árbol default del dueño. La venta de un',
+        '  terminal vive en el árbol parametrizado del compartido',
+        '  (`hmi_<term>`), así que no se encontraba → "Venta no',
+        '  encontrada". Dueño funcionaba porque su árbol es el',
+        '  default. **Fix:** `generar_impresion` acepta',
+        '  `?string $nombre_terminal`; `index.php` lee',
+        '  `$_GET[\'nombre_terminal\']`; las 5 URLs del frontend',
+        '  (`mostrar_opciones_impresion` × 2, cuponera × 1,',
+        '  `ver_pasajes_pasajero` × 1,',
+        '  `ver_detalle_pasaje_individual` × 1) agregan',
+        '  `nombre_terminal` si el usuario es terminal.',
+        '- **Estado del bug §4.7:** el ciclo completo (venta en',
+        '  micro de 2 pisos + impresión de pasaje/cupón como',
+        '  terminal y como dueño) funciona post-83e. El blindaje',
+        '  de 1.5i.7t/7u no se dispara. La DB no se corrompe. Los',
+        '  4 bugs encadenados de Fase 3 (falso positivo del',
+        '  blindaje, venta sin chequear `guardar_ambos`, cupón',
+        '  sin chequear, impresión de terminal sin',
+        '  `nombre_terminal`) quedaron cerrados. La migración de',
+        '  pasajeros **sigue en pausa** hasta que el usuario',
+        '  valide un ciclo completo post-83e.',
     ],
 ],
 

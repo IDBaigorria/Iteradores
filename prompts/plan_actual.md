@@ -27,12 +27,13 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.83d (Fase 3 del
-bug §4.7: fix del falso positivo en 1.5i.7u. Detectado
-que `confirmar_venta_actual` y `pagar_cupon_venta` no
-chequean `guardar_ambos`, reportando "éxito" con la DB
-intacta. Chequeos aplicados. Deuda: ~15 flujos más con
-el mismo patrón, tanda aparte).
+**Última actualización:** v1.5piloto.83e (Fase 3 del
+bug §4.7, cierre del flujo de venta en micro de 2 pisos.
+Fix de impresión de ventas para terminal: las URLs no
+llevaban `nombre_terminal`, así que `obtener_venta_por_id`
+buscaba en el árbol default del dueño y no encontraba la
+venta del compartido. Aplicado en las 5 URLs del frontend
+y en `generar_impresion` / `index.php`).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -591,6 +592,32 @@ disparó.
   `subir_declaracion_jurada_pasajero`. Todos tienen el
   mismo síntoma: "éxito" sin persistir. Hacer después
   de cerrar §4.7.
+- **Tercer bug detectado (1.5piloto.83e):** impresión de
+  ventas para terminal. Las URLs `?imprimir=1&tipo=pasajes`
+  y `tipo=cupon` llevaban `id_venta` y `nombre_dueno` pero
+  NO `nombre_terminal`. `generar_impresion` llamaba
+  `obtener_venta_por_id($id, null, $nombre_dueno)`, que
+  busca en el árbol default del dueño. La venta de un
+  terminal vive en el árbol parametrizado del compartido
+  (`hmi_<term>`), así que no se encontraba → "Venta no
+  encontrada". Dueño funcionaba porque su árbol es el
+  default. **Fix:** `generar_impresion` acepta
+  `?string $nombre_terminal`; `index.php` lee
+  `$_GET['nombre_terminal']`; las 5 URLs del frontend
+  (`mostrar_opciones_impresion` × 2, cuponera × 1,
+  `ver_pasajes_pasajero` × 1,
+  `ver_detalle_pasaje_individual` × 1) agregan
+  `nombre_terminal` si el usuario es terminal.
+- **Estado del bug §4.7:** el ciclo completo (venta en
+  micro de 2 pisos + impresión de pasaje/cupón como
+  terminal y como dueño) funciona post-83e. El blindaje
+  de 1.5i.7t/7u no se dispara. La DB no se corrompe. Los
+  4 bugs encadenados de Fase 3 (falso positivo del
+  blindaje, venta sin chequear `guardar_ambos`, cupón
+  sin chequear, impresión de terminal sin
+  `nombre_terminal`) quedaron cerrados. La migración de
+  pasajeros **sigue en pausa** hasta que el usuario
+  valide un ciclo completo post-83e.
 
 **Fase 4 — Fix real.**
 - Depende del diagnóstico:

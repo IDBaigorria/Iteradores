@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.82i
+ * @version   1.5piloto.83e
  */
 
 // --- Utilidades base ----------------------------------
@@ -1144,7 +1144,17 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
     $numero_cupon = $_GET['numero_cupon'] ?? '';
     // Fase 1c.2: pasar el dueño si viene en el GET, para que
     // la búsqueda de la venta use su contexto en carga parcial.
-    generar_impresion($tipo, $_GET['id_venta'] ?? '', $dni_filtro, $numero_cupon, $_GET['dueno'] ?? '');
+    // Fix v1.5piloto.83e: pasar también nombre_terminal. Sin esto,
+    // el terminal no puede imprimir sus propias ventas (viven en
+    // el árbol del compartido, no en el default del dueño).
+    generar_impresion(
+        $tipo,
+        $_GET['id_venta'] ?? '',
+        $dni_filtro,
+        $numero_cupon,
+        $_GET['dueno'] ?? '',
+        $_GET['nombre_terminal'] ?? null
+    );
     exit;
 }
 

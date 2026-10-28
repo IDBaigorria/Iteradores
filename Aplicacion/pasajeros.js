@@ -1,6 +1,6 @@
 /***
  * Funciones del panel de pasajeros/clientes.
- * @version 1.5piloto.82i
+ * @version 1.5piloto.83e
  */
 /**
  * Normaliza un DNI dejando solo dígitos.
@@ -196,9 +196,14 @@ async function ver_pasajes_pasajero(dni) {
             }
 
             // Botón imprimir todos (siempre visible)
+            // Fix v1.5piloto.83e: nombre_terminal si el usuario es
+            // terminal (la venta vive en el árbol del compartido).
+            const terminal_qs = (usuario_actual && usuario_actual.nivel === 'terminal')
+                ? `&nombre_terminal=${encodeURIComponent(usuario_actual.nombre_usuario)}`
+                : '';
             const urlImprimirTodos = v.es_comprador
-                ? `index.php?imprimir=1&tipo=pasajes&id_venta=${v.compra.id_venta}`
-                : `index.php?imprimir=1&tipo=pasajes&id_venta=${v.compra.id_venta}&dni=${p.dni}`;
+                ? `index.php?imprimir=1&tipo=pasajes&id_venta=${v.compra.id_venta}${terminal_qs}`
+                : `index.php?imprimir=1&tipo=pasajes&id_venta=${v.compra.id_venta}&dni=${p.dni}${terminal_qs}`;
             const botonImprimirTodos = `
                 <div class="actions" style="margin-top:8px;">
                     <button class="btn imprimir_todos_pasajes" data-url="${urlImprimirTodos}">Imprimir todos los pasajes</button>
@@ -389,7 +394,11 @@ async function ver_detalle_pasaje_individual(id_venta, dni_pasajero, asiento) {
     document.querySelector('.imprimir_pasaje_individual').addEventListener('click', function() {
         const id = this.dataset.id;
         const dni = this.dataset.dni;
-        window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id}&dni=${dni}`, '_blank');
+        // Fix v1.5piloto.83e: nombre_terminal si el usuario es terminal.
+        const terminal_qs = (usuario_actual && usuario_actual.nivel === 'terminal')
+            ? `&nombre_terminal=${encodeURIComponent(usuario_actual.nombre_usuario)}`
+            : '';
+        window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id}&dni=${dni}${terminal_qs}`, '_blank');
     });
 
     document.querySelector('.volver_listado_pasajes').addEventListener('click', function() {

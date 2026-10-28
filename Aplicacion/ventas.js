@@ -1,6 +1,6 @@
 /***
  * Funciones de venta, confirmación, listado y cancelación.
- * @version 1.5piloto.81k
+ * @version 1.5piloto.83e
  */
 
 // (aplicar_cambios.php funcionó)
@@ -731,13 +731,21 @@ function mostrar_opciones_impresion(id_venta) {
     const contenedor = $("#opciones_impresion");
     if (!contenedor) return;
     contenedor.classList.remove("hidden");
+    // Fix v1.5piloto.83e: si el usuario es terminal, agregar
+    // nombre_terminal a las URLs de impresión. Sin esto, el
+    // backend busca la venta en el árbol default del dueño y
+    // no la encuentra (la venta del terminal vive en el árbol
+    // del compartido).
+    const terminal_qs = (usuario_actual && usuario_actual.nivel === 'terminal')
+        ? `&nombre_terminal=${encodeURIComponent(usuario_actual.nombre_usuario)}`
+        : '';
     $("#btn_imprimir_pasajes").onclick = () => {
-        window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id_venta}`, '_blank');
+        window.open(`index.php?imprimir=1&tipo=pasajes&id_venta=${id_venta}${terminal_qs}`, '_blank');
     };
     // El cupón post-venta corresponde siempre al primer pago de la venta,
     // que es el cupón 1.
     $("#btn_imprimir_cupon").onclick = () => {
-        window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${id_venta}&numero_cupon=1`, '_blank');
+        window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${id_venta}&numero_cupon=1${terminal_qs}`, '_blank');
     };
     $("#btn_cerrar_opciones").onclick = () => {
         contenedor.classList.add("hidden");
@@ -1434,7 +1442,12 @@ function _renderizar_cuponera_en_modal() {
             const accion = this.dataset.accion;
             const numero = this.dataset.cupon;
             if (accion === 'imprimir') {
-                window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${venta.id_venta}&numero_cupon=${numero}`, '_blank');
+                // Fix v1.5piloto.83e: nombre_terminal si el usuario es
+                // terminal (la venta vive en el árbol del compartido).
+                const terminal_qs = (usuario_actual && usuario_actual.nivel === 'terminal')
+                    ? `&nombre_terminal=${encodeURIComponent(usuario_actual.nombre_usuario)}`
+                    : '';
+                window.open(`index.php?imprimir=1&tipo=cupon&id_venta=${venta.id_venta}&numero_cupon=${numero}${terminal_qs}`, '_blank');
             } else if (accion === 'pagar') {
                 _abrir_modal_pagar_cupon(numero);
             }
