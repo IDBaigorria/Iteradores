@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.83g
+ * @version   1.5piloto.83h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -769,7 +769,15 @@ function limpiar_pasajeros_de_prueba(string $nombre_dueno): array {
         $borrados[] = $dni;
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83h: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("limpiar_pasajeros_de_prueba: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La limpieza se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return [
         'exito' => true,

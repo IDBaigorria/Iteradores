@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.83g
+ * @version   1.5piloto.83h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -830,7 +830,16 @@ function agregar_viaje(array $datos): array {
     }
 
     $nodo_viajes->_adyacente_en($nodo_viaje, $nombre_viaje);
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+
+    // Fix 1.5piloto.83h: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("agregar_viaje: guardar_ambos falló para viaje=$nombre_viaje");
+        return [
+            'exito' => false,
+            'error' => 'El alta del viaje se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -865,7 +874,15 @@ function editar_viaje(string $nombre_viaje, array $datos): array {
         }
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83h: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("editar_viaje: guardar_ambos falló para viaje=$nombre_viaje");
+        return [
+            'exito' => false,
+            'error' => 'La edición del viaje se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -974,7 +991,15 @@ function agregar_terminal_autorizada(string $nombre_viaje, string $nombre_termin
     // agrega el viaje + sus empresas. Idempotente.
     _sincronizar_terminal_en_compartido_del_viaje($nodo_viaje, $nombre_terminal, $nombre_dueno);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83h: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("agregar_terminal_autorizada: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal");
+        return [
+            'exito' => false,
+            'error' => 'La autorización de la terminal se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -1019,7 +1044,15 @@ function eliminar_terminal_autorizada(string $nombre_viaje, string $nombre_termi
     // compartidos no se tocan.
     _desincronizar_terminal_de_compartido_del_viaje($nodo_viaje, $nombre_terminal);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83h: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("eliminar_terminal_autorizada: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal");
+        return [
+            'exito' => false,
+            'error' => 'La desautorización de la terminal se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -1206,7 +1239,15 @@ function guardar_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
         _aplicar_retroactivo_a_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal, $snapshot_ventas, $aplicar_retroactivo);
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83h: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("guardar_opciones_terminal_viaje: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal");
+        return [
+            'exito' => false,
+            'error' => 'Las opciones de la terminal se procesaron en memoria pero no se pudieron guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 /**
@@ -1283,7 +1324,18 @@ function guardar_viaje_completo(array $datos): array {
         return $resultado_opciones;
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83h: chequear guardar_ambos.
+    // Nota: guardar_opciones_avanzadas_viaje ya guardó internamente;
+    // este segundo guardar_ambos es redundante pero inofensivo. Si falla,
+    // algo raro pasó (conexión perdida entre medio) y conviene alertar.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("guardar_viaje_completo: guardar_ambos final falló para viaje=$nombre_viaje");
+        return [
+            'exito' => false,
+            'error' => 'El viaje y sus opciones se procesaron en memoria pero no se pudo confirmar el guardado final en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -1399,7 +1451,15 @@ function guardar_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, 
         $nodo_viaje->_adyacente_en(Nodo::crear_con_dato($contenido), $enlace);
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83h: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("guardar_declaracion_jurada: guardar_ambos falló para viaje=$nombre_viaje tipo=$tipo");
+        return [
+            'exito' => false,
+            'error' => 'La declaración jurada se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -1614,7 +1674,15 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
         $borrados[] = $nombre_viaje;
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83h: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("limpiar_viajes_de_prueba: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La limpieza se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return [
         'exito' => true,

@@ -27,10 +27,11 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.83g (tanda de los
-15 flujos con `guardar_ambos` sin chequear. Aplicado el
-patrón C.6: ahora reportan `exito: false` si el guardado
-falla, en lugar de mentir con "éxito" con la DB intacta).
+**Última actualización:** v1.5piloto.83h (tanda final de
+cobertura de `guardar_ambos`. Los 10 flujos restantes del
+piloto aplican el patrón C.6. **Todos los flujos del
+piloto que llaman `guardar_ambos` chequean el resultado.**
+Excepciones documentadas en §4.7).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -666,8 +667,7 @@ disparó.
   `subir_declaracion_jurada_pasajero`. Todos aplican
   el patrón C.6: si `guardar_ambos` falla, devuelven
   `exito: false` con error específico.
-- **Deuda técnica restante (tanda chiquita siguiente):**
-  quedan ~10 flujos más con el mismo patrón:
+- **10 flujos restantes: CERRADOS en v1.5piloto.83h.**
   `agregar_viaje`, `editar_viaje`,
   `guardar_viaje_completo`,
   `agregar_terminal_autorizada`,
@@ -676,9 +676,20 @@ disparó.
   `guardar_declaracion_jurada`,
   `limpiar_viajes_de_prueba`,
   `limpiar_pasajeros_de_prueba`,
-  `migrar_pasajeros_de_micro`,
-  `limpiar_ventas_de_prueba`,
-  `limpiar_cancelaciones_de_prueba`.
+  `limpiar_cancelaciones_de_prueba`. Todos aplican el
+  patrón C.6.
+- **Excepciones (no requieren fix):**
+  - `migrar_pasajeros_de_micro`: ya cubierto (Tanda 1,
+    1.5piloto.82e).
+  - `limpiar_ventas_de_prueba`: no llama `guardar_ambos`
+    directamente (cada `cancelar_venta` interno lo hace
+    y ya está chequeado desde v81w).
+  - `listar_viajes_de_dueno` (drenar buzón): lectura
+    con side-effect. Si falla, se loguea pero se devuelve
+    el listado igual.
+- **Estado de cobertura: COMPLETA.** Todos los flujos
+  del piloto que llaman `guardar_ambos` chequean el
+  resultado.
 - **Tercer bug detectado (1.5piloto.83e):** impresión de
   ventas para terminal. Las URLs `?imprimir=1&tipo=pasajes`
   y `tipo=cupon` llevaban `id_venta` y `nombre_dueno` pero
@@ -936,22 +947,21 @@ Reglas de oro que aplican a cualquier tanda nueva.
 
 ---
 
-**Estado del proyecto al cierre:** v1.5piloto.83g
+**Estado del proyecto al cierre:** v1.5piloto.83h
 (framework 1.5i.7u). **Bug §4.7 contenido:** cerrado
 como bug activo tras sesión de diagnóstico que no logró
 reproducirlo post-restauración + blindaje. Los 4 bugs
 encadenados del flujo de venta en micro de 2 pisos
 quedaron cerrados. Blindaje activo (rollback si pierde
 bits, nodos o aristas) + logging de diagnóstico
-(`Conf::DEBUG_PERSISTENCIA`). Los 15 flujos con
-`guardar_ambos` sin chequear quedaron cubiertos con el
-patrón C.6 (v1.5piloto.83g). Queda deuda de Fase 4
-(no saltar nodos con máscara 0 + propagar a fixpoint)
-para sesión del framework, y ~10 flujos más con el
-mismo patrón para tanda chiquita. SQL64 activo,
-topología admin/soporte, auditoría topológica
+(`Conf::DEBUG_PERSISTENCIA`). **Cobertura de
+`guardar_ambos`: COMPLETA.** Todos los flujos del
+piloto chequean el resultado (v1.5piloto.83g + 83h).
+Queda deuda de Fase 4 (no saltar nodos con máscara 0 +
+propagar a fixpoint) para sesión del framework. SQL64
+activo, topología admin/soporte, auditoría topológica
 disponible. **La migración de pasajeros sigue en pausa**
-hasta validación post-83g.
+hasta validación post-83h.
 
 **Deuda técnica del arco** en §4.7: endpoints temporales
 de diagnóstico, espejo `_hmi` a JS, espejo C.7-C.10 a JS,

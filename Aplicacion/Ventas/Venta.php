@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.83d
+ * @version   1.5piloto.83h
  */
 
 
@@ -3389,7 +3389,15 @@ function limpiar_cancelaciones_de_prueba(string $nombre_dueno): array {
     }
 
     if (!empty($borrados)) {
-        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+        // Fix 1.5piloto.83h: chequear guardar_ambos.
+        $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+        if (!$ok_guardar) {
+            Controlador::_error("limpiar_cancelaciones_de_prueba: guardar_ambos falló");
+            return [
+                'exito' => false,
+                'error' => 'La limpieza se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+            ];
+        }
     }
 
     return [
