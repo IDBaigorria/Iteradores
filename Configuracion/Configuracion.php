@@ -2,7 +2,7 @@
 namespace Iteradores\Configuracion;
 require_once __DIR__ . '/../config_servidor.php';
 /**
- * @version 1.5i.7h
+ * @version 1.5i.7t
  *
  * @author Ignacio David Baigorria
  *
@@ -35,6 +35,25 @@ class Conf extends ConfServidor {
      * @var string
      */
     public const SUPERESTRUCTURA_CARPETA_GUARDAR_XML = "XML";
+
+    /**
+     * Activa el logging de diagnóstico del guardado parcial (SQL64).
+     *
+     * Cuando está en true, `_guardar_con_filtro` escribe a
+     * `error_log` información sobre:
+     * - Cuántos nodos hay en memoria, en el mapa previo, nuevos,
+     *   con máscara 0 y a insertar.
+     * - Cuántas aristas se van a insertar y cuántas cruzan el borde.
+     * - Resultado de las verificaciones de máscaras, nodos y aristas.
+     *
+     * Activar solo en local, para reproducir y diagnosticar el
+     * bug §4.7 (corrupción del grafo por guardado parcial).
+     * En producción dejar en false: agrega ~50-100ms por guardado.
+     *
+     * @var bool
+     * @since 1.5i.7t
+     */
+    public const DEBUG_PERSISTENCIA = false;
     //////////////////////////////////////////////////////////////////////////////////////
     //  Sobre los errores y alertas //////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////

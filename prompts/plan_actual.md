@@ -27,9 +27,9 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.83a (Fase 0 del
-diagnóstico del bug crítico §4.7: corrupción del grafo
-por guardado parcial. Solo documentación. No toca código).
+**Última actualización:** v1.5piloto.83b (Fases 1 y 2 del
+bug crítico §4.7: blindaje del guardado parcial + logging
+de diagnóstico. Framework 1.5i.7t).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -502,30 +502,37 @@ disparó.
     permitida. Si una operación deja el viaje huérfano,
     NO repetirla; anotar la secuencia exacta.
 
-**Fase 1 — Blindaje (red de seguridad).**
-- Modificar `_guardar_con_filtro` para que falle con
-  `rollback` si:
-  - Un nodo del grafo no queda persistido.
-  - Un nodo pierde bits de máscara respecto del estado
-    anterior en DB.
-  - El conteo de aristas en DB < conteo en grafo.
-- Costo: 2-3 SELECT extra por guardado parcial. Con
-  ~10k nodos, +1-2 segundos.
+**Fase 1 — Blindaje (red de seguridad). CERRADA en 1.5i.7t.**
+- `_guardar_con_filtro` ahora hace rollback si:
+  - Un nodo con máscara vieja > 0 pierde bits en el BFS.
+  - Algún `id_fila` insertado no queda en DB.
+  - Alguna arista calculada no queda en DB.
+- Pre-DELETE: lee las máscaras viejas de los nodos a
+  borrar. Guarda el mapa inverso `id_fila → id_nodo`.
+- Post-INSERT: verifica. Si algo falla, `throw` →
+  `rollback` → `false`. Sin reintento automático (reintentar
+  con `guardar()` total pisaría todo el grafo desde la
+  memoria parcial, catastrófico).
+- Costo: 3 SELECTs extra por guardado parcial. Estimado
+  +200-500ms con ~10k nodos.
 - Beneficio: si el bug vuelve a pasar, falla con error
   en lugar de corromper en silencio.
 
-**Fase 2 — Logging de diagnóstico.**
-- Flag `Conf::DEBUG_PERSISTENCIA`.
-- Log en `error_log`:
-  - Cuántos nodos en memoria, en `$mapa_previo`, nuevos.
-  - Nodos nuevos y su máscara calculada.
-  - Nodos con máscara 0 (los que se saltan del INSERT).
-  - Aristas a insertar, cuántas se saltan por destino
-    fuera de máscara.
-  - Aristas preexistentes que cruzan el borde y no se
-    reinsertan.
-- Se activa con `Conf::DEBUG_PERSISTENCIA = true` o
-  `?debug_persistencia=1`.
+**Fase 2 — Logging de diagnóstico. CERRADA en 1.5i.7t.**
+- Flag `Conf::DEBUG_PERSISTENCIA = false` (default).
+- Log a `error_log` con prefijo `[SQL64_GUARDAR]`:
+  - Cabecera: `nombre`, `mf`, `modo` (parcial/total),
+    `nodos_en_memoria`, `nodos_previos`, `filas_cargadas`,
+    `mascaras_viejas`.
+  - `ids_a_insertar`, `nodos_mascara_0` (con hasta 20 IDs
+    de ejemplo).
+  - `aristas_a_insertar`.
+  - Resultado de `verif_mascaras`, `verif_nodos`,
+    `verif_aristas`.
+  - Si una máscara pierde bits: `PERDIDA id_nodo=... id_fila=...
+    vieja=... nueva=...`.
+- Solo activo en local. En producción se deja en `false`
+  (agrega ~50-100ms por guardado).
 
 **Fase 3 — Reproducir el bug en local.**
 - Con el backup restaurado + migración + log activo.
@@ -763,14 +770,17 @@ Reglas de oro que aplican a cualquier tanda nueva.
 
 ---
 
-**Estado del proyecto al cierre:** v1.5piloto.83a
-(framework 1.5i.8f). **Bug crítico abierto:** corrupción
+**Estado del proyecto al cierre:** v1.5piloto.83b
+(framework 1.5i.7t). **Bug crítico abierto:** corrupción
 del grafo por guardado parcial (§4.7). Base restaurada
-desde backup + reparaciones idempotentes. Plan de
-diagnóstico y blindaje de 6 fases en curso. SQL64
-activo, topología admin/soporte, auditoría topológica
-disponible. **La migración de pasajeros queda en pausa**
-hasta que el bug §4.7 esté resuelto.
+desde backup + reparaciones idempotentes. Fases 1 y 2
+cerradas: blindaje del guardado parcial (rollback si
+pierde bits, nodos o aristas) y logging de diagnóstico
+(`Conf::DEBUG_PERSISTENCIA`). Fase 3 (reproducir en
+local) es el próximo paso. SQL64 activo, topología
+admin/soporte, auditoría topológica disponible. **La
+migración de pasajeros queda en pausa** hasta que el bug
+§4.7 esté resuelto.
 
 **Deuda técnica del arco** en §4.7: endpoints temporales
 de diagnóstico, espejo `_hmi` a JS, espejo C.7-C.10 a JS,
