@@ -17,7 +17,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStrin
  * no permite ese privilegio. Se usa IN (...) directo.
  *
  * @author Ignacio David Baigorria
- * @version 1.5i.7t
+ * @version 1.5i.7u
  * @since 1.5i.7k
  */
 class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQL implements PerdurarSuperestructuraConContexto {
@@ -291,6 +291,11 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                     if ($mascara_vieja === 0) continue;
                     $id_nodo_prev = $mapa_fila_a_id_previo[$id_fila_viejo] ?? null;
                     if ($id_nodo_prev === null) continue; // nodo borrado, válido
+                    // Fix 1.5i.7u: si el nodo ya no está en el grafo,
+                    // se destruyó legítimamente durante la request
+                    // (por ejemplo, la venta_actual al confirmar).
+                    // No es pérdida de bits, es borrado. Válido.
+                    if (!Nodo::existe($id_nodo_prev)) continue;
                     $mascara_nueva = (int)($mascaras[$id_nodo_prev] ?? 0);
                     if (($mascara_nueva & $mascara_vieja) !== $mascara_vieja) {
                         $perdidos[] = ["id_nodo" => $id_nodo_prev, "id_fila" => $id_fila_viejo, "vieja" => $mascara_vieja, "nueva" => $mascara_nueva];

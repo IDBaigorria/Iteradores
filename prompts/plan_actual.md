@@ -27,9 +27,10 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.83b (Fases 1 y 2 del
-bug crítico §4.7: blindaje del guardado parcial + logging
-de diagnóstico. Framework 1.5i.7t).
+**Última actualización:** v1.5piloto.83c (Fase 3 del
+bug §4.7: primer ciclo con blindaje detectó un falso
+positivo en la verificación de máscaras. El bug real NO
+se reprodujo. Fix del falso positivo en 1.5i.7u).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -534,11 +535,33 @@ disparó.
 - Solo activo en local. En producción se deja en `false`
   (agrega ~50-100ms por guardado).
 
-**Fase 3 — Reproducir el bug en local.**
+**Fase 3 — Reproducir el bug en local. EN CURSO.**
 - Con el backup restaurado + migración + log activo.
-- Secuencia: agregar micro → migrar → eliminar micro
-  viejo → pagar cupón.
-- Leer el log y aislar el punto exacto de corrupción.
+- Secuencia probada: vender un pasaje en el micro de
+  2 pisos. El blindaje abortó con rollback.
+- **Diagnóstico del aborto:** falso positivo. La
+  verificación de máscaras marcó como "PERDIDA" a los
+  5 nodos que `_destruir_venta_actual` destruye
+  legítimamente al confirmar la venta (`venta_actual`,
+  cabeza de asientos, `asiento_venta`, `viaje`, `micro`).
+  Esos nodos ya no están en `$mascaras` porque se
+  borraron del grafo, entonces `$mascaras[$id] ?? 0` = 0.
+  La verificación no distinguía "borrado" de "perdió
+  bits".
+- **Fix (1.5i.7u):** agregar
+  `if (!Nodo::existe($id_nodo_prev)) continue;` antes de
+  comparar máscaras. `Nodo::existe()` es O(1)
+  (`isset(self::$superestructura[$id])`).
+- **Importante:** el bug real §4.7 (nodo pierde bits en
+  el BFS) **NO se reprodujo** en este flujo. Los guardar
+  total del bootstrap (login, recarga) pasaron todos con
+  `verif_nodos ok=1` y `verif_aristas ok=1`. La DB creció
+  legítimamente por los nodos de sesión, no por
+  corrupción. **Próximo paso:** volver a probar con el
+  fix. Si el ciclo completo (migración + venta +
+  cupón) no rompe, evaluar marcar §4.7 como "no
+  reproducido post-restauración + blindaje". Si rompe,
+  ahora sí el log va a mostrar el punto exacto.
 
 **Fase 4 — Fix real.**
 - Depende del diagnóstico:
