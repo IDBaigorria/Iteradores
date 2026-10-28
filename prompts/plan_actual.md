@@ -27,10 +27,12 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.83c (Fase 3 del
-bug §4.7: primer ciclo con blindaje detectó un falso
-positivo en la verificación de máscaras. El bug real NO
-se reprodujo. Fix del falso positivo en 1.5i.7u).
+**Última actualización:** v1.5piloto.83d (Fase 3 del
+bug §4.7: fix del falso positivo en 1.5i.7u. Detectado
+que `confirmar_venta_actual` y `pagar_cupon_venta` no
+chequean `guardar_ambos`, reportando "éxito" con la DB
+intacta. Chequeos aplicados. Deuda: ~15 flujos más con
+el mismo patrón, tanda aparte).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -562,6 +564,33 @@ disparó.
   cupón) no rompe, evaluar marcar §4.7 como "no
   reproducido post-restauración + blindaje". Si rompe,
   ahora sí el log va a mostrar el punto exacto.
+- **Segundo bug detectado (1.5piloto.83d):**
+  `confirmar_venta_actual` y `pagar_cupon_venta`
+  llamaban `guardar_ambos` **sin chequear el
+  resultado**. Cuando el guardado parcial fallaba (por
+  el falso positivo del blindaje), el backend devolvía
+  `exito: true` igual. El frontend mostraba "Venta
+  confirmada" con la DB intacta. El asiento seguía
+  "seleccionado" en el croquis (por el polling) y
+  "Imprimir pasaje" devolvía "venta no encontrada".
+  **Fix:** patrón C.6. Chequear `guardar_ambos`; si
+  falla, devolver `exito: false` con error específico
+  ("La venta se procesó en memoria pero no se pudo
+  guardar en la base de datos. Revisá el log del
+  servidor o intentá de nuevo.").
+- **Deuda técnica (tanda aparte):** ~15 flujos más
+  llaman `guardar_ambos` sin chequear.
+  `reservar_asiento_micro`, `asignar_pasajero_a_reserva`,
+  `liberar_reserva_asiento_micro`, `seleccionar_asiento_micro`,
+  `deseleccionar_asiento_micro`, `cambiar_asiento_pasaje`,
+  `agregar_micro_a_viaje`, `eliminar_micro_de_viaje`,
+  `actualizar_monto_micro`, `eliminar_viaje`,
+  `crear_pasajero`, `actualizar_pasajero`,
+  `eliminar_pasajero`,
+  `eliminar_declaracion_jurada_pasajero`,
+  `subir_declaracion_jurada_pasajero`. Todos tienen el
+  mismo síntoma: "éxito" sin persistir. Hacer después
+  de cerrar §4.7.
 
 **Fase 4 — Fix real.**
 - Depende del diagnóstico:

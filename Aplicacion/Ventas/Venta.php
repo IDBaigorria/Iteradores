@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.82i
+ * @version   1.5piloto.83d
  */
 
 
@@ -641,7 +641,21 @@ function confirmar_venta_actual(
     $nodo_terminal->eliminar_adyacente('venta_actual');
     _destruir_venta_actual($venta_actual);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83d: chequear el resultado del guardado.
+    // Antes se ignoraba y el backend respondía "éxito" aunque
+    // la DB no se hubiera actualizado. El usuario veía "Venta
+    // confirmada" con el asiento todavía "seleccionado" en el
+    // croquis (por el polling) y "venta no encontrada" al
+    // intentar imprimir el pasaje. Patrón C.6 (aplicado en
+    // cancelar_venta en v81w).
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("confirmar_venta_actual: guardar_ambos falló para id_venta=$id_venta");
+        return [
+            'exito' => false,
+            'error' => 'La venta se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return [
         'exito' => true,
@@ -2332,7 +2346,19 @@ function pagar_cupon_venta(string $id_venta, string $numero_cupon, string $monto
         }
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83d: chequear el resultado del guardado.
+    // Mismo patrón que confirmar_venta_actual y
+    // cancelar_venta. Si el guardado parcial falla, la DB no
+    // se actualiza pero el backend respondía "éxito" igual.
+    // El usuario veía "Cupón pagado" con el estado viejo.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("pagar_cupon_venta: guardar_ambos falló para id_venta=$id_venta numero_cupon=$numero_cupon");
+        return [
+            'exito' => false,
+            'error' => 'El pago del cupón se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return [
         'exito' => true,

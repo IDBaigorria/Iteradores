@@ -1,131 +1,185 @@
 <?php
 /**
- * Aplicador — Fix del falso positivo en la verificación de máscaras
- * (bug §4.7, Fase 1).
+ * Aplicador — Fase 3 del bug §4.7: chequeo de guardar_ambos
+ * en confirmar_venta_actual y pagar_cupon_venta.
  *
- * La verificación de máscaras de `_guardar_con_filtro` (v1.5i.7t)
- * marcaba como "PERDIDA" a los nodos que se destruyen
- * legítimamente durante la request (por ejemplo, la venta_actual
- * al confirmar la venta). Esos nodos ya no están en `$mascaras`
- * (porque se borraron del grafo), y `$mascaras[$id] ?? 0` da 0.
+ * Motivo: ambos flujos llaman `guardar_ambos` sin chequear el
+ * resultado. Cuando el guardado parcial falla (por ejemplo, por
+ * el blindaje de 1.5i.7t o por el bug real §4.7), el backend
+ * devuelve `exito: true` igual. El frontend muestra "Venta
+ * confirmada" con la DB intacta. El asiento sigue "seleccionado"
+ * en el croquis (por el polling) e "Imprimir pasaje" devuelve
+ * "venta no encontrada".
  *
- * Fix: distinguir "nodo borrado del grafo" (correcto) de
- * "nodo que sigue en el grafo pero perdió bits" (bug real).
- * Agregar `if (!Nodo::existe($id_nodo_prev)) continue;`.
+ * Fix: patrón C.6 (aplicado en cancelar_venta en v81w).
+ * Chequear `guardar_ambos`; si falla, devolver `exito: false`
+ * con error específico. El caller (frontend) muestra el error
+ * y NO muestra el modal post-venta.
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5i.7u';
+$version_nueva = '1.5piloto.83d';
 
-$htmls_a_bumpear = [];
+$htmls_a_bumpear = ['aplicacion_GET.html'];
 
 $cambios = [
 
+// ============================================================
+// 1. Venta.php — confirmar_venta_actual: chequear guardar_ambos
+// ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStringSQL64.php',
-    'descripcion' => 'SQL64: distinguir nodo borrado de nodo que perdió bits',
+    'archivo' => 'Aplicacion/Ventas/Venta.php',
+    'descripcion' => 'confirmar_venta_actual: chequear guardar_ambos',
     'buscar' => [
-        '            if ($mf_parcial !== 0 && !empty($mascaras_viejas)) {',
-        '                $perdidos = [];',
-        '                foreach ($mascaras_viejas as $id_fila_viejo => $mascara_vieja) {',
-        '                    if ($mascara_vieja === 0) continue;',
-        '                    $id_nodo_prev = $mapa_fila_a_id_previo[$id_fila_viejo] ?? null;',
-        '                    if ($id_nodo_prev === null) continue; // nodo borrado, válido',
-        '                    $mascara_nueva = (int)($mascaras[$id_nodo_prev] ?? 0);',
-        '                    if (($mascara_nueva & $mascara_vieja) !== $mascara_vieja) {',
-        '                        $perdidos[] = ["id_nodo" => $id_nodo_prev, "id_fila" => $id_fila_viejo, "vieja" => $mascara_vieja, "nueva" => $mascara_nueva];',
-        '                    }',
-        '                }',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '',
+        '    return [',
+        '        \'exito\' => true,',
+        '        \'id_venta\' => $id_venta,',
+        '        \'total\' => (string)$total,',
+        '        \'pagado\' => (string)$monto_pagado,',
+        '        \'cuotas_restantes\' => (string)$cuotas_restantes,',
+        '        \'asientos\' => count($asientos_seleccionados),',
+        '    ];',
     ],
     'reemplazar' => [
-        '            if ($mf_parcial !== 0 && !empty($mascaras_viejas)) {',
-        '                $perdidos = [];',
-        '                foreach ($mascaras_viejas as $id_fila_viejo => $mascara_vieja) {',
-        '                    if ($mascara_vieja === 0) continue;',
-        '                    $id_nodo_prev = $mapa_fila_a_id_previo[$id_fila_viejo] ?? null;',
-        '                    if ($id_nodo_prev === null) continue; // nodo borrado, válido',
-        '                    // Fix 1.5i.7u: si el nodo ya no está en el grafo,',
-        '                    // se destruyó legítimamente durante la request',
-        '                    // (por ejemplo, la venta_actual al confirmar).',
-        '                    // No es pérdida de bits, es borrado. Válido.',
-        '                    if (!Nodo::existe($id_nodo_prev)) continue;',
-        '                    $mascara_nueva = (int)($mascaras[$id_nodo_prev] ?? 0);',
-        '                    if (($mascara_nueva & $mascara_vieja) !== $mascara_vieja) {',
-        '                        $perdidos[] = ["id_nodo" => $id_nodo_prev, "id_fila" => $id_fila_viejo, "vieja" => $mascara_vieja, "nueva" => $mascara_nueva];',
-        '                    }',
-        '                }',
+        '    // Fix 1.5piloto.83d: chequear el resultado del guardado.',
+        '    // Antes se ignoraba y el backend respondía "éxito" aunque',
+        '    // la DB no se hubiera actualizado. El usuario veía "Venta',
+        '    // confirmada" con el asiento todavía "seleccionado" en el',
+        '    // croquis (por el polling) y "venta no encontrada" al',
+        '    // intentar imprimir el pasaje. Patrón C.6 (aplicado en',
+        '    // cancelar_venta en v81w).',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        Controlador::_error("confirmar_venta_actual: guardar_ambos falló para id_venta=$id_venta");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La venta se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '',
+        '    return [',
+        '        \'exito\' => true,',
+        '        \'id_venta\' => $id_venta,',
+        '        \'total\' => (string)$total,',
+        '        \'pagado\' => (string)$monto_pagado,',
+        '        \'cuotas_restantes\' => (string)$cuotas_restantes,',
+        '        \'asientos\' => count($asientos_seleccionados),',
+        '    ];',
     ],
 ],
 
 // ============================================================
-// plan_actual.md: documentar el falso positivo y el fix
+// 2. Venta.php — pagar_cupon_venta: chequear guardar_ambos
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Ventas/Venta.php',
+    'descripcion' => 'pagar_cupon_venta: chequear guardar_ambos',
+    'buscar' => [
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '',
+        '    return [',
+        '        \'exito\' => true,',
+        '        \'venta\' => formatear_venta_completa($nodo_venta),',
+        '    ];',
+    ],
+    'reemplazar' => [
+        '    // Fix 1.5piloto.83d: chequear el resultado del guardado.',
+        '    // Mismo patrón que confirmar_venta_actual y',
+        '    // cancelar_venta. Si el guardado parcial falla, la DB no',
+        '    // se actualiza pero el backend respondía "éxito" igual.',
+        '    // El usuario veía "Cupón pagado" con el estado viejo.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        Controlador::_error("pagar_cupon_venta: guardar_ambos falló para id_venta=$id_venta numero_cupon=$numero_cupon");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'El pago del cupón se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '',
+        '    return [',
+        '        \'exito\' => true,',
+        '        \'venta\' => formatear_venta_completa($nodo_venta),',
+        '    ];',
+    ],
+],
+
+// ============================================================
+// 3. plan_actual.md: header a v83d
 // ============================================================
 [
     'tipo' => 'reemplazar',
     'archivo' => 'prompts/plan_actual.md',
-    'descripcion' => 'plan_actual: header a v83c',
+    'descripcion' => 'plan_actual: header a v83d',
     'buscar' => [
-        '**Última actualización:** v1.5piloto.83b (Fases 1 y 2 del',
-        'bug crítico §4.7: blindaje del guardado parcial + logging',
-        'de diagnóstico. Framework 1.5i.7t).',
-    ],
-    'reemplazar' => [
         '**Última actualización:** v1.5piloto.83c (Fase 3 del',
         'bug §4.7: primer ciclo con blindaje detectó un falso',
         'positivo en la verificación de máscaras. El bug real NO',
         'se reprodujo. Fix del falso positivo en 1.5i.7u).',
     ],
+    'reemplazar' => [
+        '**Última actualización:** v1.5piloto.83d (Fase 3 del',
+        'bug §4.7: fix del falso positivo en 1.5i.7u. Detectado',
+        'que `confirmar_venta_actual` y `pagar_cupon_venta` no',
+        'chequean `guardar_ambos`, reportando "éxito" con la DB',
+        'intacta. Chequeos aplicados. Deuda: ~15 flujos más con',
+        'el mismo patrón, tanda aparte).',
+    ],
 ],
+
+// ============================================================
+// 4. plan_actual.md: nota en Fase 3
+// ============================================================
 [
     'tipo' => 'reemplazar',
     'archivo' => 'prompts/plan_actual.md',
-    'descripcion' => 'plan_actual: Fase 3 con falso positivo y fix',
+    'descripcion' => 'plan_actual: nota del segundo bug y fix',
     'buscar' => [
-        '**Fase 3 — Reproducir el bug en local.**',
-        '- Con el backup restaurado + migración + log activo.',
-        '- Secuencia: agregar micro → migrar → eliminar micro',
-        '  viejo → pagar cupón.',
-        '- Leer el log y aislar el punto exacto de corrupción.',
+        '  ahora sí el log va a mostrar el punto exacto.',
     ],
     'reemplazar' => [
-        '**Fase 3 — Reproducir el bug en local. EN CURSO.**',
-        '- Con el backup restaurado + migración + log activo.',
-        '- Secuencia probada: vender un pasaje en el micro de',
-        '  2 pisos. El blindaje abortó con rollback.',
-        '- **Diagnóstico del aborto:** falso positivo. La',
-        '  verificación de máscaras marcó como "PERDIDA" a los',
-        '  5 nodos que `_destruir_venta_actual` destruye',
-        '  legítimamente al confirmar la venta (`venta_actual`,',
-        '  cabeza de asientos, `asiento_venta`, `viaje`, `micro`).',
-        '  Esos nodos ya no están en `$mascaras` porque se',
-        '  borraron del grafo, entonces `$mascaras[$id] ?? 0` = 0.',
-        '  La verificación no distinguía "borrado" de "perdió',
-        '  bits".',
-        '- **Fix (1.5i.7u):** agregar',
-        '  `if (!Nodo::existe($id_nodo_prev)) continue;` antes de',
-        '  comparar máscaras. `Nodo::existe()` es O(1)',
-        '  (`isset(self::$superestructura[$id])`).',
-        '- **Importante:** el bug real §4.7 (nodo pierde bits en',
-        '  el BFS) **NO se reprodujo** en este flujo. Los guardar',
-        '  total del bootstrap (login, recarga) pasaron todos con',
-        '  `verif_nodos ok=1` y `verif_aristas ok=1`. La DB creció',
-        '  legítimamente por los nodos de sesión, no por',
-        '  corrupción. **Próximo paso:** volver a probar con el',
-        '  fix. Si el ciclo completo (migración + venta +',
-        '  cupón) no rompe, evaluar marcar §4.7 como "no',
-        '  reproducido post-restauración + blindaje". Si rompe,',
         '  ahora sí el log va a mostrar el punto exacto.',
+        '- **Segundo bug detectado (1.5piloto.83d):**',
+        '  `confirmar_venta_actual` y `pagar_cupon_venta`',
+        '  llamaban `guardar_ambos` **sin chequear el',
+        '  resultado**. Cuando el guardado parcial fallaba (por',
+        '  el falso positivo del blindaje), el backend devolvía',
+        '  `exito: true` igual. El frontend mostraba "Venta',
+        '  confirmada" con la DB intacta. El asiento seguía',
+        '  "seleccionado" en el croquis (por el polling) y',
+        '  "Imprimir pasaje" devolvía "venta no encontrada".',
+        '  **Fix:** patrón C.6. Chequear `guardar_ambos`; si',
+        '  falla, devolver `exito: false` con error específico',
+        '  ("La venta se procesó en memoria pero no se pudo',
+        '  guardar en la base de datos. Revisá el log del',
+        '  servidor o intentá de nuevo.").',
+        '- **Deuda técnica (tanda aparte):** ~15 flujos más',
+        '  llaman `guardar_ambos` sin chequear.',
+        '  `reservar_asiento_micro`, `asignar_pasajero_a_reserva`,',
+        '  `liberar_reserva_asiento_micro`, `seleccionar_asiento_micro`,',
+        '  `deseleccionar_asiento_micro`, `cambiar_asiento_pasaje`,',
+        '  `agregar_micro_a_viaje`, `eliminar_micro_de_viaje`,',
+        '  `actualizar_monto_micro`, `eliminar_viaje`,',
+        '  `crear_pasajero`, `actualizar_pasajero`,',
+        '  `eliminar_pasajero`,',
+        '  `eliminar_declaracion_jurada_pasajero`,',
+        '  `subir_declaracion_jurada_pasajero`. Todos tienen el',
+        '  mismo síntoma: "éxito" sin persistir. Hacer después',
+        '  de cerrar §4.7.',
     ],
 ],
 
 ];
 
 // ============================================================
-// Runner v2
+// Runner v2 (textual, ver prompt_sistema_scripts_v2.md §14)
 // ============================================================
 
 echo "=== Aplicador ===\n\n";
