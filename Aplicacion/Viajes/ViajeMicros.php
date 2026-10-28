@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.82e
+ * @version   1.5piloto.83g
  */
 
 use Iteradores\Nodos\Nodo;
@@ -229,7 +229,15 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
         }
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("agregar_micro_a_viaje: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
+        return [
+            'exito' => false,
+            'error' => 'El alta del micro se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true, 'nombre_micro' => $nombre_micro];
 }
 
@@ -268,7 +276,16 @@ function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, str
     _destruir_micro($nodo_micro);
 
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno, $nodo_contexto);
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("eliminar_micro_de_viaje: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
+        return [
+            'exito' => false,
+            'error' => 'La baja del micro se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -592,7 +609,15 @@ function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, stri
         $nodo_micro->_adyacente_en(Nodo::crear_con_dato($monto), 'monto');
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("actualizar_monto_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
+        return [
+            'exito' => false,
+            'error' => 'La actualización del monto se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 

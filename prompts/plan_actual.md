@@ -27,13 +27,10 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.83e (Fase 3 del
-bug §4.7, cierre del flujo de venta en micro de 2 pisos.
-Fix de impresión de ventas para terminal: las URLs no
-llevaban `nombre_terminal`, así que `obtener_venta_por_id`
-buscaba en el árbol default del dueño y no encontraba la
-venta del compartido. Aplicado en las 5 URLs del frontend
-y en `generar_impresion` / `index.php`).
+**Última actualización:** v1.5piloto.83g (tanda de los
+15 flujos con `guardar_ambos` sin chequear. Aplicado el
+patrón C.6: ahora reportan `exito: false` si el guardado
+falla, en lugar de mentir con "éxito" con la DB intacta).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -449,9 +446,86 @@ local, el mismo flujo funcionaba.
   - Cancelación desde carmen2: persiste
   - Auditoría topológica:    0 críticos / 0 errores / 0 warnings
 
-### 4.7. Bug crítico abierto: corrupción del grafo por guardado parcial
+### 4.7. Bug contenido: corrupción del grafo por guardado parcial
 
-**Estado:** abierto. Fase 0 cerrada (este documento).
+**Estado:** contenido y cerrado como bug activo.
+
+**Resultado de la sesión de diagnóstico (v1.5piloto.83a-f).**
+El bug no se reproduce post-restauración + blindaje. Los
+20+ guardados parciales de la sesión pasaron todos con
+`verif_mascaras ok=1`, `verif_nodos ok=1`, `verif_aristas ok=1`.
+Cero `PERDIDA`, cero `FALLO`. La DB quedó consistente.
+
+**4 bugs encadenados del flujo de venta en micro de 2 pisos
+que SÍ se encontraron y cerraron:**
+- Falso positivo del blindaje con `_destruir_venta_actual`
+  (1.5i.7u): la verificación de máscaras marcaba como
+  "PERDIDA" a los 5 nodos que se destruyen legítimamente al
+  confirmar la venta. Fix: `if (!Nodo::existe($id_nodo_prev))
+  continue;`.
+- `confirmar_venta_actual` sin chequear `guardar_ambos`
+  (v1.5piloto.83d): el backend respondía `exito: true` con la
+  DB intacta cuando el guardado fallaba. El usuario veía
+  "Venta confirmada" con el asiento todavía "seleccionado"
+  (por el polling) e "imprimir pasaje" devolvía "venta no
+  encontrada". Fix: patrón C.6.
+- `pagar_cupon_venta` sin chequear `guardar_ambos`
+  (v1.5piloto.83d): mismo patrón. Fix aplicado.
+- Impresión de ventas para terminal sin `nombre_terminal`
+  (v1.5piloto.83e): las URLs de impresión llevaban `id_venta`
+  y `nombre_dueno` pero no `nombre_terminal`. El backend
+  buscaba en el árbol default del dueño (donde no está la
+  venta del compartido). Fix aplicado en 5 URLs +
+  `generar_impresion` + `index.php`.
+
+**Hueco del blindaje (deuda de la Fase 4).** El blindaje
+atrapa la pérdida de bits, pero NO atrapa:
+- Nodos que **nunca tuvieron bits** (creados con máscara 0,
+  o cargados así de la DB). El check `if ($mf !== 0 &&
+  ($mascara & $mf) === 0) return;` los salta del INSERT sin
+  avisar.
+- Aristas que apuntan a esos nodos: también se saltan.
+
+Ese es el **leak lento acumulativo** que produjo los 1817
+nodos con máscara 0 del estado original. Se necesita Fase 4
+(fix real) para cerrarlo. Ver "Fase 4" más abajo.
+
+**Mitigación operativa mientras Fase 4 no esté:**
+- Correr `?auditar_topologia=1` periódicamente (semanal o
+  mensual) para detectar acumulación de huérfanos.
+- Correr `?reparar_topologia=1` + `?reparar_arboles=1` si
+  aparecen huérfanos.
+- Si en el futuro "desaparece un viaje", seguir el mismo
+  procedimiento de diagnóstico de esta sesión: restaurar,
+  migrar, auditar, reparar.
+
+**Fase 4 pendiente (sesión del framework).** Dos cambios
+para cerrar el leak lento de raíz:
+1. **No saltar nodos con máscara 0 del INSERT.** Insertarlos
+   con máscara 0. El `id_fila` se preserva, las aristas
+   apuntan bien, no hay duplicados en el siguiente guardado.
+2. **Propagar máscaras a fixpoint sobre TODAS las aristas.**
+   Repetir el BFS hasta que no cambie nada. Los nodos
+   "huérfanos en memoria" recuperan bits en el próximo
+   guardado.
+
+Cambio sensible. Requiere sesión del framework dedicada con
+tests a fondo. No bloquea el trabajo del piloto.
+
+**Historial del diagnóstico (sesiones):**
+- **Fase 0** (v1.5piloto.83a): anotar el bug y congelar
+  producción.
+- **Fase 1+2** (framework 1.5i.7t): blindaje del guardado
+  parcial + logging de diagnóstico.
+- **Fase 3** (v1.5piloto.83c-f): falso positivo del blindaje,
+  los 4 bugs encadenados del flujo de venta, y esta sesión
+  de reproducción que no logró reproducir el bug.
+
+**Estado del bug:** contenido. Los 4 bugs concretos del
+flujo están cerrados. El leak lento del blindaje es deuda
+de Fase 4, no de esta sesión.
+
+**Estado histórico:**
 
 **Síntoma.** Después de una secuencia de operaciones
 (agregar micro de 2 pisos → migrar pasajeros del micro
@@ -579,9 +653,9 @@ disparó.
   ("La venta se procesó en memoria pero no se pudo
   guardar en la base de datos. Revisá el log del
   servidor o intentá de nuevo.").
-- **Deuda técnica (tanda aparte):** ~15 flujos más
-  llaman `guardar_ambos` sin chequear.
-  `reservar_asiento_micro`, `asignar_pasajero_a_reserva`,
+- **15 flujos con `guardar_ambos` sin chequear: CERRADOS
+  en v1.5piloto.83g.** `reservar_asiento_micro`,
+  `asignar_pasajero_a_reserva`,
   `liberar_reserva_asiento_micro`, `seleccionar_asiento_micro`,
   `deseleccionar_asiento_micro`, `cambiar_asiento_pasaje`,
   `agregar_micro_a_viaje`, `eliminar_micro_de_viaje`,
@@ -589,9 +663,22 @@ disparó.
   `crear_pasajero`, `actualizar_pasajero`,
   `eliminar_pasajero`,
   `eliminar_declaracion_jurada_pasajero`,
-  `subir_declaracion_jurada_pasajero`. Todos tienen el
-  mismo síntoma: "éxito" sin persistir. Hacer después
-  de cerrar §4.7.
+  `subir_declaracion_jurada_pasajero`. Todos aplican
+  el patrón C.6: si `guardar_ambos` falla, devuelven
+  `exito: false` con error específico.
+- **Deuda técnica restante (tanda chiquita siguiente):**
+  quedan ~10 flujos más con el mismo patrón:
+  `agregar_viaje`, `editar_viaje`,
+  `guardar_viaje_completo`,
+  `agregar_terminal_autorizada`,
+  `eliminar_terminal_autorizada`,
+  `guardar_opciones_terminal_viaje`,
+  `guardar_declaracion_jurada`,
+  `limpiar_viajes_de_prueba`,
+  `limpiar_pasajeros_de_prueba`,
+  `migrar_pasajeros_de_micro`,
+  `limpiar_ventas_de_prueba`,
+  `limpiar_cancelaciones_de_prueba`.
 - **Tercer bug detectado (1.5piloto.83e):** impresión de
   ventas para terminal. Las URLs `?imprimir=1&tipo=pasajes`
   y `tipo=cupon` llevaban `id_venta` y `nombre_dueno` pero
@@ -849,17 +936,22 @@ Reglas de oro que aplican a cualquier tanda nueva.
 
 ---
 
-**Estado del proyecto al cierre:** v1.5piloto.83b
-(framework 1.5i.7t). **Bug crítico abierto:** corrupción
-del grafo por guardado parcial (§4.7). Base restaurada
-desde backup + reparaciones idempotentes. Fases 1 y 2
-cerradas: blindaje del guardado parcial (rollback si
-pierde bits, nodos o aristas) y logging de diagnóstico
-(`Conf::DEBUG_PERSISTENCIA`). Fase 3 (reproducir en
-local) es el próximo paso. SQL64 activo, topología
-admin/soporte, auditoría topológica disponible. **La
-migración de pasajeros queda en pausa** hasta que el bug
-§4.7 esté resuelto.
+**Estado del proyecto al cierre:** v1.5piloto.83g
+(framework 1.5i.7u). **Bug §4.7 contenido:** cerrado
+como bug activo tras sesión de diagnóstico que no logró
+reproducirlo post-restauración + blindaje. Los 4 bugs
+encadenados del flujo de venta en micro de 2 pisos
+quedaron cerrados. Blindaje activo (rollback si pierde
+bits, nodos o aristas) + logging de diagnóstico
+(`Conf::DEBUG_PERSISTENCIA`). Los 15 flujos con
+`guardar_ambos` sin chequear quedaron cubiertos con el
+patrón C.6 (v1.5piloto.83g). Queda deuda de Fase 4
+(no saltar nodos con máscara 0 + propagar a fixpoint)
+para sesión del framework, y ~10 flujos más con el
+mismo patrón para tanda chiquita. SQL64 activo,
+topología admin/soporte, auditoría topológica
+disponible. **La migración de pasajeros sigue en pausa**
+hasta validación post-83g.
 
 **Deuda técnica del arco** en §4.7: endpoints temporales
 de diagnóstico, espejo `_hmi` a JS, espejo C.7-C.10 a JS,

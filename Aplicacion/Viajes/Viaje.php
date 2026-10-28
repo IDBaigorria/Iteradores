@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.80f
+ * @version   1.5piloto.83g
  */
 
 use Iteradores\Nodos\Nodo;
@@ -911,7 +911,15 @@ function eliminar_viaje(string $nombre_viaje, string $nombre_dueno): array {
     $nodo_viajes->eliminar_adyacente($nombre_viaje);
     Nodo::eliminar($nodo_viaje);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("eliminar_viaje: guardar_ambos falló para viaje=$nombre_viaje");
+        return [
+            'exito' => false,
+            'error' => 'La baja del viaje se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 

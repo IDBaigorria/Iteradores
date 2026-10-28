@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.81j
+ * @version   1.5piloto.83g
  */
 
 use Iteradores\Nodos\Nodo;
@@ -318,7 +318,15 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos, ?N
         }
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("actualizar_pasajero: guardar_ambos falló para dni=$dni");
+        return [
+            'exito' => false,
+            'error' => 'La actualización del pasajero se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     $activos = pasajero_tiene_pasajes_activos($nombre_dueno, $dni, $nodo_contexto);
     return [
@@ -384,7 +392,15 @@ function crear_pasajero(string $nombre_dueno, array $datos, ?Nodo $nodo_contexto
 
     $nodo_pasajero->_adyacente_en(Nodo::crear_con_dato(date('Y-m-d')), 'fecha_ultima_modificacion');
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("crear_pasajero: guardar_ambos falló para dni=$dni_norm");
+        return [
+            'exito' => false,
+            'error' => 'El alta del pasajero se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return [
         'exito' => true,
@@ -624,7 +640,15 @@ function eliminar_pasajero(string $nombre_dueno, string $dni, ?Nodo $nodo_contex
     $contenedor->eliminar_adyacente($dni);
     _destruir_pasajero_completo($nodo_pasajero);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("eliminar_pasajero: guardar_ambos falló para dni=$dni");
+        return [
+            'exito' => false,
+            'error' => 'La baja del pasajero se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -1167,7 +1191,15 @@ function subir_declaracion_jurada_pasajero(string $nombre_dueno, string $dni, ar
     $nodo_dj->_adyacente_en(Nodo::crear_con_dato(date('d/m/Y H:i')), 'fecha_subida');
     $nodo_pasajero->_adyacente_en($nodo_dj, 'declaracion_jurada');
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("subir_declaracion_jurada_pasajero: guardar_ambos falló para dni=$dni_norm");
+        return [
+            'exito' => false,
+            'error' => 'La subida de la declaración jurada se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return [
         'exito' => true,
@@ -1207,6 +1239,14 @@ function eliminar_declaracion_jurada_pasajero(string $nombre_dueno, string $dni,
     $nodo_pasajero->eliminar_adyacente('declaracion_jurada');
     _destruir_declaracion_jurada_pasajero($nodo_dj);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("eliminar_declaracion_jurada_pasajero: guardar_ambos falló para dni=$dni_norm");
+        return [
+            'exito' => false,
+            'error' => 'La baja de la declaración jurada se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }

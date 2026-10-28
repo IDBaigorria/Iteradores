@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.82h
+ * @version   1.5piloto.83g
  */
 
 use Iteradores\Nodos\Nodo;
@@ -259,7 +259,17 @@ function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, stri
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear el resultado del guardado.
+    // Antes se ignoraba y el backend respondía "éxito" aunque
+    // la DB no se hubiera actualizado. Patrón C.6.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("reservar_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
+        return [
+            'exito' => false,
+            'error' => 'La reserva se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -362,7 +372,15 @@ function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, 
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("asignar_pasajero_a_reserva: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
+        return [
+            'exito' => false,
+            'error' => 'La asignación de pasajero se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -426,7 +444,15 @@ function liberar_reserva_asiento_micro(string $nombre_viaje, string $nombre_micr
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("liberar_reserva_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
+        return [
+            'exito' => false,
+            'error' => 'La liberación de reserva se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -713,7 +739,15 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("seleccionar_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
+        return [
+            'exito' => false,
+            'error' => 'La selección de asiento se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -835,7 +869,15 @@ function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro,
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("deseleccionar_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
+        return [
+            'exito' => false,
+            'error' => 'La deselección de asiento se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -1038,7 +1080,16 @@ function cambiar_asiento_pasaje(
 
     actualizar_contadores_micro($nodo_micro);
     actualizar_contadores_viaje($nombre_viaje, $nombre_dueno);
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+
+    // Fix 1.5piloto.83g: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        Controlador::_error("cambiar_asiento_pasaje: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
+        return [
+            'exito' => false,
+            'error' => 'El cambio de asiento se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
