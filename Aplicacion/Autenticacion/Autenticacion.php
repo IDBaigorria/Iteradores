@@ -10,7 +10,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.83m
+ * @version   1.5piloto.83o
  */
 
 use Iteradores\Configuracion\Conf;
@@ -69,7 +69,7 @@ function autenticar_por_codigo(string $codigo): ?array {
         // callback, para que el guardar_ambos(credenciales) del
         // finally ya tenga el tag [user=X].
         log_persistencia_establecer_usuario((string)$encontrado);
-    });
+    }, false);  // Fix 1.5piloto.83o: no guardar la app (solo credenciales).
 
     if ($nombre_usuario === null) return null;
 
@@ -125,7 +125,7 @@ function autenticar_por_usuario(string $nombre_usuario, string $contrasena): ?ar
         // callback, para que el guardar_ambos(credenciales) del
         // finally ya tenga el tag [user=X].
         log_persistencia_establecer_usuario($nombre_usuario);
-    });
+    }, false);  // Fix 1.5piloto.83o: no guardar la app (solo credenciales).
 
     if (!$verificado) return null;
 

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.83l
+ * @version   1.5piloto.83o
  */
 
 use Iteradores\Nodos\Nodo;
@@ -51,6 +51,9 @@ function eliminar_sesiones_de_usuario(string $nombre_usuario): void {
  * @return string Token de sesión generado.
  */
 function crear_sesion(string $nombre_usuario): string {
+    // Fix 1.5piloto.83o: no guardar la app (solo credenciales). La app
+    // no cambia al crear una sesión; el guardado total de la app era
+    // innecesario y duplicaba el trabajo en cada login.
     return en_grafo_credenciales(function() use ($nombre_usuario) {
         eliminar_sesiones_de_usuario($nombre_usuario);
 
@@ -67,7 +70,7 @@ function crear_sesion(string $nombre_usuario): string {
         $raiz_sesiones->_adyacente_en($nodo_sesion, $token);
 
         return $token;
-    });
+    }, false);
 }
 
 /**
