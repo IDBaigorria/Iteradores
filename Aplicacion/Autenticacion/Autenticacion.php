@@ -10,13 +10,14 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.83l
+ * @version   1.5piloto.83m
  */
 
 use Iteradores\Configuracion\Conf;
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
 include_once("./Configuracion/Configuracion.php");
+include_once("./Configuracion/LogPersistencia.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 
@@ -64,6 +65,10 @@ function autenticar_por_codigo(string $codigo): ?array {
         // Login exitoso: resetear intentos, registrar acceso, rehash.
         _registrar_login_exitoso($encontrado_nodo, $ip_cliente, 'codigo_hash', $codigo);
         $nombre_usuario = $encontrado;
+        // Fix 1.5piloto.83m: setear el usuario en el log dentro del
+        // callback, para que el guardar_ambos(credenciales) del
+        // finally ya tenga el tag [user=X].
+        log_persistencia_establecer_usuario((string)$encontrado);
     });
 
     if ($nombre_usuario === null) return null;
@@ -116,6 +121,10 @@ function autenticar_por_usuario(string $nombre_usuario, string $contrasena): ?ar
         // Login exitoso: resetear intentos, registrar acceso, rehash.
         _registrar_login_exitoso($nodo_usuario, $ip_cliente, 'contrasena', $contrasena);
         $verificado = true;
+        // Fix 1.5piloto.83m: setear el usuario en el log dentro del
+        // callback, para que el guardar_ambos(credenciales) del
+        // finally ya tenga el tag [user=X].
+        log_persistencia_establecer_usuario($nombre_usuario);
     });
 
     if (!$verificado) return null;
@@ -156,6 +165,11 @@ function validar_token_sesion(string $token): ?array {
     // parcial puede no estar cargada.
     $nodo_usuario_real = Nodo::nodo_por_id('us_' . $nombre_usuario);
     if (!$nodo_usuario_real) return null;
+
+    // Fix 1.5piloto.83m: setear el usuario en el log de persistencia.
+    // A partir de acá, todos los `log_persistencia` del request
+    // llevan el tag `[user=<nombre>]`.
+    log_persistencia_establecer_usuario((string)$nombre_usuario);
 
     return [
         'nombre_usuario' => $nombre_usuario,

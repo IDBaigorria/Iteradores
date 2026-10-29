@@ -1,195 +1,113 @@
 <?php
 /**
- * Aplicador — Framework 1.5i.7x: GET_LOCK por superestructura
- * + usuario actual en el log de persistencia.
+ * Aplicador — Piloto 1.5piloto.83m: setear el usuario en el log
+ * de persistencia (validar_token_sesion + login).
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5i.7x';
+$version_nueva = '1.5piloto.83m';
 $htmls_a_bumpear = [];
 
 $cambios = [
 
 // ============================================================
-// 1. SQL64: lock antes de begin_transaction
+// 1. Autenticacion: include de LogPersistencia
 // ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStringSQL64.php',
-    'descripcion' => 'SQL64: GET_LOCK antes de begin_transaction',
+    'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
+    'descripcion' => 'Autenticacion: include de LogPersistencia',
     'buscar' => [
-        '        $sql->begin_transaction();',
-        '        try {',
-        '            $nombre_escapado = $sql->real_escape_string((string)$nombre);',
-        '            $mf = (int)$mascara_filtro;',
+        'include_once("./Configuracion/Configuracion.php");',
+        'include_once("./Nodos/Nodo.php");',
+        'include_once("./Controlador/Controlador.php");',
     ],
     'reemplazar' => [
-        '        // Fix 1.5i.7x: GET_LOCK por superestructura. Evita que dos',
-        '        // requests concurrentes hagan DELETE + INSERT al mismo',
-        '        // tiempo y se pisen entre sí (duplicados / id_fila inestable).',
-        '        // Timeout 5s. Si no se obtiene, abortar con error (los',
-        '        // llamadores del piloto ya chequean guardar_ambos desde v83g).',
-        '        $nombre_lock = \'grafo_\' . substr((string)$nombre, 0, 50);',
-        '        $nombre_lock_esc = $sql->real_escape_string($nombre_lock);',
-        '        $res_lock = $sql->query("SELECT GET_LOCK(\'" . $nombre_lock_esc . "\', 5) AS l");',
-        '        $lock_ok = false;',
-        '        if ($res_lock) {',
-        '            $f_lock = $res_lock->fetch_assoc();',
-        '            $lock_ok = (isset($f_lock[\'l\']) && (int)$f_lock[\'l\'] === 1);',
-        '        }',
-        '        if (!$lock_ok) {',
-        '            self::_error("SQL64::guardar: no se pudo obtener el lock \'" . $nombre_lock . "\' (otro request está guardando).");',
-        '            static::_liberar_conexion_sql($sql);',
-        '            return false;',
-        '        }',
-        '',
-        '        try {',
-        '            if (!$sql->begin_transaction()) {',
-        '                throw new \\RuntimeException("SQL64::guardar: fallo begin_transaction: " . $sql->error);',
-        '            }',
-        '            $nombre_escapado = $sql->real_escape_string((string)$nombre);',
-        '            $mf = (int)$mascara_filtro;',
+        'include_once("./Configuracion/Configuracion.php");',
+        'include_once("./Configuracion/LogPersistencia.php");',
+        'include_once("./Nodos/Nodo.php");',
+        'include_once("./Controlador/Controlador.php");',
     ],
 ],
 
 // ============================================================
-// 2. SQL64: liberar lock en éxito y en error
+// 2. autenticar_por_codigo: setear usuario en el callback
 // ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStringSQL64.php',
-    'descripcion' => 'SQL64: RELEASE_LOCK en éxito y error',
+    'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
+    'descripcion' => 'autenticar_por_codigo: setear usuario',
     'buscar' => [
-        '            if (!$sql->commit()) {',
-        '                throw new \\RuntimeException("SQL64::guardar: commit falló: " . $sql->error);',
-        '            }',
-        '            static::_liberar_conexion_sql($sql);',
-        '            return true;',
-        '        } catch (\\Throwable $e) {',
-        '            @$sql->rollback();',
-        '            self::_error($e->getMessage());',
-        '            static::_liberar_conexion_sql($sql);',
-        '            return false;',
-        '        }',
+        '        _registrar_login_exitoso($encontrado_nodo, $ip_cliente, \'codigo_hash\', $codigo);',
+        '        $nombre_usuario = $encontrado;',
+        '    });',
     ],
     'reemplazar' => [
-        '            if (!$sql->commit()) {',
-        '                throw new \\RuntimeException("SQL64::guardar: commit falló: " . $sql->error);',
-        '            }',
-        '            // Fix 1.5i.7x: liberar el lock en el camino de éxito.',
-        '            @$sql->query("SELECT RELEASE_LOCK(\'" . $nombre_lock_esc . "\')");',
-        '            static::_liberar_conexion_sql($sql);',
-        '            return true;',
-        '        } catch (\\Throwable $e) {',
-        '            @$sql->rollback();',
-        '            // Fix 1.5i.7x: liberar el lock en el camino de error.',
-        '            @$sql->query("SELECT RELEASE_LOCK(\'" . $nombre_lock_esc . "\')");',
-        '            self::_error($e->getMessage());',
-        '            static::_liberar_conexion_sql($sql);',
-        '            return false;',
-        '        }',
+        '        _registrar_login_exitoso($encontrado_nodo, $ip_cliente, \'codigo_hash\', $codigo);',
+        '        $nombre_usuario = $encontrado;',
+        '        // Fix 1.5piloto.83m: setear el usuario en el log dentro del',
+        '        // callback, para que el guardar_ambos(credenciales) del',
+        '        // finally ya tenga el tag [user=X].',
+        '        log_persistencia_establecer_usuario((string)$encontrado);',
+        '    });',
     ],
 ],
 
 // ============================================================
-// 3. LogPersistencia: usuario actual
+// 3. autenticar_por_usuario: setear usuario en el callback
 // ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Configuracion/LogPersistencia.php',
-    'descripcion' => 'LogPersistencia: usuario actual (global + setter + getter)',
+    'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
+    'descripcion' => 'autenticar_por_usuario: setear usuario',
     'buscar' => [
-        'require_once __DIR__ . \'/Configuracion.php\';',
-        '',
-        '/**',
-        ' * Escribe un mensaje al log de persistencia del proyecto.',
+        '        _registrar_login_exitoso($nodo_usuario, $ip_cliente, \'contrasena\', $contrasena);',
+        '        $verificado = true;',
+        '    });',
     ],
     'reemplazar' => [
-        'require_once __DIR__ . \'/Configuracion.php\';',
-        '',
-        '// Fix 1.5i.7x: usuario actual del request. Lo setea el piloto',
-        '// (en `validar_token_sesion` y en el login) y se incluye en',
-        '// cada línea del log para saber quién disparó el guardado.',
-        '// Si no se setea, el tag es `[user=-]`.',
-        '$GLOBALS[\'__log_persistencia_usuario\'] = null;',
-        '',
-        '/**',
-        ' * Establece el usuario actual para los logs de persistencia.',
-        ' *',
-        ' * @param string|null $nombre Nombre de usuario (null para limpiar).',
-        ' * @return void',
-        ' * @since 1.5i.7x',
-        ' */',
-        'function log_persistencia_establecer_usuario(?string $nombre): void {',
-        '    $GLOBALS[\'__log_persistencia_usuario\'] = $nombre;',
-        '}',
-        '',
-        '/**',
-        ' * Devuelve el usuario actual del log de persistencia (o null).',
-        ' *',
-        ' * @return string|null',
-        ' * @since 1.5i.7x',
-        ' */',
-        'function log_persistencia_usuario_actual(): ?string {',
-        '    return $GLOBALS[\'__log_persistencia_usuario\'] ?? null;',
-        '}',
-        '',
-        '/**',
-        ' * Escribe un mensaje al log de persistencia del proyecto.',
+        '        _registrar_login_exitoso($nodo_usuario, $ip_cliente, \'contrasena\', $contrasena);',
+        '        $verificado = true;',
+        '        // Fix 1.5piloto.83m: setear el usuario en el log dentro del',
+        '        // callback, para que el guardar_ambos(credenciales) del',
+        '        // finally ya tenga el tag [user=X].',
+        '        log_persistencia_establecer_usuario($nombre_usuario);',
+        '    });',
     ],
 ],
 
 // ============================================================
-// 4. LogPersistencia: tag [user=X] en cada línea
+// 4. validar_token_sesion: setear usuario después de resolver
 // ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Configuracion/LogPersistencia.php',
-    'descripcion' => 'LogPersistencia: tag [user=X] en cada línea',
+    'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
+    'descripcion' => 'validar_token_sesion: setear usuario',
     'buscar' => [
-        'function log_persistencia(string $msg, string $nivel = \'info\'): void {',
-        '    $nivel = strtolower($nivel);',
-        '    if (!in_array($nivel, [\'info\', \'warn\', \'error\'], true)) $nivel = \'info\';',
-        '    if (($nivel === \'info\' || $nivel === \'warn\') && !Conf::DEBUG_PERSISTENCIA) return;',
+        '    $nodo_usuario_real = Nodo::nodo_por_id(\'us_\' . $nombre_usuario);',
+        '    if (!$nodo_usuario_real) return null;',
         '',
-        '    $dir = _log_persistencia_directorio();',
-        '    if ($dir === null) {',
-        '        // Fallback: si no se pudo crear el directorio, error_log.',
-        '        error_log("[LOG_PERSISTENCIA] " . $msg);',
-        '        return;',
-        '    }',
-        '',
-        '    $fecha = date(\'Y-m-d\');',
-        '    $ruta = $dir . $fecha . \'.log\';',
-        '    $primera_vez_hoy = !file_exists($ruta);',
-        '    $linea = \'[\' . date(\'Y-m-d H:i:s\') . \'] [\' . $nivel . \'] \' . $msg . "\\n";',
+        '    return [',
+        '        \'nombre_usuario\' => $nombre_usuario,',
+        '        \'nodo\' => $nodo_usuario_real,',
+        '    ];',
     ],
     'reemplazar' => [
-        'function log_persistencia(string $msg, string $nivel = \'info\'): void {',
-        '    $nivel = strtolower($nivel);',
-        '    if (!in_array($nivel, [\'info\', \'warn\', \'error\'], true)) $nivel = \'info\';',
-        '    if (($nivel === \'info\' || $nivel === \'warn\') && !Conf::DEBUG_PERSISTENCIA) return;',
+        '    $nodo_usuario_real = Nodo::nodo_por_id(\'us_\' . $nombre_usuario);',
+        '    if (!$nodo_usuario_real) return null;',
         '',
-        '    // Fix 1.5i.7x: prefijo `[user=X]` (o `[user=-]` si no hay',
-        '    // usuario seteado). Permite saber qué usuario disparó cada',
-        '    // guardado cuando hay múltiples sesiones.',
-        '    $usuario = log_persistencia_usuario_actual();',
-        '    $tag_usuario = \'[user=\' . (($usuario === null || $usuario === \'\') ? \'-\' : $usuario) . \']\';',
+        '    // Fix 1.5piloto.83m: setear el usuario en el log de persistencia.',
+        '    // A partir de acá, todos los `log_persistencia` del request',
+        '    // llevan el tag `[user=<nombre>]`.',
+        '    log_persistencia_establecer_usuario((string)$nombre_usuario);',
         '',
-        '    $dir = _log_persistencia_directorio();',
-        '    if ($dir === null) {',
-        '        // Fallback: si no se pudo crear el directorio, error_log.',
-        '        error_log("[LOG_PERSISTENCIA] " . $tag_usuario . " " . $msg);',
-        '        return;',
-        '    }',
-        '',
-        '    $fecha = date(\'Y-m-d\');',
-        '    $ruta = $dir . $fecha . \'.log\';',
-        '    $primera_vez_hoy = !file_exists($ruta);',
-        '    $linea = \'[\' . date(\'Y-m-d H:i:s\') . \'] [\' . $nivel . \'] \' . $tag_usuario . \' \' . $msg . "\\n";',
+        '    return [',
+        '        \'nombre_usuario\' => $nombre_usuario,',
+        '        \'nodo\' => $nodo_usuario_real,',
+        '    ];',
     ],
 ],
 
