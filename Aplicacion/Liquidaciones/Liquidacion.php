@@ -8,7 +8,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.54
- * @version   1.5piloto.81h
+ * @version   1.5piloto.83n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -139,7 +139,17 @@ function confirmar_liquidacion(string $nombre_dueno, string $monto_efectivo_str,
     if ($nodo_ba) $nodo_ba->_dato((string)$banco_restante);
 
     _hmi($contenedor, $nodo_liq);
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("agregar_liquidacion: guardar_ambos falló", 'error');
+        Controlador::_error("agregar_liquidacion: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La liquidación se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return [
         'exito' => true,

@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.77w
+ * @version   1.5piloto.83n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -175,7 +175,16 @@ function agregar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, strin
 
     $nodo_vehiculos->_adyacente_en($nodo_vehiculo, $nombre_vehiculo);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("agregar_vehiculo: guardar_ambos falló", 'error');
+        Controlador::_error("agregar_vehiculo: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'El vehículo se creó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return ['exito' => true];
 }
@@ -240,7 +249,16 @@ function actualizar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, st
         }
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("actualizar_vehiculo: guardar_ambos falló", 'error');
+        Controlador::_error("actualizar_vehiculo: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La actualización se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return ['exito' => true];
 }
@@ -349,7 +367,16 @@ function actualizar_configuracion_vehiculo(string $nombre_empresa, string $nombr
 
     $nodo_asientos->_dato((string)$total_asientos);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("actualizar_configuracion_vehiculo: guardar_ambos falló", 'error');
+        Controlador::_error("actualizar_configuracion_vehiculo: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La configuración se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return ['exito' => true];
 }
@@ -388,7 +415,16 @@ function eliminar_vehiculo(string $nombre_empresa, string $nombre_vehiculo, stri
     $nodo_vehiculos->eliminar_adyacente($nombre_vehiculo);
     _destruir_vehiculo_completo($nodo_vehiculo);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("eliminar_vehiculo: guardar_ambos falló", 'error');
+        Controlador::_error("eliminar_vehiculo: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La eliminación se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -497,8 +533,17 @@ function subir_foto_vehiculo(string $nombre_empresa, string $nombre_vehiculo, st
     // Crear enlace foto
     $vehiculo_encontrado->_adyacente_en(Nodo::crear_con_dato($ruta_relativa), 'foto');
 
-    // Guardar persistencia
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Guardar persistencia.
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("subir_foto_vehiculo: guardar_ambos falló", 'error');
+        Controlador::_error("subir_foto_vehiculo: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La foto se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return ['exito' => true, 'foto' => $ruta_relativa];
 }

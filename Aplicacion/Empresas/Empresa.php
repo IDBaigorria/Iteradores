@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.5
- * @version   1.5piloto.80f
+ * @version   1.5piloto.83n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -85,7 +85,16 @@ function agregar_empresa(string $nombre_dueno, string $nombre_empresa, string $n
 
     $nodo_empresas->_adyacente_en($nodo_empresa, $nombre_empresa);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("agregar_empresa: guardar_ambos falló", 'error');
+        Controlador::_error("agregar_empresa: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La empresa se creó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return ['exito' => true];
 }
@@ -122,7 +131,16 @@ function editar_empresa(string $nombre_dueno, string $nombre_empresa, string $nu
         $nodo_empresa->_adyacente_en(Nodo::crear_con_dato($nuevo_nombre), 'nombre');
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("actualizar_empresa: guardar_ambos falló", 'error');
+        Controlador::_error("actualizar_empresa: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La actualización se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
@@ -177,7 +195,16 @@ function eliminar_empresa(string $nombre_dueno, string $nombre_empresa): array {
     _destruir_campos_simples($nodo_empresa);
     Nodo::eliminar($nodo_empresa);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("eliminar_empresa: guardar_ambos falló", 'error');
+        Controlador::_error("eliminar_empresa: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La eliminación se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 

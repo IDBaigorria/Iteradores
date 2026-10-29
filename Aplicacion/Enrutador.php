@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.82h
+ * @version   1.5piloto.83n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1662,7 +1662,18 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     if ($resultado_huerfanos === null) {
                         responder_json(['exito' => false, 'error' => 'No se pudo ejecutar la eliminación']);
                     }
-                    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                    // Fix 1.5piloto.83n: chequear guardar_ambos.
+                    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                    if (!$ok_guardar) {
+                        log_persistencia("grafo/eliminar_huerfanos: guardar_ambos falló", 'error');
+                        Controlador::_error("grafo/eliminar_huerfanos: guardar_ambos falló");
+                        responder_json([
+                            'exito' => false,
+                            'error' => 'La eliminación se procesó en memoria pero no se pudo guardar en la base de datos.',
+                            'eliminados' => $resultado_huerfanos['eliminados'],
+                            'total_huerfanos' => $resultado_huerfanos['total_huerfanos'],
+                        ]);
+                    }
                     responder_json([
                         'exito' => true,
                         'eliminados' => $resultado_huerfanos['eliminados'],
@@ -1735,7 +1746,17 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
                     // Si hubo auto-marcado, guardar.
                     if (!empty($lista['auto_marcadas'])) {
-                        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                        // Fix 1.5piloto.83n: chequear guardar_ambos.
+                        $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                        if (!$ok_guardar) {
+                            log_persistencia("grafo/migraciones_listar: guardar_ambos falló", 'error');
+                            Controlador::_error("grafo/migraciones_listar: guardar_ambos falló");
+                            responder_json([
+                                'exito' => false,
+                                'error' => 'Las migraciones se auto-marcaron en memoria pero no se pudo guardar en la base de datos.',
+                                'migraciones' => $lista['migraciones'],
+                            ]);
+                        }
                     }
                     responder_json(['exito' => true, 'migraciones' => $lista['migraciones']]);
                     break;
@@ -1753,7 +1774,17 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         $err = is_array($res_lim) && isset($res_lim['error']) ? $res_lim['error'] : 'Error al limpiar.';
                         responder_json(['exito' => false, 'error' => $err]);
                     }
-                    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                    // Fix 1.5piloto.83n: chequear guardar_ambos.
+                    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                    if (!$ok_guardar) {
+                        log_persistencia("grafo/migracion_limpiar: guardar_ambos falló", 'error');
+                        Controlador::_error("grafo/migracion_limpiar: guardar_ambos falló");
+                        responder_json([
+                            'exito' => false,
+                            'error' => 'La limpieza se procesó en memoria pero no se pudo guardar en la base de datos.',
+                            'limpiados' => $res_lim['limpiados'] ?? 0,
+                        ]);
+                    }
                     responder_json(['exito' => true, 'limpiados' => $res_lim['limpiados'] ?? 0]);
                     break;
 
@@ -1771,7 +1802,17 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         $err = is_array($res_mig) && isset($res_mig['error']) ? $res_mig['error'] : 'Error al aplicar.';
                         responder_json(['exito' => false, 'error' => $err]);
                     }
-                    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                    // Fix 1.5piloto.83n: chequear guardar_ambos.
+                    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                    if (!$ok_guardar) {
+                        log_persistencia("grafo/migraciones_aplicar: guardar_ambos falló", 'error');
+                        Controlador::_error("grafo/migraciones_aplicar: guardar_ambos falló");
+                        responder_json([
+                            'exito' => false,
+                            'error' => 'La migración se aplicó en memoria pero no se pudo guardar en la base de datos.',
+                            'detalles' => $res_mig['detalles'] ?? [],
+                        ]);
+                    }
                     responder_json(['exito' => true, 'detalles' => $res_mig['detalles'] ?? []]);
                     break;
 

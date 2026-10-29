@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.83i
+ * @version   1.5piloto.83n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -504,6 +504,7 @@ function migrar_pasajeros_de_micro(
     // 7. Guardar.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("migrar_pasajeros_de_micro: guardar_ambos falló para viaje=$nombre_viaje origen=$nombre_micro_origen destino=$nombre_micro_destino", 'error');
         Controlador::_error("migrar_pasajeros_de_micro: guardar_ambos falló para viaje=$nombre_viaje origen=$nombre_micro_origen destino=$nombre_micro_destino");
         return [
             'exito' => false,

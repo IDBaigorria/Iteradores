@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.12
- * @version   1.5piloto.78h
+ * @version   1.5piloto.83n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -131,7 +131,16 @@ function guardar_opciones_avanzadas_viaje(string $nombre_dueno, string $nombre_v
         _aplicar_retroactivo_a_ventas_del_viaje($nombre_dueno, $nombre_viaje, $snapshot_ventas, $aplicar_retroactivo);
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("guardar_opciones_avanzadas_viaje: guardar_ambos falló", 'error');
+        Controlador::_error("guardar_opciones_avanzadas_viaje: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'Las opciones se procesaron en memoria pero no se pudieron guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 

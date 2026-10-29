@@ -1,113 +1,678 @@
 <?php
 /**
- * Aplicador — Piloto 1.5piloto.83m: setear el usuario en el log
- * de persistencia (validar_token_sesion + login).
+ * Aplicador — Piloto 1.5piloto.83n: cobertura de guardar_ambos
+ * en 15 flujos + log_persistencia faltante + 4 comandos de admin.
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.83m';
+$version_nueva = '1.5piloto.83n';
 $htmls_a_bumpear = [];
 
 $cambios = [
 
 // ============================================================
-// 1. Autenticacion: include de LogPersistencia
+// 1. Empresa.php: agregar_empresa (línea 88)
 // ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
-    'descripcion' => 'Autenticacion: include de LogPersistencia',
+    'archivo' => 'Aplicacion/Empresas/Empresa.php',
+    'descripcion' => 'agregar_empresa: chequear guardar_ambos',
     'buscar' => [
-        'include_once("./Configuracion/Configuracion.php");',
-        'include_once("./Nodos/Nodo.php");',
-        'include_once("./Controlador/Controlador.php");',
+        '    $nodo_empresas->_adyacente_en($nodo_empresa, $nombre_empresa);',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '',
+        '    return [\'exito\' => true];',
     ],
     'reemplazar' => [
-        'include_once("./Configuracion/Configuracion.php");',
-        'include_once("./Configuracion/LogPersistencia.php");',
-        'include_once("./Nodos/Nodo.php");',
-        'include_once("./Controlador/Controlador.php");',
+        '    $nodo_empresas->_adyacente_en($nodo_empresa, $nombre_empresa);',
+        '',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("agregar_empresa: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("agregar_empresa: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La empresa se creó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '',
+        '    return [\'exito\' => true];',
     ],
 ],
 
 // ============================================================
-// 2. autenticar_por_codigo: setear usuario en el callback
+// 2. Empresa.php: actualizar_empresa (línea 125)
 // ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
-    'descripcion' => 'autenticar_por_codigo: setear usuario',
+    'archivo' => 'Aplicacion/Empresas/Empresa.php',
+    'descripcion' => 'actualizar_empresa: chequear guardar_ambos',
     'buscar' => [
-        '        _registrar_login_exitoso($encontrado_nodo, $ip_cliente, \'codigo_hash\', $codigo);',
-        '        $nombre_usuario = $encontrado;',
-        '    });',
+        '        $nodo_empresa->_adyacente_en(Nodo::crear_con_dato($nuevo_nombre), \'nombre\');',
+        '    }',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    return [\'exito\' => true];',
     ],
     'reemplazar' => [
-        '        _registrar_login_exitoso($encontrado_nodo, $ip_cliente, \'codigo_hash\', $codigo);',
-        '        $nombre_usuario = $encontrado;',
-        '        // Fix 1.5piloto.83m: setear el usuario en el log dentro del',
-        '        // callback, para que el guardar_ambos(credenciales) del',
-        '        // finally ya tenga el tag [user=X].',
-        '        log_persistencia_establecer_usuario((string)$encontrado);',
-        '    });',
+        '        $nodo_empresa->_adyacente_en(Nodo::crear_con_dato($nuevo_nombre), \'nombre\');',
+        '    }',
+        '',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("actualizar_empresa: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("actualizar_empresa: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La actualización se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '    return [\'exito\' => true];',
     ],
 ],
 
 // ============================================================
-// 3. autenticar_por_usuario: setear usuario en el callback
+// 3. Empresa.php: eliminar_empresa (línea 180)
 // ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
-    'descripcion' => 'autenticar_por_usuario: setear usuario',
+    'archivo' => 'Aplicacion/Empresas/Empresa.php',
+    'descripcion' => 'eliminar_empresa: chequear guardar_ambos',
     'buscar' => [
-        '        _registrar_login_exitoso($nodo_usuario, $ip_cliente, \'contrasena\', $contrasena);',
-        '        $verificado = true;',
-        '    });',
+        '    $nodo_empresas->eliminar_adyacente($nombre_empresa);',
+        '    _destruir_campos_simples($nodo_empresa);',
+        '    Nodo::eliminar($nodo_empresa);',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    return [\'exito\' => true];',
     ],
     'reemplazar' => [
-        '        _registrar_login_exitoso($nodo_usuario, $ip_cliente, \'contrasena\', $contrasena);',
-        '        $verificado = true;',
-        '        // Fix 1.5piloto.83m: setear el usuario en el log dentro del',
-        '        // callback, para que el guardar_ambos(credenciales) del',
-        '        // finally ya tenga el tag [user=X].',
-        '        log_persistencia_establecer_usuario($nombre_usuario);',
-        '    });',
+        '    $nodo_empresas->eliminar_adyacente($nombre_empresa);',
+        '    _destruir_campos_simples($nodo_empresa);',
+        '    Nodo::eliminar($nodo_empresa);',
+        '',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("eliminar_empresa: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("eliminar_empresa: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La eliminación se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '    return [\'exito\' => true];',
     ],
 ],
 
 // ============================================================
-// 4. validar_token_sesion: setear usuario después de resolver
+// 4. Usuario.php: agregar_usuario (línea 819) — solo log
 // ============================================================
 [
     'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Autenticacion/Autenticacion.php',
-    'descripcion' => 'validar_token_sesion: setear usuario',
+    'archivo' => 'Aplicacion/Usuarios/Usuario.php',
+    'descripcion' => 'agregar_usuario: log de guardar_ambos',
     'buscar' => [
-        '    $nodo_usuario_real = Nodo::nodo_por_id(\'us_\' . $nombre_usuario);',
-        '    if (!$nodo_usuario_real) return null;',
+        '    // Si es soporte, asignar dueños.',
+        '    if ($nivel === \'soporte\' && !empty($duenos_asignados)) {',
+        '        _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);',
+        '    }',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+    ],
+    'reemplazar' => [
+        '    // Si es soporte, asignar dueños.',
+        '    if ($nivel === \'soporte\' && !empty($duenos_asignados)) {',
+        '        _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);',
+        '    }',
+        '',
+        '    // Fix 1.5piloto.83n: registrar si el guardado falla. NO se hace',
+        '    // return temprano porque este flujo continúa con el guardado de',
+        '    // credenciales, y un return acá dejaría el usuario sin credenciales.',
+        '    // El return temprano correcto requiere revisar el formato exacto',
+        '    // de la respuesta; queda como deuda técnica en plan_actual.md.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("agregar_usuario: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("agregar_usuario: guardar_ambos falló");',
+        '    }',
+    ],
+],
+
+// ============================================================
+// 5. Usuario.php: actualizar_usuario (línea 1020) — solo log
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Usuarios/Usuario.php',
+    'descripcion' => 'actualizar_usuario: log de guardar_ambos',
+    'buscar' => [
+        '            // huérfanos (grafo:eliminar_huerfanos).',
+        '            _asegurar_compartido_y_repuntar($nodo_dueno, $nodo_usuario, $dueno, $nombre_usuario);',
+        '        }',
+        '    }',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+    ],
+    'reemplazar' => [
+        '            // huérfanos (grafo:eliminar_huerfanos).',
+        '            _asegurar_compartido_y_repuntar($nodo_dueno, $nodo_usuario, $dueno, $nombre_usuario);',
+        '        }',
+        '    }',
+        '',
+        '    // Fix 1.5piloto.83n: registrar si el guardado falla. NO se hace',
+        '    // return temprano porque este flujo continúa con el guardado de',
+        '    // credenciales. Ver nota en agregar_usuario.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("actualizar_usuario: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("actualizar_usuario: guardar_ambos falló");',
+        '    }',
+    ],
+],
+
+// ============================================================
+// 6. Usuario.php: eliminar_usuario (línea 1229) — solo log
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Usuarios/Usuario.php',
+    'descripcion' => 'eliminar_usuario: log de guardar_ambos',
+    'buscar' => [
+        '    Nodo::eliminar($nodo_usuario);',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '',
+        '    // === 7. Destruir en credenciales: sesiones + nodo + campos ===',
+    ],
+    'reemplazar' => [
+        '    Nodo::eliminar($nodo_usuario);',
+        '',
+        '    // Fix 1.5piloto.83n: registrar si el guardado falla. NO se hace',
+        '    // return temprano porque este flujo continúa con el guardado de',
+        '    // credenciales. Ver nota en agregar_usuario.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("eliminar_usuario: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("eliminar_usuario: guardar_ambos falló");',
+        '    }',
+        '',
+        '    // === 7. Destruir en credenciales: sesiones + nodo + campos ===',
+    ],
+],
+
+// ============================================================
+// 7. Vehiculo.php: agregar_vehiculo (línea 178)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Vehiculos/Vehiculo.php',
+    'descripcion' => 'agregar_vehiculo: chequear guardar_ambos',
+    'buscar' => [
+        '    $nodo_vehiculos->_adyacente_en($nodo_vehiculo, $nombre_vehiculo);',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '',
+        '    return [\'exito\' => true];',
+    ],
+    'reemplazar' => [
+        '    $nodo_vehiculos->_adyacente_en($nodo_vehiculo, $nombre_vehiculo);',
+        '',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("agregar_vehiculo: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("agregar_vehiculo: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'El vehículo se creó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '',
+        '    return [\'exito\' => true];',
+    ],
+],
+
+// ============================================================
+// 8. Vehiculo.php: actualizar_vehiculo (línea 243)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Vehiculos/Vehiculo.php',
+    'descripcion' => 'actualizar_vehiculo: chequear guardar_ambos',
+    'buscar' => [
+        '            $nodo_vehiculo->_adyacente_en(Nodo::crear_con_dato((string)$asientos), \'asientos\');',
+        '        }',
+        '    }',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '',
+        '    return [\'exito\' => true];',
+    ],
+    'reemplazar' => [
+        '            $nodo_vehiculo->_adyacente_en(Nodo::crear_con_dato((string)$asientos), \'asientos\');',
+        '        }',
+        '    }',
+        '',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("actualizar_vehiculo: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("actualizar_vehiculo: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La actualización se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '',
+        '    return [\'exito\' => true];',
+    ],
+],
+
+// ============================================================
+// 9. Vehiculo.php: actualizar_configuracion_vehiculo (línea 352)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Vehiculos/Vehiculo.php',
+    'descripcion' => 'actualizar_configuracion_vehiculo: chequear guardar_ambos',
+    'buscar' => [
+        '    $nodo_asientos->_dato((string)$total_asientos);',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '',
+        '    return [\'exito\' => true];',
+    ],
+    'reemplazar' => [
+        '    $nodo_asientos->_dato((string)$total_asientos);',
+        '',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("actualizar_configuracion_vehiculo: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("actualizar_configuracion_vehiculo: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La configuración se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '',
+        '    return [\'exito\' => true];',
+    ],
+],
+
+// ============================================================
+// 10. Vehiculo.php: eliminar_vehiculo (línea 391)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Vehiculos/Vehiculo.php',
+    'descripcion' => 'eliminar_vehiculo: chequear guardar_ambos',
+    'buscar' => [
+        '    $nodo_vehiculos->eliminar_adyacente($nombre_vehiculo);',
+        '    _destruir_vehiculo_completo($nodo_vehiculo);',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    return [\'exito\' => true];',
+    ],
+    'reemplazar' => [
+        '    $nodo_vehiculos->eliminar_adyacente($nombre_vehiculo);',
+        '    _destruir_vehiculo_completo($nodo_vehiculo);',
+        '',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("eliminar_vehiculo: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("eliminar_vehiculo: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La eliminación se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '    return [\'exito\' => true];',
+    ],
+],
+
+// ============================================================
+// 11. Vehiculo.php: subir_foto_vehiculo (línea 501)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Vehiculos/Vehiculo.php',
+    'descripcion' => 'subir_foto_vehiculo: chequear guardar_ambos',
+    'buscar' => [
+        '    // Guardar persistencia',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '',
+        '    return [\'exito\' => true, \'foto\' => $ruta_relativa];',
+    ],
+    'reemplazar' => [
+        '    // Guardar persistencia.',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("subir_foto_vehiculo: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("subir_foto_vehiculo: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La foto se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '',
+        '    return [\'exito\' => true, \'foto\' => $ruta_relativa];',
+    ],
+],
+
+// ============================================================
+// 12. Liquidacion.php: agregar_liquidacion (línea 142)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Liquidaciones/Liquidacion.php',
+    'descripcion' => 'agregar_liquidacion: chequear guardar_ambos',
+    'buscar' => [
+        '    _hmi($contenedor, $nodo_liq);',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
         '',
         '    return [',
-        '        \'nombre_usuario\' => $nombre_usuario,',
-        '        \'nodo\' => $nodo_usuario_real,',
-        '    ];',
+        '        \'exito\' => true,',
+        '        \'id_liquidacion\' => $id_liquidacion,',
     ],
     'reemplazar' => [
-        '    $nodo_usuario_real = Nodo::nodo_por_id(\'us_\' . $nombre_usuario);',
-        '    if (!$nodo_usuario_real) return null;',
+        '    _hmi($contenedor, $nodo_liq);',
         '',
-        '    // Fix 1.5piloto.83m: setear el usuario en el log de persistencia.',
-        '    // A partir de acá, todos los `log_persistencia` del request',
-        '    // llevan el tag `[user=<nombre>]`.',
-        '    log_persistencia_establecer_usuario((string)$nombre_usuario);',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("agregar_liquidacion: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("agregar_liquidacion: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La liquidación se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
         '',
         '    return [',
-        '        \'nombre_usuario\' => $nombre_usuario,',
-        '        \'nodo\' => $nodo_usuario_real,',
-        '    ];',
+        '        \'exito\' => true,',
+        '        \'id_liquidacion\' => $id_liquidacion,',
+    ],
+],
+
+// ============================================================
+// 13. Rendicion.php: agregar_rendicion (línea 520)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Rendiciones/Rendicion.php',
+    'descripcion' => 'agregar_rendicion: chequear guardar_ambos',
+    'buscar' => [
+        '    // Insertar la rendición al inicio del contenedor del dueño.',
+        '    _hmi($contenedor, $nodo_rendicion);',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '',
+        '    return [',
+        '        \'exito\' => true,',
+        '        \'id_rendicion\' => $id_rendicion,',
+    ],
+    'reemplazar' => [
+        '    // Insertar la rendición al inicio del contenedor del dueño.',
+        '    _hmi($contenedor, $nodo_rendicion);',
+        '',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("agregar_rendicion: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("agregar_rendicion: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La rendición se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '',
+        '    return [',
+        '        \'exito\' => true,',
+        '        \'id_rendicion\' => $id_rendicion,',
+    ],
+],
+
+// ============================================================
+// 14. Rendicion.php: aceptar_ajuste_rendicion (línea 789)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Rendiciones/Rendicion.php',
+    'descripcion' => 'aceptar_ajuste_rendicion: chequear guardar_ambos',
+    'buscar' => [
+        '    $ajuste->_adyacente_en(Nodo::crear_con_dato(date(\'d/m/Y H:i\')), \'aceptada_en\');',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    return [\'exito\' => true];',
+    ],
+    'reemplazar' => [
+        '    $ajuste->_adyacente_en(Nodo::crear_con_dato(date(\'d/m/Y H:i\')), \'aceptada_en\');',
+        '',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("aceptar_ajuste_rendicion: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("aceptar_ajuste_rendicion: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'La aceptación del ajuste se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '    return [\'exito\' => true];',
+    ],
+],
+
+// ============================================================
+// 15. ViajeOpciones.php: guardar_opciones_avanzadas_viaje (línea 134)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Viajes/ViajeOpciones.php',
+    'descripcion' => 'guardar_opciones_avanzadas_viaje: chequear guardar_ambos',
+    'buscar' => [
+        '    if ($cambio_permite_viaje) {',
+        '        _aplicar_retroactivo_a_ventas_del_viaje($nombre_dueno, $nombre_viaje, $snapshot_ventas, $aplicar_retroactivo);',
+        '    }',
+        '',
+        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    return [\'exito\' => true];',
+    ],
+    'reemplazar' => [
+        '    if ($cambio_permite_viaje) {',
+        '        _aplicar_retroactivo_a_ventas_del_viaje($nombre_dueno, $nombre_viaje, $snapshot_ventas, $aplicar_retroactivo);',
+        '    }',
+        '',
+        '    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("guardar_opciones_avanzadas_viaje: guardar_ambos falló", \'error\');',
+        '        Controlador::_error("guardar_opciones_avanzadas_viaje: guardar_ambos falló");',
+        '        return [',
+        '            \'exito\' => false,',
+        '            \'error\' => \'Las opciones se procesaron en memoria pero no se pudieron guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
+        '        ];',
+        '    }',
+        '    return [\'exito\' => true];',
+    ],
+],
+
+// ============================================================
+// 16. ViajeMicros.php: migrar_pasajeros_de_micro (línea 505)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Viajes/ViajeMicros.php',
+    'descripcion' => 'migrar_pasajeros_de_micro: agregar log_persistencia',
+    'buscar' => [
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        Controlador::_error("migrar_pasajeros_de_micro: guardar_ambos falló para viaje=$nombre_viaje origen=$nombre_micro_origen destino=$nombre_micro_destino");',
+    ],
+    'reemplazar' => [
+        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '    if (!$ok_guardar) {',
+        '        log_persistencia("migrar_pasajeros_de_micro: guardar_ambos falló para viaje=$nombre_viaje origen=$nombre_micro_origen destino=$nombre_micro_destino", \'error\');',
+        '        Controlador::_error("migrar_pasajeros_de_micro: guardar_ambos falló para viaje=$nombre_viaje origen=$nombre_micro_origen destino=$nombre_micro_destino");',
+    ],
+],
+
+// ============================================================
+// 17. Enrutador.php: grafo/eliminar_huerfanos (línea 1665)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Enrutador.php',
+    'descripcion' => 'grafo/eliminar_huerfanos: chequear guardar_ambos',
+    'buscar' => [
+        '                    $resultado_huerfanos = Controlador::ejecutar_comando(\'grafo:eliminar_huerfanos\');',
+        '                    if ($resultado_huerfanos === null) {',
+        '                        responder_json([\'exito\' => false, \'error\' => \'No se pudo ejecutar la eliminación\']);',
+        '                    }',
+        '                    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '                    responder_json([',
+        '                        \'exito\' => true,',
+        '                        \'eliminados\' => $resultado_huerfanos[\'eliminados\'],',
+        '                        \'total_huerfanos\' => $resultado_huerfanos[\'total_huerfanos\'],',
+        '                    ]);',
+    ],
+    'reemplazar' => [
+        '                    $resultado_huerfanos = Controlador::ejecutar_comando(\'grafo:eliminar_huerfanos\');',
+        '                    if ($resultado_huerfanos === null) {',
+        '                        responder_json([\'exito\' => false, \'error\' => \'No se pudo ejecutar la eliminación\']);',
+        '                    }',
+        '                    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '                    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '                    if (!$ok_guardar) {',
+        '                        log_persistencia("grafo/eliminar_huerfanos: guardar_ambos falló", \'error\');',
+        '                        Controlador::_error("grafo/eliminar_huerfanos: guardar_ambos falló");',
+        '                        responder_json([',
+        '                            \'exito\' => false,',
+        '                            \'error\' => \'La eliminación se procesó en memoria pero no se pudo guardar en la base de datos.\',',
+        '                            \'eliminados\' => $resultado_huerfanos[\'eliminados\'],',
+        '                            \'total_huerfanos\' => $resultado_huerfanos[\'total_huerfanos\'],',
+        '                        ]);',
+        '                    }',
+        '                    responder_json([',
+        '                        \'exito\' => true,',
+        '                        \'eliminados\' => $resultado_huerfanos[\'eliminados\'],',
+        '                        \'total_huerfanos\' => $resultado_huerfanos[\'total_huerfanos\'],',
+        '                    ]);',
+    ],
+],
+
+// ============================================================
+// 18. Enrutador.php: grafo/migraciones_listar (línea 1738)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Enrutador.php',
+    'descripcion' => 'grafo/migraciones_listar: chequear guardar_ambos',
+    'buscar' => [
+        '                    // Si hubo auto-marcado, guardar.',
+        '                    if (!empty($lista[\'auto_marcadas\'])) {',
+        '                        guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '                    }',
+        '                    responder_json([\'exito\' => true, \'migraciones\' => $lista[\'migraciones\']]);',
+    ],
+    'reemplazar' => [
+        '                    // Si hubo auto-marcado, guardar.',
+        '                    if (!empty($lista[\'auto_marcadas\'])) {',
+        '                        // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '                        $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '                        if (!$ok_guardar) {',
+        '                            log_persistencia("grafo/migraciones_listar: guardar_ambos falló", \'error\');',
+        '                            Controlador::_error("grafo/migraciones_listar: guardar_ambos falló");',
+        '                            responder_json([',
+        '                                \'exito\' => false,',
+        '                                \'error\' => \'Las migraciones se auto-marcaron en memoria pero no se pudo guardar en la base de datos.\',',
+        '                                \'migraciones\' => $lista[\'migraciones\'],',
+        '                            ]);',
+        '                        }',
+        '                    }',
+        '                    responder_json([\'exito\' => true, \'migraciones\' => $lista[\'migraciones\']]);',
+    ],
+],
+
+// ============================================================
+// 19. Enrutador.php: grafo/migracion_limpiar (línea 1756)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Enrutador.php',
+    'descripcion' => 'grafo/migracion_limpiar: chequear guardar_ambos',
+    'buscar' => [
+        '                    $res_lim = Controlador::ejecutar_comando(\'app:migracion_limpiar_marcadores\', [\'id\' => $id_lim]);',
+        '                    if (!is_array($res_lim) || empty($res_lim[\'exito\'])) {',
+        '                        $err = is_array($res_lim) && isset($res_lim[\'error\']) ? $res_lim[\'error\'] : \'Error al limpiar.\';',
+        '                        responder_json([\'exito\' => false, \'error\' => $err]);',
+        '                    }',
+        '                    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '                    responder_json([\'exito\' => true, \'limpiados\' => $res_lim[\'limpiados\'] ?? 0]);',
+    ],
+    'reemplazar' => [
+        '                    $res_lim = Controlador::ejecutar_comando(\'app:migracion_limpiar_marcadores\', [\'id\' => $id_lim]);',
+        '                    if (!is_array($res_lim) || empty($res_lim[\'exito\'])) {',
+        '                        $err = is_array($res_lim) && isset($res_lim[\'error\']) ? $res_lim[\'error\'] : \'Error al limpiar.\';',
+        '                        responder_json([\'exito\' => false, \'error\' => $err]);',
+        '                    }',
+        '                    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '                    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '                    if (!$ok_guardar) {',
+        '                        log_persistencia("grafo/migracion_limpiar: guardar_ambos falló", \'error\');',
+        '                        Controlador::_error("grafo/migracion_limpiar: guardar_ambos falló");',
+        '                        responder_json([',
+        '                            \'exito\' => false,',
+        '                            \'error\' => \'La limpieza se procesó en memoria pero no se pudo guardar en la base de datos.\',',
+        '                            \'limpiados\' => $res_lim[\'limpiados\'] ?? 0,',
+        '                        ]);',
+        '                    }',
+        '                    responder_json([\'exito\' => true, \'limpiados\' => $res_lim[\'limpiados\'] ?? 0]);',
+    ],
+],
+
+// ============================================================
+// 20. Enrutador.php: grafo/migraciones_aplicar (línea 1774)
+// ============================================================
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'Aplicacion/Enrutador.php',
+    'descripcion' => 'grafo/migraciones_aplicar: chequear guardar_ambos',
+    'buscar' => [
+        '                    $res_mig = Controlador::ejecutar_comando(\'app:migracion_aplicar\', [\'id\' => $id_mig]);',
+        '                    if (!is_array($res_mig) || empty($res_mig[\'exito\'])) {',
+        '                        $err = is_array($res_mig) && isset($res_mig[\'error\']) ? $res_mig[\'error\'] : \'Error al aplicar.\';',
+        '                        responder_json([\'exito\' => false, \'error\' => $err]);',
+        '                    }',
+        '                    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '                    responder_json([\'exito\' => true, \'detalles\' => $res_mig[\'detalles\'] ?? []]);',
+    ],
+    'reemplazar' => [
+        '                    $res_mig = Controlador::ejecutar_comando(\'app:migracion_aplicar\', [\'id\' => $id_mig]);',
+        '                    if (!is_array($res_mig) || empty($res_mig[\'exito\'])) {',
+        '                        $err = is_array($res_mig) && isset($res_mig[\'error\']) ? $res_mig[\'error\'] : \'Error al aplicar.\';',
+        '                        responder_json([\'exito\' => false, \'error\' => $err]);',
+        '                    }',
+        '                    // Fix 1.5piloto.83n: chequear guardar_ambos.',
+        '                    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
+        '                    if (!$ok_guardar) {',
+        '                        log_persistencia("grafo/migraciones_aplicar: guardar_ambos falló", \'error\');',
+        '                        Controlador::_error("grafo/migraciones_aplicar: guardar_ambos falló");',
+        '                        responder_json([',
+        '                            \'exito\' => false,',
+        '                            \'error\' => \'La migración se aplicó en memoria pero no se pudo guardar en la base de datos.\',',
+        '                            \'detalles\' => $res_mig[\'detalles\'] ?? [],',
+        '                        ]);',
+        '                    }',
+        '                    responder_json([\'exito\' => true, \'detalles\' => $res_mig[\'detalles\'] ?? []]);',
     ],
 ],
 

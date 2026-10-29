@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.83l
+ * @version   1.5piloto.83n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -816,7 +816,16 @@ function agregar_usuario(array $datos): array {
         _asignar_duenos_a_soporte($nodo_usuario, $duenos_asignados);
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: registrar si el guardado falla. NO se hace
+    // return temprano porque este flujo continúa con el guardado de
+    // credenciales, y un return acá dejaría el usuario sin credenciales.
+    // El return temprano correcto requiere revisar el formato exacto
+    // de la respuesta; queda como deuda técnica en plan_actual.md.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("agregar_usuario: guardar_ambos falló", 'error');
+        Controlador::_error("agregar_usuario: guardar_ambos falló");
+    }
 
     // Escribir credenciales en su grafo aparte.
     en_grafo_credenciales(function() use ($nombre_usuario, $codigo_acceso, $contrasena) {
@@ -1017,7 +1026,14 @@ function actualizar_usuario(array $datos): array {
         }
     }
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: registrar si el guardado falla. NO se hace
+    // return temprano porque este flujo continúa con el guardado de
+    // credenciales. Ver nota en agregar_usuario.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("actualizar_usuario: guardar_ambos falló", 'error');
+        Controlador::_error("actualizar_usuario: guardar_ambos falló");
+    }
 
     if ($codigo_acceso !== '' || $contrasena !== '') {
         en_grafo_credenciales(function() use ($nombre_usuario, $codigo_acceso, $contrasena) {
@@ -1226,7 +1242,15 @@ function eliminar_usuario(string $nombre_usuario): array {
         $raiz_usuarios->eliminar_adyacente($nombre_usuario);
     }
     Nodo::eliminar($nodo_usuario);
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+
+    // Fix 1.5piloto.83n: registrar si el guardado falla. NO se hace
+    // return temprano porque este flujo continúa con el guardado de
+    // credenciales. Ver nota en agregar_usuario.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("eliminar_usuario: guardar_ambos falló", 'error');
+        Controlador::_error("eliminar_usuario: guardar_ambos falló");
+    }
 
     // === 7. Destruir en credenciales: sesiones + nodo + campos ===
     en_grafo_credenciales(function() use ($nombre_usuario) {

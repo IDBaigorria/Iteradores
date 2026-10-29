@@ -13,7 +13,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.50
- * @version   1.5piloto.81h
+ * @version   1.5piloto.83n
  */
 
 use Iteradores\Nodos\Nodo;
@@ -517,7 +517,16 @@ function confirmar_rendicion(string $nombre_dueno, array $ventas_seleccionadas, 
     // Insertar la rendición al inicio del contenedor del dueño.
     _hmi($contenedor, $nodo_rendicion);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("agregar_rendicion: guardar_ambos falló", 'error');
+        Controlador::_error("agregar_rendicion: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La rendición se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
 
     return [
         'exito' => true,
@@ -786,7 +795,16 @@ function aceptar_ajuste_rendicion(string $id_rendicion, string $id_cancelacion, 
     if ($acept) return ['exito' => false, 'error' => 'Este ajuste ya fue aceptado'];
     $ajuste->_adyacente_en(Nodo::crear_con_dato(date('d/m/Y H:i')), 'aceptada_en');
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    // Fix 1.5piloto.83n: chequear guardar_ambos.
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("aceptar_ajuste_rendicion: guardar_ambos falló", 'error');
+        Controlador::_error("aceptar_ajuste_rendicion: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La aceptación del ajuste se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true];
 }
 
