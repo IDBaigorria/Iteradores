@@ -18,7 +18,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStrin
  * no permite ese privilegio. Se usa IN (...) directo.
  *
  * @author Ignacio David Baigorria
- * @version 1.5i.7w
+ * @version 1.5i.7x
  * @since 1.5i.7k
  */
 class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQL implements PerdurarSuperestructuraConContexto {
@@ -190,8 +190,29 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                 . " mascaras_viejas=" . count($mascaras_viejas), 'info');
         }
 
-        $sql->begin_transaction();
+        // Fix 1.5i.7x: GET_LOCK por superestructura. Evita que dos
+        // requests concurrentes hagan DELETE + INSERT al mismo
+        // tiempo y se pisen entre sí (duplicados / id_fila inestable).
+        // Timeout 5s. Si no se obtiene, abortar con error (los
+        // llamadores del piloto ya chequean guardar_ambos desde v83g).
+        $nombre_lock = 'grafo_' . substr((string)$nombre, 0, 50);
+        $nombre_lock_esc = $sql->real_escape_string($nombre_lock);
+        $res_lock = $sql->query("SELECT GET_LOCK('" . $nombre_lock_esc . "', 5) AS l");
+        $lock_ok = false;
+        if ($res_lock) {
+            $f_lock = $res_lock->fetch_assoc();
+            $lock_ok = (isset($f_lock['l']) && (int)$f_lock['l'] === 1);
+        }
+        if (!$lock_ok) {
+            self::_error("SQL64::guardar: no se pudo obtener el lock '" . $nombre_lock . "' (otro request está guardando).");
+            static::_liberar_conexion_sql($sql);
+            return false;
+        }
+
         try {
+            if (!$sql->begin_transaction()) {
+                throw new \RuntimeException("SQL64::guardar: fallo begin_transaction: " . $sql->error);
+            }
             $nombre_escapado = $sql->real_escape_string((string)$nombre);
             $mf = (int)$mascara_filtro;
 
@@ -430,10 +451,14 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             if (!$sql->commit()) {
                 throw new \RuntimeException("SQL64::guardar: commit falló: " . $sql->error);
             }
+            // Fix 1.5i.7x: liberar el lock en el camino de éxito.
+            @$sql->query("SELECT RELEASE_LOCK('" . $nombre_lock_esc . "')");
             static::_liberar_conexion_sql($sql);
             return true;
         } catch (\Throwable $e) {
             @$sql->rollback();
+            // Fix 1.5i.7x: liberar el lock en el camino de error.
+            @$sql->query("SELECT RELEASE_LOCK('" . $nombre_lock_esc . "')");
             self::_error($e->getMessage());
             static::_liberar_conexion_sql($sql);
             return false;

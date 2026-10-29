@@ -13,12 +13,39 @@
  * @author  Ignacio David Baigorria
  * @package Iteradores\Configuracion
  * @since   1.5i.7w
- * @version 1.5i.7w
+ * @version 1.5i.7x
  */
 
 use Iteradores\Configuracion\Conf;
 
 require_once __DIR__ . '/Configuracion.php';
+
+// Fix 1.5i.7x: usuario actual del request. Lo setea el piloto
+// (en `validar_token_sesion` y en el login) y se incluye en
+// cada línea del log para saber quién disparó el guardado.
+// Si no se setea, el tag es `[user=-]`.
+$GLOBALS['__log_persistencia_usuario'] = null;
+
+/**
+ * Establece el usuario actual para los logs de persistencia.
+ *
+ * @param string|null $nombre Nombre de usuario (null para limpiar).
+ * @return void
+ * @since 1.5i.7x
+ */
+function log_persistencia_establecer_usuario(?string $nombre): void {
+    $GLOBALS['__log_persistencia_usuario'] = $nombre;
+}
+
+/**
+ * Devuelve el usuario actual del log de persistencia (o null).
+ *
+ * @return string|null
+ * @since 1.5i.7x
+ */
+function log_persistencia_usuario_actual(): ?string {
+    return $GLOBALS['__log_persistencia_usuario'] ?? null;
+}
 
 /**
  * Escribe un mensaje al log de persistencia del proyecto.
@@ -34,17 +61,23 @@ function log_persistencia(string $msg, string $nivel = 'info'): void {
     if (!in_array($nivel, ['info', 'warn', 'error'], true)) $nivel = 'info';
     if (($nivel === 'info' || $nivel === 'warn') && !Conf::DEBUG_PERSISTENCIA) return;
 
+    // Fix 1.5i.7x: prefijo `[user=X]` (o `[user=-]` si no hay
+    // usuario seteado). Permite saber qué usuario disparó cada
+    // guardado cuando hay múltiples sesiones.
+    $usuario = log_persistencia_usuario_actual();
+    $tag_usuario = '[user=' . (($usuario === null || $usuario === '') ? '-' : $usuario) . ']';
+
     $dir = _log_persistencia_directorio();
     if ($dir === null) {
         // Fallback: si no se pudo crear el directorio, error_log.
-        error_log("[LOG_PERSISTENCIA] " . $msg);
+        error_log("[LOG_PERSISTENCIA] " . $tag_usuario . " " . $msg);
         return;
     }
 
     $fecha = date('Y-m-d');
     $ruta = $dir . $fecha . '.log';
     $primera_vez_hoy = !file_exists($ruta);
-    $linea = '[' . date('Y-m-d H:i:s') . '] [' . $nivel . '] ' . $msg . "\n";
+    $linea = '[' . date('Y-m-d H:i:s') . '] [' . $nivel . '] ' . $tag_usuario . ' ' . $msg . "\n";
 
     // Rotación: si el archivo del día supera el máximo,
     // se trunca al 50% (deja las líneas más recientes).
