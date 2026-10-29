@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.13
- * @version   1.5piloto.83h
+ * @version   1.5piloto.83i
  */
 
 use Iteradores\Nodos\Nodo;
@@ -12,6 +12,7 @@ use Iteradores\Controlador\Controlador;
 use Iteradores\Configuracion\Conf;
 use Iteradores\Configuracion\Entorno;
 include_once("./Configuracion/Configuracion.php");
+include_once("./Configuracion/LogPersistencia.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./miscelaneas/Arbol.php");
@@ -321,6 +322,7 @@ function actualizar_pasajero(string $nombre_dueno, string $dni, array $datos, ?N
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("actualizar_pasajero: guardar_ambos falló para dni=$dni", 'error');
         Controlador::_error("actualizar_pasajero: guardar_ambos falló para dni=$dni");
         return [
             'exito' => false,
@@ -395,6 +397,7 @@ function crear_pasajero(string $nombre_dueno, array $datos, ?Nodo $nodo_contexto
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("crear_pasajero: guardar_ambos falló para dni=$dni_norm", 'error');
         Controlador::_error("crear_pasajero: guardar_ambos falló para dni=$dni_norm");
         return [
             'exito' => false,
@@ -643,6 +646,7 @@ function eliminar_pasajero(string $nombre_dueno, string $dni, ?Nodo $nodo_contex
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("eliminar_pasajero: guardar_ambos falló para dni=$dni", 'error');
         Controlador::_error("eliminar_pasajero: guardar_ambos falló para dni=$dni");
         return [
             'exito' => false,
@@ -772,6 +776,7 @@ function limpiar_pasajeros_de_prueba(string $nombre_dueno): array {
     // Fix 1.5piloto.83h: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("limpiar_pasajeros_de_prueba: guardar_ambos falló", 'error');
         Controlador::_error("limpiar_pasajeros_de_prueba: guardar_ambos falló");
         return [
             'exito' => false,
@@ -1202,6 +1207,7 @@ function subir_declaracion_jurada_pasajero(string $nombre_dueno, string $dni, ar
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("subir_declaracion_jurada_pasajero: guardar_ambos falló para dni=$dni_norm", 'error');
         Controlador::_error("subir_declaracion_jurada_pasajero: guardar_ambos falló para dni=$dni_norm");
         return [
             'exito' => false,
@@ -1250,6 +1256,7 @@ function eliminar_declaracion_jurada_pasajero(string $nombre_dueno, string $dni,
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("eliminar_declaracion_jurada_pasajero: guardar_ambos falló para dni=$dni_norm", 'error');
         Controlador::_error("eliminar_declaracion_jurada_pasajero: guardar_ambos falló para dni=$dni_norm");
         return [
             'exito' => false,

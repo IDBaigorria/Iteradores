@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.83h
+ * @version   1.5piloto.83i
  */
 
 
@@ -13,6 +13,7 @@ use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
 use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
+include_once("./Configuracion/LogPersistencia.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./miscelaneas/Arbol.php");
@@ -650,6 +651,7 @@ function confirmar_venta_actual(
     // cancelar_venta en v81w).
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("confirmar_venta_actual: guardar_ambos falló para id_venta=$id_venta", 'error');
         Controlador::_error("confirmar_venta_actual: guardar_ambos falló para id_venta=$id_venta");
         return [
             'exito' => false,
@@ -1801,6 +1803,7 @@ function cancelar_venta(string $id_venta, string $motivo = '', ?string $nombre_t
     // lentos con wait_timeout corto).
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("cancelar_venta: guardar_ambos falló para id_venta=$id_venta", 'error');
         Controlador::_error("cancelar_venta: guardar_ambos falló para id_venta=$id_venta");
         return [
             'exito' => false,
@@ -2353,6 +2356,7 @@ function pagar_cupon_venta(string $id_venta, string $numero_cupon, string $monto
     // El usuario veía "Cupón pagado" con el estado viejo.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("pagar_cupon_venta: guardar_ambos falló para id_venta=$id_venta numero_cupon=$numero_cupon", 'error');
         Controlador::_error("pagar_cupon_venta: guardar_ambos falló para id_venta=$id_venta numero_cupon=$numero_cupon");
         return [
             'exito' => false,
@@ -3392,7 +3396,8 @@ function limpiar_cancelaciones_de_prueba(string $nombre_dueno): array {
         // Fix 1.5piloto.83h: chequear guardar_ambos.
         $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
         if (!$ok_guardar) {
-            Controlador::_error("limpiar_cancelaciones_de_prueba: guardar_ambos falló");
+            log_persistencia("limpiar_cancelaciones_de_prueba: guardar_ambos falló", 'error');
+        Controlador::_error("limpiar_cancelaciones_de_prueba: guardar_ambos falló");
             return [
                 'exito' => false,
                 'error' => 'La limpieza se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',

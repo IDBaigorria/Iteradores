@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.81l
+ * @version   1.5piloto.83l
  */
 
 use Iteradores\Nodos\Nodo;
@@ -51,7 +51,7 @@ function listar_usuarios(): array {
     if (!$raiz) return [];
 
     // Pre-cargar el mapa de usuarios con código desde credenciales.
-    $con_codigo = en_grafo_credenciales(function() {
+    $con_codigo = en_grafo_credenciales_solo_lectura(function() {
         $raiz_cred = Nodo::nodo_por_id('usuarios');
         if (!$raiz_cred) return [];
         $mapa = [];
@@ -263,7 +263,7 @@ function listar_usuarios_de_soporte(string $nombre_soporte): array {
     if (!$nodo_duenos) return [];
 
     // Cargar el mapa de usuarios con código (para codigo_asignado).
-    $con_codigo = en_grafo_credenciales(function() {
+    $con_codigo = en_grafo_credenciales_solo_lectura(function() {
         $raiz_cred = Nodo::nodo_por_id('usuarios');
         if (!$raiz_cred) return [];
         $mapa = [];
@@ -457,7 +457,7 @@ function _puede_cerrar_sesion(string $nombre_solicitante, string $token): bool {
     if ($nombre_solicitante === ConfiguracionApli::NOMBRE_ADMIN) return true;
 
     // Leer el usuario de la sesión desde credenciales.
-    $usuario_de_sesion = en_grafo_credenciales(function() use ($token) {
+    $usuario_de_sesion = en_grafo_credenciales_solo_lectura(function() use ($token) {
         $raiz = Nodo::nodo_por_id('sesiones');
         if (!$raiz) return null;
         $nodo_sesion = $raiz->adyacente($token);
@@ -708,7 +708,7 @@ function agregar_usuario(array $datos): array {
     }
 
     if ($codigo_acceso !== '') {
-        $codigo_duplicado = en_grafo_credenciales(function() use ($codigo_acceso) {
+        $codigo_duplicado = en_grafo_credenciales_solo_lectura(function() use ($codigo_acceso) {
             $encontrado = buscar_usuario_por_codigo($codigo_acceso);
             return $encontrado !== null;
         });
@@ -887,7 +887,7 @@ function actualizar_usuario(array $datos): array {
     }
 
     if (!empty($codigo_acceso)) {
-        $codigo_duplicado = en_grafo_credenciales(function() use ($codigo_acceso, $nombre_usuario) {
+        $codigo_duplicado = en_grafo_credenciales_solo_lectura(function() use ($codigo_acceso, $nombre_usuario) {
             $existente = buscar_usuario_por_codigo($codigo_acceso);
             if ($existente === null) return false;
             return $existente['nombre_usuario'] !== $nombre_usuario;
@@ -1268,7 +1268,7 @@ function listar_terminales_de_dueno(string $nombre_dueno): array {
     if (!$adyacentes) return [];
 
     // Pre-cargar el mapa de usuarios con código desde credenciales.
-    $con_codigo = en_grafo_credenciales(function() {
+    $con_codigo = en_grafo_credenciales_solo_lectura(function() {
         $raiz_cred = Nodo::nodo_por_id('usuarios');
         if (!$raiz_cred) return [];
         $mapa = [];
@@ -1386,7 +1386,7 @@ function obtener_perfil_usuario(string $nombre_usuario): ?array {
     if (!$nodo_usuario) return null;
 
     // Mapa de usuarios con código (desde credenciales).
-    $con_codigo = en_grafo_credenciales(function() {
+    $con_codigo = en_grafo_credenciales_solo_lectura(function() {
         $raiz_cred = Nodo::nodo_por_id('usuarios');
         if (!$raiz_cred) return [];
         $mapa = [];

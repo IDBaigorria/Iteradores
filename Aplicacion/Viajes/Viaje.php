@@ -4,13 +4,14 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.83h
+ * @version   1.5piloto.83i
  */
 
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
 use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
+include_once("./Configuracion/LogPersistencia.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./miscelaneas/Arbol.php");
@@ -834,6 +835,7 @@ function agregar_viaje(array $datos): array {
     // Fix 1.5piloto.83h: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("agregar_viaje: guardar_ambos falló para viaje=$nombre_viaje", 'error');
         Controlador::_error("agregar_viaje: guardar_ambos falló para viaje=$nombre_viaje");
         return [
             'exito' => false,
@@ -877,6 +879,7 @@ function editar_viaje(string $nombre_viaje, array $datos): array {
     // Fix 1.5piloto.83h: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("editar_viaje: guardar_ambos falló para viaje=$nombre_viaje", 'error');
         Controlador::_error("editar_viaje: guardar_ambos falló para viaje=$nombre_viaje");
         return [
             'exito' => false,
@@ -931,6 +934,7 @@ function eliminar_viaje(string $nombre_viaje, string $nombre_dueno): array {
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("eliminar_viaje: guardar_ambos falló para viaje=$nombre_viaje", 'error');
         Controlador::_error("eliminar_viaje: guardar_ambos falló para viaje=$nombre_viaje");
         return [
             'exito' => false,
@@ -994,6 +998,7 @@ function agregar_terminal_autorizada(string $nombre_viaje, string $nombre_termin
     // Fix 1.5piloto.83h: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("agregar_terminal_autorizada: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal", 'error');
         Controlador::_error("agregar_terminal_autorizada: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal");
         return [
             'exito' => false,
@@ -1047,6 +1052,7 @@ function eliminar_terminal_autorizada(string $nombre_viaje, string $nombre_termi
     // Fix 1.5piloto.83h: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("eliminar_terminal_autorizada: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal", 'error');
         Controlador::_error("eliminar_terminal_autorizada: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal");
         return [
             'exito' => false,
@@ -1242,6 +1248,7 @@ function guardar_opciones_terminal_viaje(string $nombre_dueno, string $nombre_vi
     // Fix 1.5piloto.83h: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("guardar_opciones_terminal_viaje: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal", 'error');
         Controlador::_error("guardar_opciones_terminal_viaje: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal");
         return [
             'exito' => false,
@@ -1330,6 +1337,7 @@ function guardar_viaje_completo(array $datos): array {
     // algo raro pasó (conexión perdida entre medio) y conviene alertar.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("guardar_viaje_completo: guardar_ambos final falló para viaje=$nombre_viaje", 'error');
         Controlador::_error("guardar_viaje_completo: guardar_ambos final falló para viaje=$nombre_viaje");
         return [
             'exito' => false,
@@ -1454,6 +1462,7 @@ function guardar_declaracion_jurada(string $nombre_dueno, string $nombre_viaje, 
     // Fix 1.5piloto.83h: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("guardar_declaracion_jurada: guardar_ambos falló para viaje=$nombre_viaje tipo=$tipo", 'error');
         Controlador::_error("guardar_declaracion_jurada: guardar_ambos falló para viaje=$nombre_viaje tipo=$tipo");
         return [
             'exito' => false,
@@ -1677,6 +1686,7 @@ function limpiar_viajes_de_prueba(string $nombre_dueno): array {
     // Fix 1.5piloto.83h: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("limpiar_viajes_de_prueba: guardar_ambos falló", 'error');
         Controlador::_error("limpiar_viajes_de_prueba: guardar_ambos falló");
         return [
             'exito' => false,

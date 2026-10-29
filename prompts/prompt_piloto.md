@@ -575,7 +575,11 @@ Enlaces: `usuario` (string), `creado_en` (timestamp Unix).
   del grafo de la app.
 - `autenticar_por_usuario($nombre, $contrasena)`: similar pero busca por
   nombre y verifica `contrasena`.
-- `validar_token_sesion($token)`.
+- `validar_token_sesion($token)`: solo lectura. Usa
+  `en_grafo_credenciales_solo_lectura` desde v83l (antes
+  usaba `en_grafo_credenciales`, lo que disparaba dos
+  guardados totales por request autenticado, causando el
+  bug §4.7).
 - Auxiliares: `_ip_cliente`, `_verificacion_dummy`, `_esta_bloqueado`,
   `_registrar_intento_fallido`, `_registrar_login_exitoso`,
   `_construir_respuesta_login`.
@@ -615,8 +619,19 @@ se reordenaron los `require_once` en `index.php` para que
 
 ### 5.6 `Aplicacion/GrafoCredenciales.php`
 
-- `en_grafo_credenciales(callable $fn)`: guarda app, carga/crea
-  credenciales, ejecuta callback, guarda credenciales, recarga app.
+- `en_grafo_credenciales(callable $fn, bool $guardar_app_antes = true)`:
+  guarda app (si `$guardar_app_antes`), carga/crea
+  credenciales, ejecuta callback, guarda credenciales (solo
+  si el callback no devolvió exactamente `false`), recarga
+  app. El flag `$guardar_app_antes` permite a los
+  llamadores que no modifican la app evitar el guardado
+  total (bug §4.7). Desde v83j. El "solo si no devolvió
+  `false`" desde v83k.
+- `en_grafo_credenciales_solo_lectura(callable $fn)`: lee
+  credenciales sin guardar. Usar en funciones de solo
+  lectura (validar sesión, listar, buscar). Desde v76f.
+  En v83l se cambiaron `validar_token_sesion` y otras 9
+  funciones a este helper.
 
 ### 5.7 `Viaje.php` (núcleo)
 
@@ -894,6 +909,29 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 
 ## 7. HISTORIAL DE VERSIONES (resumen)
 
+- **v83j-v83l** (cierre del bug §4.7): ver
+  `plan_actual.md` §4.7 para el diagnóstico completo.
+  Resumen:
+  - 83j: `en_grafo_credenciales` acepta
+    `bool $guardar_app_antes = true`. El bootstrap del
+    admin pasa `false`. El bloque del `aplicacion`
+    guarda solo si creó algo (flag
+    `$hubo_cambio_app_meta`).
+  - 83k: `en_grafo_credenciales` solo guarda
+    credenciales si el callback no devolvió `false`.
+    El callback del bootstrap del admin devuelve
+    `$creado`.
+  - 83l: las 10 funciones de solo lectura pasan a
+    `en_grafo_credenciales_solo_lectura`:
+    `validar_token_sesion`, `listar_sesiones`,
+    `listar_sesiones_de_usuarios`, `listar_usuarios`,
+    `listar_duenos_de_soporte`, `_puede_cerrar_sesion`,
+    `agregar_usuario` (bloque codigo_duplicado),
+    `actualizar_usuario` (bloque codigo_duplicado),
+    `listar_terminales_de_dueno`, `obtener_perfil_usuario`.
+  El bug NO era el leak lento ni la migración. Era
+  guardado total en cada request autenticado.
+  Validado con ciclo completo.
 - **v81t-v82d** (línea de cancelaciones en compartidos +
   persistencia robusta en hostings compartidos): ver §3.5,
   §5.17 y la sección del bug §4.6 en `prompt_seguridad.md`.
@@ -3498,19 +3536,21 @@ podés retomar el trabajo.
   estructura de nodos).
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.78s
-(framework 1.5i.7r). La línea de carga parcial quedó
+**Estado del proyecto al cierre:** v1.5piloto.83l
+(framework 1.5i.7w). La línea de carga parcial está
 aplicada en los módulos principales (Viajes, Venta,
 Pasajeros, Impresión). SQL64 activo, topología
 admin/soporte, reparación topológica disponible.
+El log de persistencia escribe a
+`logs/persistencia/YYYY-MM-DD.log` (legible por HTTP
+con `?ver_log_persistencia=1`, admin/soporte).
 
-**BUG PERSISTENTE.** El viaje viejo del dueño desaparece
-cuando un terminal hace una operación de guardado
-(reproducible con el plugin: autocompletado → alta de
-viaje). Los fixes v78r (regla de borrado de aristas) y
-v78s (preservar bits de máscara) no alcanzaron. Detalle
-completo, hipótesis y próximo paso de diagnóstico en
-`prompts/plan_actual.md` §1.5.
+**Bug §4.7 cerrado** (v1.5piloto.83l). No era el leak
+lento ni la migración. Era guardado total en cada
+request autenticado. Detalle completo en
+`prompts/plan_actual.md` §4.7. El `id_fila` del dueño es
+estable entre requests. La migración de pasajeros se
+puede desbloquear (Tanda 3 pendiente).
 
 Próximo paso sugerido: retomar el bug con logs de
 diagnóstico en `_guardar_con_filtro`. Después: espejar

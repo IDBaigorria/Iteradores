@@ -27,11 +27,18 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.83h (tanda final de
-cobertura de `guardar_ambos`. Los 10 flujos restantes del
-piloto aplican el patrón C.6. **Todos los flujos del
-piloto que llaman `guardar_ambos` chequean el resultado.**
-Excepciones documentadas en §4.7).
+**Última actualización:** v1.5piloto.83l (bug §4.7 cerrado
+con evidencia: `id_fila` del dueño estable entre requests,
+cero `mf=0 modo=total` en el log durante el ciclo completo
+venta/cancelación/cupón, auditoría topológica limpia después
+de la limpieza). Causa raíz: guardado total en cada request
+autenticado por `validar_token_sesion` y otros 9 llamadores
+de `en_grafo_credenciales`, más 2 bloques de bootstrap en
+`index.php`. Fix: 10 funciones de solo lectura a
+`en_grafo_credenciales_solo_lectura`, condicionar el bloque
+del `aplicacion`, condicionar el bootstrap del admin, y
+agregar un flag de "hubo cambios" al `finally` de
+`en_grafo_credenciales`. Ver §4.7).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -58,10 +65,12 @@ lo propaga el framework, no la app.
 
 **Versiones:**
 
-- **Piloto:** `1.5piloto.82d`.
-- **Framework PHP:** `1.5i.8f` (SQL64, con singleton de
+- **Piloto:** `1.5piloto.83l`.
+- **Framework PHP:** `1.5i.7w` (SQL64, con singleton de
   conexión, `mysqli_report(OFF)`, `SELECT 1` en lugar de
-  `ping()` y `IN (...)` en lugar de TEMPORARY TABLE). El
+  `ping()`, `IN (...)` en lugar de TEMPORARY TABLE, y
+  log de persistencia a archivo del proyecto vía
+  `Configuracion/LogPersistencia.php`). El
   archivo `Controlador/Controlador.php` está en `1.5i.7s`
   por los comandos del visualizador.
 - **Framework JS:** `V1.5i.8c` (IndexedDB64). **Deuda
@@ -82,8 +91,9 @@ botón en el plugin) y todas las reparaciones idempotentes
 la topología del grafo: el bitmask lo propaga el framework,
 no la app.
 
-**Sin bugs abiertos de prioridad alta.** La deuda técnica
-del arco está consolidada en §4.7.
+**Sin bugs abiertos de prioridad alta.** El bug §4.7
+(guardado total en cada GET) está cerrado con evidencia.
+La deuda técnica del arco está consolidada en §4.8.
 
 La pestaña Grafo tiene dos sub-pestañas (Tabla y Visual), con
 Visual como default. La sub-pestaña Visual es un SVG puro con
@@ -101,6 +111,22 @@ temáticas y la persistencia de corridas en su propio grafo
 
 Resumen de 1-2 líneas por arco. El detalle completo vive en
 los prompts correspondientes o en los commits.
+
+- **Bug §4.7 cerrado (v83j-v83l).** El bug no era el leak
+  lento ni la migración de pasajeros. Era guardado total en
+  cada request autenticado. `validar_token_sesion` (y otras
+  9 funciones de solo lectura) llamaban `en_grafo_credenciales`
+  con el default, que disparaba `guardar_ambos(app)` y
+  `guardar_ambos(credenciales)` en cada GET. Cada guardado
+  total hacía DELETE ALL + INSERT ALL con `id_fila` nuevo.
+  El `id_fila` del dueño cambiaba en cada request. Las
+  aristas del próximo BFS apuntaban a filas inexistentes.
+  El viaje "desaparecía" y el header mostraba "terminal".
+  Fix: 10 funciones a `solo_lectura`, condicionar el
+  `aplicacion`, condicionar el bootstrap del admin, y flag
+  de "hubo cambios" en el `finally` de
+  `en_grafo_credenciales`. Ver §4.7 para el diagnóstico
+  completo.
 
 - **Fix del croquis multi-piso (v1.5piloto.82h).** El croquis
   y todas las acciones de asiento matcheaban por
@@ -338,8 +364,10 @@ Van todos juntos en una sesión del framework.
 ### 4.5. Próximas tandas sugeridas
 
 **Arco en curso: migración de pasajeros entre micros.**
-**ESTADO: EN PAUSA** hasta que el bug del guardado
-parcial (§4.7) esté diagnosticado y blindado.
+**ESTADO: DESBLOQUEADA.** El bug §4.7 está cerrado
+(v1.5piloto.83l). El `id_fila` es estable entre
+requests, el grafo no se corrompe. Se puede retomar
+la Tanda 3.
 
 Plan completo en `prompts/plan_migrar_micro.md`.
 
@@ -363,8 +391,10 @@ Plan completo en `prompts/plan_migrar_micro.md`.
   + actualización de `aplicacion_POST.php`,
   `prompt_piloto.md` §5.8 y §4.9, y este archivo.
 
-**La migración NO vuelve a producción** hasta que el
-guardado parcial esté blindado (Fases 4 y 6 de §4.7).
+**La migración YA PUEDE VOLVER A PRODUCCIÓN.** El bug
+§4.7 está cerrado (v1.5piloto.83l). Antes de pasarla,
+correr la Tanda 3 en local y validar el ciclo completo
+en un viaje de prueba.
 
 **Foco inmediato: Piloto — calidad.**
 
@@ -447,9 +477,75 @@ local, el mismo flujo funcionaba.
   - Cancelación desde carmen2: persiste
   - Auditoría topológica:    0 críticos / 0 errores / 0 warnings
 
-### 4.7. Bug contenido: corrupción del grafo por guardado parcial
+### 4.7. Bug §4.7: cerrado (era guardado total en cada GET)
 
-**Estado:** contenido y cerrado como bug activo.
+**Estado:** cerrado en v1.5piloto.83l. Validado con el ciclo
+completo: `id_fila` del dueño estable entre requests, cero
+`mf=0 modo=total` en el log, auditoría topológica limpia
+después de la limpieza.
+
+**Diagnóstico real (sesión v83i-v83l).** El bug NO era el
+leak lento (aunque Fase 4 fue necesaria para hacerlo
+visible). NO era la migración de pasajeros. NO era la
+concurrencia per se. Era que **cada request autenticado
+hacía dos guardados TOTALES**:
+
+1. `validar_token_sesion` (Autenticacion.php:134) se llama
+   en cada request. Llamaba a `en_grafo_credenciales` con el
+   default, que disparaba `guardar_ambos($nombre_app)`
+   **antes** del callback y `guardar_ambos($credenciales)`
+   **en el finally**.
+2. Otros 9 llamadores de solo lectura (`listar_sesiones`,
+   `listar_usuarios`, `listar_terminales_de_dueno`,
+   `obtener_perfil_usuario`, `_puede_cerrar_sesion`, etc.)
+   hacían lo mismo.
+3. El bloque del `aplicacion` (index.php:253-275) guardaba
+   en cada GET si faltaba `migraciones`. Como el guardado
+   total reinsertaba `migraciones` con `id_fila` nuevo, en
+   el próximo GET volvía a faltar → loop infinito.
+4. El bloque del admin en credenciales (index.php:639-655)
+   guardaba aunque el admin ya existiera.
+
+Cada `DELETE ALL + INSERT ALL` reinsertaba el grafo entero
+con `id_fila` auto-increment. El `id_fila` del dueño
+cambiaba en cada request. Las aristas del BFS del próximo
+request apuntaban a filas que ya no existían. El viaje
+viejo "desaparecía" y el header mostraba "terminal" en vez
+de "dueño".
+
+**Fix (v83j-v83l).**
+- v83j: `en_grafo_credenciales` acepta `bool
+  $guardar_app_antes = true`. El bootstrap del admin pasa
+  `false`.
+- v83k: `en_grafo_credenciales` solo guarda credenciales si
+  el callback no devolvió exactamente `false`. El callback
+  del bootstrap del admin devuelve `$creado`.
+- v83k: el bloque del `aplicacion` solo guarda si creó algo
+  en este request (flag `$hubo_cambio_app_meta`).
+- v83l: las 10 funciones de solo lectura pasan a
+  `en_grafo_credenciales_solo_lectura`. Corta el 90% de los
+  guardados totales. Es el fix de raíz.
+
+**Cobertura.** Las funciones que sí modifican (autenticar,
+crear/cerrar sesión, agregar/actualizar/eliminar usuario,
+eliminar terminal, eliminar sesiones) siguen con
+`en_grafo_credenciales`. Solo se cambiaron las de lectura.
+
+**Estado post-fix (validado por el usuario).**
+- `id_fila` del dueño: estable entre recargas, ventas,
+  cancelaciones, pagos de cupón.
+- Log: cero `mf=0 modo=total`, cero
+  `nombre=credenciales`. Solo guardados parciales de las
+  operaciones reales.
+- Auditoría topológica post-limpieza: 0 críticos, 0
+  errores, 0 warnings.
+
+**Histórico (sesión v83a-h, conservado para contexto).**
+Lo que sigue documenta la investigación que precedió al
+diagnóstico real. Fue necesaria (Fase 1-4 del framework,
+cobertura de `guardar_ambos` en 25 flujos, blindaje de
+persistencia robusta) pero el trigger real estaba en otro
+lado.
 
 **Resultado de la sesión de diagnóstico (v1.5piloto.83a-f).**
 El bug no se reproduce post-restauración + blindaje. Los
@@ -500,18 +596,41 @@ nodos con máscara 0 del estado original. Se necesita Fase 4
   procedimiento de diagnóstico de esta sesión: restaurar,
   migrar, auditar, reparar.
 
-**Fase 4 pendiente (sesión del framework).** Dos cambios
-para cerrar el leak lento de raíz:
-1. **No saltar nodos con máscara 0 del INSERT.** Insertarlos
-   con máscara 0. El `id_fila` se preserva, las aristas
-   apuntan bien, no hay duplicados en el siguiente guardado.
-2. **Propagar máscaras a fixpoint sobre TODAS las aristas.**
-   Repetir el BFS hasta que no cambie nada. Los nodos
-   "huérfanos en memoria" recuperan bits en el próximo
-   guardado.
+**Fase 4 cerrada (framework 1.5i.7v).** Tres cambios:
+1. **Fixpoint de máscaras sobre TODAS las aristas.** Se
+   reemplaza el bloque de propagación a `$nuevos` (hasta
+   10 iteraciones) por un fixpoint general (hasta 20).
+   Los nodos que perdieron bits en el BFS del grafo
+   parcial, o que nunca los tuvieron, recuperan los bits
+   de sus vecinos por transitividad. Si no converge en 20
+   iteraciones, `_error` (defensivo).
+2. **Insertar nodos con máscara 0.** Antes se skipeaban del
+   INSERT. Ahora se insertan con máscara 0, preservando
+   `id_fila`. Cierra los duplicados entre requests: el
+   nodo tiene id_fila estable desde el primer guardado.
+   El chequeo de "no hay nodos del filtro" ahora usa
+   `$ids_matchean_filtro` (máscara > 0 que matchea), no
+   `$ids_a_insertar` (que incluye los de máscara 0).
+3. **Aristas hacia destinos con máscara 0.** Antes se
+   skipeaban por `($m_d & $mf) === 0`. Ahora solo se
+   skipea si el destino NO está en `$mapa_final`. Las
+   aristas entre nodos persistidos se insertan siempre,
+   aunque el destino tenga máscara 0.
 
-Cambio sensible. Requiere sesión del framework dedicada con
-tests a fondo. No bloquea el trabajo del piloto.
+**Estado del leak lento: cerrado de raíz.** Los nodos en
+memoria con máscara 0 se persisten con su id_fila. El
+fixpoint propaga bits por transitividad. El próximo
+guardado no duplica.
+
+**Verificación pendiente (usuario).** Correr el ciclo
+completo (migración de pasajeros + venta + cupón) con
+`Conf::DEBUG_PERSISTENCIA = true`. Esperado:
+- `matchean_filtro > 0` en todos los guardados parciales.
+- `nodos_mascara_0 = 0` en el ciclo normal.
+- Si aparece `nodos_mascara_0 > 10` de forma persistente,
+  investigar por qué esos nodos no son alcanzables desde
+  ninguna raíz. Pueden ser residuos reales (basura) que
+  conviene limpiar con `?eliminar_huerfanos=1`.
 
 **Historial del diagnóstico (sesiones):**
 - **Fase 0** (v1.5piloto.83a): anotar el bug y congelar
@@ -522,9 +641,12 @@ tests a fondo. No bloquea el trabajo del piloto.
   los 4 bugs encadenados del flujo de venta, y esta sesión
   de reproducción que no logró reproducir el bug.
 
-**Estado del bug:** contenido. Los 4 bugs concretos del
-flujo están cerrados. El leak lento del blindaje es deuda
-de Fase 4, no de esta sesión.
+**Estado del bug:** cerrado en v1.5piloto.83l. El leak
+lento del blindaje fue cerrado de raíz en Fase 4
+(framework 1.5i.7v). El trigger real (guardado total en
+cada GET) fue cerrado en v83j-v83l. El blindaje de
+1.5i.7t/7u sigue activo (rollback si pierde bits, nodos
+o aristas).
 
 **Estado histórico:**
 
@@ -746,6 +868,15 @@ disparó.
 Pendientes generados por la línea v81p-v82d. Ninguno es
 bloqueante.
 
+- **`GET_LOCK('grafo_<nombre>', 5)` en `_guardar_con_filtro`.**
+  Para blindar la concurrencia real. Ahora que el guardado
+  total no se dispara en cada GET, la concurrencia es
+  mucho menos probable (solo operaciones reales se
+  pueden solapar). Pero dos terminales que venden al
+  mismo tiempo todavía pueden pisarse. Con GET_LOCK, el
+  segundo espera o falla, pero no duplica. Es deuda
+  técnica, no bug activo. Tanda del framework.
+
 - **Endpoints temporales de diagnóstico en index.php.**
   - `?diag_persistencia=1` (C.6b).
   - `?diagnostico_cancelaciones=1` (C.4a).
@@ -947,21 +1078,21 @@ Reglas de oro que aplican a cualquier tanda nueva.
 
 ---
 
-**Estado del proyecto al cierre:** v1.5piloto.83h
-(framework 1.5i.7u). **Bug §4.7 contenido:** cerrado
-como bug activo tras sesión de diagnóstico que no logró
-reproducirlo post-restauración + blindaje. Los 4 bugs
-encadenados del flujo de venta en micro de 2 pisos
-quedaron cerrados. Blindaje activo (rollback si pierde
-bits, nodos o aristas) + logging de diagnóstico
-(`Conf::DEBUG_PERSISTENCIA`). **Cobertura de
-`guardar_ambos`: COMPLETA.** Todos los flujos del
-piloto chequean el resultado (v1.5piloto.83g + 83h).
-Queda deuda de Fase 4 (no saltar nodos con máscara 0 +
-propagar a fixpoint) para sesión del framework. SQL64
-activo, topología admin/soporte, auditoría topológica
-disponible. **La migración de pasajeros sigue en pausa**
-hasta validación post-83h.
+**Estado del proyecto al cierre:** v1.5piloto.83l
+(framework 1.5i.7w). **Bug §4.7 cerrado.** No era el
+leak lento (Fase 4 fue necesaria, pero no suficiente).
+Era guardado total en cada request autenticado por
+`validar_token_sesion` y otros 9 llamadores de
+`en_grafo_credenciales`, más 2 bloques de bootstrap en
+`index.php`. Fix: 10 funciones a `solo_lectura`,
+condicionar `aplicacion`, condicionar bootstrap del
+admin, flag de "hubo cambios" en `finally`. Validado
+con ciclo completo (venta/cancelación/cupón): `id_fila`
+estable, cero totales en el log, auditoría limpia.
+**La migración de pasajeros se puede desbloquear**
+(Tanda 3 pendiente). El log de persistencia está activo,
+escribiendo a `logs/persistencia/YYYY-MM-DD.log`,
+legible por HTTP con `?ver_log_persistencia=1`.
 
 **Deuda técnica del arco** en §4.7: endpoints temporales
 de diagnóstico, espejo `_hmi` a JS, espejo C.7-C.10 a JS,

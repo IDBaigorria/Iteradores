@@ -11,7 +11,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.70
- * @version   1.5piloto.78g
+ * @version   1.5piloto.83k
  */
 
 use Iteradores\Nodos\Nodo;
@@ -40,7 +40,7 @@ $GLOBALS['__en_grafo_credenciales'] = false;
  * @param callable $fn Callback a ejecutar en el contexto de credenciales.
  * @return mixed El valor devuelto por el callback.
  */
-function en_grafo_credenciales(callable $fn) {
+function en_grafo_credenciales(callable $fn, bool $guardar_app_antes = true) {
     if (!empty($GLOBALS['__en_grafo_credenciales'])) {
         return $fn();
     }
@@ -54,8 +54,12 @@ function en_grafo_credenciales(callable $fn) {
     $contextos_app_previos = Controlador::contextos_cargados();
 
     try {
-        // Guardar la app actual si tiene nodos.
-        if (Nodo::hay_nodos_en_superestructura()) {
+        // Fix 1.5piloto.83j: el bootstrap del admin (que no
+        // modifica la app) puede pasar $guardar_app_antes = false
+        // para evitar el guardado total que reinserta el grafo
+        // entero y cambia los id_fila. Sin este check, cada GET
+        // del dueño disparaba un DELETE ALL + INSERT ALL.
+        if ($guardar_app_antes && Nodo::hay_nodos_en_superestructura()) {
             guardar_ambos(ConfiguracionApli::NOMBRE_APP);
         }
 
@@ -83,7 +87,18 @@ function en_grafo_credenciales(callable $fn) {
         } catch (\Throwable $e) {
             $excepcion = $e;
         } finally {
-            guardar_ambos(ConfiguracionApli::NOMBRE_APP_CREDENCIALES);
+            // Fix 1.5piloto.83k: guardar credenciales solo si hubo
+            // cambios reales. Si el callback devuelve exactamente
+            // `false`, se interpreta como "no modifiqué nada" y no
+            // se guarda. Cualquier otro valor (incluido `true`,
+            // array, objeto, null) guarda por retrocompatibilidad
+            // con los llamadores existentes. Si el callback lanzó
+            // excepción, se guarda para no perder los cambios
+            // parciales que haya hecho antes de fallar.
+            $debe_guardar = ($excepcion !== null) || ($resultado !== false);
+            if ($debe_guardar) {
+                guardar_ambos(ConfiguracionApli::NOMBRE_APP_CREDENCIALES);
+            }
         }
         if ($excepcion !== null) {
             throw $excepcion;

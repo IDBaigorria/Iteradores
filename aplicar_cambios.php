@@ -1,513 +1,317 @@
 <?php
 /**
- * Aplicador — Tanda final de cobertura de guardar_ambos.
+ * Aplicador — Documentación v83m: cierre del bug §4.7.
  *
- * Los 10 flujos restantes del piloto que llaman guardar_ambos()
- * sin chequear el resultado. Con esta tanda, TODOS los flujos
- * del piloto aplican el patrón C.6: si guardar_ambos falla,
- * devuelven exito: false con error específico.
- *
- * Excepciones (documentadas en plan_actual.md):
- *   - migrar_pasajeros_de_micro: ya cubierto (Tanda 1, 1.5piloto.82e).
- *   - limpiar_ventas_de_prueba: no llama guardar_ambos
- *     (cada cancelar_venta interno lo hace).
- *   - listar_viajes_de_dueno (drenar buzón): lectura con
- *     side-effect. Si falla, se loguea pero se devuelve el
- *     listado igual.
+ * Solo toca prompts. No toca código PHP ni JS.
+ * No bumpea versiones (los prompts no tienen @version).
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.83h';
-
+$version_nueva = '';
 $htmls_a_bumpear = [];
 
 $cambios = [
 
 // ============================================================
-// Viaje.php — 8 flujos
+// plan_actual.md
 // ============================================================
 
-// 1. agregar_viaje (legacy, no usado por el enrutador)
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/Viaje.php',
-    'descripcion' => 'agregar_viaje: chequear guardar_ambos',
-    'buscar' => [
-        '    $nodo_viajes->_adyacente_en($nodo_viaje, $nombre_viaje);',
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-    'reemplazar' => [
-        '    $nodo_viajes->_adyacente_en($nodo_viaje, $nombre_viaje);',
-        '',
-        '    // Fix 1.5piloto.83h: chequear guardar_ambos.',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("agregar_viaje: guardar_ambos falló para viaje=$nombre_viaje");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'El alta del viaje se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-],
-
-// 2. editar_viaje (legacy, no usado por el enrutador)
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/Viaje.php',
-    'descripcion' => 'editar_viaje: chequear guardar_ambos',
-    'buscar' => [
-        '        if (!$resultado_paradas[\'exito\']) {',
-        '            return $resultado_paradas;',
-        '        }',
-        '    }',
-        '',
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    return [\'exito\' => true];',
-        '}',
-        '',
-        '/**',
-        ' * Elimina un viaje.',
-    ],
-    'reemplazar' => [
-        '        if (!$resultado_paradas[\'exito\']) {',
-        '            return $resultado_paradas;',
-        '        }',
-        '    }',
-        '',
-        '    // Fix 1.5piloto.83h: chequear guardar_ambos.',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("editar_viaje: guardar_ambos falló para viaje=$nombre_viaje");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'La edición del viaje se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '    return [\'exito\' => true];',
-        '}',
-        '',
-        '/**',
-        ' * Elimina un viaje.',
-    ],
-],
-
-// 3. guardar_viaje_completo (el que usa el enrutador)
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/Viaje.php',
-    'descripcion' => 'guardar_viaje_completo: chequear guardar_ambos',
-    'buscar' => [
-        '    $aplicar_retroactivo = (($datos[\'aplicar_retroactivo\'] ?? \'\') === \'1\');',
-        '    $resultado_opciones = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones, $aplicar_retroactivo);',
-        '    if (!$resultado_opciones[\'exito\']) {',
-        '        return $resultado_opciones;',
-        '    }',
-        '',
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-    'reemplazar' => [
-        '    $aplicar_retroactivo = (($datos[\'aplicar_retroactivo\'] ?? \'\') === \'1\');',
-        '    $resultado_opciones = guardar_opciones_avanzadas_viaje($nombre_dueno, $nombre_viaje, $opciones, $aplicar_retroactivo);',
-        '    if (!$resultado_opciones[\'exito\']) {',
-        '        return $resultado_opciones;',
-        '    }',
-        '',
-        '    // Fix 1.5piloto.83h: chequear guardar_ambos.',
-        '    // Nota: guardar_opciones_avanzadas_viaje ya guardó internamente;',
-        '    // este segundo guardar_ambos es redundante pero inofensivo. Si falla,',
-        '    // algo raro pasó (conexión perdida entre medio) y conviene alertar.',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("guardar_viaje_completo: guardar_ambos final falló para viaje=$nombre_viaje");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'El viaje y sus opciones se procesaron en memoria pero no se pudo confirmar el guardado final en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-],
-
-// 4. agregar_terminal_autorizada
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/Viaje.php',
-    'descripcion' => 'agregar_terminal_autorizada: chequear guardar_ambos',
-    'buscar' => [
-        '    _sincronizar_terminal_en_compartido_del_viaje($nodo_viaje, $nombre_terminal, $nombre_dueno);',
-        '',
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-    'reemplazar' => [
-        '    _sincronizar_terminal_en_compartido_del_viaje($nodo_viaje, $nombre_terminal, $nombre_dueno);',
-        '',
-        '    // Fix 1.5piloto.83h: chequear guardar_ambos.',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("agregar_terminal_autorizada: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'La autorización de la terminal se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-],
-
-// 5. eliminar_terminal_autorizada
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/Viaje.php',
-    'descripcion' => 'eliminar_terminal_autorizada: chequear guardar_ambos',
-    'buscar' => [
-        '    _desincronizar_terminal_de_compartido_del_viaje($nodo_viaje, $nombre_terminal);',
-        '',
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-    'reemplazar' => [
-        '    _desincronizar_terminal_de_compartido_del_viaje($nodo_viaje, $nombre_terminal);',
-        '',
-        '    // Fix 1.5piloto.83h: chequear guardar_ambos.',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("eliminar_terminal_autorizada: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'La desautorización de la terminal se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-],
-
-// 6. guardar_opciones_terminal_viaje
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/Viaje.php',
-    'descripcion' => 'guardar_opciones_terminal_viaje: chequear guardar_ambos',
-    'buscar' => [
-        '    $cambio_permite_terminal = ($config_antes[\'permite_efectivo\'] !== $config_despues[\'permite_efectivo\']',
-        '        || $config_antes[\'permite_transferencia\'] !== $config_despues[\'permite_transferencia\']);',
-        '    if ($cambio_permite_terminal) {',
-        '        _aplicar_retroactivo_a_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal, $snapshot_ventas, $aplicar_retroactivo);',
-        '    }',
-        '',
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-    'reemplazar' => [
-        '    $cambio_permite_terminal = ($config_antes[\'permite_efectivo\'] !== $config_despues[\'permite_efectivo\']',
-        '        || $config_antes[\'permite_transferencia\'] !== $config_despues[\'permite_transferencia\']);',
-        '    if ($cambio_permite_terminal) {',
-        '        _aplicar_retroactivo_a_ventas_de_terminal($nombre_dueno, $nombre_viaje, $nombre_terminal, $snapshot_ventas, $aplicar_retroactivo);',
-        '    }',
-        '',
-        '    // Fix 1.5piloto.83h: chequear guardar_ambos.',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("guardar_opciones_terminal_viaje: guardar_ambos falló para viaje=$nombre_viaje terminal=$nombre_terminal");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'Las opciones de la terminal se procesaron en memoria pero no se pudieron guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-],
-
-// 7. guardar_declaracion_jurada
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/Viaje.php',
-    'descripcion' => 'guardar_declaracion_jurada: chequear guardar_ambos',
-    'buscar' => [
-        '    $nodo_dj = $nodo_viaje->adyacente($enlace);',
-        '    if ($nodo_dj) {',
-        '        $nodo_dj->_dato($contenido);',
-        '    } else {',
-        '        $nodo_viaje->_adyacente_en(Nodo::crear_con_dato($contenido), $enlace);',
-        '    }',
-        '',
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-    'reemplazar' => [
-        '    $nodo_dj = $nodo_viaje->adyacente($enlace);',
-        '    if ($nodo_dj) {',
-        '        $nodo_dj->_dato($contenido);',
-        '    } else {',
-        '        $nodo_viaje->_adyacente_en(Nodo::crear_con_dato($contenido), $enlace);',
-        '    }',
-        '',
-        '    // Fix 1.5piloto.83h: chequear guardar_ambos.',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("guardar_declaracion_jurada: guardar_ambos falló para viaje=$nombre_viaje tipo=$tipo");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'La declaración jurada se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '    return [\'exito\' => true];',
-        '}',
-    ],
-],
-
-// 8. limpiar_viajes_de_prueba
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Viajes/Viaje.php',
-    'descripcion' => 'limpiar_viajes_de_prueba: chequear guardar_ambos',
-    'buscar' => [
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '',
-        '    return [',
-        '        \'exito\' => true,',
-        '        \'borrados\' => $borrados,',
-        '        \'cantidad_borrados\' => count($borrados),',
-        '        \'conservados\' => $conservados,',
-        '        \'con_ventas\' => $con_ventas,',
-        '        // v79l: ids de ventas de prueba canceladas durante',
-        '        // la limpieza. Quedan como nodos Cancelación en el',
-        '        // árbol del dueño (auditoría). Se puede agregar',
-        '        // un botón "Eliminar cancelaciones de prueba" en',
-        '        // una tanda futura.',
-        '        \'canceladas\' => $canceladas,',
-        '        \'cantidad_canceladas\' => count($canceladas),',
-        '    ];',
-        '}',
-    ],
-    'reemplazar' => [
-        '    // Fix 1.5piloto.83h: chequear guardar_ambos.',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("limpiar_viajes_de_prueba: guardar_ambos falló");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'La limpieza se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '',
-        '    return [',
-        '        \'exito\' => true,',
-        '        \'borrados\' => $borrados,',
-        '        \'cantidad_borrados\' => count($borrados),',
-        '        \'conservados\' => $conservados,',
-        '        \'con_ventas\' => $con_ventas,',
-        '        // v79l: ids de ventas de prueba canceladas durante',
-        '        // la limpieza. Quedan como nodos Cancelación en el',
-        '        // árbol del dueño (auditoría). Se puede agregar',
-        '        // un botón "Eliminar cancelaciones de prueba" en',
-        '        // una tanda futura.',
-        '        \'canceladas\' => $canceladas,',
-        '        \'cantidad_canceladas\' => count($canceladas),',
-        '    ];',
-        '}',
-    ],
-],
-
-// ============================================================
-// Pasajero.php — 1 flujo
-// ============================================================
-
-// 9. limpiar_pasajeros_de_prueba
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Pasajeros/Pasajero.php',
-    'descripcion' => 'limpiar_pasajeros_de_prueba: chequear guardar_ambos',
-    'buscar' => [
-        '    guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '',
-        '    return [',
-        '        \'exito\' => true,',
-        '        \'borrados\' => $borrados,',
-        '        \'cantidad_borrados\' => count($borrados),',
-        '        \'conservados_con_referencias\' => $conservados_con_referencias,',
-        '        \'conservados_no_prueba\' => $conservados_no_prueba,',
-        '    ];',
-        '}',
-    ],
-    'reemplazar' => [
-        '    // Fix 1.5piloto.83h: chequear guardar_ambos.',
-        '    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    if (!$ok_guardar) {',
-        '        Controlador::_error("limpiar_pasajeros_de_prueba: guardar_ambos falló");',
-        '        return [',
-        '            \'exito\' => false,',
-        '            \'error\' => \'La limpieza se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '        ];',
-        '    }',
-        '',
-        '    return [',
-        '        \'exito\' => true,',
-        '        \'borrados\' => $borrados,',
-        '        \'cantidad_borrados\' => count($borrados),',
-        '        \'conservados_con_referencias\' => $conservados_con_referencias,',
-        '        \'conservados_no_prueba\' => $conservados_no_prueba,',
-        '    ];',
-        '}',
-    ],
-],
-
-// ============================================================
-// Venta.php — 1 flujo
-// ============================================================
-
-// 10. limpiar_cancelaciones_de_prueba
-[
-    'tipo' => 'reemplazar',
-    'archivo' => 'Aplicacion/Ventas/Venta.php',
-    'descripcion' => 'limpiar_cancelaciones_de_prueba: chequear guardar_ambos',
-    'buscar' => [
-        '    if (!empty($borrados)) {',
-        '        guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '    }',
-        '',
-        '    return [',
-        '        \'exito\' => true,',
-        '        \'borrados\' => $borrados,',
-        '        \'cantidad_borrados\' => count($borrados),',
-        '        \'salteados\' => $salteados,',
-        '        \'cantidad_salteados\' => count($salteados),',
-        '    ];',
-        '}',
-    ],
-    'reemplazar' => [
-        '    if (!empty($borrados)) {',
-        '        // Fix 1.5piloto.83h: chequear guardar_ambos.',
-        '        $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);',
-        '        if (!$ok_guardar) {',
-        '            Controlador::_error("limpiar_cancelaciones_de_prueba: guardar_ambos falló");',
-        '            return [',
-        '                \'exito\' => false,',
-        '                \'error\' => \'La limpieza se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.\',',
-        '            ];',
-        '        }',
-        '    }',
-        '',
-        '    return [',
-        '        \'exito\' => true,',
-        '        \'borrados\' => $borrados,',
-        '        \'cantidad_borrados\' => count($borrados),',
-        '        \'salteados\' => $salteados,',
-        '        \'cantidad_salteados\' => count($salteados),',
-        '    ];',
-        '}',
-    ],
-],
-
-// ============================================================
-// plan_actual.md — docs
-// ============================================================
-
+// 1. Header
 [
     'tipo' => 'reemplazar',
     'archivo' => 'prompts/plan_actual.md',
-    'descripcion' => 'plan_actual: header a v83h',
+    'descripcion' => 'plan_actual: header con bug §4.7 cerrado',
     'buscar' => [
-        '**Última actualización:** v1.5piloto.83g (tanda de los',
-        '15 flujos con `guardar_ambos` sin chequear. Aplicado el',
-        'patrón C.6: ahora reportan `exito: false` si el guardado',
-        'falla, en lugar de mentir con "éxito" con la DB intacta).',
+        '**Última actualización:** v1.5piloto.83h + framework 1.5i.7v',
+        '(Fase 4 del bug §4.7 implementada. `_guardar_con_filtro`',
+        'hace fixpoint de máscaras sobre TODAS las aristas, inserta',
+        'nodos con máscara 0 (preservando id_fila) y no skipea',
+        'aristas por máscara del destino. Cierra el leak lento del',
+        'guardado parcial. El piloto queda en 83h; solo el framework',
+        'cambia de versión).',
     ],
     'reemplazar' => [
-        '**Última actualización:** v1.5piloto.83h (tanda final de',
-        'cobertura de `guardar_ambos`. Los 10 flujos restantes del',
-        'piloto aplican el patrón C.6. **Todos los flujos del',
-        'piloto que llaman `guardar_ambos` chequean el resultado.**',
-        'Excepciones documentadas en §4.7).',
+        '**Última actualización:** v1.5piloto.83l (bug §4.7 cerrado',
+        'con evidencia: `id_fila` del dueño estable entre requests,',
+        'cero `mf=0 modo=total` en el log durante el ciclo completo',
+        'venta/cancelación/cupón, auditoría topológica limpia después',
+        'de la limpieza). Causa raíz: guardado total en cada request',
+        'autenticado por `validar_token_sesion` y otros 9 llamadores',
+        'de `en_grafo_credenciales`, más 2 bloques de bootstrap en',
+        '`index.php`. Fix: 10 funciones de solo lectura a',
+        '`en_grafo_credenciales_solo_lectura`, condicionar el bloque',
+        'del `aplicacion`, condicionar el bootstrap del admin, y',
+        'agregar un flag de "hubo cambios" al `finally` de',
+        '`en_grafo_credenciales`. Ver §4.7).',
     ],
 ],
+
+// 2. Versiones
 [
     'tipo' => 'reemplazar',
     'archivo' => 'prompts/plan_actual.md',
-    'descripcion' => 'plan_actual: marcar los 10 flujos restantes',
+    'descripcion' => 'plan_actual: bump de versiones a 83l',
     'buscar' => [
-        '- **Deuda técnica restante (tanda chiquita siguiente):**',
-        '  quedan ~10 flujos más con el mismo patrón:',
-        '  `agregar_viaje`, `editar_viaje`,',
-        '  `guardar_viaje_completo`,',
-        '  `agregar_terminal_autorizada`,',
-        '  `eliminar_terminal_autorizada`,',
-        '  `guardar_opciones_terminal_viaje`,',
-        '  `guardar_declaracion_jurada`,',
-        '  `limpiar_viajes_de_prueba`,',
-        '  `limpiar_pasajeros_de_prueba`,',
-        '  `migrar_pasajeros_de_micro`,',
-        '  `limpiar_ventas_de_prueba`,',
-        '  `limpiar_cancelaciones_de_prueba`.',
+        '- **Piloto:** `1.5piloto.82d`.',
+        '- **Framework PHP:** `1.5i.8f` (SQL64, con singleton de',
+        '  conexión, `mysqli_report(OFF)`, `SELECT 1` en lugar de',
+        '  `ping()` y `IN (...)` en lugar de TEMPORARY TABLE). El',
+        '  archivo `Controlador/Controlador.php` está en `1.5i.7s`',
+        '  por los comandos del visualizador.',
     ],
     'reemplazar' => [
-        '- **10 flujos restantes: CERRADOS en v1.5piloto.83h.**',
-        '  `agregar_viaje`, `editar_viaje`,',
-        '  `guardar_viaje_completo`,',
-        '  `agregar_terminal_autorizada`,',
-        '  `eliminar_terminal_autorizada`,',
-        '  `guardar_opciones_terminal_viaje`,',
-        '  `guardar_declaracion_jurada`,',
-        '  `limpiar_viajes_de_prueba`,',
-        '  `limpiar_pasajeros_de_prueba`,',
-        '  `limpiar_cancelaciones_de_prueba`. Todos aplican el',
-        '  patrón C.6.',
-        '- **Excepciones (no requieren fix):**',
-        '  - `migrar_pasajeros_de_micro`: ya cubierto (Tanda 1,',
-        '    1.5piloto.82e).',
-        '  - `limpiar_ventas_de_prueba`: no llama `guardar_ambos`',
-        '    directamente (cada `cancelar_venta` interno lo hace',
-        '    y ya está chequeado desde v81w).',
-        '  - `listar_viajes_de_dueno` (drenar buzón): lectura',
-        '    con side-effect. Si falla, se loguea pero se devuelve',
-        '    el listado igual.',
-        '- **Estado de cobertura: COMPLETA.** Todos los flujos',
-        '  del piloto que llaman `guardar_ambos` chequean el',
-        '  resultado.',
+        '- **Piloto:** `1.5piloto.83l`.',
+        '- **Framework PHP:** `1.5i.7w` (SQL64, con singleton de',
+        '  conexión, `mysqli_report(OFF)`, `SELECT 1` en lugar de',
+        '  `ping()`, `IN (...)` en lugar de TEMPORARY TABLE, y',
+        '  log de persistencia a archivo del proyecto vía',
+        '  `Configuracion/LogPersistencia.php`). El',
+        '  archivo `Controlador/Controlador.php` está en `1.5i.7s`',
+        '  por los comandos del visualizador.',
     ],
 ],
+
+// 3. Sin bugs abiertos
 [
     'tipo' => 'reemplazar',
     'archivo' => 'prompts/plan_actual.md',
-    'descripcion' => 'plan_actual: estado del proyecto al cierre',
+    'descripcion' => 'plan_actual: sin bugs abiertos',
     'buscar' => [
-        '**Estado del proyecto al cierre:** v1.5piloto.83g',
-        '(framework 1.5i.7u). **Bug §4.7 contenido:** cerrado',
-        'como bug activo tras sesión de diagnóstico que no logró',
-        'reproducirlo post-restauración + blindaje. Los 4 bugs',
-        'encadenados del flujo de venta en micro de 2 pisos',
-        'quedaron cerrados. Blindaje activo (rollback si pierde',
-        'bits, nodos o aristas) + logging de diagnóstico',
-        '(`Conf::DEBUG_PERSISTENCIA`). Los 15 flujos con',
-        '`guardar_ambos` sin chequear quedaron cubiertos con el',
-        'patrón C.6 (v1.5piloto.83g). Queda deuda de Fase 4',
-        '(no saltar nodos con máscara 0 + propagar a fixpoint)',
-        'para sesión del framework, y ~10 flujos más con el',
-        'mismo patrón para tanda chiquita. SQL64 activo,',
-        'topología admin/soporte, auditoría topológica',
-        'disponible. **La migración de pasajeros sigue en pausa**',
-        'hasta validación post-83g.',
+        '**Sin bugs abiertos de prioridad alta.** La deuda técnica',
+        'del arco está consolidada en §4.7.',
     ],
     'reemplazar' => [
+        '**Sin bugs abiertos de prioridad alta.** El bug §4.7',
+        '(guardado total en cada GET) está cerrado con evidencia.',
+        'La deuda técnica del arco está consolidada en §4.8.',
+    ],
+],
+
+// 4. §2 arcos cerrados: agregar bullet del bug
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/plan_actual.md',
+    'descripcion' => 'plan_actual: agregar arco del bug §4.7',
+    'buscar' => [
+        '## 2. ARCOS CERRADOS RECIENTES',
+        '',
+        'Resumen de 1-2 líneas por arco. El detalle completo vive en',
+        'los prompts correspondientes o en los commits.',
+    ],
+    'reemplazar' => [
+        '## 2. ARCOS CERRADOS RECIENTES',
+        '',
+        'Resumen de 1-2 líneas por arco. El detalle completo vive en',
+        'los prompts correspondientes o en los commits.',
+        '',
+        '- **Bug §4.7 cerrado (v83j-v83l).** El bug no era el leak',
+        '  lento ni la migración de pasajeros. Era guardado total en',
+        '  cada request autenticado. `validar_token_sesion` (y otras',
+        '  9 funciones de solo lectura) llamaban `en_grafo_credenciales`',
+        '  con el default, que disparaba `guardar_ambos(app)` y',
+        '  `guardar_ambos(credenciales)` en cada GET. Cada guardado',
+        '  total hacía DELETE ALL + INSERT ALL con `id_fila` nuevo.',
+        '  El `id_fila` del dueño cambiaba en cada request. Las',
+        '  aristas del próximo BFS apuntaban a filas inexistentes.',
+        '  El viaje "desaparecía" y el header mostraba "terminal".',
+        '  Fix: 10 funciones a `solo_lectura`, condicionar el',
+        '  `aplicacion`, condicionar el bootstrap del admin, y flag',
+        '  de "hubo cambios" en el `finally` de',
+        '  `en_grafo_credenciales`. Ver §4.7 para el diagnóstico',
+        '  completo.',
+    ],
+],
+
+// 5. §4.7 título + diagnóstico real
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/plan_actual.md',
+    'descripcion' => 'plan_actual: §4.7 cerrado con diagnóstico real',
+    'buscar' => [
+        '### 4.7. Bug contenido: corrupción del grafo por guardado parcial',
+        '',
+        '**Estado:** contenido y cerrado como bug activo.',
+        '',
+        '**Resultado de la sesión de diagnóstico (v1.5piloto.83a-f).**',
+    ],
+    'reemplazar' => [
+        '### 4.7. Bug §4.7: cerrado (era guardado total en cada GET)',
+        '',
+        '**Estado:** cerrado en v1.5piloto.83l. Validado con el ciclo',
+        'completo: `id_fila` del dueño estable entre requests, cero',
+        '`mf=0 modo=total` en el log, auditoría topológica limpia',
+        'después de la limpieza.',
+        '',
+        '**Diagnóstico real (sesión v83i-v83l).** El bug NO era el',
+        'leak lento (aunque Fase 4 fue necesaria para hacerlo',
+        'visible). NO era la migración de pasajeros. NO era la',
+        'concurrencia per se. Era que **cada request autenticado',
+        'hacía dos guardados TOTALES**:',
+        '',
+        '1. `validar_token_sesion` (Autenticacion.php:134) se llama',
+        '   en cada request. Llamaba a `en_grafo_credenciales` con el',
+        '   default, que disparaba `guardar_ambos($nombre_app)`',
+        '   **antes** del callback y `guardar_ambos($credenciales)`',
+        '   **en el finally**.',
+        '2. Otros 9 llamadores de solo lectura (`listar_sesiones`,',
+        '   `listar_usuarios`, `listar_terminales_de_dueno`,',
+        '   `obtener_perfil_usuario`, `_puede_cerrar_sesion`, etc.)',
+        '   hacían lo mismo.',
+        '3. El bloque del `aplicacion` (index.php:253-275) guardaba',
+        '   en cada GET si faltaba `migraciones`. Como el guardado',
+        '   total reinsertaba `migraciones` con `id_fila` nuevo, en',
+        '   el próximo GET volvía a faltar → loop infinito.',
+        '4. El bloque del admin en credenciales (index.php:639-655)',
+        '   guardaba aunque el admin ya existiera.',
+        '',
+        'Cada `DELETE ALL + INSERT ALL` reinsertaba el grafo entero',
+        'con `id_fila` auto-increment. El `id_fila` del dueño',
+        'cambiaba en cada request. Las aristas del BFS del próximo',
+        'request apuntaban a filas que ya no existían. El viaje',
+        'viejo "desaparecía" y el header mostraba "terminal" en vez',
+        'de "dueño".',
+        '',
+        '**Fix (v83j-v83l).**',
+        '- v83j: `en_grafo_credenciales` acepta `bool',
+        '  $guardar_app_antes = true`. El bootstrap del admin pasa',
+        '  `false`.',
+        '- v83k: `en_grafo_credenciales` solo guarda credenciales si',
+        '  el callback no devolvió exactamente `false`. El callback',
+        '  del bootstrap del admin devuelve `$creado`.',
+        '- v83k: el bloque del `aplicacion` solo guarda si creó algo',
+        '  en este request (flag `$hubo_cambio_app_meta`).',
+        '- v83l: las 10 funciones de solo lectura pasan a',
+        '  `en_grafo_credenciales_solo_lectura`. Corta el 90% de los',
+        '  guardados totales. Es el fix de raíz.',
+        '',
+        '**Cobertura.** Las funciones que sí modifican (autenticar,',
+        'crear/cerrar sesión, agregar/actualizar/eliminar usuario,',
+        'eliminar terminal, eliminar sesiones) siguen con',
+        '`en_grafo_credenciales`. Solo se cambiaron las de lectura.',
+        '',
+        '**Estado post-fix (validado por el usuario).**',
+        '- `id_fila` del dueño: estable entre recargas, ventas,',
+        '  cancelaciones, pagos de cupón.',
+        '- Log: cero `mf=0 modo=total`, cero',
+        '  `nombre=credenciales`. Solo guardados parciales de las',
+        '  operaciones reales.',
+        '- Auditoría topológica post-limpieza: 0 críticos, 0',
+        '  errores, 0 warnings.',
+        '',
+        '**Histórico (sesión v83a-h, conservado para contexto).**',
+        'Lo que sigue documenta la investigación que precedió al',
+        'diagnóstico real. Fue necesaria (Fase 1-4 del framework,',
+        'cobertura de `guardar_ambos` en 25 flujos, blindaje de',
+        'persistencia robusta) pero el trigger real estaba en otro',
+        'lado.',
+        '',
+        '**Resultado de la sesión de diagnóstico (v1.5piloto.83a-f).**',
+    ],
+],
+
+// 6. §4.7 estado del bug al final del bloque
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/plan_actual.md',
+    'descripcion' => 'plan_actual: §4.7 estado del bug cerrado',
+    'buscar' => [
+        '**Estado del bug:** contenido. Los 4 bugs concretos del',
+        'flujo están cerrados. El leak lento del blindaje fue',
+        'cerrado de raíz en Fase 4 (framework 1.5i.7v): fixpoint',
+        'de máscaras sobre TODAS las aristas + inserción de nodos',
+        'con máscara 0 preservando id_fila. El blindaje de',
+        '1.5i.7t/7u sigue activo (rollback si pierde bits, nodos',
+        'o aristas).',
+    ],
+    'reemplazar' => [
+        '**Estado del bug:** cerrado en v1.5piloto.83l. El leak',
+        'lento del blindaje fue cerrado de raíz en Fase 4',
+        '(framework 1.5i.7v). El trigger real (guardado total en',
+        'cada GET) fue cerrado en v83j-v83l. El blindaje de',
+        '1.5i.7t/7u sigue activo (rollback si pierde bits, nodos',
+        'o aristas).',
+    ],
+],
+
+// 7. §4.8 GET_LOCK
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/plan_actual.md',
+    'descripcion' => 'plan_actual: §4.8 agregar GET_LOCK',
+    'buscar' => [
+        '### 4.8. Deuda técnica del arco (baja)',
+        '',
+        'Pendientes generados por la línea v81p-v82d. Ninguno es',
+        'bloqueante.',
+        '',
+        '- **Endpoints temporales de diagnóstico en index.php.**',
+    ],
+    'reemplazar' => [
+        '### 4.8. Deuda técnica del arco (baja)',
+        '',
+        'Pendientes generados por la línea v81p-v82d. Ninguno es',
+        'bloqueante.',
+        '',
+        '- **`GET_LOCK(\'grafo_<nombre>\', 5)` en `_guardar_con_filtro`.**',
+        '  Para blindar la concurrencia real. Ahora que el guardado',
+        '  total no se dispara en cada GET, la concurrencia es',
+        '  mucho menos probable (solo operaciones reales se',
+        '  pueden solapar). Pero dos terminales que venden al',
+        '  mismo tiempo todavía pueden pisarse. Con GET_LOCK, el',
+        '  segundo espera o falla, pero no duplica. Es deuda',
+        '  técnica, no bug activo. Tanda del framework.',
+        '',
+        '- **Endpoints temporales de diagnóstico en index.php.**',
+    ],
+],
+
+// 8. §4.5 desbloquear migración
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/plan_actual.md',
+    'descripcion' => 'plan_actual: §4.5 desbloquear migración',
+    'buscar' => [
+        '**Arco en curso: migración de pasajeros entre micros.**',
+        '**ESTADO: EN PAUSA** hasta que el bug del guardado',
+        'parcial (§4.7) esté diagnosticado y blindado.',
+    ],
+    'reemplazar' => [
+        '**Arco en curso: migración de pasajeros entre micros.**',
+        '**ESTADO: DESBLOQUEADA.** El bug §4.7 está cerrado',
+        '(v1.5piloto.83l). El `id_fila` es estable entre',
+        'requests, el grafo no se corrompe. Se puede retomar',
+        'la Tanda 3.',
+    ],
+],
+
+// 9. §4.5 final: la migración puede volver
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/plan_actual.md',
+    'descripcion' => 'plan_actual: §4.5 migración desbloqueada',
+    'buscar' => [
+        '**La migración NO vuelve a producción** hasta que el',
+        'guardado parcial esté blindado (Fases 4 y 6 de §4.7).',
+    ],
+    'reemplazar' => [
+        '**La migración YA PUEDE VOLVER A PRODUCCIÓN.** El bug',
+        '§4.7 está cerrado (v1.5piloto.83l). Antes de pasarla,',
+        'correr la Tanda 3 en local y validar el ciclo completo',
+        'en un viaje de prueba.',
+    ],
+],
+
+// 10. Estado al cierre
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/plan_actual.md',
+    'descripcion' => 'plan_actual: estado al cierre',
+    'buscar' => [
         '**Estado del proyecto al cierre:** v1.5piloto.83h',
-        '(framework 1.5i.7u). **Bug §4.7 contenido:** cerrado',
+        '(framework 1.5i.7v). **Bug §4.7 contenido:** cerrado',
         'como bug activo tras sesión de diagnóstico que no logró',
         'reproducirlo post-restauración + blindaje. Los 4 bugs',
         'encadenados del flujo de venta en micro de 2 pisos',
@@ -516,18 +320,239 @@ $cambios = [
         '(`Conf::DEBUG_PERSISTENCIA`). **Cobertura de',
         '`guardar_ambos`: COMPLETA.** Todos los flujos del',
         'piloto chequean el resultado (v1.5piloto.83g + 83h).',
-        'Queda deuda de Fase 4 (no saltar nodos con máscara 0 +',
-        'propagar a fixpoint) para sesión del framework. SQL64',
-        'activo, topología admin/soporte, auditoría topológica',
-        'disponible. **La migración de pasajeros sigue en pausa**',
-        'hasta validación post-83h.',
+        '**Fase 4: cerrada en framework 1.5i.7v** (fixpoint de',
+        'máscaras sobre TODAS las aristas + inserción de nodos',
+        'con máscara 0 preservando id_fila + aristas hacia',
+        'destinos con máscara 0). El leak lento del guardado',
+        'parcial quedó cerrado de raíz. SQL64 activo, topología',
+        'admin/soporte, auditoría topológica disponible. **La',
+        'migración de pasajeros sigue en pausa** hasta validación',
+        'post-1.5i.7v.',
+    ],
+    'reemplazar' => [
+        '**Estado del proyecto al cierre:** v1.5piloto.83l',
+        '(framework 1.5i.7w). **Bug §4.7 cerrado.** No era el',
+        'leak lento (Fase 4 fue necesaria, pero no suficiente).',
+        'Era guardado total en cada request autenticado por',
+        '`validar_token_sesion` y otros 9 llamadores de',
+        '`en_grafo_credenciales`, más 2 bloques de bootstrap en',
+        '`index.php`. Fix: 10 funciones a `solo_lectura`,',
+        'condicionar `aplicacion`, condicionar bootstrap del',
+        'admin, flag de "hubo cambios" en `finally`. Validado',
+        'con ciclo completo (venta/cancelación/cupón): `id_fila`',
+        'estable, cero totales en el log, auditoría limpia.',
+        '**La migración de pasajeros se puede desbloquear**',
+        '(Tanda 3 pendiente). El log de persistencia está activo,',
+        'escribiendo a `logs/persistencia/YYYY-MM-DD.log`,',
+        'legible por HTTP con `?ver_log_persistencia=1`.',
+    ],
+],
+
+// ============================================================
+// prompt_piloto.md
+// ============================================================
+
+// 11. §5.2 validar_token_sesion
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/prompt_piloto.md',
+    'descripcion' => 'prompt_piloto: §5.2 validar_token_sesion',
+    'buscar' => [
+        '- `validar_token_sesion($token)`.',
+    ],
+    'reemplazar' => [
+        '- `validar_token_sesion($token)`: solo lectura. Usa',
+        '  `en_grafo_credenciales_solo_lectura` desde v83l (antes',
+        '  usaba `en_grafo_credenciales`, lo que disparaba dos',
+        '  guardados totales por request autenticado, causando el',
+        '  bug §4.7).',
+    ],
+],
+
+// 12. §5.6 en_grafo_credenciales con flag
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/prompt_piloto.md',
+    'descripcion' => 'prompt_piloto: §5.6 en_grafo_credenciales',
+    'buscar' => [
+        '### 5.6 `Aplicacion/GrafoCredenciales.php`',
+        '',
+        '- `en_grafo_credenciales(callable $fn)`: guarda app, carga/crea',
+        '  credenciales, ejecuta callback, guarda credenciales, recarga app.',
+    ],
+    'reemplazar' => [
+        '### 5.6 `Aplicacion/GrafoCredenciales.php`',
+        '',
+        '- `en_grafo_credenciales(callable $fn, bool $guardar_app_antes = true)`:',
+        '  guarda app (si `$guardar_app_antes`), carga/crea',
+        '  credenciales, ejecuta callback, guarda credenciales (solo',
+        '  si el callback no devolvió exactamente `false`), recarga',
+        '  app. El flag `$guardar_app_antes` permite a los',
+        '  llamadores que no modifican la app evitar el guardado',
+        '  total (bug §4.7). Desde v83j. El "solo si no devolvió',
+        '  `false`" desde v83k.',
+        '- `en_grafo_credenciales_solo_lectura(callable $fn)`: lee',
+        '  credenciales sin guardar. Usar en funciones de solo',
+        '  lectura (validar sesión, listar, buscar). Desde v76f.',
+        '  En v83l se cambiaron `validar_token_sesion` y otras 9',
+        '  funciones a este helper.',
+    ],
+],
+
+// 13. §7 historial
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/prompt_piloto.md',
+    'descripcion' => 'prompt_piloto: §7 historial v83j-l',
+    'buscar' => [
+        '## 7. HISTORIAL DE VERSIONES (resumen)',
+        '',
+        '- **v81t-v82d** (línea de cancelaciones en compartidos +',
+    ],
+    'reemplazar' => [
+        '## 7. HISTORIAL DE VERSIONES (resumen)',
+        '',
+        '- **v83j-v83l** (cierre del bug §4.7): ver',
+        '  `plan_actual.md` §4.7 para el diagnóstico completo.',
+        '  Resumen:',
+        '  - 83j: `en_grafo_credenciales` acepta',
+        '    `bool $guardar_app_antes = true`. El bootstrap del',
+        '    admin pasa `false`. El bloque del `aplicacion`',
+        '    guarda solo si creó algo (flag',
+        '    `$hubo_cambio_app_meta`).',
+        '  - 83k: `en_grafo_credenciales` solo guarda',
+        '    credenciales si el callback no devolvió `false`.',
+        '    El callback del bootstrap del admin devuelve',
+        '    `$creado`.',
+        '  - 83l: las 10 funciones de solo lectura pasan a',
+        '    `en_grafo_credenciales_solo_lectura`:',
+        '    `validar_token_sesion`, `listar_sesiones`,',
+        '    `listar_sesiones_de_usuarios`, `listar_usuarios`,',
+        '    `listar_duenos_de_soporte`, `_puede_cerrar_sesion`,',
+        '    `agregar_usuario` (bloque codigo_duplicado),',
+        '    `actualizar_usuario` (bloque codigo_duplicado),',
+        '    `listar_terminales_de_dueno`, `obtener_perfil_usuario`.',
+        '  El bug NO era el leak lento ni la migración. Era',
+        '  guardado total en cada request autenticado.',
+        '  Validado con ciclo completo.',
+        '- **v81t-v82d** (línea de cancelaciones en compartidos +',
+    ],
+],
+
+// 14. §13 cierre estado
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/prompt_piloto.md',
+    'descripcion' => 'prompt_piloto: §13 estado al cierre',
+    'buscar' => [
+        '**Estado del proyecto al cierre:** v1.5piloto.78s',
+        '(framework 1.5i.7r). La línea de carga parcial quedó',
+        'aplicada en los módulos principales (Viajes, Venta,',
+        'Pasajeros, Impresión). SQL64 activo, topología',
+        'admin/soporte, reparación topológica disponible.',
+    ],
+    'reemplazar' => [
+        '**Estado del proyecto al cierre:** v1.5piloto.83l',
+        '(framework 1.5i.7w). La línea de carga parcial está',
+        'aplicada en los módulos principales (Viajes, Venta,',
+        'Pasajeros, Impresión). SQL64 activo, topología',
+        'admin/soporte, reparación topológica disponible.',
+        'El log de persistencia escribe a',
+        '`logs/persistencia/YYYY-MM-DD.log` (legible por HTTP',
+        'con `?ver_log_persistencia=1`, admin/soporte).',
+    ],
+],
+
+// 15. §13 bug persistente -> cerrado
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/prompt_piloto.md',
+    'descripcion' => 'prompt_piloto: §13 bug §4.7 cerrado',
+    'buscar' => [
+        '**BUG PERSISTENTE.** El viaje viejo del dueño desaparece',
+        'cuando un terminal hace una operación de guardado',
+        '(reproducible con el plugin: autocompletado → alta de',
+        'viaje). Los fixes v78r (regla de borrado de aristas) y',
+        'v78s (preservar bits de máscara) no alcanzaron. Detalle',
+        'completo, hipótesis y próximo paso de diagnóstico en',
+        '`prompts/plan_actual.md` §1.5.',
+    ],
+    'reemplazar' => [
+        '**Bug §4.7 cerrado** (v1.5piloto.83l). No era el leak',
+        'lento ni la migración. Era guardado total en cada',
+        'request autenticado. Detalle completo en',
+        '`prompts/plan_actual.md` §4.7. El `id_fila` del dueño es',
+        'estable entre requests. La migración de pasajeros se',
+        'puede desbloquear (Tanda 3 pendiente).',
+    ],
+],
+
+// ============================================================
+// prompt_framework_iteradores.md
+// ============================================================
+
+// 16. §11.4 nota de cierre
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/prompt_framework_iteradores.md',
+    'descripcion' => 'prompt_framework: §11.4 nota de cierre',
+    'buscar' => [
+        '**Momento:** antes de la fase 5 (256 contextos) o antes',
+        'de cualquier otro método de indexación. En la fase 1-2',
+        'actual el campo en el nodo funciona; no bloquea nada.',
+    ],
+    'reemplazar' => [
+        '**Momento:** antes de la fase 5 (256 contextos) o antes',
+        'de cualquier otro método de indexación. En la fase 1-2',
+        'actual el campo en el nodo funciona; no bloquea nada.',
+        '',
+        '**Nota de cierre (v83l).** El bug §4.7 del piloto NO',
+        'era del guardado parcial ni del leak lento. Era',
+        'guardado TOTAL en cada GET. Ver',
+        '`plan_actual.md` §4.7 del piloto. La Fase 4 de §11.4',
+        '(fixpoint de máscaras, inserción de nodos con máscara 0)',
+        'fue necesaria pero no suficiente. El diagnóstico real',
+        'es una lección para el framework: cuando un bug',
+        '"desaparece" post-restauración y vuelve, buscar en el',
+        'código que corre en CADA request, no en las operaciones',
+        'puntuales.',
+    ],
+],
+
+// 17. §13 lección nueva
+[
+    'tipo' => 'reemplazar',
+    'archivo' => 'prompts/prompt_framework_iteradores.md',
+    'descripcion' => 'prompt_framework: §13 lección 30',
+    'buscar' => [
+        '**Regla de oro:** cualquier cambio al framework PHP se refleja en',
+        'JS en la misma tanda, con dos scripts y dos commits.',
+    ],
+    'reemplazar' => [
+        '**30. Un bug que "desaparece" post-restauración y vuelve',
+        'con una secuencia específica probablemente NO está en',
+        'las operaciones que disparan el síntoma.** En el piloto',
+        '(v83l), el bug §4.7 no era del guardado parcial ni del',
+        'leak lento: era que `validar_token_sesion` llamaba',
+        '`en_grafo_credenciales` (que guarda app + credenciales)',
+        'en cada request. Cada guardado total hacía DELETE ALL',
+        '+ INSERT ALL con `id_fila` nuevo, y el `id_fila` del',
+        'dueño cambiaba en cada GET. El síntoma aparecía con',
+        'una secuencia específica (micro de 2 pisos → migración',
+        '→ cupón) porque esa secuencia generaba más requests.',
+        'Lección: cuando un bug se resiste a dos intentos de',
+        'fix, instrumentar el código que corre en cada request,',
+        'no el de la operación puntual.',
+        '',
+        '**Regla de oro:** cualquier cambio al framework PHP se refleja en',
+        'JS en la misma tanda, con dos scripts y dos commits.',
     ],
 ],
 
 ];
 
 // ============================================================
-// Runner v2 (textual, ver prompt_sistema_scripts_v2.md §14)
+// Runner v2
 // ============================================================
 
 echo "=== Aplicador ===\n\n";
@@ -602,21 +627,13 @@ if ($modo_estricto && !empty($bloques_fallidos)) {
 }
 
 $archivos_bump_php_js = [];
-$archivos_bump_js_css = [];
 foreach ($archivos_a_escribir as $ruta_abs => $info) {
     $rel = substr($ruta_abs, strlen($raiz_proyecto) + 1);
     $ext = strtolower(pathinfo($ruta_abs, PATHINFO_EXTENSION));
     if ($ext === 'php' || $ext === 'js') $archivos_bump_php_js[] = $rel;
-    if ($ext === 'js' || $ext === 'css') $archivos_bump_js_css[] = $rel;
-}
-foreach ($creaciones as $cr) {
-    $ext = strtolower(pathinfo($cr['archivo'], PATHINFO_EXTENSION));
-    if ($ext === 'php' || $ext === 'js') $archivos_bump_php_js[] = $cr['archivo'];
-    if ($ext === 'js' || $ext === 'css') $archivos_bump_js_css[] = $cr['archivo'];
 }
 
 $bumps_atversion = 0;
-$bumps_qv = 0;
 $bumps_detalle = [];
 $info_bumps = [];
 
@@ -643,36 +660,6 @@ if ($bumpear) {
         $bumps_atversion++;
         $bumps_detalle[] = "$archivo_rel  @version $viejo -> $version_nueva";
     }
-
-    foreach ($htmls_a_bumpear as $html_rel) {
-        $html_abs = $raiz_proyecto . '/' . $html_rel;
-        if (!file_exists($html_abs)) { $info_bumps[] = "$html_rel (no encontrado)"; continue; }
-        if (isset($archivos_a_escribir[$html_abs])) {
-            list($html, $eol) = $archivos_a_escribir[$html_abs];
-        } else {
-            $html_orig = file_get_contents($html_abs);
-            $eol = detectar_eol($html_orig);
-            $html = normalizar_a_unix($html_orig);
-        }
-        $html_antes = $html;
-        foreach (array_unique($archivos_bump_js_css) as $archivo_rel) {
-            $base = basename($archivo_rel);
-            $base_esc = preg_quote($base, '/');
-            $patron = '/(' . $base_esc . '\?v=)([^"\'\s>]+)/';
-            $viejo_qv = '';
-            $html = preg_replace_callback($patron, function($m) use ($version_nueva, &$viejo_qv) {
-                $viejo_qv = $m[2];
-                return $m[1] . $version_nueva;
-            }, $html, 1, $c_qv);
-            if ($c_qv > 0 && $viejo_qv !== $version_nueva) {
-                $bumps_qv++;
-                $bumps_detalle[] = "$html_rel  $base ?v= $viejo_qv -> $version_nueva";
-            }
-        }
-        if ($html !== $html_antes) {
-            $archivos_a_escribir[$html_abs] = [normalizar_a_unix($html), $eol];
-        }
-    }
 }
 
 $archivos_escritos = 0;
@@ -687,26 +674,6 @@ foreach ($archivos_a_escribir as $ruta_abs => $info) {
     echo "[OK] " . substr($ruta_abs, strlen($raiz_proyecto) + 1) . "\n";
 }
 
-foreach ($creaciones as $creacion) {
-    $ruta_abs = $raiz_proyecto . '/' . $creacion['archivo'];
-    $dir_destino = dirname($ruta_abs);
-    if (!is_dir($dir_destino)) mkdir($dir_destino, 0777, true);
-    $contenido_nuevo = implode("\n", $creacion['contenido']);
-    $ya_existia = file_exists($ruta_abs);
-    if (file_put_contents($ruta_abs, $contenido_nuevo) === false) {
-        echo "[FALLO] No se pudo crear: {$creacion['archivo']}\n"; continue;
-    }
-    $accion = $ya_existia ? 'sobrescrito' : 'creado';
-    echo "[OK] {$creacion['archivo']} ($accion)\n";
-}
-
-foreach ($eliminaciones as $elim) {
-    $ruta_abs = $raiz_proyecto . '/' . $elim['archivo'];
-    if (!file_exists($ruta_abs)) { echo "[INFO] " . $elim['archivo'] . " no existía.\n"; continue; }
-    if (unlink($ruta_abs)) echo "[OK] " . $elim['archivo'] . " (eliminado)\n";
-    else echo "[FALLO] No se pudo eliminar: " . $elim['archivo'] . "\n";
-}
-
 if ($bumpear && (!empty($bumps_detalle) || !empty($info_bumps))) {
     echo "\n--- Bumps ---\n";
     foreach ($bumps_detalle as $d) echo "[BUMP] $d\n";
@@ -718,7 +685,6 @@ echo "Bloques aplicados: $bloques_ok\n";
 echo "Archivos escritos: $archivos_escritos\n";
 if ($bumpear) {
     echo "Bumps @version:    $bumps_atversion\n";
-    echo "Bumps ?v=:         $bumps_qv\n";
 }
 if (!empty($bloques_fallidos)) {
     echo "Fallos: " . count($bloques_fallidos) . "\n";

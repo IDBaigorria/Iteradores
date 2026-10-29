@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.83e
+ * @version   1.5piloto.83k
  */
 
 // --- Utilidades base ----------------------------------
@@ -36,6 +36,7 @@ include_once("miscelaneas/generarUUID.php");
 
 // --- Configuración ------------------------------------
 include_once("Configuracion/Configuracion.php");
+include_once(__DIR__ . '/Configuracion/LogPersistencia.php');
 
 // --- Núcleo -------------------------------------------
 include_once("Nucleo/Objeto.php");
@@ -255,12 +256,20 @@ if (isset($_GET['probar_contextos'])) {
 // parcial no se puede navegar la raíz `usuarios` ni crear
 // nodos nuevos que no pertenezcan al contexto.
 if (!$modo_parcial) {
+    // Fix 1.5piloto.83k: guardar solo si se creó `aplicacion`
+    // o `migraciones` en este request. Antes se guardaba en
+    // cada GET si faltaba `migraciones`. Como el guardado
+    // total reinserta `migraciones` con id_fila nuevo, en
+    // el próximo GET volvía a faltar. Loop infinito que
+    // reinserta el grafo entero en cada request (causa
+    // directa del bug §4.7: el id_fila del dueño cambia).
+    $hubo_cambio_app_meta = false;
     if (!Nodo::nodo_por_id('aplicacion')) {
         $nodo_app_meta = Nodo::crear_con_id('aplicacion');
         if ($nodo_app_meta) {
             $contenedor_mig = Nodo::crear_con_dato('');
             $nodo_app_meta->_adyacente_en($contenedor_mig, 'migraciones');
-            guardar_ambos($nombre_app);
+            $hubo_cambio_app_meta = true;
         }
     } else {
         // Existe el nodo aplicacion pero puede faltar el contenedor.
@@ -268,8 +277,11 @@ if (!$modo_parcial) {
         if ($nodo_app_meta && !$nodo_app_meta->adyacente('migraciones')) {
             $contenedor_mig = Nodo::crear_con_dato('');
             $nodo_app_meta->_adyacente_en($contenedor_mig, 'migraciones');
-            guardar_ambos($nombre_app);
+            $hubo_cambio_app_meta = true;
         }
+    }
+    if ($hubo_cambio_app_meta) {
+        guardar_ambos($nombre_app);
     }
 }
 
@@ -636,22 +648,44 @@ if (!$modo_parcial) {
     }
 
     // Crear admin en el grafo de credenciales si no existe.
-    en_grafo_credenciales(function() {
-        $raiz_cred = Nodo::nodo_por_id('usuarios');
-        if (!$raiz_cred) {
-            Nodo::crear_con_id('usuarios');
-            $raiz_cred = Nodo::nodo_por_id('usuarios');
-        }
-        // Fase B3.1: chequeo por ID especial.
-        if (!Nodo::nodo_por_id('us_' . ConfiguracionApli::NOMBRE_ADMIN)) {
-            $id_especial_admin_cred = 'us_' . ConfiguracionApli::NOMBRE_ADMIN;
-            $nodo_admin_cred = Nodo::crear_con_dato_e_id(ConfiguracionApli::NOMBRE_ADMIN, $id_especial_admin_cred);
-            if ($nodo_admin_cred) {
-                $nodo_admin_cred->_adyacente_en(Nodo::crear_con_dato(password_hash(Conf::CODIGO_ADMIN, PASSWORD_DEFAULT)), 'codigo_hash');
-                $raiz_cred->_adyacente_en($nodo_admin_cred, ConfiguracionApli::NOMBRE_ADMIN);
-            }
-        }
+    // Fix 1.5piloto.83j: chequear primero con solo_lectura. Si
+    // el admin ya existe (caso normal), NO se llama a
+    // en_grafo_credenciales, que guardaba la app Y credenciales
+    // en cada GET (incluso cuando el callback no modificaba
+    // nada). Ese guardado total reinsertaba el grafo con
+    // id_fila nuevos en cada request, causando el bug §4.7
+    // (el viaje viejo "desaparece" porque su id_fila cambia).
+    $admin_cred_existe = en_grafo_credenciales_solo_lectura(function() {
+        return Nodo::nodo_por_id('us_' . ConfiguracionApli::NOMBRE_ADMIN) !== null;
     });
+    if (!$admin_cred_existe) {
+        // Fix 1.5piloto.83k: el callback devuelve un flag
+        // (`$creado`). Si el admin ya existe, `$creado` es
+        // `false`, y `en_grafo_credenciales` NO guarda
+        // credenciales. Antes guardaba aunque el callback no
+        // modificara nada, y eso reinsertaba el grafo de
+        // credenciales con id_fila nuevos en cada GET.
+        en_grafo_credenciales(function() {
+            $creado = false;
+            $raiz_cred = Nodo::nodo_por_id('usuarios');
+            if (!$raiz_cred) {
+                Nodo::crear_con_id('usuarios');
+                $raiz_cred = Nodo::nodo_por_id('usuarios');
+                $creado = true;
+            }
+            // Fase B3.1: chequeo por ID especial.
+            if (!Nodo::nodo_por_id('us_' . ConfiguracionApli::NOMBRE_ADMIN)) {
+                $id_especial_admin_cred = 'us_' . ConfiguracionApli::NOMBRE_ADMIN;
+                $nodo_admin_cred = Nodo::crear_con_dato_e_id(ConfiguracionApli::NOMBRE_ADMIN, $id_especial_admin_cred);
+                if ($nodo_admin_cred) {
+                    $nodo_admin_cred->_adyacente_en(Nodo::crear_con_dato(password_hash(Conf::CODIGO_ADMIN, PASSWORD_DEFAULT)), 'codigo_hash');
+                    $raiz_cred->_adyacente_en($nodo_admin_cred, ConfiguracionApli::NOMBRE_ADMIN);
+                    $creado = true;
+                }
+            }
+            return $creado;
+        }, false);
+    }
 }
 
 // ==== Reparación de ciclos en árboles de cancelaciones (v1.5piloto.81v) ====
@@ -907,6 +941,72 @@ function _diag_wait_timeout(\mysqli $sql): ?int {
 // En pruebas y producción es obligatorio y debe ser
 // admin o soporte. El plugin arma la URL con el nombre
 // del usuario logueado.
+// Endpoint de diagnóstico: ver/limpiar el log de persistencia.
+if (isset($_GET['ver_log_persistencia'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    if (Controlador::es_grafo_parcial()) {
+        $ok_recarga_log = Controlador::cargar($nombre_app);
+        if ($ok_recarga_log !== true) {
+            http_response_code(500);
+            echo json_encode([
+                'exito' => false,
+                'error' => 'No se pudo recargar el grafo completo.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+    $nombre_sol_log = trim((string)($_GET['nombre_solicitante'] ?? ''));
+    if ($nombre_sol_log === '') {
+        if (!Conf::LOCAL) {
+            http_response_code(403);
+            echo json_encode(['exito' => false, 'error' => 'Falta nombre_solicitante.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    } else {
+        $nodo_sol_log = Nodo::nodo_por_id('us_' . $nombre_sol_log);
+        if (!$nodo_sol_log) {
+            http_response_code(403);
+            echo json_encode(['exito' => false, 'error' => "Solicitante '$nombre_sol_log' no encontrado."], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $nivel_nodo_log = $nodo_sol_log->adyacente('nivel');
+        $nivel_log = $nivel_nodo_log ? (string)$nivel_nodo_log->dato() : '';
+        if ($nivel_log !== 'admin' && $nivel_log !== 'soporte') {
+            http_response_code(403);
+            echo json_encode(['exito' => false, 'error' => "Permiso denegado. Nivel '$nivel_log'."], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+    $fecha_log = isset($_GET['fecha']) ? trim((string)$_GET['fecha']) : '';
+    $limpiar_log = isset($_GET['limpiar']) && $_GET['limpiar'] === '1';
+    if ($limpiar_log) {
+        $ok_limp = limpiar_log_persistencia($fecha_log !== '' ? $fecha_log : null);
+        echo json_encode([
+            'exito' => $ok_limp,
+            'limpiado' => $ok_limp,
+            'fecha' => $fecha_log !== '' ? $fecha_log : date('Y-m-d'),
+            'debug_activo' => Conf::DEBUG_PERSISTENCIA,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $archivos_log = listar_logs_persistencia();
+    $fecha_lectura = $fecha_log !== '' ? $fecha_log : date('Y-m-d');
+    $contenido_log = leer_log_persistencia($fecha_lectura);
+    $lineas_log = 0;
+    if ($contenido_log !== null) {
+        $lineas_log = substr_count($contenido_log, "\n");
+    }
+    echo json_encode([
+        'exito' => true,
+        'debug_activo' => Conf::DEBUG_PERSISTENCIA,
+        'archivos' => $archivos_log,
+        'fecha' => $fecha_lectura,
+        'lineas' => $lineas_log,
+        'contenido' => $contenido_log,
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}
+
 if (isset($_GET['auditar_topologia'])) {
     header('Content-Type: application/json; charset=utf-8');
 

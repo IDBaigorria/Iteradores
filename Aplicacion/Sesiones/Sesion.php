@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.75
+ * @version   1.5piloto.83l
  */
 
 use Iteradores\Nodos\Nodo;
@@ -76,7 +76,7 @@ function crear_sesion(string $nombre_usuario): string {
  * @return array Lista de sesiones.
  */
 function listar_sesiones(): array {
-    return en_grafo_credenciales(function() {
+    return en_grafo_credenciales_solo_lectura(function() {
         $raiz = Nodo::nodo_por_id('sesiones');
         if (!$raiz) return [];
 
@@ -130,7 +130,7 @@ function cerrar_sesion(string $token): bool {
 function listar_sesiones_de_usuarios(array $nombres_usuarios): array {
     if (empty($nombres_usuarios)) return [];
 
-    return en_grafo_credenciales(function() use ($nombres_usuarios) {
+    return en_grafo_credenciales_solo_lectura(function() use ($nombres_usuarios) {
         $raiz = Nodo::nodo_por_id('sesiones');
         if (!$raiz) return [];
 

@@ -10,7 +10,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.80d
+ * @version   1.5piloto.83l
  */
 
 use Iteradores\Configuracion\Conf;
@@ -131,7 +131,12 @@ function autenticar_por_usuario(string $nombre_usuario, string $contrasena): ?ar
  */
 function validar_token_sesion(string $token): ?array {
     $nombre_usuario = null;
-    en_grafo_credenciales(function() use ($token, &$nombre_usuario) {
+    // Fix 1.5piloto.83l: solo lectura. Antes usaba
+    // en_grafo_credenciales (que guarda app + credenciales),
+    // y se llama en CADA request autenticado. Eso disparaba
+    // 2 guardados totales por request, y el id_fila del
+    // dueño cambiaba en cada GET. Bug §4.7.
+    en_grafo_credenciales_solo_lectura(function() use ($token, &$nombre_usuario) {
         $raiz = Nodo::nodo_por_id('sesiones');
         if (!$raiz) return;
 

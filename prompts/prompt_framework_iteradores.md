@@ -827,6 +827,17 @@ nunca lo ve). Es una tanda aparte, con espejo PHP + JS.
 de cualquier otro método de indexación. En la fase 1-2
 actual el campo en el nodo funciona; no bloquea nada.
 
+**Nota de cierre (v83l).** El bug §4.7 del piloto NO
+era del guardado parcial ni del leak lento. Era
+guardado TOTAL en cada GET. Ver
+`plan_actual.md` §4.7 del piloto. La Fase 4 de §11.4
+(fixpoint de máscaras, inserción de nodos con máscara 0)
+fue necesaria pero no suficiente. El diagnóstico real
+es una lección para el framework: cuando un bug
+"desaparece" post-restauración y vuelve, buscar en el
+código que corre en CADA request, no en las operaciones
+puntuales.
+
 ### 11.5 Dirección futura: iteradores como raíces de contexto
 
 Idea anotada en v1.5piloto.78a. No implementada. Se
@@ -1455,6 +1466,21 @@ Cada una costó un bug en producción o en pruebas.
     forma robusta es recorrer desde una raíz dentro de
     una sola carga del grafo. `grafo:nodo_por_dato` fue
     propuesto y descartado por esta razón.
+
+**30. Un bug que "desaparece" post-restauración y vuelve
+con una secuencia específica probablemente NO está en
+las operaciones que disparan el síntoma.** En el piloto
+(v83l), el bug §4.7 no era del guardado parcial ni del
+leak lento: era que `validar_token_sesion` llamaba
+`en_grafo_credenciales` (que guarda app + credenciales)
+en cada request. Cada guardado total hacía DELETE ALL
++ INSERT ALL con `id_fila` nuevo, y el `id_fila` del
+dueño cambiaba en cada GET. El síntoma aparecía con
+una secuencia específica (micro de 2 pisos → migración
+→ cupón) porque esa secuencia generaba más requests.
+Lección: cuando un bug se resiste a dos intentos de
+fix, instrumentar el código que corre en cada request,
+no el de la operación puntual.
 
 **Regla de oro:** cualquier cambio al framework PHP se refleja en
 JS en la misma tanda, con dos scripts y dos commits.

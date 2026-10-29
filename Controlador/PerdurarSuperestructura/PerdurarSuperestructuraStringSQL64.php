@@ -6,6 +6,7 @@ use Iteradores\Configuracion\Conf;
 include_once("./Nucleo/Objeto.php");
 include_once("./Nodos/NodoElectrico.php");
 include_once("./Configuracion/Configuracion.php");
+include_once("./Configuracion/LogPersistencia.php");
 include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php");
 include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraConContexto.php");
 include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStringSQL.php");
@@ -17,7 +18,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructuraStrin
  * no permite ese privilegio. Se usa IN (...) directo.
  *
  * @author Ignacio David Baigorria
- * @version 1.5i.7u
+ * @version 1.5i.7w
  * @since 1.5i.7k
  */
 class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQL implements PerdurarSuperestructuraConContexto {
@@ -116,37 +117,39 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             });
         }
 
-        $mapa_previo = self::$_mapa_id_a_fila[$nombre] ?? [];
-
-        if ($mf_parcial !== 0 && !empty($mapa_previo)) {
-            $nuevos = [];
-            Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use (&$nuevos, $mapa_previo) {
-                $id = $nodo->id();
-                if (!isset($mapa_previo[$id])) { $nuevos[$id] = true; }
-            });
-            if (!empty($nuevos)) {
-                $cambio = true;
-                $iter = 0;
-                while ($cambio && $iter < 10) {
-                    $cambio = false;
-                    $iter++;
-                    Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use (&$mascaras, $nuevos, &$cambio) {
-                        $id_origen = $nodo->id();
-                        $m_origen = (int)($mascaras[$id_origen] ?? 0);
-                        if ($m_origen === 0) return;
-                        $ady = $nodo->adyacentes();
-                        if (!is_array($ady)) return;
-                        foreach ($ady as $destino) {
-                            $id_dest = $destino->id();
-                            if (!isset($nuevos[$id_dest])) continue;
-                            $m_dest = (int)($mascaras[$id_dest] ?? 0);
-                            $m_nueva = $m_dest | $m_origen;
-                            if ($m_nueva !== $m_dest) { $mascaras[$id_dest] = $m_nueva; $cambio = true; }
-                        }
-                    });
-                }
+        // Fix 1.5i.7v (Fase 4): propagar máscaras a fixpoint sobre TODAS
+        // las aristas, no solo a los nodos nuevos. Cierra el hueco del
+        // guardado parcial: los nodos viejos que perdieron sus bits en
+        // el BFS del grafo parcial (o que nunca los tuvieron) recuperan
+        // los bits de sus vecinos por transitividad. Se itera hasta
+        // que nada cambie, con un tope de 20 iteraciones por seguridad.
+        if ($mf_parcial !== 0 && !empty($mascaras)) {
+            $cambio = true;
+            $iter = 0;
+            $max_iter = 20;
+            while ($cambio && $iter < $max_iter) {
+                $cambio = false;
+                $iter++;
+                Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use (&$mascaras, &$cambio) {
+                    $id_origen = $nodo->id();
+                    $m_origen = (int)($mascaras[$id_origen] ?? 0);
+                    if ($m_origen === 0) return;
+                    $ady = $nodo->adyacentes();
+                    if (!is_array($ady)) return;
+                    foreach ($ady as $destino) {
+                        $id_dest = $destino->id();
+                        $m_dest = (int)($mascaras[$id_dest] ?? 0);
+                        $m_nueva = $m_dest | $m_origen;
+                        if ($m_nueva !== $m_dest) { $mascaras[$id_dest] = $m_nueva; $cambio = true; }
+                    }
+                });
+            }
+            if ($cambio) {
+                self::_error("SQL64::_guardar_con_filtro: fixpoint de máscaras no convergió en $max_iter iteraciones.");
             }
         }
+
+        $mapa_previo = self::$_mapa_id_a_fila[$nombre] ?? [];
 
         $filas_cargadas = [];
         if ($mf_parcial !== 0) {
@@ -180,11 +183,11 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
 
         if (Conf::DEBUG_PERSISTENCIA) {
             $modo_log = ($mf_parcial !== 0) ? "parcial" : "total";
-            error_log("[SQL64_GUARDAR] nombre=" . $nombre . " mf=" . $mf_parcial . " modo=" . $modo_log
+            log_persistencia("[SQL64_GUARDAR] nombre=" . $nombre . " mf=" . $mf_parcial . " modo=" . $modo_log
                 . " nodos_en_memoria=" . count($mascaras)
                 . " nodos_previos=" . count($mapa_previo)
                 . " filas_cargadas=" . count($filas_cargadas)
-                . " mascaras_viejas=" . count($mascaras_viejas));
+                . " mascaras_viejas=" . count($mascaras_viejas), 'info');
         }
 
         $sql->begin_transaction();
@@ -223,29 +226,44 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
             }
 
             $ids_a_insertar = [];
+            $ids_matchean_filtro = [];
             $nodos_mascara_0 = [];
-            Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras, $mf, &$ids_a_insertar, &$nodos_mascara_0) {
+            Nodo::por_cada_nodo_ejecutar(static::$token, function ($nodo) use ($mascaras, $mf, &$ids_a_insertar, &$ids_matchean_filtro, &$nodos_mascara_0) {
                 $id = $nodo->id();
                 $mascara = (int)($mascaras[$id] ?? 0);
                 if ($mf !== 0 && ($mascara & $mf) === 0) {
-                    if ($mascara === 0) $nodos_mascara_0[] = $id;
+                    if ($mascara === 0) {
+                        // Fix 1.5i.7v (Fase 4): insertar nodos con máscara 0
+                        // para preservar su id_fila entre requests. Antes se
+                        // saltaban del INSERT y, en el próximo guardado que sí
+                        // les diera un bit, se insertaban con un id_fila nuevo,
+                        // duplicándose. Este es el leak lento que produjo los
+                        // 1817 nodos con máscara 0 del estado original.
+                        $nodos_mascara_0[] = $id;
+                        $ids_a_insertar[] = $id;
+                    }
                     return;
                 }
+                $ids_matchean_filtro[] = $id;
                 $ids_a_insertar[] = $id;
             });
 
             if (Conf::DEBUG_PERSISTENCIA) {
-                error_log("[SQL64_GUARDAR] ids_a_insertar=" . count($ids_a_insertar)
+                log_persistencia("[SQL64_GUARDAR] ids_a_insertar=" . count($ids_a_insertar)
+                    . " matchean_filtro=" . count($ids_matchean_filtro)
                     . " nodos_mascara_0=" . count($nodos_mascara_0)
-                    . (count($nodos_mascara_0) > 0 ? " [mascara_0: " . implode(",", array_slice($nodos_mascara_0, 0, 20)) . "]" : ""));
+                    . (count($nodos_mascara_0) > 0 ? " [mascara_0: " . implode(",", array_slice($nodos_mascara_0, 0, 20)) . "]" : ""), 'info');
             }
 
             // Fix 1.5i.7t: si el guardado es parcial y no hay
-            // ningún nodo a insertar, es un error. El grafo en
+            // ningún nodo del filtro, es un error. El grafo en
             // memoria no matchea el filtro. Antes se hacía INSERT
             // vacío y el DELETE había borrado todo lo que estaba
             // en DB. Ahora se aborta con rollback.
-            if ($mf !== 0 && empty($ids_a_insertar)) {
+            // Fix 1.5i.7v: el chequeo ahora usa $ids_matchean_filtro,
+            // no $ids_a_insertar, porque los nodos con máscara 0
+            // también entran a $ids_a_insertar.
+            if ($mf !== 0 && empty($ids_matchean_filtro)) {
                 throw new \RuntimeException("SQL64::guardar: no hay nodos que matcheen el filtro. ¿Se cargó el subgrafo correcto?");
             }
 
@@ -302,15 +320,13 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                     }
                 }
                 if (!empty($perdidos)) {
-                    if (Conf::DEBUG_PERSISTENCIA) {
-                        foreach ($perdidos as $p) {
-                            error_log("[SQL64_GUARDAR] PERDIDA id_nodo=" . $p["id_nodo"] . " id_fila=" . $p["id_fila"] . " vieja=" . $p["vieja"] . " nueva=" . $p["nueva"]);
-                        }
+                    foreach ($perdidos as $p) {
+                        log_persistencia("[SQL64_GUARDAR] PERDIDA id_nodo=" . $p["id_nodo"] . " id_fila=" . $p["id_fila"] . " vieja=" . $p["vieja"] . " nueva=" . $p["nueva"], 'error');
                     }
                     throw new \RuntimeException("SQL64::guardar: " . count($perdidos) . " nodo(s) perdieron bits de máscara. Rollback.");
                 }
                 if (Conf::DEBUG_PERSISTENCIA) {
-                    error_log("[SQL64_GUARDAR] verif_mascaras ok=1 revisadas=" . count($mascaras_viejas));
+                    log_persistencia("[SQL64_GUARDAR] verif_mascaras ok=1 revisadas=" . count($mascaras_viejas), 'info');
                 }
             }
 
@@ -323,12 +339,12 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                 $cnt_n = $res_cnt_n ? (int)$res_cnt_n->fetch_assoc()["c"] : -1;
                 if ($cnt_n !== count($filas_insertadas_ahora)) {
                     if (Conf::DEBUG_PERSISTENCIA) {
-                        error_log("[SQL64_GUARDAR] verif_nodos FALLO esperado=" . count($filas_insertadas_ahora) . " en_db=" . $cnt_n);
+                        log_persistencia("[SQL64_GUARDAR] verif_nodos FALLO esperado=" . count($filas_insertadas_ahora) . " en_db=" . $cnt_n, 'error');
                     }
                     throw new \RuntimeException("SQL64::guardar: verificación de nodos falló. Esperado=" . count($filas_insertadas_ahora) . " en_db=" . $cnt_n);
                 }
                 if (Conf::DEBUG_PERSISTENCIA) {
-                    error_log("[SQL64_GUARDAR] verif_nodos ok=1 count=" . $cnt_n);
+                    log_persistencia("[SQL64_GUARDAR] verif_nodos ok=1 count=" . $cnt_n, 'info');
                 }
             }
 
@@ -344,17 +360,19 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                 if (!is_array($ady)) return;
                 foreach ($ady as $enlace => $adyacente) {
                     $id_dest = $adyacente->id();
-                    $m_d = (int)($mascaras[$id_dest] ?? 0);
-                    if ($mf !== 0 && ($m_d & $mf) === 0) continue;
+                    // Fix 1.5i.7v (Fase 4): confiar en $mapa_final como
+                    // único criterio. Si el destino está persistido (aunque
+                    // su máscara sea 0), la arista se inserta. El chequeo
+                    // previo por máscara del destino dejaba aristas faltantes
+                    // cuando el destino recuperó máscara por el fixpoint pero
+                    // el origen ya había pasado por el loop.
                     if (!isset($mapa_final[$id_dest])) continue;
                     $fila_dest = (int)$mapa_final[$id_dest];
                     $filas_aristas[] = [$fila_origen, (string)$enlace, $fila_dest];
                 }
             });
 
-            if (Conf::DEBUG_PERSISTENCIA) {
-                error_log("[SQL64_GUARDAR] aristas_a_insertar=" . count($filas_aristas));
-            }
+            log_persistencia("[SQL64_GUARDAR] aristas_a_insertar=" . count($filas_aristas), 'info');
 
             if (!empty($filas_aristas)) {
                 $limite_bytes = 200 * 1024;
@@ -397,12 +415,12 @@ class PerdurarSuperestructuraStringSQL64 extends PerdurarSuperestructuraStringSQ
                 $cnt_a = $res_cnt_a ? (int)$res_cnt_a->fetch_assoc()["c"] : -1;
                 if ($cnt_a !== count($filas_aristas)) {
                     if (Conf::DEBUG_PERSISTENCIA) {
-                        error_log("[SQL64_GUARDAR] verif_aristas FALLO esperado=" . count($filas_aristas) . " en_db=" . $cnt_a);
+                        log_persistencia("[SQL64_GUARDAR] verif_aristas FALLO esperado=" . count($filas_aristas) . " en_db=" . $cnt_a, 'error');
                     }
                     throw new \RuntimeException("SQL64::guardar: verificación de aristas falló. Esperado=" . count($filas_aristas) . " en_db=" . $cnt_a);
                 }
                 if (Conf::DEBUG_PERSISTENCIA) {
-                    error_log("[SQL64_GUARDAR] verif_aristas ok=1 count=" . $cnt_a);
+                    log_persistencia("[SQL64_GUARDAR] verif_aristas ok=1 count=" . $cnt_a, 'info');
                 }
             }
 

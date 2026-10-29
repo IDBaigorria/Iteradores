@@ -4,13 +4,14 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.83g
+ * @version   1.5piloto.83i
  */
 
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
 use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
+include_once("./Configuracion/LogPersistencia.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./Aplicacion/Compartidos.php");
@@ -232,6 +233,7 @@ function agregar_micro_a_viaje(string $nombre_viaje, string $nombre_empresa, str
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("agregar_micro_a_viaje: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro", 'error');
         Controlador::_error("agregar_micro_a_viaje: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
         return [
             'exito' => false,
@@ -280,6 +282,7 @@ function eliminar_micro_de_viaje(string $nombre_viaje, string $nombre_micro, str
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("eliminar_micro_de_viaje: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro", 'error');
         Controlador::_error("eliminar_micro_de_viaje: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
         return [
             'exito' => false,
@@ -612,6 +615,7 @@ function actualizar_monto_micro(string $nombre_viaje, string $nombre_micro, stri
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("actualizar_monto_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro", 'error');
         Controlador::_error("actualizar_monto_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
         return [
             'exito' => false,

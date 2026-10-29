@@ -2,7 +2,7 @@
 namespace Iteradores\Configuracion;
 require_once __DIR__ . '/../config_servidor.php';
 /**
- * @version 1.5i.7t
+ * @version 1.5i.7w
  *
  * @author Ignacio David Baigorria
  *
@@ -54,6 +54,36 @@ class Conf extends ConfServidor {
      * @since 1.5i.7t
      */
     public const DEBUG_PERSISTENCIA = true;
+
+    /**
+     * Directorio (relativo a la raíz del proyecto) donde se
+     * escriben los logs de persistencia. Se crea la primera
+     * vez que se escribe.
+     *
+     * @var string
+     * @since 1.5i.7w
+     */
+    public const LOG_PERSISTENCIA_DIR = 'logs/persistencia/';
+
+    /**
+     * Tamaño máximo del archivo de log diario. Si se supera,
+     * se trunca al 50% (deja las líneas más recientes). Evita
+     * que el log crezca sin control en producción.
+     *
+     * @var int
+     * @since 1.5i.7w
+     */
+    public const LOG_PERSISTENCIA_MAX_BYTES = 5 * 1024 * 1024;
+
+    /**
+     * Días que se retienen los archivos de log. Al escribir
+     * por primera vez en el día, se borran los archivos más
+     * viejos que este límite.
+     *
+     * @var int
+     * @since 1.5i.7w
+     */
+    public const LOG_PERSISTENCIA_RETENER_DIAS = 7;
     //////////////////////////////////////////////////////////////////////////////////////
     //  Sobre los errores y alertas //////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////

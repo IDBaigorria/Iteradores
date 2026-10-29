@@ -4,13 +4,14 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.83g
+ * @version   1.5piloto.83i
  */
 
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
 use Iteradores\Configuracion\Conf;
 include_once("./Configuracion/Configuracion.php");
+include_once("./Configuracion/LogPersistencia.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
 include_once("./Aplicacion/FuncionesAuxiliares.php");
@@ -264,6 +265,7 @@ function reservar_asiento_micro(string $nombre_viaje, string $nombre_micro, stri
     // la DB no se hubiera actualizado. Patrón C.6.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("reservar_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro", 'error');
         Controlador::_error("reservar_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
         return [
             'exito' => false,
@@ -375,6 +377,7 @@ function asignar_pasajero_a_reserva(string $nombre_viaje, string $nombre_micro, 
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("asignar_pasajero_a_reserva: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro", 'error');
         Controlador::_error("asignar_pasajero_a_reserva: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
         return [
             'exito' => false,
@@ -447,6 +450,7 @@ function liberar_reserva_asiento_micro(string $nombre_viaje, string $nombre_micr
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("liberar_reserva_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro", 'error');
         Controlador::_error("liberar_reserva_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
         return [
             'exito' => false,
@@ -742,6 +746,7 @@ function seleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro, s
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("seleccionar_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro", 'error');
         Controlador::_error("seleccionar_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
         return [
             'exito' => false,
@@ -872,6 +877,7 @@ function deseleccionar_asiento_micro(string $nombre_viaje, string $nombre_micro,
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("deseleccionar_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro", 'error');
         Controlador::_error("deseleccionar_asiento_micro: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
         return [
             'exito' => false,
@@ -1084,6 +1090,7 @@ function cambiar_asiento_pasaje(
     // Fix 1.5piloto.83g: chequear guardar_ambos.
     $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
     if (!$ok_guardar) {
+        log_persistencia("cambiar_asiento_pasaje: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro", 'error');
         Controlador::_error("cambiar_asiento_pasaje: guardar_ambos falló para viaje=$nombre_viaje micro=$nombre_micro");
         return [
             'exito' => false,
