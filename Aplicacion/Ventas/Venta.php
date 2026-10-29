@@ -5,7 +5,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.14
- * @version   1.5piloto.83i
+ * @version   1.5piloto.83q
  */
 
 
@@ -693,7 +693,11 @@ function listar_ventas_por_dueno(string $nombre_dueno): array {
     $contenedor = obtener_contenedor_ventas_dueno($nombre_dueno);
     if (!$contenedor) {
         if ($hubo_cambios) {
-            guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+            $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+            if (!$ok_guardar) {
+                log_persistencia("listar_ventas_por_dueno: guardar_ambos falló al drenar buzón (sin contenedor)", 'error');
+                Controlador::_error("listar_ventas_por_dueno: guardar_ambos falló al drenar buzón (sin contenedor)");
+            }
         }
         return [];
     }
@@ -713,7 +717,11 @@ function listar_ventas_por_dueno(string $nombre_dueno): array {
         $actual = $siguiente;
     }
     if ($hubo_cambios) {
-        guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+        $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+        if (!$ok_guardar) {
+            log_persistencia("listar_ventas_por_dueno: guardar_ambos falló al cerrar el barrido de buzón", 'error');
+            Controlador::_error("listar_ventas_por_dueno: guardar_ambos falló al cerrar el barrido de buzón");
+        }
     }
     return $ventas;
 }
@@ -3023,7 +3031,11 @@ function listar_cancelaciones_de_dueno(string $nombre_dueno, array $filtros = []
     if ($nodo_contexto === null) {
         $hubo_cambios = _procesar_pendientes_del_dueno($nombre_dueno);
         if ($hubo_cambios) {
-            guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+            $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+            if (!$ok_guardar) {
+                log_persistencia("listar_cancelaciones_de_dueno: guardar_ambos falló al drenar buzón", 'error');
+                Controlador::_error("listar_cancelaciones_de_dueno: guardar_ambos falló al drenar buzón");
+            }
         }
     }
 
@@ -3397,7 +3409,7 @@ function limpiar_cancelaciones_de_prueba(string $nombre_dueno): array {
         $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
         if (!$ok_guardar) {
             log_persistencia("limpiar_cancelaciones_de_prueba: guardar_ambos falló", 'error');
-        Controlador::_error("limpiar_cancelaciones_de_prueba: guardar_ambos falló");
+            Controlador::_error("limpiar_cancelaciones_de_prueba: guardar_ambos falló");
             return [
                 'exito' => false,
                 'error' => 'La limpieza se procesó en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',

@@ -12,7 +12,7 @@
  * vía `Entorno::es_pruebas()`.
  *
  * @author Ignacio David Baigorria
- * @version 1.5piloto.80b
+ * @version 1.5piloto.83q
  * @since   1.5piloto.76e
  */
 
@@ -36,9 +36,17 @@ class ConfiguracionApli extends Conf {
     /**
      * Versión de la aplicación piloto.
      *
+     * Fix 1.5piloto.83q: antes era "0.0.0" (nunca se actualizó).
+     * Se usa en el endpoint de diagnóstico ?diag_persistencia=1.
+     * **Actualización manual:** se sincroniza a mano con el
+     * @version del index.php en cada tanda grande (Tanda, no
+     * letra). Si se olvida, el diag muestra una versión vieja,
+     * pero no rompe nada. Deuda anotada en plan_actual.md §4.8:
+     * convertir en método que lea el @version del index.php.
+     *
      * @var string
      */
-    public const VERSION_APP = "0.0.0";
+    public const VERSION_APP = "1.5piloto.83q";
 
     /**
      * Autor de la aplicación piloto.

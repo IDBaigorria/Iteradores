@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.83i
+ * @version   1.5piloto.83q
  */
 
 use Iteradores\Nodos\Nodo;
@@ -246,7 +246,11 @@ function listar_viajes_de_dueno(string $nombre_dueno): array {
     if (function_exists('_procesar_pendientes_del_dueno')) {
         $hubo_drenado = _procesar_pendientes_del_dueno($nombre_dueno);
         if ($hubo_drenado) {
-            guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+            $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+            if (!$ok_guardar) {
+                log_persistencia("listar_viajes_de_dueno: guardar_ambos falló al drenar buzón", 'error');
+                Controlador::_error("listar_viajes_de_dueno: guardar_ambos falló al drenar buzón");
+            }
         }
     }
 

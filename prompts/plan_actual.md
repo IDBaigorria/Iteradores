@@ -27,18 +27,14 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.83l (bug §4.7 cerrado
-con evidencia: `id_fila` del dueño estable entre requests,
-cero `mf=0 modo=total` en el log durante el ciclo completo
-venta/cancelación/cupón, auditoría topológica limpia después
-de la limpieza). Causa raíz: guardado total en cada request
-autenticado por `validar_token_sesion` y otros 9 llamadores
-de `en_grafo_credenciales`, más 2 bloques de bootstrap en
-`index.php`. Fix: 10 funciones de solo lectura a
-`en_grafo_credenciales_solo_lectura`, condicionar el bloque
-del `aplicacion`, condicionar el bootstrap del admin, y
-agregar un flag de "hubo cambios" al `finally` de
-`en_grafo_credenciales`. Ver §4.7).
+**Última actualización:** v1.5piloto.83p + framework 1.5i.7x
+(Tanda 4 cerrada: lock de escritura por superestructura,
+usuario en el log de persistencia, cobertura de
+`guardar_ambos` completa en flujos críticos, returns
+tempranos en los 3 flujos de Usuario, y login optimizado
+de 4 a 2 guardados totales. El bug §4.7 ya estaba cerrado
+en v1.5piloto.83l; esta tanda es deuda técnica del arco.
+Ver §2 y §4.8).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -65,12 +61,13 @@ lo propaga el framework, no la app.
 
 **Versiones:**
 
-- **Piloto:** `1.5piloto.83l`.
-- **Framework PHP:** `1.5i.7w` (SQL64, con singleton de
+- **Piloto:** `1.5piloto.83p`.
+- **Framework PHP:** `1.5i.7x` (SQL64, con singleton de
   conexión, `mysqli_report(OFF)`, `SELECT 1` en lugar de
-  `ping()`, `IN (...)` en lugar de TEMPORARY TABLE, y
-  log de persistencia a archivo del proyecto vía
-  `Configuracion/LogPersistencia.php`). El
+  `ping()`, `IN (...)` en lugar de TEMPORARY TABLE,
+  log de persistencia a archivo del proyecto, `GET_LOCK`
+  por superestructura, y tag `[user=X]` en cada línea del
+  log). El
   archivo `Controlador/Controlador.php` está en `1.5i.7s`
   por los comandos del visualizador.
 - **Framework JS:** `V1.5i.8c` (IndexedDB64). **Deuda
@@ -128,6 +125,57 @@ los prompts correspondientes o en los commits.
   `en_grafo_credenciales`. Ver §4.7 para el diagnóstico
   completo.
 
+- **Lock de escritura por superestructura (framework
+  1.5i.7x).** `_guardar_con_filtro` toma
+  `GET_LOCK('grafo_<nombre>', 5)` antes del
+  `begin_transaction`. Si no lo obtiene, `_error` +
+  `return false`. `RELEASE_LOCK` en éxito y en el catch.
+  Evita que dos requests concurrentes hagan DELETE +
+  INSERT al mismo tiempo y se pisen. `begin_transaction`
+  se mueve dentro del try con check de retorno. En la
+  práctica el lock casi nunca se dispara (solo si dos
+  guardados del mismo grafo coinciden al segundo). Ver
+  §4.8 para el análisis de impacto en producción.
+
+- **Usuario en el log de persistencia (framework 1.5i.7x +
+  piloto 1.5piloto.83m).** `LogPersistencia.php` gana
+  `log_persistencia_establecer_usuario()` y
+  `log_persistencia_usuario_actual()`; cada línea del log
+  lleva `[user=X]` (o `[user=-]` si no hay usuario).
+  `Autenticacion.php` setea el usuario en
+  `autenticar_por_codigo`, `autenticar_por_usuario` y
+  `validar_token_sesion`. Permite saber quién disparó cada
+  guardado cuando hay múltiples sesiones activas.
+
+- **Cobertura de `guardar_ambos` completa en flujos
+  críticos (v1.5piloto.83n).** 15 flujos + 4 comandos de
+  admin aplican el patrón C.6: chequear `guardar_ambos`,
+  `log_persistencia(..., 'error')` +
+  `Controlador::_error(...)`, `return exito: false` con
+  error específico. Empresa (3), Vehiculo (5),
+  Liquidacion (1), Rendicion (2), ViajeOpciones (1),
+  Usuario (3, luego returns tempranos), ViajeMicros (1,
+  faltaba el `log_persistencia`), Enrutador (4 comandos
+  de grafo). Lo que queda como deuda: los buzones
+  (`Venta.php:696/716/3026`, `Viaje.php:249`),
+  `reiniciar_seleccion_completa`, y los comandos de
+  reparación (no críticos, ver §4.8).
+
+- **Returns tempranos en Usuario + login optimizado
+  (v1.5piloto.83o).** `agregar_usuario`,
+  `actualizar_usuario` y `eliminar_usuario` ahora hacen
+  `return exito: false` si el guardado de la app falla,
+  ANTES de escribir credenciales. Antes solo logueaban y el
+  flujo continuaba, dejando al usuario inconsistente entre
+  los dos grafos (existía en uno y no en el otro, o tenía
+  credenciales sin datos visibles, o estaba eliminado de
+  credenciales con ventas colgando en la app). Además,
+  `autenticar_por_codigo`, `autenticar_por_usuario` y
+  `crear_sesion` pasan `false` a `en_grafo_credenciales`:
+  el login pasa de 4 guardados totales (2 app + 2
+  credenciales) a 2 (solo credenciales). La app no cambia
+  durante el login; el guardado era innecesario.
+
 - **Fix del croquis multi-piso (v1.5piloto.82h).** El croquis
   y todas las acciones de asiento matcheaban por
   `(fila, columna)` sin `piso`. En un micro con pisos que
@@ -154,7 +202,18 @@ los prompts correspondientes o en los commits.
   croquis impreso del micro de 2 pisos ya no pierde los
   pasajeros de las filas 1-3 del piso 2. `viajes-asientos.js`
   pasa `piso` a la impresión desde reservar/asignar/cambiar.
-  **Sin pendientes del bug de piso.**
+
+  **Verificación del frontend (v83q).** Grep exhaustivo
+  de `viajes-asientos.js` y `pasajeros.js` confirmó que
+  los 9 flujos de `viajes-asientos.js` (seleccionar,
+  deseleccionar, deselección masiva, liberación masiva,
+  reservar desde modal, reservar desde equipo, asignar,
+  liberar reserva, cambiar de asiento) y el flujo de
+  "cambiar de asiento desde Clientes"
+  (`pasajeros.js:438`) pasan `piso` (o `piso_vieja` /
+  `piso_nueva`) en el body del POST. El backend y el
+  frontend están alineados. **Bug de piso: cerrado de
+  punta a punta, sin pendientes.**
 - **Migración de pasajeros entre micros — Tanda 1
   (v1.5piloto.82e).** Nueva función
   `migrar_pasajeros_de_micro` en `ViajeMicros.php` +
@@ -648,6 +707,18 @@ cada GET) fue cerrado en v83j-v83l. El blindaje de
 1.5i.7t/7u sigue activo (rollback si pierde bits, nodos
 o aristas).
 
+**Cierre de la concurrencia (framework 1.5i.7x, v83p).**
+Se agregó `GET_LOCK('grafo_<nombre>', 5)` en
+`_guardar_con_filtro` para blindar la concurrencia real.
+Ahora que el guardado total ya no se dispara en cada GET,
+el solapamiento es raro (solo operaciones reales que
+coinciden al segundo). Con el lock, el segundo request
+espera hasta 5s o falla con error específico (los flujos
+del piloto ya chequean `guardar_ambos` desde v83g/h). Sin
+el lock, dos guardados del mismo grafo podían hacer DELETE
++ INSERT concurrentes y corromper la topología persistida.
+Ver §4.8 para el análisis de impacto en producción.
+
 **Estado histórico:**
 
 **Síntoma.** Después de una secuencia de operaciones
@@ -868,14 +939,62 @@ disparó.
 Pendientes generados por la línea v81p-v82d. Ninguno es
 bloqueante.
 
-- **`GET_LOCK('grafo_<nombre>', 5)` en `_guardar_con_filtro`.**
-  Para blindar la concurrencia real. Ahora que el guardado
-  total no se dispara en cada GET, la concurrencia es
-  mucho menos probable (solo operaciones reales se
-  pueden solapar). Pero dos terminales que venden al
-  mismo tiempo todavía pueden pisarse. Con GET_LOCK, el
-  segundo espera o falla, pero no duplica. Es deuda
-  técnica, no bug activo. Tanda del framework.
+**Cerradas en la Tanda 4 (v83m-v83p):**
+
+- ~~**`GET_LOCK('grafo_<nombre>', 5)` en
+  `_guardar_con_filtro`.**~~ **CERRADO en framework 1.5i.7x.**
+  Ver §4.7. Impacto en producción: el lock casi nunca se
+  dispara (solo si dos guardados del mismo grafo coinciden
+  al segundo). Cuando se dispara, el segundo request espera
+  hasta 5s o falla con error. Los flujos del piloto ya
+  chequean `guardar_ambos` desde v83g/h, así que la UI
+  muestra "no se pudo guardar, intentá de nuevo" en vez de
+  un falso éxito. Monitorear el log las primeras semanas:
+  si aparece `no se pudo obtener el lock` varias veces al
+  día, subir el timeout a 10s (cambio de una línea).
+
+- ~~**Usuario en el log de persistencia.**~~ **CERRADO en
+  1.5i.7x + v83m.** Ver §2.
+
+- ~~**Cobertura de `guardar_ambos` en flujos críticos.**~~
+  **CERRADA en v83n + v83o.** Ver §2.
+
+- ~~**Login: 4 guardados totales → 2.**~~ **CERRADO en v83o.**
+  Ver §2.
+
+**Pendientes (nuevos o que siguen):**
+
+- **Buzones de ventas y cancelaciones sin chequear
+  `guardar_ambos`.** `Venta.php:696, 716, 3026` y
+  `Viaje.php:249`. Son flujos de lectura con side-effect
+  (drenar el buzón del compartido al listar). Si el guardado
+  falla, `Controlador::_error` ya loguea y el siguiente
+  listado reintenta. No crítico.
+
+- **`reiniciar_seleccion_completa` sin chequear
+  `guardar_ambos`.** `ViajeAsientos.php:1195`. El usuario
+  puede reintentar la operación. No crítico.
+
+- **Comandos de reparación sin chequear `guardar_ambos`.**
+  `Reparacion/Comandos.php:29, 53, 67`. Son comandos de
+  admin; el output se ve en la página si falla. No crítico.
+
+- **Indentación cosmética en `limpiar_cancelaciones_de_prueba`.**
+  `Venta.php:~3400`: el `Controlador::_error` tiene 8
+  espacios en vez de 12. Funciona igual, pero conviene
+  alinearlo en una pasada de limpieza.
+
+- **Duplicado `_dni_asignado_en_viaje_venta`.**
+  `Venta.php` tiene una copia local de
+  `_dni_asignado_en_viaje` (que vive en
+  `ViajeAsientos.php`). Se duplicó para evitar dependencia
+  circular. Anotado en el comentario de la función. No
+  urgente.
+
+- **`GET_LOCK` en el espejo JS: documentar como no aplica.**
+  IndexedDB es single-thread por origen. No hay concurrencia
+  real entre transacciones. Documentar esta diferencia de
+  plataforma en `prompt_framework_iteradores.md` §12.
 
 - **Endpoints temporales de diagnóstico en index.php.**
   - `?diag_persistencia=1` (C.6b).
@@ -1078,21 +1197,21 @@ Reglas de oro que aplican a cualquier tanda nueva.
 
 ---
 
-**Estado del proyecto al cierre:** v1.5piloto.83l
-(framework 1.5i.7w). **Bug §4.7 cerrado.** No era el
-leak lento (Fase 4 fue necesaria, pero no suficiente).
-Era guardado total en cada request autenticado por
-`validar_token_sesion` y otros 9 llamadores de
-`en_grafo_credenciales`, más 2 bloques de bootstrap en
-`index.php`. Fix: 10 funciones a `solo_lectura`,
-condicionar `aplicacion`, condicionar bootstrap del
-admin, flag de "hubo cambios" en `finally`. Validado
-con ciclo completo (venta/cancelación/cupón): `id_fila`
-estable, cero totales en el log, auditoría limpia.
-**La migración de pasajeros se puede desbloquear**
-(Tanda 3 pendiente). El log de persistencia está activo,
-escribiendo a `logs/persistencia/YYYY-MM-DD.log`,
-legible por HTTP con `?ver_log_persistencia=1`.
+**Estado del proyecto al cierre:** v1.5piloto.83p
+(framework 1.5i.7x). **Bug §4.7 cerrado** (v83l).
+**Tanda 4 cerrada** (v83m-v83p): lock por superestructura,
+usuario en el log, cobertura de `guardar_ambos` completa
+en flujos críticos, returns tempranos en Usuario, login
+de 4 a 2 guardados totales. **La migración de pasajeros
+se puede desbloquear** (Tanda 3 pendiente del
+`plan_migrar_micro.md`). El log de persistencia escribe
+a `logs/persistencia/YYYY-MM-DD.log`, con tag
+`[user=X]` por línea, legible por HTTP con
+`?ver_log_persistencia=1` (admin/soporte). El lock de
+escritura (`GET_LOCK('grafo_<nombre>', 5)`) está activo
+en el framework 1.5i.7x. Monitorear el log las primeras
+semanas: si aparece `no se pudo obtener el lock` con
+frecuencia, subir el timeout o investigar.
 
 **Deuda técnica del arco** en §4.7: endpoints temporales
 de diagnóstico, espejo `_hmi` a JS, espejo C.7-C.10 a JS,

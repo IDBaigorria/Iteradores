@@ -12,7 +12,7 @@ include_once("./Controlador/PerdurarSuperestructura/PerdurarSuperestructura.php"
 /**
  * Clase PerdurarSuperestructuraStringSQL
  *
- * @version 1.5piloto.82c
+ * @version 1.5piloto.83q
  *
  * @author Ignacio David Baigorria
  *
@@ -44,8 +44,9 @@ class PerdurarSuperestructuraStringSQL extends Objeto implements PerdurarSuperes
         // devuelve la semántica clásica: false en fallo.
         mysqli_report(MYSQLI_REPORT_OFF);
 
-        // Log de versión para diagnóstico (aparece en error_log).
-        error_log("[CREAR_CONEXION] version=82c, singleton=" . (self::$_sql_singleton ? "vivo" : "nulo"));
+        // Fix 1.5piloto.83q: se quitó el error_log("[CREAR_CONEXION]")
+        // de diagnóstico. Era ruido en el log de Apache y no aportaba
+        // (la versión era fija, el singleton se ve por otros logs).
 
         // Reusar la conexión si sigue viva.
         if (self::$_sql_singleton !== null) {

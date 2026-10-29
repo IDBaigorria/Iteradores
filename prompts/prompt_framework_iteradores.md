@@ -414,6 +414,19 @@ el commit fallaba silenciosamente y algunos nodos se
 persistían, otros no. Ahora se verifica el retorno (y se
 hace un `ping()` previo).
 
+**`GET_LOCK('grafo_<nombre>', 5)` (framework 1.5i.7x).**
+Antes del `begin_transaction`, `_guardar_con_filtro` toma
+un lock de MySQL por superestructura. Evita que dos
+requests concurrentes hagan DELETE + INSERT al mismo
+tiempo y se pisen entre sí. Si no se obtiene el lock en
+5s, `_error` + `return false`. `RELEASE_LOCK` en éxito y
+en el catch. `begin_transaction` se movió dentro del try
+con check de retorno. En la práctica el lock casi nunca
+se dispara: solo si dos guardados del mismo grafo
+coinciden al segundo. Los flujos del piloto ya chequean
+`guardar_ambos` desde v83g/h, así que la UI muestra
+"no se pudo guardar" en vez de un falso éxito.
+
 ---
 
 ## 7. PATRONES DE CÓDIGO DEL FRAMEWORK
@@ -1126,6 +1139,17 @@ resto son mejoras.
   `adyacente_contexto`. Con 1500 IDs (~10 bytes cada uno),
   la query pesa ~15KB. Cabe en `max_allowed_packet` (10MB).
 
+- **1.5i.7x**: `GET_LOCK('grafo_<nombre>', 5)` por
+  superestructura en `_guardar_con_filtro`. `begin_transaction`
+  se mueve dentro del try con check de retorno.
+  `RELEASE_LOCK` en éxito y en el catch. Evita que dos
+  requests concurrentes hagan DELETE + INSERT al mismo
+  tiempo. En `LogPersistencia.php` (agregado en 1.5i.7w) se
+  suma el tag `[user=X]` por línea: getter
+  `log_persistencia_usuario_actual()` y setter
+  `log_persistencia_establecer_usuario()`. El piloto lo
+  setea en `validar_token_sesion` y en los flujos de login.
+
 **BUG PENDIENTE (framework).** El bug del viaje viejo que
 desaparece tras una operación del terminal (§1.5 del
 `plan_actual.md`) afecta a `_guardar_con_filtro` y no está
@@ -1340,6 +1364,19 @@ Versiones recientes del espejo JS:
   del Controlador lo normalizan a un objeto
   `{id: {dato, ady}}` para el resto del módulo.
 
+**Diferencia de plataforma: `GET_LOCK` en JS.** El espejo JS
+(`PerdurarSuperestructuraStringIndexedDB64.js`) **no tiene**
+equivalente al `GET_LOCK('grafo_<nombre>', 5)` del PHP. No
+aplica: IndexedDB es single-thread por origen. Dos pestañas
+del mismo origen con la misma DB coordinan a través de
+transacciones atómicas (`tx.oncomplete`/`tx.onerror`); no
+hay concurrencia real entre transacciones. La transacción
+atómica de IndexedDB (DELETE + INSERT en la misma
+`db.transaction`) cumple el mismo rol que el lock +
+`begin_transaction` del PHP: o se aplica todo, o no se
+aplica nada. Esta es una diferencia de plataforma, no una
+deuda pendiente. Documentado en framework 1.5i.7x.
+
 Cualquier cambio al framework PHP que toque la API compartida debe
 reflejarse también en el espejo JS.
 
@@ -1481,6 +1518,27 @@ una secuencia específica (micro de 2 pisos → migración
 Lección: cuando un bug se resiste a dos intentos de
 fix, instrumentar el código que corre en cada request,
 no el de la operación puntual.
+
+**31. Un lock de escritura es necesario cuando dos
+requests pueden hacer DELETE + INSERT concurrentes sobre
+el mismo conjunto de filas.** En el piloto (framework
+1.5i.7x), `GET_LOCK('grafo_<nombre>', 5)` antes del
+`begin_transaction` cierra la clase entera de bugs de
+concurrencia: dos terminales que venden al mismo tiempo,
+el dueño y un terminal guardando en paralelo, dos
+pestañas del mismo usuario. Sin el lock, el último en
+llegar pisa al primero y deja el grafo corrupto (filas
+duplicadas por id_especial, aristas huérfanas). Con el
+lock, el segundo espera o falla con error específico, y
+el usuario puede reintentar. **En la práctica casi nunca
+se dispara**: 5s de timeout es 3-5x el tiempo normal de
+guardado, y desde el fix del bug §4.7 (v83l) los
+guardados totales solo ocurren en operaciones reales, no
+en cada GET. Monitorear el log: si aparece seguido,
+subir el timeout o investigar qué está generando la
+concurrencia. En IndexedDB (espejo JS) no aplica: es
+single-thread por origen. Documentar como diferencia de
+plataforma.
 
 **Regla de oro:** cualquier cambio al framework PHP se refleja en
 JS en la misma tanda, con dos scripts y dos commits.

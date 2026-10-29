@@ -8,7 +8,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.78z
- * @version   1.5piloto.81v
+ * @version   1.5piloto.83q
  */
 
 use Iteradores\Nodos\Nodo;
@@ -26,7 +26,13 @@ function registrar_comandos_reparacion(): void {
             require_once __DIR__ . '/RepararArboles.php';
             $res = reparar_arboles($token);
             if (!empty($res['cambios'])) {
-                guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                if (!$ok_guardar) {
+                    log_persistencia("app:reparar_arboles: guardar_ambos falló", 'error');
+                    Controlador::_error("app:reparar_arboles: guardar_ambos falló");
+                    $res['exito'] = false;
+                    $res['error'] = 'Los cambios se procesaron en memoria pero no se pudieron guardar en la base de datos.';
+                }
             }
             return $res;
         },
@@ -50,7 +56,13 @@ function registrar_comandos_reparacion(): void {
             require_once __DIR__ . '/RepararCancelaciones.php';
             $res = reparar_cancelaciones_compartidos($token);
             if (!empty($res['cambios'])) {
-                guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                if (!$ok_guardar) {
+                    log_persistencia("app:reparar_cancelaciones_compartidos: guardar_ambos falló", 'error');
+                    Controlador::_error("app:reparar_cancelaciones_compartidos: guardar_ambos falló");
+                    $res['exito'] = false;
+                    $res['error'] = 'Los cambios se procesaron en memoria pero no se pudieron guardar en la base de datos.';
+                }
             }
             return $res;
         },
@@ -64,7 +76,13 @@ function registrar_comandos_reparacion(): void {
             require_once __DIR__ . '/RepararCancelaciones.php';
             $res = reparar_cancelaciones_arboles($token);
             if (!empty($res['cambios'])) {
-                guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+                if (!$ok_guardar) {
+                    log_persistencia("app:reparar_cancelaciones_arboles: guardar_ambos falló", 'error');
+                    Controlador::_error("app:reparar_cancelaciones_arboles: guardar_ambos falló");
+                    $res['exito'] = false;
+                    $res['error'] = 'Los cambios se procesaron en memoria pero no se pudieron guardar en la base de datos.';
+                }
             }
             return $res;
         },

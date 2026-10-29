@@ -909,6 +909,32 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 
 ## 7. HISTORIAL DE VERSIONES (resumen)
 
+- **v83m-v83p** (Tanda 4: lock, usuario en log,
+  cobertura de `guardar_ambos`, login optimizado).
+  - 83m: `Autenticacion.php` setea el usuario en el
+    log de persistencia (`log_persistencia_establecer_usuario`)
+    en `autenticar_por_codigo` (dentro del callback),
+    `autenticar_por_usuario` (dentro del callback) y
+    `validar_token_sesion` (después de resolver). A partir
+    de acá, todos los `[SQL64_GUARDAR]` llevan
+    `[user=<nombre>]`.
+  - 83n: cobertura de `guardar_ambos` en 15 flujos
+    críticos (Empresa × 3, Vehiculo × 5, Liquidacion × 1,
+    Rendicion × 2, ViajeOpciones × 1, Usuario × 3,
+    ViajeMicros × 1) + 4 comandos de admin en
+    `Enrutador.php` (grafo/eliminar_huerfanos,
+    grafo/migraciones_listar, grafo/migracion_limpiar,
+    grafo/migraciones_aplicar). Patrón C.6 completo.
+    Los 3 flujos de Usuario solo logueaban en esta
+    tanda (return temprano en 83o).
+  - 83o: `agregar_usuario`, `actualizar_usuario` y
+    `eliminar_usuario` con return temprano ANTES de
+    escribir credenciales. Cierra el escenario de usuario
+    inconsistente entre los dos grafos.
+    `autenticar_por_codigo`, `autenticar_por_usuario` y
+    `crear_sesion` pasan `false` a `en_grafo_credenciales`
+    (login de 4 a 2 guardados totales).
+  - 83p: solo documentación (este historial).
 - **v83j-v83l** (cierre del bug §4.7): ver
   `plan_actual.md` §4.7 para el diagnóstico completo.
   Resumen:
@@ -3536,14 +3562,19 @@ podés retomar el trabajo.
   estructura de nodos).
 - Avisar de riesgos.
 
-**Estado del proyecto al cierre:** v1.5piloto.83l
-(framework 1.5i.7w). La línea de carga parcial está
+**Estado del proyecto al cierre:** v1.5piloto.83p
+(framework 1.5i.7x). La línea de carga parcial está
 aplicada en los módulos principales (Viajes, Venta,
 Pasajeros, Impresión). SQL64 activo, topología
 admin/soporte, reparación topológica disponible.
 El log de persistencia escribe a
-`logs/persistencia/YYYY-MM-DD.log` (legible por HTTP
-con `?ver_log_persistencia=1`, admin/soporte).
+`logs/persistencia/YYYY-MM-DD.log` con tag `[user=X]`
+por línea (legible por HTTP con `?ver_log_persistencia=1`,
+admin/soporte). El lock de escritura
+(`GET_LOCK('grafo_<nombre>', 5)`) está activo en el
+framework 1.5i.7x. **Cobertura de `guardar_ambos`:
+completa en flujos críticos.** Buzones y comandos de
+reparación quedan como deuda no crítica.
 
 **Bug §4.7 cerrado** (v1.5piloto.83l). No era el leak
 lento ni la migración. Era guardado total en cada

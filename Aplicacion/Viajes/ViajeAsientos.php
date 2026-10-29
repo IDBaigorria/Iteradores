@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.8
- * @version   1.5piloto.83i
+ * @version   1.5piloto.83q
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1192,6 +1192,14 @@ function reiniciar_seleccion_completa_terminal(string $nombre_terminal): array {
     $nodo_terminal->eliminar_adyacente('venta_actual');
     _destruir_venta_actual($venta_actual);
 
-    guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    $ok_guardar = guardar_ambos(ConfiguracionApli::NOMBRE_APP);
+    if (!$ok_guardar) {
+        log_persistencia("reiniciar_seleccion_completa: guardar_ambos falló", 'error');
+        Controlador::_error("reiniciar_seleccion_completa: guardar_ambos falló");
+        return [
+            'exito' => false,
+            'error' => 'La selección se reinició en memoria pero no se pudo guardar en la base de datos. Revisá el log del servidor o intentá de nuevo.',
+        ];
+    }
     return ['exito' => true, 'habia_venta' => true];
 }
