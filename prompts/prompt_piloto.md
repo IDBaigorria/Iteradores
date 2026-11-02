@@ -909,6 +909,22 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 
 ## 7. HISTORIAL DE VERSIONES (resumen)
 
+- **v83q** (Grupo A: limpieza de deuda técnica del
+  piloto). Buzones (`listar_ventas_por_dueno` × 2,
+  `listar_cancelaciones_de_dueno`, `listar_viajes_de_dueno`)
+  con `log_persistencia` + check. `reiniciar_seleccion_completa`
+  con check de `guardar_ambos`. Los 3 comandos de
+  reparación (`app:reparar_arboles`,
+  `app:reparar_cancelaciones_compartidos`,
+  `app:reparar_cancelaciones_arboles`) con check. Se quitó
+  `error_log("[CREAR_CONEXION]")` de SQL base (ruido en
+  Apache). `VERSION_APP` de "0.0.0" a "1.5piloto.83q"
+  (deuda anotada: hacerlo dinámico). Documentación:
+  `GET_LOCK` en JS no aplica (IndexedDB es single-thread
+  por origen). Indentación cosmética en `Venta.php`.
+  **Validado en producción**: una semana sin errores en
+  el log.
+
 - **v83m-v83p** (Tanda 4: lock, usuario en log,
   cobertura de `guardar_ambos`, login optimizado).
   - 83m: `Autenticacion.php` setea el usuario en el

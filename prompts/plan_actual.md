@@ -27,14 +27,17 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.83p + framework 1.5i.7x
-(Tanda 4 cerrada: lock de escritura por superestructura,
-usuario en el log de persistencia, cobertura de
-`guardar_ambos` completa en flujos críticos, returns
-tempranos en los 3 flujos de Usuario, y login optimizado
-de 4 a 2 guardados totales. El bug §4.7 ya estaba cerrado
-en v1.5piloto.83l; esta tanda es deuda técnica del arco.
-Ver §2 y §4.8).
+**Última actualización:** v1.5piloto.83s + framework 1.5i.7x
+(**Validado en producción:** una semana en pruebas y
+una semana en producción sin errores visibles ni
+`[error]` en el log de persistencia. Todos los guardados
+son `[info]`. Bug §4.7 cerrado y validado. Tanda 4
+(lock, usuario en log, cobertura de `guardar_ambos`,
+returns tempranos, login optimizado) confirmada en
+producción. Grupo A de limpieza aplicado (v83q). §8
+(nota de cierre de v82d) eliminado en v83s: cumplió su
+función, los pendientes reales viven en §4.1-4.4 y
+§4.8. Ver §2 y §4.8).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -61,7 +64,8 @@ lo propaga el framework, no la app.
 
 **Versiones:**
 
-- **Piloto:** `1.5piloto.83p`.
+- **Piloto:** `1.5piloto.83q` (validado en producción;
+  una semana en pruebas y una en producción sin errores).
 - **Framework PHP:** `1.5i.7x` (SQL64, con singleton de
   conexión, `mysqli_report(OFF)`, `SELECT 1` en lugar de
   `ping()`, `IN (...)` en lugar de TEMPORARY TABLE,
@@ -175,6 +179,54 @@ los prompts correspondientes o en los commits.
   el login pasa de 4 guardados totales (2 app + 2
   credenciales) a 2 (solo credenciales). La app no cambia
   durante el login; el guardado era innecesario.
+
+- **Grupo A de limpieza (v1.5piloto.83q).** Cierre de la
+  deuda técnica menor del arco:
+  - Los 4 flujos de buzón (`listar_ventas_por_dueno` × 2,
+    `listar_cancelaciones_de_dueno`, `listar_viajes_de_dueno`)
+    ahora chequean `guardar_ambos` y loguean al archivo si
+    falla. Siguen siendo flujos de lectura con side-effect
+    (si falla el guardado, la lista se devuelve igual y el
+    próximo listado reintenta), pero el error queda
+    registrado.
+  - `reiniciar_seleccion_completa` ahora chequea y devuelve
+    `exito: false` si falla el guardado.
+  - Los 3 comandos de reparación
+    (`app:reparar_arboles`, `app:reparar_cancelaciones_compartidos`,
+    `app:reparar_cancelaciones_arboles`) chequean y
+    devuelven `exito: false` si falla el guardado.
+  - Se quitó `error_log("[CREAR_CONEXION]")` del SQL base
+    (era ruido en el log de Apache, no aportaba).
+  - `VERSION_APP` pasó de "0.0.0" a "1.5piloto.83q". Deuda
+    anotada: hacerlo dinámico leyendo el `@version` del
+    `index.php`, o actualizarlo a mano en cada tanda grande.
+  - Se documentó en `prompt_framework_iteradores.md` §12.5
+    que `GET_LOCK` no aplica al espejo JS (IndexedDB es
+    single-thread por origen; la transacción atómica hace
+    el mismo rol).
+  - Alineación cosmética de la indentación en
+    `limpiar_cancelaciones_de_prueba` (Venta.php).
+
+- **Validación en producción (v83r).** Una semana en
+  staging (`viajesdelcarmen.rf.gd`) y una semana en
+  producción (`viajesdelcarmen.click.gd`) sin errores
+  visibles. El log de persistencia no tiene ningún
+  `[error]`: todos los guardados son `[info]`, y
+  `DEBUG_PERSISTENCIA` está en `false`, así que solo
+  los errores se habrían escrito. **Confirmado:**
+  - El lock `GET_LOCK` funciona en InfinityFree (no
+    aparecen mensajes de "no se pudo obtener el lock").
+  - El fix del bug §4.7 se sostiene: `id_fila` del dueño
+    estable, sin desaparición de viajes, sin header
+    mostrando "terminal".
+  - Los returns tempranos en Usuario no bloquean al admin.
+  - La cobertura de `guardar_ambos` no produce falsos
+    `exito: false`.
+  - El fix del piso funciona con micros de 2 pisos.
+  - El login optimizado (4 → 2 guardados totales) es
+    transparente.
+  Con esto, el bug §4.7 y la Tanda 4 quedan **cerrados y
+  validados en producción**.
 
 - **Fix del croquis multi-piso (v1.5piloto.82h).** El croquis
   y todas las acciones de asiento matcheaban por
@@ -962,39 +1014,51 @@ bloqueante.
 - ~~**Login: 4 guardados totales → 2.**~~ **CERRADO en v83o.**
   Ver §2.
 
+**Cerradas en el Grupo A (v83q):**
+
+- ~~**Buzones sin chequear `guardar_ambos`.**~~ **CERRADO.**
+  Los 4 flujos ahora chequean y loguean. Ver §2.
+
+- ~~**`reiniciar_seleccion_completa` sin chequear.**~~
+  **CERRADO.** Ahora devuelve `exito: false` si falla el
+  guardado. Ver §2.
+
+- ~~**Comandos de reparación sin chequear.**~~ **CERRADO.**
+  Los 3 comandos chequean y devuelven `exito: false`. Ver
+  §2.
+
+- ~~**Indentación cosmética en `limpiar_cancelaciones_de_prueba`.**~~
+  **CERRADO.** Alineada.
+
+- ~~**`GET_LOCK` en el espejo JS.**~~ **CERRADO como
+  documentación.** En `prompt_framework_iteradores.md`
+  §12.5 se aclara que no aplica (IndexedDB es
+  single-thread por origen).
+
+- ~~**`VERSION_APP` en "0.0.0".**~~ **CERRADO.** Ahora es
+  `"1.5piloto.83q"`. Deuda chica: hacerlo dinámico leyendo
+  el `@version` del `index.php`, o actualizarlo a mano en
+  cada tanda grande. Anotado abajo.
+
+**Decisión consciente (no es deuda):**
+
+- **Duplicado `_dni_asignado_en_viaje_venta`.** `Venta.php`
+  tiene una copia local de `_dni_asignado_en_viaje` (que
+  vive en `ViajeAsientos.php`). Se duplicó para evitar
+  dependencia circular (`ViajeAsientos.php` incluye
+  `Venta.php`; `Venta.php` no puede incluir
+  `ViajeAsientos.php`). Unificar a `FuncionesAuxiliares.php`
+  es posible pero cambia la estructura actual sin ganancia
+  real. Se deja como está. Si en el futuro se agrega un
+  "common" más grande, se puede mover.
+
 **Pendientes (nuevos o que siguen):**
 
-- **Buzones de ventas y cancelaciones sin chequear
-  `guardar_ambos`.** `Venta.php:696, 716, 3026` y
-  `Viaje.php:249`. Son flujos de lectura con side-effect
-  (drenar el buzón del compartido al listar). Si el guardado
-  falla, `Controlador::_error` ya loguea y el siguiente
-  listado reintenta. No crítico.
-
-- **`reiniciar_seleccion_completa` sin chequear
-  `guardar_ambos`.** `ViajeAsientos.php:1195`. El usuario
-  puede reintentar la operación. No crítico.
-
-- **Comandos de reparación sin chequear `guardar_ambos`.**
-  `Reparacion/Comandos.php:29, 53, 67`. Son comandos de
-  admin; el output se ve en la página si falla. No crítico.
-
-- **Indentación cosmética en `limpiar_cancelaciones_de_prueba`.**
-  `Venta.php:~3400`: el `Controlador::_error` tiene 8
-  espacios en vez de 12. Funciona igual, pero conviene
-  alinearlo en una pasada de limpieza.
-
-- **Duplicado `_dni_asignado_en_viaje_venta`.**
-  `Venta.php` tiene una copia local de
-  `_dni_asignado_en_viaje` (que vive en
-  `ViajeAsientos.php`). Se duplicó para evitar dependencia
-  circular. Anotado en el comentario de la función. No
-  urgente.
-
-- **`GET_LOCK` en el espejo JS: documentar como no aplica.**
-  IndexedDB es single-thread por origen. No hay concurrencia
-  real entre transacciones. Documentar esta diferencia de
-  plataforma en `prompt_framework_iteradores.md` §12.
+- **`VERSION_APP` dinámico.** Hoy es una constante manual.
+  Cada tanda grande hay que actualizarla a mano. Deuda
+  chica: convertirla en método que lea el `@version` del
+  `index.php`, o agregar un test que verifique que
+  coinciden.
 
 - **Endpoints temporales de diagnóstico en index.php.**
   - `?diag_persistencia=1` (C.6b).
@@ -1016,16 +1080,6 @@ bloqueante.
   no tiene el problema del `TEMPORARY TABLE` ni
   `mysqli_report`, pero sí se beneficia del singleton
   (menos transacciones). No urgente.
-
-- **`\ConfiguracionApli::VERSION_APP` devuelve "0.0.0"
-  en pruebas.** El diag lo muestra así. Probablemente el
-  `ConfiguracionApli.php` de pruebas no tiene
-  `VERSION_APP` configurada. Detalle menor.
-
-- **`error_log("[CREAR_CONEXION] version=82c, ...")` en
-  SQL base.** Era para diagnóstico. Ahora que se
-  confirmó que funciona, se puede quitar. Se va con
-  la limpieza de endpoints.
 
 ---
 
@@ -1197,132 +1251,39 @@ Reglas de oro que aplican a cualquier tanda nueva.
 
 ---
 
-**Estado del proyecto al cierre:** v1.5piloto.83p
-(framework 1.5i.7x). **Bug §4.7 cerrado** (v83l).
-**Tanda 4 cerrada** (v83m-v83p): lock por superestructura,
+**Estado del proyecto al cierre:** v1.5piloto.83q
+(framework 1.5i.7x). **Bug §4.7 cerrado y validado en
+producción** (v83l + una semana en pruebas + una en
+producción sin errores). **Tanda 4 cerrada y validada**
+(v83m-v83p + v83q + v83r): lock por superestructura,
 usuario en el log, cobertura de `guardar_ambos` completa
 en flujos críticos, returns tempranos en Usuario, login
-de 4 a 2 guardados totales. **La migración de pasajeros
-se puede desbloquear** (Tanda 3 pendiente del
-`plan_migrar_micro.md`). El log de persistencia escribe
-a `logs/persistencia/YYYY-MM-DD.log`, con tag
-`[user=X]` por línea, legible por HTTP con
-`?ver_log_persistencia=1` (admin/soporte). El lock de
-escritura (`GET_LOCK('grafo_<nombre>', 5)`) está activo
-en el framework 1.5i.7x. Monitorear el log las primeras
-semanas: si aparece `no se pudo obtener el lock` con
-frecuencia, subir el timeout o investigar.
+de 4 a 2 guardados totales. **Grupo A cerrado** (v83q):
+buzones y comandos de reparación con check, `error_log`
+de diagnóstico eliminado, `VERSION_APP` actualizada,
+`GET_LOCK` en JS documentado. **El log de persistencia**
+no tiene ningún `[error]` en una semana de uso real. La
+migración de pasajeros se puede desbloquear (Tanda 3
+pendiente del `plan_migrar_micro.md`). Pendientes
+inmediatos: deuda de seguridad en impresión, endpoints
+temporales de diagnóstico, Tanda 3 de migración.
 
-**Deuda técnica del arco** en §4.7: endpoints temporales
-de diagnóstico, espejo `_hmi` a JS, espejo C.7-C.10 a JS,
-`VERSION_APP` en pruebas, `error_log` de diagnóstico.
+**Deuda técnica del arco** en §4.8: endpoints temporales
+de diagnóstico, espejo `_hmi` a JS, espejo C.7-C.10 a JS.
+(`VERSION_APP` y `error_log` de diagnóstico ya cerrados
+en v83q. El bug §4.7 ya no es deuda: está cerrado y
+validado en producción.)
 
 ---
 
-## 8. NOTA DE CIERRE — v1.5piloto.82d
+## 8. NOTA HISTÓRICA
 
-Documento de retomada del arco "cancelaciones en compartidos
-+ persistencia robusta en hostings compartidos". Se puede
-borrar cuando la próxima sesión haya revisado los pendientes.
-
-### 8.1 Estado verificado
-
-En pruebas (InfinityFree):
-
-  - guardar_total.ok:        true, 551ms
-  - guardar_parcial.ok:      true, 592ms
-  - Cancelación desde carmen2: persiste
-  - Auditoría topológica:    0 críticos / 0 errores / 0 warnings
-
-Sin bugs abiertos de prioridad alta.
-
-### 8.2 Pendientes por prioridad
-
-**Media (deuda del arco):**
-- Espejar `_hmi` a JS (`iteradoresJS/miscelaneas/Arbol.js`).
-- Espejar C.7-C.10 a JS (`PerdurarSuperestructuraStringIndexedDB64.js`).
-- Limpieza de endpoints temporales: `?diag_persistencia=1`,
-  `?diagnostico_cancelaciones=1`, `error_log(...)` en SQL base.
-- `\ConfiguracionApli::VERSION_APP` devuelve "0.0.0" en pruebas.
-
-**Baja (futuro):**
-- Framework Fase 3/4/5 (§5.2).
-- Iteradores con ID especial + ocupante (§5.2).
-- Auditar estados colgados (§4.1).
-- Deuda de seguridad en impresión (§4.1).
-- Fusionar las dos §11 de `prompt_plugin_piloto.md`.
-
-### 8.3 Aprendizajes clave (compactos)
-
-1. **PHP 8.4 rompe `mysqli_report` y `mysqli_ping`.**
-   `MYSQLI_REPORT_STRICT` es default: cualquier fallo lanza
-   excepción. El `@` no la atrapa. Usar `mysqli_report(OFF)`
-   + `SELECT 1` en lugar de `ping()`.
-
-2. **Hostings compartidos tienen privilegios limitados.**
-   `CREATE TEMPORARY TABLES`, `SET SESSION wait_timeout`,
-   rate limit de conexiones. Solución: singleton de conexión,
-   `IN (...)` directo, `SET SESSION wait_timeout = 300`.
-   **Testear siempre en el hosting real antes de dar un fix
-   por bueno.**
-
-3. **Los errores silenciosos son peores que los ruidosos.**
-   `cancelar_venta` no chequeaba `guardar_ambos`. Lección:
-   toda operación de escritura que pueda fallar debe
-   chequear el resultado y reportarlo.
-
-4. **Un bug que cambia de síntoma no significa que el fix
-   no sirvió.** §4.6 tuvo 4 capas de causa raíz. Cada fix
-   movió el error sin resolverlo. Cuando el síntoma cambia
-   pero persiste, hay una causa más profunda.
-
-5. **`_hmi` debe ser idempotente.** Antes de C.4b:
-   reinsertar un nodo que ya era el hmi generaba autoenlace
-   `hd → sí mismo` (ciclo). Fix: no-op si el hijo ya es el
-   hmi; limpiar `hd` residual cuando el padre no tenía hmi.
-
-6. **Cycle guard en lectura de cadenas.** Aunque `_hmi` esté
-   bien, un bug en otro lugar puede generar ciclos. Todo
-   `while ($actual && $seg < 2000)` que recorre una cadena
-   `hd`/`hd_<term>` debe trackear nodos visitados por id.
-   Aplica a cancelaciones hoy; auditar ventas, rendiciones,
-   liquidaciones en el futuro.
-
-7. **Soft delete coordinado también aplica a cancelaciones.**
-   El patrón de "árboles paralelos + buzón diferido" no era
-   solo para ventas.
-
-8. **Bloques `buscar` con estructura repetida necesitan
-   desambiguación.** El prompt del plugin tiene dos §11. Los
-   `buscar` deben anclar al header único, no al contenido
-   compartido.
-
-9. **Invertir en la herramienta de diagnóstico paga.**
-   `?auditar_topologia=1` encontró en 500ms lo que a ojo
-   hubiera costado horas.
-
-10. **Cuando el reporte de la auditoría tiene muchos items
-    de un mismo tipo, revisar la verificación antes de
-    asumir que hay muchos bugs.** Los 96 `p_apunta_a_otro`
-    y 7 `terminal_dueno_real` eran falsos positivos.
-
-### 8.4 Próximos pasos sugeridos
-
-1. Limpieza de endpoints temporales (§4.7).
-2. Espejo `_hmi` a JS.
-3. Auditar cycle guard en otros flujos (ventas,
-   rendiciones, liquidaciones).
-4. Fusionar las dos §11 de `prompt_plugin_piloto.md`.
-
-### 8.5 Archivo obsoleto
-
-`prompts/plan_auditar_topologia.md` quedó obsoleto. Su
-contenido está cubierto por:
-- §3.5 de `prompt_piloto.md` (auditoría).
-- §12 de `prompt_plugin_piloto.md` (botón del plugin).
-- §2 de este archivo (arco cerrado).
-
-Se puede borrar.
+La nota de cierre de v1.5piloto.82d (arco "cancelaciones
+en compartidos + persistencia robusta en hostings
+compartidos") fue eliminada en v83s. Cumplió su función:
+los pendientes reales están consolidados en §4.1-4.4 y
+§4.8, y los aprendizajes en `prompt_seguridad.md` §8.10
+y en el historial de `prompt_piloto.md`.
 
 ---
 
