@@ -4,12 +4,13 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.83o
+ * @version   1.5piloto.84a
  */
 
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
 use Iteradores\Configuracion\Conf;
+use Iteradores\Configuracion\Entorno;
 include_once("./Configuracion/Configuracion.php");
 include_once("./Nodos/Nodo.php");
 include_once("./Controlador/Controlador.php");
@@ -157,4 +158,99 @@ function listar_sesiones_de_usuarios(array $nombres_usuarios): array {
         }
         return $sesiones;
     });
+}
+
+// ============================================================
+// Fase 1 de seguridad (1.5piloto.84a): sesion PHP
+//
+// Guarda la identidad del usuario en $_SESSION, sobre la cookie
+// PHPSESSID que ya crea session_start() en index.php. Sirve como
+// punto de verdad server-side para las requests del mismo
+// navegador. El token en el grafo de credenciales (sesiones/
+// <token>) sigue siendo la fuente de verdad para invalidar
+// sesiones remotamente: si el token se borra, la proxima
+// sesiones/validar falla y limpia $_SESSION.
+// ============================================================
+
+/**
+ * Guarda la identidad del usuario en $_SESSION.
+ *
+ * Se llama desde:
+ *   - `_construir_respuesta_login` (login por codigo o
+ *     usuario+contrasena), despues de crear el token en el
+ *     grafo de credenciales.
+ *   - `sesiones/validar` (rehidratacion al recargar la pagina
+ *     con un token del localStorage).
+ *
+ * La cookie PHPSESSID viaja en cada request del navegador,
+ * asi que a partir de aca las requests del mismo navegador
+ * tienen identidad server-side.
+ *
+ * @param array $usuario Array con al menos nombre_usuario y
+ *                       nivel. Opcionalmente dueno (terminal),
+ *                       duenos (soporte), token_sesion.
+ * @return void
+ */
+function guardar_sesion_php(array $usuario): void {
+    if (session_status() !== PHP_SESSION_ACTIVE) return;
+    $prefijo = Entorno::prefijo_sesion();
+    $_SESSION[$prefijo . 'usuario'] = [
+        'nombre_usuario' => (string)($usuario['nombre_usuario'] ?? ''),
+        'nivel' => (string)($usuario['nivel'] ?? ''),
+        'dueno' => (string)($usuario['dueno'] ?? ''),
+        'duenos' => is_array($usuario['duenos'] ?? null) ? $usuario['duenos'] : [],
+        'token_sesion' => (string)($usuario['token_sesion'] ?? ''),
+    ];
+    $_SESSION[$prefijo . 'ultima_actividad'] = time();
+}
+
+/**
+ * Devuelve el usuario guardado en $_SESSION, o null si no hay.
+ *
+ * @return array|null
+ */
+function usuario_sesion_actual(): ?array {
+    if (session_status() !== PHP_SESSION_ACTIVE) return null;
+    $prefijo = Entorno::prefijo_sesion();
+    $u = $_SESSION[$prefijo . 'usuario'] ?? null;
+    return is_array($u) ? $u : null;
+}
+
+/**
+ * Limpia la identidad del usuario en $_SESSION.
+ *
+ * Se llama desde:
+ *   - `sesiones/cerrar` cuando el token cerrado coincide con
+ *     el de la sesion PHP actual (logout local).
+ *   - `sesiones/validar` cuando el token enviado ya no es
+ *     valido (expirado o cerrado remotamente).
+ *
+ * No destruye la cookie PHPSESSID; solo limpia las claves
+ * propias de la app. La proxima request del mismo navegador
+ * arranca sin identidad y el JS pide login.
+ *
+ * @return void
+ */
+function limpiar_sesion_php(): void {
+    if (session_status() !== PHP_SESSION_ACTIVE) return;
+    $prefijo = Entorno::prefijo_sesion();
+    unset($_SESSION[$prefijo . 'usuario']);
+    unset($_SESSION[$prefijo . 'ultima_actividad']);
+}
+
+/**
+ * Devuelve el token de sesion guardado en $_SESSION, o null.
+ *
+ * Se usa en `sesiones/cerrar` para distinguir:
+ *   - logout local (el token cerrado es el propio);
+ *   - cierre remoto (dueno/admin cerrando el de otro, no
+ *     tocar la sesion PHP del solicitante).
+ *
+ * @return string|null
+ */
+function token_sesion_actual(): ?string {
+    $u = usuario_sesion_actual();
+    if (!$u) return null;
+    $t = (string)($u['token_sesion'] ?? '');
+    return $t !== '' ? $t : null;
 }

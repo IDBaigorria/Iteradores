@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.83n
+ * @version   1.5piloto.84a
  */
 
 use Iteradores\Nodos\Nodo;
@@ -277,13 +277,11 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     }
 
                     if ($usuario) {
-                        // Si es terminal, incluir el nombre del dueño.
-                        // Fase B3.1: ID especial directo.
-                        if ($usuario['nivel'] === 'terminal') {
-                            $nodo_usuario = Nodo::nodo_por_id('us_' . $usuario['nombre_usuario']);
-                            $nodo_dueno = $nodo_usuario ? $nodo_usuario->adyacente('dueno') : null;
-                            $usuario['dueno'] = $nodo_dueno ? $nodo_dueno->dato() : '';
-                        }
+                        // Fase 1 de seguridad (1.5piloto.84a): la
+                        // logica del dueno de terminal vive ahora
+                        // dentro de _construir_respuesta_login, para
+                        // que la sesion PHP se guarde con el array
+                        // completo.
                         responder_json(['exito' => true, 'usuario' => $usuario]);
                     } else {
                         responder_json(['exito' => false, 'error' => 'Credenciales incorrectas']);
@@ -487,7 +485,18 @@ function enrutar_peticion_post(string $accion, array $post): void {
                 if (!_puede_cerrar_sesion($nombre_solicitante_cerrar, $token)) {
                     responder_json(['exito' => false, 'error' => 'Permiso denegado']);
                 }
+                // Fase 1 de seguridad (1.5piloto.84a): si el token
+                // cerrado es el de la sesion PHP actual, limpiar
+                // $_SESSION (logout local). Si es de otro (dueno
+                // cerrando terminal, admin cerrando un usuario),
+                // NO tocar la sesion del solicitante.
+                $token_propio = token_sesion_actual();
+                $es_logout_local = ($token_propio !== null && $token_propio === $token);
+
                 if (cerrar_sesion($token)) {
+                    if ($es_logout_local) {
+                        limpiar_sesion_php();
+                    }
                     responder_json(['exito' => true]);
                 } else {
                     responder_json(['exito' => false, 'error' => 'Token no válido']);
@@ -521,8 +530,22 @@ function enrutar_peticion_post(string $accion, array $post): void {
                         }
                         $usuario['duenos'] = $duenos;
                     }
+                    // Fase 1 de seguridad (1.5piloto.84a): rehidratar
+                    // $_SESSION con el token validado. El usuario
+                    // recarga la pagina, el JS lee el token del
+                    // localStorage y manda este POST. Aca el backend
+                    // conecta la cookie PHPSESSID con la sesion del
+                    // grafo de credenciales. A partir de aca, las
+                    // proximas requests (impresion incluida) tienen
+                    // identidad server-side.
+                    $usuario['token_sesion'] = $token;
+                    guardar_sesion_php($usuario);
                     responder_json(['exito' => true, 'usuario' => $usuario]);
                 } else {
+                    // Token invalido o expirado: limpiar la sesion
+                    // PHP para que no quede una identidad vieja
+                    // colgada.
+                    limpiar_sesion_php();
                     responder_json(['exito' => false, 'error' => 'Sesión no válida']);
                 }
             }else {

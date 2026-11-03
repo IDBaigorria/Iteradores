@@ -10,10 +10,11 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.83o
+ * @version   1.5piloto.84a
  */
 
 use Iteradores\Configuracion\Conf;
+use Iteradores\Configuracion\Entorno;
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
 include_once("./Configuracion/Configuracion.php");
@@ -328,8 +329,26 @@ function _construir_respuesta_login(string $nombre_usuario): ?array {
         $usuario['duenos'] = $duenos;
     }
 
+    // Fase 1 de seguridad (1.5piloto.84a): agregar el dueño
+    // acá adentro, para que el array esté completo ANTES de
+    // guardar la sesión PHP. Antes lo hacía el Enrutador
+    // después de _construir_respuesta_login, y la sesión PHP
+    // se guardaba sin el dueño.
+    if ($usuario['nivel'] === 'terminal') {
+        $nodo_dueno = $nodo_app->adyacente('dueno');
+        $usuario['dueno'] = $nodo_dueno ? $nodo_dueno->dato() : '';
+    }
+
     $token = crear_sesion($nombre_usuario);
     $usuario['token_sesion'] = $token;
+
+    // Fase 1 de seguridad: guardar la identidad en $_SESSION
+    // para que las próximas requests del mismo navegador tengan
+    // un punto de verdad server-side. La cookie PHPSESSID ya
+    // existe (session_start() en index.php). A partir de acá,
+    // ?imprimir=1 y los chequeos de permisos pueden confiar en
+    // esto.
+    guardar_sesion_php($usuario);
 
     return $usuario;
 }
