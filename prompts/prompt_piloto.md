@@ -598,8 +598,20 @@ Enlaces: `usuario` (string), `creado_en` (timestamp Unix).
 
 ### 5.4 `Aplicacion/Sesiones/Sesion.php`
 
+Grafo de credenciales:
 - `crear_sesion`, `listar_sesiones`, `cerrar_sesion`,
   `listar_sesiones_de_usuarios`, `eliminar_sesiones_de_usuario`.
+
+Sesión PHP (v1.5piloto.84a):
+- `guardar_sesion_php($usuario)`: escribe la identidad
+  en `$_SESSION[prefijo . 'usuario']`.
+- `usuario_sesion_actual(): ?array`: lee el usuario de
+  `$_SESSION`.
+- `limpiar_sesion_php()`: borra la identidad de
+  `$_SESSION`.
+- `token_sesion_actual(): ?string`: devuelve el token
+  guardado, para distinguir logout local de cierre
+  remoto.
 
 ### 5.5 Persistencia SQL + JSON
 
@@ -908,6 +920,17 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 ---
 
 ## 7. HISTORIAL DE VERSIONES (resumen)
+
+- **v84a** (Fase 1 de seguridad: sesión PHP). Login,
+  logout y cierre remoto funcionando con `$_SESSION` +
+  cookie PHPSESSID. `_construir_respuesta_login` guarda
+  la identidad completa (con `dueno` resuelto) en
+  `$_SESSION`. `sesiones/validar` rehidrata `$_SESSION`
+  al recargar. `sesiones/cerrar` distingue logout local
+  (limpia `$_SESSION`) de cierre remoto (no la toca).
+  Nuevos helpers en `Sesion.php`. Sin cambios en
+  `aplicacion.js` (la cookie viaja sola). Sin carga ni
+  guardado total nuevo. Próxima fase: impresión cerrada.
 
 - **v83q** (Grupo A: limpieza de deuda técnica del
   piloto). Buzones (`listar_ventas_por_dueno` × 2,

@@ -1174,6 +1174,63 @@ desde el terminal. En local, el mismo flujo funcionaba.
 
 Ver también: `prompt_framework_iteradores.md` §6.7 y §11.6.
 
+### 8.11 Sesión PHP del lado del servidor (v1.5piloto.84a)
+
+**Problema.** Antes de v84a, la "sesión" vivía en
+`localStorage.token_sesion` (cliente) más un nodo
+`sesiones/<token>` en el grafo de credenciales. El
+`nombre_solicitante` que mandaba el cliente era la
+identidad que el backend aceptaba, sin validación
+server-side. Cualquiera podía hacer POST como cualquier
+usuario. Las URLs `?imprimir=1&tipo=...` no validaban
+sesión ni permisos.
+
+**Solución.** La cookie PHPSESSID ya existía (por
+`session_start()` en `index.php`), solo estaba vacía.
+La Fase 1 la usa como punto de verdad server-side:
+
+- Login: `guardar_sesion_php($usuario)` guarda la
+  identidad en `$_SESSION[prefijo . 'usuario']`.
+- Rehidratación: `sesiones/validar` rehidrata al recargar.
+- Logout local: `sesiones/cerrar` limpia `$_SESSION`
+  (cuando el token cerrado es el propio).
+- Cierre remoto: `sesiones/cerrar` NO toca `$_SESSION`
+  del solicitante (cuando el token cerrado es de otro).
+
+**Diseño del cierre remoto.** El token en el grafo sigue
+siendo la fuente de verdad para invalidar sesiones
+remotamente. Cuando el dueño cierra la sesión de un
+terminal:
+
+1. El backend borra el nodo `sesiones/<token_term>` del
+   grafo.
+2. NO toca `$_SESSION` del dueño (porque
+   `token_sesion_actual() != token_term`).
+3. El terminal se entera en el próximo page load:
+   `sesiones/validar` falla → `limpiar_sesion_php()` →
+   JS pide login.
+
+**Trade-off.** El terminal no se entera del cierre hasta
+que recargue la página. En la práctica, un terminal
+vendiendo no recarga, así que "sigue funcionando" hasta
+el próximo page load. Se puede endurecer en Fase 2/3.
+
+**Helpers nuevos** en `Sesion.php`: `guardar_sesion_php`,
+`usuario_sesion_actual`, `limpiar_sesion_php`,
+`token_sesion_actual`. Todos leen el prefijo de
+`Entorno::prefijo_sesion()`.
+
+**No se tocó `aplicacion.js`.** La cookie PHPSESSID
+viaja sola en cada `fetch` a `index.php` y en cada
+`window.open`.
+
+**No se introdujo carga ni guardado total nuevo.**
+`guardar_sesion_php` escribe en memoria. `sesiones/validar`
+sigue haciendo la misma carga total que antes.
+
+Ver `prompts/plan_actual.md` §8 para el plan completo
+(Fases 2, 3 y 4).
+
 ---
 
 ## 9. PRÓXIMOS PASOS: REPLICAR EL PATRÓN

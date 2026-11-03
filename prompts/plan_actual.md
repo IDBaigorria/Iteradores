@@ -27,17 +27,18 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.83s + framework 1.5i.7x
+**Última actualización:** v1.5piloto.84a + framework 1.5i.7x
 (**Validado en producción:** una semana en pruebas y
 una semana en producción sin errores visibles ni
 `[error]` en el log de persistencia. Todos los guardados
 son `[info]`. Bug §4.7 cerrado y validado. Tanda 4
 (lock, usuario en log, cobertura de `guardar_ambos`,
 returns tempranos, login optimizado) confirmada en
-producción. Grupo A de limpieza aplicado (v83q). §8
-(nota de cierre de v82d) eliminado en v83s: cumplió su
-función, los pendientes reales viven en §4.1-4.4 y
-§4.8. Ver §2 y §4.8).
+producción. Grupo A de limpieza aplicado (v83q).
+**Fase 1 de seguridad aplicada (v84a):** sesión PHP con
+cookie PHPSESSID + `$_SESSION`; login, logout local y
+cierre remoto funcionando. Próxima fase: impresión
+cerrada. Ver §2 y §8).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -64,8 +65,9 @@ lo propaga el framework, no la app.
 
 **Versiones:**
 
-- **Piloto:** `1.5piloto.83q` (validado en producción;
-  una semana en pruebas y una en producción sin errores).
+- **Piloto:** `1.5piloto.84a` (validado en producción
+  hasta v83q; v84a agrega sesión PHP, sin cambios en
+  persistencia).
 - **Framework PHP:** `1.5i.7x` (SQL64, con singleton de
   conexión, `mysqli_report(OFF)`, `SELECT 1` en lugar de
   `ping()`, `IN (...)` en lugar de TEMPORARY TABLE,
@@ -112,6 +114,19 @@ temáticas y la persistencia de corridas en su propio grafo
 
 Resumen de 1-2 líneas por arco. El detalle completo vive en
 los prompts correspondientes o en los commits.
+
+- **Fase 1 de seguridad: sesión PHP (v1.5piloto.84a).**
+  Login, logout local y cierre remoto funcionando con
+  `$_SESSION` sobre la cookie PHPSESSID. Nuevos helpers en
+  `Sesion.php`. `_construir_respuesta_login` guarda la
+  identidad completa (con `dueno` resuelto) en `$_SESSION`.
+  Sin cambios en `aplicacion.js`. Sin carga ni guardado
+  total nuevo. Ver §8.
+
+- **Migración de pasajeros entre micros: completa
+  (v1.5piloto.82e-82f + Tanda 3).** Backend, frontend,
+  tests del plugin y documentación. Probada en local,
+  pruebas y producción. Sale de §4.5.
 
 - **Bug §4.7 cerrado (v83j-v83l).** El bug no era el leak
   lento ni la migración de pasajeros. Era guardado total en
@@ -474,13 +489,12 @@ Van todos juntos en una sesión del framework.
 
 ### 4.5. Próximas tandas sugeridas
 
-**Arco en curso: migración de pasajeros entre micros.**
-**ESTADO: DESBLOQUEADA.** El bug §4.7 está cerrado
-(v1.5piloto.83l). El `id_fila` es estable entre
-requests, el grafo no se corrompe. Se puede retomar
-la Tanda 3.
+**Arco de migración de pasajeros: COMPLETO.**
 
-Plan completo en `prompts/plan_migrar_micro.md`.
+Backend (v82e), frontend (v82f), tests del plugin y
+documentación (Tanda 3). Probado en local, pruebas y
+producción. El plan original en
+`prompts/plan_migrar_micro.md` queda como histórico.
 
 - **Tanda 1 (backend): cerrada en `1.5piloto.82e`.**
   `migrar_pasajeros_de_micro` en
@@ -498,14 +512,9 @@ Plan completo en `prompts/plan_migrar_micro.md`.
   vacíos, aviso de layouts distintos, confirm() nativo y
   refresco post-migración (cierra o refresca el panel de
   pasaje según qué micro estaba abierto).
-- **Tanda 3 (tests + docs): pendiente.** 7 tests del plugin
-  + actualización de `aplicacion_POST.php`,
-  `prompt_piloto.md` §5.8 y §4.9, y este archivo.
-
-**La migración YA PUEDE VOLVER A PRODUCCIÓN.** El bug
-§4.7 está cerrado (v1.5piloto.83l). Antes de pasarla,
-correr la Tanda 3 en local y validar el ciclo completo
-en un viaje de prueba.
+- **Tanda 3 (tests + docs): cerrada.** 7 tests del plugin
+  + actualización de `aplicacion_POST.php` y
+  documentación. Validada en local, pruebas y producción.
 
 **Foco inmediato: Piloto — calidad.**
 
@@ -1276,7 +1285,172 @@ validado en producción.)
 
 ---
 
-## 8. NOTA HISTÓRICA
+## 8. SEGURIDAD DE SESIONES E IDENTIDAD
+
+Estado al cierre de v1.5piloto.84a. La Fase 1 está aplicada
+y funcionando. Las Fases 2, 3 y 4 son el plan pendiente.
+
+### 8.1. Estado antes de v84a
+
+- La "sesión" vivía en `localStorage.token_sesion` (cliente)
+  más un nodo `sesiones/<token>` en el grafo de credenciales.
+- En cada request, el frontend mandaba `nombre_solicitante`
+  con el nombre del usuario. El enrutador lo usaba para
+  permisos y carga parcial **sin validarlo server-side**.
+- Cualquiera podía hacer `POST accion=administrador/listar_usuarios`
+  con `nombre_solicitante=Administrador` y ver datos del admin.
+- Las URLs `?imprimir=1&tipo=...` no validaban sesión ni
+  permisos. Cualquiera con la URL veía datos de pasajeros
+  (DNI, teléfonos, domicilios), montos, cancelaciones, etc.
+- `session_start()` corría en `index.php` (cookie PHPSESSID
+  emitida), pero nadie escribía en `$_SESSION`. Estaba vacía.
+
+### 8.2. Fase 1 — sesión PHP (v1.5piloto.84a, aplicada)
+
+La cookie PHPSESSID ya existía, solo estaba vacía. La
+Fase 1 la usa como punto de verdad server-side:
+
+- **Login** (`_construir_respuesta_login`): resuelve el
+  dueño de terminal adentro (para que el array esté
+  completo antes de guardar) y llama a
+  `guardar_sesion_php($usuario)`.
+  `$_SESSION[prefijo . 'usuario']` guarda
+  `{nombre_usuario, nivel, dueno, duenos, token_sesion}`.
+- **Rehidratación** (`sesiones/validar`): al recargar la
+  página, el JS lee el token del `localStorage` y manda
+  este POST. Si el token es válido, `guardar_sesion_php`
+  conecta la cookie con la sesión del grafo. Si no,
+  `limpiar_sesion_php()`.
+- **Logout local** (`sesiones/cerrar` con el propio token):
+  borra el nodo `sesiones/<token>` y limpia `$_SESSION`.
+- **Cierre remoto** (dueño cerrando sesión de un terminal,
+  admin cerrando un usuario): borra el nodo
+  `sesiones/<token>` del grafo. NO toca `$_SESSION` del
+  solicitante (porque `token_sesion_actual() != token_cerrado`).
+  El terminal se entera en el próximo page load.
+
+**Helpers nuevos** (`Aplicacion/Sesiones/Sesion.php`):
+- `guardar_sesion_php(array $usuario)`
+- `usuario_sesion_actual(): ?array`
+- `limpiar_sesion_php(): void`
+- `token_sesion_actual(): ?string`
+
+**Trade-off aceptado.** Si el dueño cierra la sesión de
+un terminal en medio de una sesión activa, el terminal
+no se entera hasta el próximo page load. Se puede
+endurecer en Fase 2/3.
+
+**No se tocó `aplicacion.js`.** La cookie PHPSESSID viaja
+sola en cada `fetch` a `index.php` y en cada `window.open`.
+
+**No se introdujo carga ni guardado total nuevo.**
+
+### 8.3. Fase 2 — impresión cerrada (pendiente)
+
+Objetivo: cerrar el agujero de `?imprimir=1&tipo=...`.
+Hoy cualquiera con la URL ve datos sin sesión.
+
+Plan:
+
+- **`index.php`, bloque `?imprimir=1`**:
+  - Validar `$_SESSION`. Sin sesión → 403 sin cargar grafo.
+  - Validar permisos por `tipo`. Sin permiso → 403 sin cargar.
+  - Exigir `dueno` en el GET para los `tipo` que hoy caen
+    a carga total (los 6-7 helpers de B3.3c). Sin `dueno`
+    → 400. Esto **elimina** la carga total en impresión.
+- **`_contextos_para_operacion` Caso 2**: usar los
+  contextos del usuario de la sesión (no del `dueno` del
+  GET). Validar que el `dueno` del GET sea accesible
+  desde ese contexto.
+- **`Impresion.php`**: sin cambios. Solo que ahora el
+  bloque `?imprimir=1` ya validó sesión y permisos antes
+  de llamarlo.
+
+**Sin carga total nueva, sin guardado nuevo.**
+
+### 8.4. Fase 3 — validación en POST (pendiente)
+
+Objetivo: cerrar el agujero de "el enrutador confía en
+`nombre_solicitante` del cliente".
+
+- **Enrutador**: derivar `nombre_solicitante` de
+  `$_SESSION`, no del POST. El POST puede seguir
+  mandándolo (compatibilidad), pero el backend lo ignora.
+- **Todos los endpoints POST** validan sesión y permisos
+  contra el `nombre_solicitante` de la sesión.
+- **Chequeo de cierre remoto en cada request** (opcional):
+  comparar el token de `$_SESSION` contra el grafo
+  (`sesiones/<token>`). Costo: una carga parcial de
+  `['sesiones']` por request (~100 nodos). Cacheable
+  con un TTL corto.
+
+**Deuda asociada**: el login por código hoy es O(N) con
+`password_verify` por cada usuario. Solución: índice
+HMAC determinístico (`HMAC(secret, codigo) → us_<nombre>`).
+
+### 8.5. Fase 4 — tercer grafo de identidad (pendiente)
+
+Objetivo: sacar el esqueleto `usuarios` de la app y de
+credenciales. Hoy `usuarios → us_<nombre>` está duplicado
+en ambos grafos, y al admin/soporte la carga "parcial"
+le trae todo (desde `usuarios` se alcanza a cada
+`us_<nombre>` con su subgrafo).
+
+**Diseño propuesto:** tercer grafo `AdministradorDeViajes_identidad`.
+
+```
+Grafo identidad:
+  usuarios → <nombre> → perfil_<nombre>   (esqueleto liviano)
+  indices  → codigos_hmac → <hmac> → perfil_<nombre>
+
+Grafo app:
+  us_<nombre> (raíz propia) → publico, privado, ventas, ...
+
+Grafo credenciales:
+  us_<nombre> (raíz propia) → codigo_hash, contrasena, ...
+  sesiones → <token> → sesion → usuario
+```
+
+- `usuarios` sale del grafo de la app y del de credenciales.
+- `perfil_<nombre>` tiene `nivel`, `nombre_real`, `email`,
+  `dueno`/`duenos` (strings). Liviano (~5 nodos).
+- El admin/soporte carga `['usuarios']` desde identidad
+  (solo perfiles) y, cuando opera sobre un usuario
+  específico, `['us_<nombre>']` desde app o credenciales.
+- El índice HMAC (login por código O(1)) vive en identidad.
+- `en_grafo_identidad` helper nuevo (o generalizar
+  `en_grafo_credenciales`).
+
+**Esfuerzo**: 3-4 tandas. Bloqueado por Fases 2 y 3.
+
+**Deuda de diseño**: dejar el Nodo limpio antes de agregar
+más métodos de indexación (256 bits, HMAC, primos). Ver
+`prompt_framework_iteradores.md` §11.4.
+
+### 8.6. Lo que sigue funcionando (no romper)
+
+- **Cierre remoto**: dueño cierra sesión de terminal
+  (borra nodo en grafo). El terminal se entera en el
+  próximo page load.
+- **Rehidratación**: al recargar, el JS lee el token del
+  `localStorage` y lo manda a `sesiones/validar`, que
+  rehidrata `$_SESSION`.
+- **Inactividad**: la cookie PHPSESSID sin `expires` es
+  una session cookie (se borra al cerrar el navegador).
+  El token en `localStorage` persiste y permite
+  rehidratar al reabrir. Si se quiere forzar re-login por
+  inactividad, chequear
+  `$_SESSION[prefijo . 'ultima_actividad']` contra
+  `time()`.
+
+### 8.7. Referencias
+
+- `prompt_seguridad.md` §8.11 (diseño de la sesión PHP).
+- `prompt_framework_iteradores.md` §11.4 (Nodo limpio).
+
+---
+
+## 9. NOTA HISTÓRICA
 
 La nota de cierre de v1.5piloto.82d (arco "cancelaciones
 en compartidos + persistencia robusta en hostings
