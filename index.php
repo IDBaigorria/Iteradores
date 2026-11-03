@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.84b
+ * @version   1.5piloto.84c
  */
 
 // --- Utilidades base ----------------------------------
@@ -116,6 +116,12 @@ Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);
 // sesión o sin permiso → 403 sin cargar nada. Con esto,
 // ?imprimir=1 deja de ser un endpoint público.
 //
+// Fix v1.5piloto.84c: inferir `dueno` desde la sesión si
+// no viene en el GET. Sin esto, las URLs que no pasan
+// `dueno` (ventas.js, pasajeros.js) hacían fallar
+// `obtener_venta_por_id` con "Venta no encontrada" en
+// carga parcial (el fallback a `usuarios` no funciona).
+//
 // Trade-off documentado en `plan_actual.md` §8.2: si la
 // sesión fue cerrada remotamente pero el navegador no
 // recargó, el token sigue en $_SESSION y el pre-check
@@ -133,6 +139,19 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
         http_response_code(403);
         echo 'No tenés permiso para ver este contenido.';
         exit;
+    }
+    // Inferir `dueno` desde la sesión si no viene en el GET.
+    // Dueño → él mismo. Terminal → su dueño. Admin/soporte
+    // no se infiere (deben pasarlo explícitamente para
+    // operaciones sobre usuarios específicos).
+    $nivel_imp = (string)($usuario_sesion_imp['nivel'] ?? '');
+    $dueno_get_imp = trim((string)($_GET['dueno'] ?? ''));
+    if ($dueno_get_imp === '') {
+        if ($nivel_imp === 'dueno') {
+            $_GET['dueno'] = (string)($usuario_sesion_imp['nombre_usuario'] ?? '');
+        } else if ($nivel_imp === 'terminal') {
+            $_GET['dueno'] = (string)($usuario_sesion_imp['dueno'] ?? '');
+        }
     }
 }
 

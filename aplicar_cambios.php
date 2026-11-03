@@ -1,157 +1,24 @@
 <?php
 /**
- * Aplicador — Fase 2: cerrar impresión (sesión + permisos).
+ * Aplicador — Fase 2.1: inferir dueño en impresión + DJ para terminal.
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '1.5piloto.84b';
+$version_nueva = '1.5piloto.84c';
 $htmls_a_bumpear = [];
 
 $cambios = [
     // ============================================================
-    // Enrutador.php — helper _puede_imprimir
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Enrutador.php',
-        'descripcion' => 'Enrutador: helper _puede_imprimir antes de _contextos_para_operacion',
-        'buscar' => [
-            '/**',
-            ' * Devuelve los contextos que hay que cargar para una',
-            ' * operación dada, según el solicitante.',
-            ' *',
-            ' * Etapa 0 del plan de carga parcial (v1.5piloto.78b):',
-        ],
-        'reemplazar' => [
-            '/**',
-            ' * Devuelve true si el usuario de la sesión puede imprimir el tipo.',
-            ' *',
-            ' * Fase 2 (v1.5piloto.84b). Valida `tipo` contra el `nivel` del',
-            ' * usuario de la sesión. No navega el grafo: es un chequeo de',
-            ' * defensa en profundidad, la restricción real la hace el contexto',
-            ' * (si el recurso no está en el contexto del usuario, no se',
-            ' * encuentra).',
-            ' *',
-            ' * Reglas:',
-            ' *   - Admin / soporte: cualquier tipo.',
-            ' *   - Dueño: los tipos de su subgrafo (informe_*, pasajes, cupon,',
-            ' *     pasaje_reserva, pasajes_actualizados, croquis_micro,',
-            ' *     planilla_pasajeros_micro, declaracion_jurada).',
-            ' *   - Terminal: los tipos de su compartido (pasajes, cupon,',
-            ' *     pasaje_reserva, pasajes_actualizados, informe_cancelacion,',
-            ' *     croquis_micro, planilla_pasajeros_micro).',
-            ' *   - Cualquier otro: false.',
-            ' *',
-            ' * Nota sobre pasajes_actualizados e informe_cancelacion para',
-            ' * terminal: requieren que el URL pase `dueno` para que el',
-            ' * contexto cargue el árbol `ventas`/`cancelaciones` del dueño',
-            ' * con nombres default. Si no pasa `dueno`, el terminal recibe',
-            ' * una lista vacía (o "no encontrada"), no un 403. Es el',
-            ' * comportamiento actual, no empeora.',
-            ' *',
-            ' * @param array  $usuario_sesion Array de `usuario_sesion_actual()`.',
-            ' * @param string $tipo           Tipo de impresión.',
-            ' * @return bool',
-            ' * @since 1.5piloto.84b',
-            ' */',
-            'function _puede_imprimir(array $usuario_sesion, string $tipo): bool {',
-            '    $nivel = (string)($usuario_sesion[\'nivel\'] ?? \'\');',
-            '    if ($nivel === \'admin\' || $nivel === \'soporte\') return true;',
-            '',
-            '    $tipos_dueno = [',
-            '        \'pasajes\', \'cupon\', \'pasaje_reserva\', \'pasajes_actualizados\',',
-            '        \'informe_ventas\', \'informe_rendicion\', \'informe_liquidacion\',',
-            '        \'informe_cancelacion\', \'croquis_micro\', \'planilla_pasajeros_micro\',',
-            '        \'declaracion_jurada\',',
-            '    ];',
-            '    $tipos_terminal = [',
-            '        \'pasajes\', \'cupon\', \'pasaje_reserva\', \'pasajes_actualizados\',',
-            '        \'informe_cancelacion\', \'croquis_micro\', \'planilla_pasajeros_micro\',',
-            '    ];',
-            '',
-            '    if ($nivel === \'dueno\') return in_array($tipo, $tipos_dueno, true);',
-            '    if ($nivel === \'terminal\') return in_array($tipo, $tipos_terminal, true);',
-            '',
-            '    return false;',
-            '}',
-            '',
-            '/**',
-            ' * Devuelve los contextos que hay que cargar para una',
-            ' * operación dada, según el solicitante.',
-            ' *',
-            ' * Etapa 0 del plan de carga parcial (v1.5piloto.78b):',
-        ],
-    ],
-
-    // ============================================================
-    // Enrutador.php — Caso 2 de _contextos_para_operacion
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'Aplicacion/Enrutador.php',
-        'descripcion' => 'Enrutador: Caso 2 impresión usa sesión, no carga total',
-        'buscar' => [
-            '    // Caso 2: GET de impresión. Los flujos imprimibles pasan',
-            '    // el dueño por query string. Si está, carga parcial de',
-            '    // ese dueño. Si no, carga total (los 6 helpers de B3.3c',
-            '    // que iteran sobre todos los dueños todavía no están',
-            '    // reescritos; ver `plan_actual.md` §1.10).',
-            '    if (isset($get[\'imprimir\']) && $get[\'imprimir\'] === \'1\') {',
-            '        $dueno = $get[\'dueno\'] ?? \'\';',
-            '        if ($dueno === \'\') return null;',
-            '',
-            '        // Fase B3.3c (v1.5piloto.81j): los informes de',
-            '        // cancelación, liquidación y rendición ahora navegan',
-            '        // directo por us_<dueño>. Se eliminó la excepción de',
-            '        // carga total que existía acá.',
-            '        return [\'us_\' . $dueno];',
-            '    }',
-        ],
-        'reemplazar' => [
-            '    // Caso 2: GET de impresión. Fase 2 (v1.5piloto.84b):',
-            '    // el pre-check de index.php ya validó sesión y permisos',
-            '    // antes de llegar acá. El contexto se arma con:',
-            '    //   - el `dueno` del GET si viene (backward compat con',
-            '    //     las URLs existentes que lo pasan);',
-            '    //   - si no, el contexto natural del usuario de la sesión',
-            '    //     (us_<nombre>).',
-            '    // En ningún caso se hace carga total: siempre parcial.',
-            '    if (isset($get[\'imprimir\']) && $get[\'imprimir\'] === \'1\') {',
-            '        $usuario_imp = usuario_sesion_actual();',
-            '        if ($usuario_imp === null) return null; // defensivo (pre-check ya devolvió 403)',
-            '        $nombre_imp = (string)($usuario_imp[\'nombre_usuario\'] ?? \'\');',
-            '        if ($nombre_imp === \'\') return null;',
-            '',
-            '        $dueno_imp = trim((string)($get[\'dueno\'] ?? \'\'));',
-            '        if ($dueno_imp !== \'\') return [\'us_\' . $dueno_imp];',
-            '',
-            '        return [\'us_\' . $nombre_imp];',
-            '    }',
-        ],
-    ],
-
-    // ============================================================
-    // index.php — pre-check de impresión
+    // index.php — inferir dueño desde sesión
     // ============================================================
     [
         'tipo' => 'reemplazar',
         'archivo' => 'index.php',
-        'descripcion' => 'index: pre-check de impresión antes de cargar el grafo',
+        'descripcion' => 'index: inferir dueno en pre-check de impresion',
         'buscar' => [
-            '// Alinear el prefijo de sesión del framework con el del piloto',
-            '// (el framework no conoce el nombre de la app).',
-            'Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);',
-            '',
-            '// ==== Migración a SQL64 (v1.5piloto.78e) ====',
-        ],
-        'reemplazar' => [
-            '// Alinear el prefijo de sesión del framework con el del piloto',
-            '// (el framework no conoce el nombre de la app).',
-            'Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);',
-            '',
             '// ==== Fase 2 (v1.5piloto.84b): pre-check de impresión ====',
             '// Valida sesión y permisos ANTES de cargar el grafo. Sin',
             '// sesión o sin permiso → 403 sin cargar nada. Con esto,',
@@ -176,8 +43,73 @@ $cambios = [
             '        exit;',
             '    }',
             '}',
-            '',
-            '// ==== Migración a SQL64 (v1.5piloto.78e) ====',
+        ],
+        'reemplazar' => [
+            '// ==== Fase 2 (v1.5piloto.84b): pre-check de impresión ====',
+            '// Valida sesión y permisos ANTES de cargar el grafo. Sin',
+            '// sesión o sin permiso → 403 sin cargar nada. Con esto,',
+            '// ?imprimir=1 deja de ser un endpoint público.',
+            '//',
+            '// Fix v1.5piloto.84c: inferir `dueno` desde la sesión si',
+            '// no viene en el GET. Sin esto, las URLs que no pasan',
+            '// `dueno` (ventas.js, pasajeros.js) hacían fallar',
+            '// `obtener_venta_por_id` con "Venta no encontrada" en',
+            '// carga parcial (el fallback a `usuarios` no funciona).',
+            '//',
+            '// Trade-off documentado en `plan_actual.md` §8.2: si la',
+            '// sesión fue cerrada remotamente pero el navegador no',
+            '// recargó, el token sigue en $_SESSION y el pre-check',
+            '// pasa. Se endurece en Fase 3 con chequeo periódico del',
+            '// token contra el grafo de credenciales.',
+            'if (isset($_GET[\'imprimir\']) && $_GET[\'imprimir\'] === \'1\') {',
+            '    $usuario_sesion_imp = usuario_sesion_actual();',
+            '    if (!$usuario_sesion_imp) {',
+            '        http_response_code(403);',
+            '        echo \'Sesión no válida. Iniciá sesión para ver esta página.\';',
+            '        exit;',
+            '    }',
+            '    $tipo_imp = $_GET[\'tipo\'] ?? \'\';',
+            '    if (!_puede_imprimir($usuario_sesion_imp, $tipo_imp)) {',
+            '        http_response_code(403);',
+            '        echo \'No tenés permiso para ver este contenido.\';',
+            '        exit;',
+            '    }',
+            '    // Inferir `dueno` desde la sesión si no viene en el GET.',
+            '    // Dueño → él mismo. Terminal → su dueño. Admin/soporte',
+            '    // no se infiere (deben pasarlo explícitamente para',
+            '    // operaciones sobre usuarios específicos).',
+            '    $nivel_imp = (string)($usuario_sesion_imp[\'nivel\'] ?? \'\');',
+            '    $dueno_get_imp = trim((string)($_GET[\'dueno\'] ?? \'\'));',
+            '    if ($dueno_get_imp === \'\') {',
+            '        if ($nivel_imp === \'dueno\') {',
+            '            $_GET[\'dueno\'] = (string)($usuario_sesion_imp[\'nombre_usuario\'] ?? \'\');',
+            '        } else if ($nivel_imp === \'terminal\') {',
+            '            $_GET[\'dueno\'] = (string)($usuario_sesion_imp[\'dueno\'] ?? \'\');',
+            '        }',
+            '    }',
+            '}',
+        ],
+    ],
+
+    // ============================================================
+    // Enrutador.php — declaracion_jurada para terminal
+    // ============================================================
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'Aplicacion/Enrutador.php',
+        'descripcion' => 'Enrutador: agregar declaracion_jurada a tipos_terminal',
+        'buscar' => [
+            '    $tipos_terminal = [',
+            '        \'pasajes\', \'cupon\', \'pasaje_reserva\', \'pasajes_actualizados\',',
+            '        \'informe_cancelacion\', \'croquis_micro\', \'planilla_pasajeros_micro\',',
+            '    ];',
+        ],
+        'reemplazar' => [
+            '    $tipos_terminal = [',
+            '        \'pasajes\', \'cupon\', \'pasaje_reserva\', \'pasajes_actualizados\',',
+            '        \'informe_cancelacion\', \'croquis_micro\', \'planilla_pasajeros_micro\',',
+            '        \'declaracion_jurada\',',
+            '    ];',
         ],
     ],
 ];

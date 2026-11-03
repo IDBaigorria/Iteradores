@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.84b
+ * @version   1.5piloto.84c
  */
 
 use Iteradores\Nodos\Nodo;
@@ -196,6 +196,7 @@ function _puede_imprimir(array $usuario_sesion, string $tipo): bool {
     $tipos_terminal = [
         'pasajes', 'cupon', 'pasaje_reserva', 'pasajes_actualizados',
         'informe_cancelacion', 'croquis_micro', 'planilla_pasajeros_micro',
+        'declaracion_jurada',
     ];
 
     if ($nivel === 'dueno') return in_array($tipo, $tipos_dueno, true);
