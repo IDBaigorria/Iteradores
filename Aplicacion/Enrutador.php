@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.84c
+ * @version   1.5piloto.84d
  */
 
 use Iteradores\Nodos\Nodo;
@@ -155,35 +155,46 @@ function _nombre_dueno_solicitante(string $nombre_solicitante, array $post = [])
 /**
  * Devuelve true si el usuario de la sesión puede imprimir el tipo.
  *
- * Fase 2 (v1.5piloto.84b). Valida `tipo` contra el `nivel` del
- * usuario de la sesión. No navega el grafo: es un chequeo de
- * defensa en profundidad, la restricción real la hace el contexto
- * (si el recurso no está en el contexto del usuario, no se
- * encuentra).
+ * Fase 2 (v1.5piloto.84b, ampliado en 84d). Valida `tipo`
+ * contra el `nivel` del usuario de la sesión. No navega el
+ * grafo: es un chequeo de defensa en profundidad, la
+ * restricción real la hace el contexto (si el recurso no
+ * está en el contexto del usuario, no se encuentra).
  *
  * Reglas:
  *   - Admin / soporte: cualquier tipo.
- *   - Dueño: los tipos de su subgrafo (informe_*, pasajes, cupon,
- *     pasaje_reserva, pasajes_actualizados, croquis_micro,
- *     planilla_pasajeros_micro, declaracion_jurada).
- *   - Terminal: los tipos de su compartido (pasajes, cupon,
- *     pasaje_reserva, pasajes_actualizados, informe_cancelacion,
- *     croquis_micro, planilla_pasajeros_micro).
+ *   - Dueño: los tipos de su subgrafo.
+ *   - Terminal: los tipos de su compartido.
  *   - Cualquier otro: false.
  *
- * Nota sobre pasajes_actualizados e informe_cancelacion para
- * terminal: requieren que el URL pase `dueno` para que el
- * contexto cargue el árbol `ventas`/`cancelaciones` del dueño
- * con nombres default. Si no pasa `dueno`, el terminal recibe
- * una lista vacía (o "no encontrada"), no un 403. Es el
- * comportamiento actual, no empeora.
+ * Caso especial `informe_ventas` (v84d): el usuario puede
+ * pedir dos cosas distintas (`tipo_ventas=dueno` para ver
+ * todas las ventas del dueño, o `tipo_ventas=terminal` para
+ * ver solo las de una terminal). Se restringe el `nombre`:
+ *   - Dueño:
+ *     - `tipo_ventas=dueno` → `nombre` == dueño de sesión.
+ *     - `tipo_ventas=terminal` → permitido (el contexto
+ *       filtra si la terminal no es suya).
+ *   - Terminal:
+ *     - `tipo_ventas=terminal` → `nombre` == terminal de
+ *       sesión.
+ *     - `tipo_ventas=dueno` → `nombre` == dueño del terminal.
+ *     - Otros → false.
+ *
+ * Nota sobre `tipo_ventas=dueno` para terminal: el terminal
+ * ve TODAS las ventas del dueño, no solo las suyas. Es el
+ * comportamiento del botón "Informe" antes de esta tanda
+ * (con carga total ya funcionaba así). Se preserva. Si en
+ * el futuro se quiere restringir, forzar `tipo_ventas=terminal`
+ * en el frontend o filtrar en `imprimir_informe_ventas`.
  *
  * @param array  $usuario_sesion Array de `usuario_sesion_actual()`.
  * @param string $tipo           Tipo de impresión.
+ * @param array  $get            Query string (`$_GET`).
  * @return bool
  * @since 1.5piloto.84b
  */
-function _puede_imprimir(array $usuario_sesion, string $tipo): bool {
+function _puede_imprimir(array $usuario_sesion, string $tipo, array $get = []): bool {
     $nivel = (string)($usuario_sesion['nivel'] ?? '');
     if ($nivel === 'admin' || $nivel === 'soporte') return true;
 
@@ -195,12 +206,37 @@ function _puede_imprimir(array $usuario_sesion, string $tipo): bool {
     ];
     $tipos_terminal = [
         'pasajes', 'cupon', 'pasaje_reserva', 'pasajes_actualizados',
-        'informe_cancelacion', 'croquis_micro', 'planilla_pasajeros_micro',
-        'declaracion_jurada',
+        'informe_cancelacion', 'informe_ventas', 'croquis_micro',
+        'planilla_pasajeros_micro', 'declaracion_jurada',
     ];
 
-    if ($nivel === 'dueno') return in_array($tipo, $tipos_dueno, true);
-    if ($nivel === 'terminal') return in_array($tipo, $tipos_terminal, true);
+    $nombre_sesion = (string)($usuario_sesion['nombre_usuario'] ?? '');
+    $dueno_sesion = (string)($usuario_sesion['dueno'] ?? '');
+
+    if ($nivel === 'dueno') {
+        if (!in_array($tipo, $tipos_dueno, true)) return false;
+        if ($tipo === 'informe_ventas') {
+            $tipo_ventas = (string)($get['tipo_ventas'] ?? 'dueno');
+            $nombre_v = (string)($get['nombre'] ?? '');
+            if ($tipo_ventas === 'dueno') return $nombre_v === $nombre_sesion;
+            // tipo_ventas=terminal: el contexto filtra si
+            // la terminal no es suya. Permitido.
+            return true;
+        }
+        return true;
+    }
+
+    if ($nivel === 'terminal') {
+        if (!in_array($tipo, $tipos_terminal, true)) return false;
+        if ($tipo === 'informe_ventas') {
+            $tipo_ventas = (string)($get['tipo_ventas'] ?? 'dueno');
+            $nombre_v = (string)($get['nombre'] ?? '');
+            if ($tipo_ventas === 'terminal') return $nombre_v === $nombre_sesion;
+            if ($tipo_ventas === 'dueno') return $nombre_v === $dueno_sesion;
+            return false;
+        }
+        return true;
+    }
 
     return false;
 }

@@ -27,7 +27,7 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.84a + framework 1.5i.7x
+**Última actualización:** v1.5piloto.84d + framework 1.5i.7x
 (**Validado en producción:** una semana en pruebas y
 una semana en producción sin errores visibles ni
 `[error]` en el log de persistencia. Todos los guardados
@@ -35,10 +35,11 @@ son `[info]`. Bug §4.7 cerrado y validado. Tanda 4
 (lock, usuario en log, cobertura de `guardar_ambos`,
 returns tempranos, login optimizado) confirmada en
 producción. Grupo A de limpieza aplicado (v83q).
-**Fase 1 de seguridad aplicada (v84a):** sesión PHP con
-cookie PHPSESSID + `$_SESSION`; login, logout local y
-cierre remoto funcionando. Próxima fase: impresión
-cerrada. Ver §2 y §8).
+**Fases 1 y 2 de seguridad aplicadas (v84a-v84d):**
+sesión PHP con cookie PHPSESSID + `$_SESSION`, y
+endpoint de impresión cerrado (sesión + permisos +
+inferencia de `dueno` desde la sesión). Próxima fase:
+validación en POST. Ver §2 y §8).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -65,9 +66,9 @@ lo propaga el framework, no la app.
 
 **Versiones:**
 
-- **Piloto:** `1.5piloto.84a` (validado en producción
-  hasta v83q; v84a agrega sesión PHP, sin cambios en
-  persistencia).
+- **Piloto:** `1.5piloto.84d` (validado en producción
+  hasta v83q; v84a-v84d agregan sesión PHP e impresión
+  cerrada, sin cambios en persistencia).
 - **Framework PHP:** `1.5i.7x` (SQL64, con singleton de
   conexión, `mysqli_report(OFF)`, `SELECT 1` en lugar de
   `ping()`, `IN (...)` en lugar de TEMPORARY TABLE,
@@ -114,6 +115,17 @@ temáticas y la persistencia de corridas en su propio grafo
 
 Resumen de 1-2 líneas por arco. El detalle completo vive en
 los prompts correspondientes o en los commits.
+
+- **Fase 2 de seguridad: impresión cerrada (v1.5piloto.84b-v84d).**
+  El bloque `?imprimir=1` valida `$_SESSION` y permisos
+  (`_puede_imprimir`) antes de cargar el grafo. Sin sesión o
+  sin permiso → 403 sin cargar. Carga siempre parcial (nunca
+  total): contextos de la sesión, con override por `dueno`
+  del GET. `dueno` se infiere desde la sesión si no viene
+  (dueño → él mismo; terminal → su dueño). `informe_ventas`
+  habilitado para terminal, con validación de
+  `tipo_ventas` + `nombre`. Sin cambios en `Impresion.php`,
+  ni en el frontend. Ver §8.3.
 
 - **Fase 1 de seguridad: sesión PHP (v1.5piloto.84a).**
   Login, logout local y cierre remoto funcionando con
@@ -1287,8 +1299,9 @@ validado en producción.)
 
 ## 8. SEGURIDAD DE SESIONES E IDENTIDAD
 
-Estado al cierre de v1.5piloto.84a. La Fase 1 está aplicada
-y funcionando. Las Fases 2, 3 y 4 son el plan pendiente.
+Estado al cierre de v1.5piloto.84d. Las Fases 1 y 2 están
+aplicadas y funcionando. Las Fases 3 y 4 son el plan
+pendiente.
 
 ### 8.1. Estado antes de v84a
 
@@ -1345,26 +1358,70 @@ sola en cada `fetch` a `index.php` y en cada `window.open`.
 
 **No se introdujo carga ni guardado total nuevo.**
 
-### 8.3. Fase 2 — impresión cerrada (pendiente)
+### 8.3. Fase 2 — impresión cerrada (v1.5piloto.84b-v84d, aplicada)
 
-Objetivo: cerrar el agujero de `?imprimir=1&tipo=...`.
-Hoy cualquiera con la URL ve datos sin sesión.
+La fase se aplicó en tres iteraciones:
 
-Plan:
+- **v84b** (base):
+  - `index.php`: pre-check de `?imprimir=1` antes de cargar
+    el grafo. Sin sesión → 403. Sin permiso → 403.
+  - `Enrutador.php`: `_puede_imprimir($usuario_sesion, $tipo)`
+    valida tipo vs nivel. Admin/soporte todo; dueño los
+    tipos de su subgrafo; terminal los de su compartido.
+  - `Enrutador.php`: `_contextos_para_operacion` Caso 2
+    deja de devolver `null` (carga total) y pasa a
+    devolver contextos parciales según la sesión y el
+    `dueno` del GET.
+- **v84c** (fix inferencia de `dueno`): las URLs de
+  `ventas.js` y `pasajeros.js` no pasan `dueno`, así que
+  el dueño no podía imprimir sus pasajes (fallaba
+  `obtener_venta_por_id` con "Venta no encontrada" en
+  carga parcial). Fix: `index.php` infiere `dueno` desde
+  la sesión si no viene en el GET (dueño → él mismo;
+  terminal → su dueño). Admin/soporte sin inferencia
+  (deben pasarlo explícito). También en v84c: agregar
+  `declaracion_jurada` a `$tipos_terminal` (el frontend
+  le muestra el botón al terminal cuando el dueño lo
+  autoriza, pero el pre-check lo rechazaba).
+- **v84d** (informe_ventas para terminal): el botón
+  "Informe" del terminal quedaba bloqueado. Fix:
+  `_puede_imprimir` recibe `$get` y agrega `informe_ventas`
+  a `$tipos_terminal`, con validación específica:
+  - Terminal: `tipo_ventas=terminal` → `nombre` == terminal
+    de sesión. `tipo_ventas=dueno` → `nombre` == dueño del
+    terminal. Otros → 403.
+  - Dueño: `tipo_ventas=dueno` → `nombre` == dueño de
+    sesión. `tipo_ventas=terminal` → permitido (el contexto
+    filtra si la terminal no es suya).
 
-- **`index.php`, bloque `?imprimir=1`**:
-  - Validar `$_SESSION`. Sin sesión → 403 sin cargar grafo.
-  - Validar permisos por `tipo`. Sin permiso → 403 sin cargar.
-  - Exigir `dueno` en el GET para los `tipo` que hoy caen
-    a carga total (los 6-7 helpers de B3.3c). Sin `dueno`
-    → 400. Esto **elimina** la carga total en impresión.
-- **`_contextos_para_operacion` Caso 2**: usar los
-  contextos del usuario de la sesión (no del `dueno` del
-  GET). Validar que el `dueno` del GET sea accesible
-  desde ese contexto.
-- **`Impresion.php`**: sin cambios. Solo que ahora el
-  bloque `?imprimir=1` ya validó sesión y permisos antes
-  de llamarlo.
+**Resultado:** el bloque `?imprimir=1` ya no es un endpoint
+público. Sin sesión → 403 sin cargar el grafo. Sin permiso
+sobre el tipo → 403 sin cargar. Carga siempre parcial
+(nunca total).
+
+**Comportamiento del botón "Informe" del terminal:** en la
+práctica el terminal solo ve sus propias ventas. Eso
+sucede porque el frontend manda `tipo_ventas=terminal`
+(y `_puede_imprimir` valida `nombre == terminal de
+sesión`). **Deuda latente**: si alguien construye a mano
+la URL `?imprimir=1&tipo=informe_ventas&tipo_ventas=dueno&nombre=<su_dueno>`
+desde el terminal, el backend lo permite y el informe
+muestra TODAS las ventas del dueño. Nadie lo explota hoy
+porque la UI no lo manda, pero es un leak. Endurecer en
+próxima iteración (restringir `informe_ventas` a
+`tipo_ventas=terminal` para terminal, o filtrar en
+`imprimir_informe_ventas`).
+
+**Trade-off del cierre remoto + impresión.** Si el dueño
+cierra la sesión de un terminal y el terminal intenta
+imprimir sin recargar la página, el pre-check pasa (el
+token sigue en `$_SESSION`) y la impresión funciona. Es
+el mismo trade-off de Fase 1 (el terminal se entera del
+cierre recién al recargar). Se endurece en Fase 3 con
+chequeo del token contra el grafo.
+
+**Sin cambios en `Impresion.php`, `aplicacion.js`, ni en
+las URLs del frontend.**
 
 **Sin carga total nueva, sin guardado nuevo.**
 

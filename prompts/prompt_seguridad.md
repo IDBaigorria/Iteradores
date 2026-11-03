@@ -1231,6 +1231,81 @@ sigue haciendo la misma carga total que antes.
 Ver `prompts/plan_actual.md` §8 para el plan completo
 (Fases 2, 3 y 4).
 
+### 8.12 Impresión cerrada (v1.5piloto.84b-v84d)
+
+**Problema.** Antes de v84b, las URLs `?imprimir=1&tipo=...`
+no validaban sesión ni permisos. Cualquiera con la URL veía
+datos de pasajeros (DNI, teléfonos, domicilios), montos,
+cancelaciones, etc. El plan de impresión era "la punta del
+iceberg" de un agujero mayor (POST confía en
+`nombre_solicitante` del cliente). Fase 2 cierra la punta;
+Fase 3 cierra la base.
+
+**Solución (v84b-v84d).** El bloque `?imprimir=1` corre un
+pre-check antes de cargar el grafo:
+
+1. Lee `usuario_sesion_actual()`. Sin sesión → 403.
+2. `_puede_imprimir($usuario, $tipo, $get)` valida tipo vs
+   nivel. Sin permiso → 403.
+3. Infiere `$_GET['dueno']` desde la sesión si no viene
+   (dueño → él mismo; terminal → su dueño).
+4. Recién ahí `_contextos_para_operacion` arma el contexto
+   parcial y se carga el grafo.
+
+**`_contextos_para_operacion` Caso 2.** Ya no devuelve
+`null` (carga total). Devuelve `['us_<dueno>']` (o
+`['us_<sesion>']` si no hay `dueno`). Carga siempre
+parcial.
+
+**Reglas de `_puede_imprimir`:**
+- Admin / soporte: cualquier tipo.
+- Dueño: los tipos de su subgrafo (`pasajes`, `cupon`,
+  `pasaje_reserva`, `pasajes_actualizados`,
+  `informe_ventas`, `informe_rendicion`,
+  `informe_liquidacion`, `informe_cancelacion`,
+  `croquis_micro`, `planilla_pasajeros_micro`,
+  `declaracion_jurada`).
+- Terminal: los tipos de su compartido (`pasajes`, `cupon`,
+  `pasaje_reserva`, `pasajes_actualizados`,
+  `informe_cancelacion`, `informe_ventas`,
+  `croquis_micro`, `planilla_pasajeros_micro`,
+  `declaracion_jurada`).
+
+**Caso especial `informe_ventas`.** El usuario puede pedir
+dos cosas distintas (`tipo_ventas=dueno` para ver todas las
+ventas del dueño, o `tipo_ventas=terminal` para ver solo
+las de una terminal). Se restringe el `nombre`:
+- Dueño: `tipo_ventas=dueno` → `nombre == dueño_sesion`.
+  `tipo_ventas=terminal` → permitido (el contexto filtra
+  si la terminal no es suya).
+- Terminal: `tipo_ventas=terminal` → `nombre == terminal_sesion`.
+  `tipo_ventas=dueno` → `nombre == dueno_sesion`.
+  Otros → 403.
+
+**Comportamiento del botón "Informe" del terminal.** En la
+práctica el terminal solo ve sus propias ventas porque el
+frontend manda `tipo_ventas=terminal`. **Deuda latente**:
+si alguien construye la URL a mano con
+`tipo_ventas=dueno&nombre=<su_dueno>`, el backend lo
+permite y el informe muestra TODAS las ventas del dueño.
+Nadie lo explota hoy porque la UI no lo manda. Endurecer en
+próxima iteración (restringir `informe_ventas` a
+`tipo_ventas=terminal` para terminal, o filtrar en
+`imprimir_informe_ventas`).
+
+**Trade-off del cierre remoto + impresión.** Si el dueño
+cierra la sesión de un terminal y el terminal intenta
+imprimir sin recargar la página, el pre-check pasa (el
+token sigue en `$_SESSION`) y la impresión funciona. Es el
+mismo trade-off de Fase 1 (el terminal se entera del
+cierre recién al recargar). Se endurece en Fase 3 con
+chequeo del token contra el grafo.
+
+**Sin cambios en `Impresion.php`, `aplicacion.js`, ni en
+las URLs del frontend.**
+
+Ver `prompts/plan_actual.md` §8.3 para el detalle completo.
+
 ---
 
 ## 9. PRÓXIMOS PASOS: REPLICAR EL PATRÓN

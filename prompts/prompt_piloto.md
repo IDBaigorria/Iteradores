@@ -921,6 +921,18 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 
 ## 7. HISTORIAL DE VERSIONES (resumen)
 
+- **v84b-v84d** (Fase 2 de seguridad: impresión cerrada).
+  El bloque `?imprimir=1` valida `$_SESSION` y permisos
+  (`_puede_imprimir`) antes de cargar el grafo. Carga
+  siempre parcial (nunca total). `dueno` se infiere desde
+  la sesión si no viene (v84c). `informe_ventas` habilitado
+  para terminal con validación de `tipo_ventas` + `nombre`
+  (v84d). `declaracion_jurada` agregado a `$tipos_terminal`
+  (v84c). Sin cambios en `Impresion.php`, ni en el
+  frontend. Deuda latente anotada en `plan_actual.md` §8.3
+  (URL armada a mano con `tipo_ventas=dueno` desde un
+  terminal).
+
 - **v84a** (Fase 1 de seguridad: sesión PHP). Login,
   logout y cierre remoto funcionando con `$_SESSION` +
   cookie PHPSESSID. `_construir_respuesta_login` guarda

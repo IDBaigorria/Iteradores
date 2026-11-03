@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.84c
+ * @version   1.5piloto.84d
  */
 
 // --- Utilidades base ----------------------------------
@@ -135,7 +135,7 @@ if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
         exit;
     }
     $tipo_imp = $_GET['tipo'] ?? '';
-    if (!_puede_imprimir($usuario_sesion_imp, $tipo_imp)) {
+    if (!_puede_imprimir($usuario_sesion_imp, $tipo_imp, $_GET)) {
         http_response_code(403);
         echo 'No tenés permiso para ver este contenido.';
         exit;
