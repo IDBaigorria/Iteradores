@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.84d
+ * @version   1.5piloto.84e
  */
 
 // --- Utilidades base ----------------------------------
@@ -227,9 +227,33 @@ if (isset($_GET['migrar_a_sql64'])) {
 // se carga total. Ver `prompts/plan_actual.md` §1.10.
 Controlador::establecer_metodo('SQL64');
 $nombre_app = ConfiguracionApli::NOMBRE_APP;
+
+// Fase 3 (v1.5piloto.84e): sesión server-side.
+// Pre-check: si la acción no es pública y no hay sesión,
+// 401 antes de cargar el grafo (ahorra la carga).
+// Para acciones públicas (login, validar), sigue el
+// comportamiento anterior: carga total (necesaria para
+// el bootstrap del admin y para verificar credenciales).
+$accion_pre_ctx = $_POST['accion'] ?? '';
+$es_publica_ctx = _es_accion_publica($accion_pre_ctx);
+$sesion_pre_ctx = usuario_sesion_actual();
+if ($accion_pre_ctx !== '' && !$es_publica_ctx && $sesion_pre_ctx === null) {
+    http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['exito' => false, 'error' => 'Sesión expirada o no iniciada. Volvé a iniciar sesión.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+// Nombre del solicitante para el contexto:
+//   - acciones no públicas → el de la sesión.
+//   - acciones públicas → el del POST (compat) o vacío.
+if ($accion_pre_ctx !== '' && !$es_publica_ctx && $sesion_pre_ctx !== null) {
+    $nombre_sol_ctx = (string)($sesion_pre_ctx['nombre_usuario'] ?? '');
+} else {
+    $nombre_sol_ctx = $_POST['nombre_solicitante'] ?? '';
+}
 $contextos_carga = _contextos_para_operacion(
-    $_POST['accion'] ?? '',
-    $_POST['nombre_solicitante'] ?? '',
+    $accion_pre_ctx,
+    $nombre_sol_ctx,
     $_GET
 );
 $modo_parcial = ($contextos_carga !== null);

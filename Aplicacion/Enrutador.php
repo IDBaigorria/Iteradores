@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.84d
+ * @version   1.5piloto.84e
  */
 
 use Iteradores\Nodos\Nodo;
@@ -20,6 +20,34 @@ function responder_json(array $datos): void {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($datos, JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+/**
+ * Devuelve true si la acción no requiere sesión.
+ *
+ * Fase 3 (v1.5piloto.84e). Las acciones públicas son
+ * las que se llaman antes de tener sesión:
+ *   - autenticar/verificar: login.
+ *   - administrador/verificar: legacy, chequeo de código
+ *     del admin sin sesión (sigue usado por algunas
+ *     pantallas).
+ *   - sesiones/validar: rehidratación de $_SESSION al
+ *     recargar la página.
+ *   - entorno/info: información del entorno, no
+ *     sensible.
+ *
+ * @param string $accion Acción en formato "modulo/subaccion".
+ * @return bool
+ * @since 1.5piloto.84e
+ */
+function _es_accion_publica(string $accion): bool {
+    static $publicas = [
+        'autenticar/verificar',
+        'administrador/verificar',
+        'sesiones/validar',
+        'entorno/info',
+    ];
+    return in_array($accion, $publicas, true);
 }
 
 /**
@@ -231,9 +259,13 @@ function _puede_imprimir(array $usuario_sesion, string $tipo, array $get = []): 
         if ($tipo === 'informe_ventas') {
             $tipo_ventas = (string)($get['tipo_ventas'] ?? 'dueno');
             $nombre_v = (string)($get['nombre'] ?? '');
-            if ($tipo_ventas === 'terminal') return $nombre_v === $nombre_sesion;
-            if ($tipo_ventas === 'dueno') return $nombre_v === $dueno_sesion;
-            return false;
+            // Fase 3 (v1.5piloto.84e): el terminal solo puede
+            // ver SUS propias ventas. Se exige
+            // tipo_ventas=terminal y nombre=terminal de sesión.
+            // Cierra el leak del camino antiguo (tipo_ventas=dueno
+            // + nombre del dueño → veía las ventas de otros
+            // terminales del mismo dueño).
+            return $tipo_ventas === 'terminal' && $nombre_v === $nombre_sesion;
         }
         return true;
     }
@@ -344,6 +376,24 @@ function enrutar_peticion_post(string $accion, array $post): void {
     $partes = explode('/', $accion);
     $modulo = $partes[0] ?? '';
     $subaccion = $partes[1] ?? '';
+
+    // Fase 3 (v1.5piloto.84e): sesión server-side.
+    // Para acciones no públicas, el nombre_solicitante sale
+    // de $_SESSION, no del POST. El POST puede seguir
+    // mandándolo (el interceptor del frontend lo hace),
+    // pero el backend lo ignora.
+    //
+    // index.php ya validó que la sesión existe antes de
+    // llegar acá. Este chequeo es defensa en profundidad
+    // (por si alguien llama a enrutar_peticion_post desde
+    // otro lugar en el futuro).
+    if (!_es_accion_publica($accion)) {
+        $sesion_f3 = usuario_sesion_actual();
+        if ($sesion_f3 === null) {
+            responder_json(['exito' => false, 'error' => 'Sesión expirada o no iniciada. Volvé a iniciar sesión.']);
+        }
+        $post['nombre_solicitante'] = (string)($sesion_f3['nombre_usuario'] ?? '');
+    }
 
     // Chequeo global: si viene nombre_solicitante y nombre_dueno,
     // verificar que el solicitante tenga permiso sobre ese dueño.
