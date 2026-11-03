@@ -27,7 +27,7 @@ para el detalle, referenciar.
 
 ## 1. ESTADO ACTUAL
 
-**Última actualización:** v1.5piloto.84d + framework 1.5i.7x
+**Última actualización:** v1.5piloto.84g + framework 1.5i.7x
 (**Validado en producción:** una semana en pruebas y
 una semana en producción sin errores visibles ni
 `[error]` en el log de persistencia. Todos los guardados
@@ -35,11 +35,13 @@ son `[info]`. Bug §4.7 cerrado y validado. Tanda 4
 (lock, usuario en log, cobertura de `guardar_ambos`,
 returns tempranos, login optimizado) confirmada en
 producción. Grupo A de limpieza aplicado (v83q).
-**Fases 1 y 2 de seguridad aplicadas (v84a-v84d):**
-sesión PHP con cookie PHPSESSID + `$_SESSION`, y
-endpoint de impresión cerrado (sesión + permisos +
-inferencia de `dueno` desde la sesión). Próxima fase:
-validación en POST. Ver §2 y §8).
+**Fases 1, 2 y 3 de seguridad aplicadas (v84a-v84g):**
+sesión PHP con cookie PHPSESSID + `$_SESSION`,
+impresión cerrada (sesión + permisos), POST valida
+sesión server-side, chequeo de token con TTL 30s
+(excluyendo polling), chequeo pre-escritura. Fase 4
+(tercer grafo de identidad) queda como deuda riesgosa.
+Ver §2 y §8).
 
 **Antes (v1.5piloto.82i):** piso en los flujos que faltaban
 (cambiar de asiento desde Clientes, impresión de
@@ -66,9 +68,10 @@ lo propaga el framework, no la app.
 
 **Versiones:**
 
-- **Piloto:** `1.5piloto.84d` (validado en producción
-  hasta v83q; v84a-v84d agregan sesión PHP e impresión
-  cerrada, sin cambios en persistencia).
+- **Piloto:** `1.5piloto.84g` (validado en producción
+  hasta v83q; v84a-v84g agregan sesión PHP, impresión
+  cerrada y validación server-side de sesión, sin
+  cambios en persistencia).
 - **Framework PHP:** `1.5i.7x` (SQL64, con singleton de
   conexión, `mysqli_report(OFF)`, `SELECT 1` en lugar de
   `ping()`, `IN (...)` en lugar de TEMPORARY TABLE,
@@ -115,6 +118,27 @@ temáticas y la persistencia de corridas en su propio grafo
 
 Resumen de 1-2 líneas por arco. El detalle completo vive en
 los prompts correspondientes o en los commits.
+
+- **Fase 3c de seguridad: chequeo pre-escritura (v84g).**
+  Antes de procesar acciones de escritura (lista blanca
+  en `_es_accion_escritura`), verificar el token SIEMPRE,
+  sin importar el TTL. `guardar_ambos` también chequea
+  (defensa en profundidad para flujos que no pasan por
+  el enrutador). Cierra la ventana entre el cierre
+  remoto y la próxima detección para escrituras. Ver §8.4c.
+
+- **Fase 3b de seguridad: chequeo de token con TTL (v84f).**
+  Chequeo periódico del token con TTL 30s. El polling
+  (`viajes/estado_asientos`) no dispara chequeo: usuario
+  inactivo con la app abierta = 0 hits extra. La sesión
+  NO se cierra por inactividad. Ver §8.4b.
+
+- **Fase 3 de seguridad: POST valida sesión server-side (v84e).**
+  El enrutador toma `nombre_solicitante` de `$_SESSION`,
+  no del POST. Leak latente de `informe_ventas` cerrado
+  (terminal solo ve sus propias ventas). Endpoints
+  temporales `?diag_persistencia=1` y
+  `?diagnostico_cancelaciones=1` eliminados. Ver §8.4.
 
 - **Fase 2 de seguridad: impresión cerrada (v1.5piloto.84b-v84d).**
   El bloque `?imprimir=1` valida `$_SESSION` y permisos
@@ -1299,9 +1323,10 @@ validado en producción.)
 
 ## 8. SEGURIDAD DE SESIONES E IDENTIDAD
 
-Estado al cierre de v1.5piloto.84d. Las Fases 1 y 2 están
-aplicadas y funcionando. Las Fases 3 y 4 son el plan
-pendiente.
+Estado al cierre de v1.5piloto.84g. Las Fases 1, 2 y 3
+están aplicadas y funcionando. La Fase 4 (tercer grafo
+de identidad) queda como deuda riesgosa, diferida por
+decisión consciente.
 
 ### 8.1. Estado antes de v84a
 
@@ -1425,10 +1450,19 @@ las URLs del frontend.**
 
 **Sin carga total nueva, sin guardado nuevo.**
 
-### 8.4. Fase 3 — validación en POST (pendiente)
+### 8.4. Fase 3 — validación en POST (v84e, aplicada)
 
-Objetivo: cerrar el agujero de "el enrutador confía en
-`nombre_solicitante` del cliente".
+**Resultado.** El enrutador toma `nombre_solicitante` de
+`$_SESSION`, no del POST. Las acciones no públicas sin
+sesión devuelven 401 antes de cargar el grafo. El leak
+latente de `informe_ventas` (terminal podía ver ventas
+del dueño armando la URL a mano) también se cerró:
+terminal solo puede `tipo_ventas=terminal` con `nombre`
+== terminal de sesión. Endpoints temporales
+`?diag_persistencia=1` y `?diagnostico_cancelaciones=1`
+eliminados. Detalle en `prompt_seguridad.md` §8.13.
+
+**Plan original (referencia histórica):**
 
 - **Enrutador**: derivar `nombre_solicitante` de
   `$_SESSION`, no del POST. El POST puede seguir
@@ -1444,8 +1478,38 @@ Objetivo: cerrar el agujero de "el enrutador confía en
 **Deuda asociada**: el login por código hoy es O(N) con
 `password_verify` por cada usuario. Solución: índice
 HMAC determinístico (`HMAC(secret, codigo) → us_<nombre>`).
+Ver §8.5 (Fase 4).
 
-### 8.5. Fase 4 — tercer grafo de identidad (pendiente)
+### 8.4b. Fase 3b — chequeo de token con TTL (v84f, aplicada)
+
+**Resultado.** Chequeo periódico del token contra el grafo
+de credenciales. TTL de 30s: como máximo 1 chequeo cada
+30s por usuario activo. El polling del sistema
+(`viajes/estado_asientos`) no dispara chequeo: usuario
+inactivo con la app abierta = 0 hits extra al hosting.
+**La sesión NO se cierra por inactividad**: vive hasta
+logout local, cierre remoto, o si el token dejó de estar
+en el grafo. Detalle en `prompt_seguridad.md` §8.13.
+
+### 8.4c. Fase 3c — chequeo pre-escritura (v84g, aplicada)
+
+**Resultado.** Las acciones de escritura (lista blanca en
+`_es_accion_escritura`) chequean el token SIEMPRE, sin
+importar el TTL. Cierra la ventana entre el cierre remoto
+y la próxima detección para escrituras. Además,
+`guardar_ambos` chequea el token antes de guardar
+(defensa en profundidad para flujos que no pasan por el
+enrutador: comandos, migraciones). Sin sesión no chequea
+(bootstrap, migraciones CLI). Detalle en
+`prompt_seguridad.md` §8.13.
+
+### 8.5. Fase 4 — tercer grafo de identidad (pendiente, riesgosa)
+
+**Estado.** Diferida por decisión consciente. Requiere una
+migración riesgosa (mover datos entre grafos, agregar
+`indices/codigos_hmac`, tocar el login). Con la app en
+producción andando, no es momento. Se retoma cuando haya
+una ventana de mantenimiento.
 
 Objetivo: sacar el esqueleto `usuarios` de la app y de
 credenciales. Hoy `usuarios → us_<nombre>` está duplicado

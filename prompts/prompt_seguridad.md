@@ -1306,6 +1306,72 @@ las URLs del frontend.**
 
 Ver `prompts/plan_actual.md` §8.3 para el detalle completo.
 
+### 8.13 Chequeo server-side y pre-escritura (v84e-v84g)
+
+**Problema.** Hasta v84d, el enrutador confiaba en el
+`nombre_solicitante` del POST, y el cierre remoto de
+sesión (dueño cierra terminal) no se detectaba hasta el
+próximo page load. La ventana entre el cierre y la
+detección podía ser de horas si el terminal quedaba
+abierto.
+
+**Solución en tres capas.**
+
+**Capa 1 — POST valida sesión server-side (v84e).**
+- `_es_accion_publica(accion)`: `autenticar/verificar`,
+  `administrador/verificar`, `sesiones/validar`,
+  `entorno/info`. El resto requiere sesión.
+- `enrutar_peticion_post`: para acciones no públicas, el
+  `nombre_solicitante` se toma de `$_SESSION`, no del POST.
+- `index.php`: pre-check 401 antes de cargar el grafo. Sin
+  sesión → 401 sin cargar.
+- Leak latente cerrado: el terminal ya no puede imprimir
+  `informe_ventas` con `tipo_ventas=dueno`. Solo
+  `tipo_ventas=terminal` con `nombre` == terminal de sesión.
+
+**Capa 2 — chequeo de token con TTL 30s (v84f).**
+- `_es_accion_polling(accion)`: `viajes/estado_asientos`.
+  El polling del sistema no cuenta como actividad ni
+  dispara chequeo.
+- En `enrutar_peticion_post`, para acciones no públicas y
+  no polling, si `ultima_validacion_token > 30s`, verificar
+  el token contra el grafo. Si falla, 401.
+- **La sesión NO se cierra por inactividad.** Vive hasta
+  logout local, cierre remoto, o si el token dejó de estar
+  en el grafo.
+- Usuario inactivo con la app abierta (solo polling) = 0
+  hits extra al hosting.
+- Usuario activo: chequeo cada 30s como máximo.
+
+**Capa 3 — chequeo pre-escritura (v84g).**
+- `_es_accion_escritura(accion)`: lista blanca de acciones
+  que modifican el grafo. `sesiones/cerrar` queda fuera
+  (ya valida `_puede_cerrar_sesion`).
+- Para acciones de escritura, verificar el token SIEMPRE,
+  sin importar el TTL. Cierra la ventana entre el cierre
+  remoto y la próxima detección para escrituras.
+- `guardar_ambos` también chequea el token antes de
+  guardar (defensa en profundidad para flujos que no pasan
+  por el enrutador: comandos, migraciones). Sin sesión no
+  chequea (bootstrap, migraciones CLI).
+
+**Trade-offs aceptados.**
+- El polling no dispara chequeo: usuario inactivo con la
+  app abierta = 0 hits. Bien para hostings con límite de
+  hits.
+- Escrituras tienen ventana 0: cualquier click que
+  modifique el grafo detecta el cierre remoto.
+- Lecturas tienen ventana 30s: molesto pero tolerable
+  (leer sin token no es grave).
+
+**Lo que NO se cierra.**
+- Fase 4 (tercer grafo de identidad + HMAC): riesgosa,
+  diferida. La app en producción anda bien, no es momento
+  de migrar.
+
+Ver `prompts/plan_actual.md` §8.4-8.4c y §8.5 para el
+detalle completo.
+
 ---
 
 ## 9. PRÓXIMOS PASOS: REPLICAR EL PATRÓN

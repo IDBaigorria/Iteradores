@@ -921,6 +921,19 @@ Dos sub-bloques alternables: por código o por usuario+contraseña.
 
 ## 7. HISTORIAL DE VERSIONES (resumen)
 
+- **v84e-v84g** (Fase 3 de seguridad: POST server-side,
+  chequeo de token, chequeo pre-escritura).
+  - **v84e**: el enrutador toma `nombre_solicitante` de
+    `$_SESSION`, no del POST. Pre-check 401 antes de
+    cargar el grafo. Leak latente de `informe_ventas`
+    cerrado. Endpoints temporales `?diag_persistencia=1`
+    y `?diagnostico_cancelaciones=1` eliminados.
+  - **v84f**: chequeo de token con TTL 30s. El polling
+    (`viajes/estado_asientos`) no dispara chequeo. La
+    sesión NO se cierra por inactividad.
+  - **v84g**: chequeo pre-escritura, siempre. `guardar_ambos`
+    también chequea.
+
 - **v84b-v84d** (Fase 2 de seguridad: impresión cerrada).
   El bloque `?imprimir=1` valida `$_SESSION` y permisos
   (`_puede_imprimir`) antes de cargar el grafo. Carga
