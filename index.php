@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.83k
+ * @version   1.5piloto.84b
  */
 
 // --- Utilidades base ----------------------------------
@@ -110,6 +110,31 @@ Entorno::establecer_modo(Conf::LOCAL ? Entorno::MODO_PRUEBAS : Entorno::MODO_PRO
 // Alinear el prefijo de sesión del framework con el del piloto
 // (el framework no conoce el nombre de la app).
 Entorno::establecer_prefijo_sesion(ConfiguracionApli::PREFIJO_SESSION);
+
+// ==== Fase 2 (v1.5piloto.84b): pre-check de impresión ====
+// Valida sesión y permisos ANTES de cargar el grafo. Sin
+// sesión o sin permiso → 403 sin cargar nada. Con esto,
+// ?imprimir=1 deja de ser un endpoint público.
+//
+// Trade-off documentado en `plan_actual.md` §8.2: si la
+// sesión fue cerrada remotamente pero el navegador no
+// recargó, el token sigue en $_SESSION y el pre-check
+// pasa. Se endurece en Fase 3 con chequeo periódico del
+// token contra el grafo de credenciales.
+if (isset($_GET['imprimir']) && $_GET['imprimir'] === '1') {
+    $usuario_sesion_imp = usuario_sesion_actual();
+    if (!$usuario_sesion_imp) {
+        http_response_code(403);
+        echo 'Sesión no válida. Iniciá sesión para ver esta página.';
+        exit;
+    }
+    $tipo_imp = $_GET['tipo'] ?? '';
+    if (!_puede_imprimir($usuario_sesion_imp, $tipo_imp)) {
+        http_response_code(403);
+        echo 'No tenés permiso para ver este contenido.';
+        exit;
+    }
+}
 
 // ==== Migración a SQL64 (v1.5piloto.78e) ====
 // Pasa el grafo del formato SQL (tablas nodo/adyacente) al

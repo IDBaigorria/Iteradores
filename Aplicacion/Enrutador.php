@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.84a
+ * @version   1.5piloto.84b
  */
 
 use Iteradores\Nodos\Nodo;
@@ -153,6 +153,58 @@ function _nombre_dueno_solicitante(string $nombre_solicitante, array $post = [])
 }
 
 /**
+ * Devuelve true si el usuario de la sesión puede imprimir el tipo.
+ *
+ * Fase 2 (v1.5piloto.84b). Valida `tipo` contra el `nivel` del
+ * usuario de la sesión. No navega el grafo: es un chequeo de
+ * defensa en profundidad, la restricción real la hace el contexto
+ * (si el recurso no está en el contexto del usuario, no se
+ * encuentra).
+ *
+ * Reglas:
+ *   - Admin / soporte: cualquier tipo.
+ *   - Dueño: los tipos de su subgrafo (informe_*, pasajes, cupon,
+ *     pasaje_reserva, pasajes_actualizados, croquis_micro,
+ *     planilla_pasajeros_micro, declaracion_jurada).
+ *   - Terminal: los tipos de su compartido (pasajes, cupon,
+ *     pasaje_reserva, pasajes_actualizados, informe_cancelacion,
+ *     croquis_micro, planilla_pasajeros_micro).
+ *   - Cualquier otro: false.
+ *
+ * Nota sobre pasajes_actualizados e informe_cancelacion para
+ * terminal: requieren que el URL pase `dueno` para que el
+ * contexto cargue el árbol `ventas`/`cancelaciones` del dueño
+ * con nombres default. Si no pasa `dueno`, el terminal recibe
+ * una lista vacía (o "no encontrada"), no un 403. Es el
+ * comportamiento actual, no empeora.
+ *
+ * @param array  $usuario_sesion Array de `usuario_sesion_actual()`.
+ * @param string $tipo           Tipo de impresión.
+ * @return bool
+ * @since 1.5piloto.84b
+ */
+function _puede_imprimir(array $usuario_sesion, string $tipo): bool {
+    $nivel = (string)($usuario_sesion['nivel'] ?? '');
+    if ($nivel === 'admin' || $nivel === 'soporte') return true;
+
+    $tipos_dueno = [
+        'pasajes', 'cupon', 'pasaje_reserva', 'pasajes_actualizados',
+        'informe_ventas', 'informe_rendicion', 'informe_liquidacion',
+        'informe_cancelacion', 'croquis_micro', 'planilla_pasajeros_micro',
+        'declaracion_jurada',
+    ];
+    $tipos_terminal = [
+        'pasajes', 'cupon', 'pasaje_reserva', 'pasajes_actualizados',
+        'informe_cancelacion', 'croquis_micro', 'planilla_pasajeros_micro',
+    ];
+
+    if ($nivel === 'dueno') return in_array($tipo, $tipos_dueno, true);
+    if ($nivel === 'terminal') return in_array($tipo, $tipos_terminal, true);
+
+    return false;
+}
+
+/**
  * Devuelve los contextos que hay que cargar para una
  * operación dada, según el solicitante.
  *
@@ -215,20 +267,24 @@ function _contextos_para_operacion(string $accion, string $nombre_solicitante, a
         return ['us_' . $nombre_solicitante];
     }
 
-    // Caso 2: GET de impresión. Los flujos imprimibles pasan
-    // el dueño por query string. Si está, carga parcial de
-    // ese dueño. Si no, carga total (los 6 helpers de B3.3c
-    // que iteran sobre todos los dueños todavía no están
-    // reescritos; ver `plan_actual.md` §1.10).
+    // Caso 2: GET de impresión. Fase 2 (v1.5piloto.84b):
+    // el pre-check de index.php ya validó sesión y permisos
+    // antes de llegar acá. El contexto se arma con:
+    //   - el `dueno` del GET si viene (backward compat con
+    //     las URLs existentes que lo pasan);
+    //   - si no, el contexto natural del usuario de la sesión
+    //     (us_<nombre>).
+    // En ningún caso se hace carga total: siempre parcial.
     if (isset($get['imprimir']) && $get['imprimir'] === '1') {
-        $dueno = $get['dueno'] ?? '';
-        if ($dueno === '') return null;
+        $usuario_imp = usuario_sesion_actual();
+        if ($usuario_imp === null) return null; // defensivo (pre-check ya devolvió 403)
+        $nombre_imp = (string)($usuario_imp['nombre_usuario'] ?? '');
+        if ($nombre_imp === '') return null;
 
-        // Fase B3.3c (v1.5piloto.81j): los informes de
-        // cancelación, liquidación y rendición ahora navegan
-        // directo por us_<dueño>. Se eliminó la excepción de
-        // carga total que existía acá.
-        return ['us_' . $dueno];
+        $dueno_imp = trim((string)($get['dueno'] ?? ''));
+        if ($dueno_imp !== '') return ['us_' . $dueno_imp];
+
+        return ['us_' . $nombre_imp];
     }
 
     // Caso 3: cualquier otro GET. Incluye:
