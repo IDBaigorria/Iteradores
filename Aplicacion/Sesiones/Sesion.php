@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.84a
+ * @version   1.5piloto.84f
  */
 
 use Iteradores\Nodos\Nodo;
@@ -202,6 +202,10 @@ function guardar_sesion_php(array $usuario): void {
         'token_sesion' => (string)($usuario['token_sesion'] ?? ''),
     ];
     $_SESSION[$prefijo . 'ultima_actividad'] = time();
+    // Fase 3b (v1.5piloto.84f): inicializar la marca de
+    // validación del token al loguear, para no chequear en
+    // el primer request post-login.
+    $_SESSION[$prefijo . 'ultima_validacion_token'] = time();
 }
 
 /**
@@ -236,6 +240,7 @@ function limpiar_sesion_php(): void {
     $prefijo = Entorno::prefijo_sesion();
     unset($_SESSION[$prefijo . 'usuario']);
     unset($_SESSION[$prefijo . 'ultima_actividad']);
+    unset($_SESSION[$prefijo . 'ultima_validacion_token']);
 }
 
 /**

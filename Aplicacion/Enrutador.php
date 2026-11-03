@@ -4,12 +4,13 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.84e
+ * @version   1.5piloto.84f
  */
 
 use Iteradores\Nodos\Nodo;
 use Iteradores\Controlador\Controlador;
 use Iteradores\Configuracion\Conf;
+use Iteradores\Configuracion\Entorno;
 /**
  * Envía una respuesta JSON y termina la ejecución.
  *
@@ -48,6 +49,27 @@ function _es_accion_publica(string $accion): bool {
         'entorno/info',
     ];
     return in_array($accion, $publicas, true);
+}
+
+/**
+ * Devuelve true si la acción es un polling del sistema.
+ *
+ * Fase 3b (v1.5piloto.84f). El polling del sistema
+ * (estado de asientos cada 15s) no cuenta como
+ * "actividad del usuario" y no dispara el chequeo
+ * periódico del token. Eso evita hits innecesarios
+ * al hosting cuando el usuario deja la app abierta
+ * sin hacer nada.
+ *
+ * @param string $accion Acción en formato "modulo/subaccion".
+ * @return bool
+ * @since 1.5piloto.84f
+ */
+function _es_accion_polling(string $accion): bool {
+    static $pollings = [
+        'viajes/estado_asientos',
+    ];
+    return in_array($accion, $pollings, true);
 }
 
 /**
@@ -393,6 +415,31 @@ function enrutar_peticion_post(string $accion, array $post): void {
             responder_json(['exito' => false, 'error' => 'Sesión expirada o no iniciada. Volvé a iniciar sesión.']);
         }
         $post['nombre_solicitante'] = (string)($sesion_f3['nombre_usuario'] ?? '');
+    }
+
+    // Fase 3b (v1.5piloto.84f): chequeo periódico del token.
+    // Endurece el cierre remoto (dueño cierra la sesión de un
+    // terminal). TTL de 30s: como máximo 1 chequeo cada 30s
+    // por usuario activo. El polling del sistema
+    // (viajes/estado_asientos) no dispara chequeo, para no
+    // sumar hits al hosting cuando el usuario está inactivo
+    // con la app abierta. La sesión NO se cierra por
+    // inactividad: solo por logout, cierre remoto, o si el
+    // token dejó de estar en el grafo.
+    if (!_es_accion_publica($accion) && !_es_accion_polling($accion)) {
+        $prefijo_tok = Entorno::prefijo_sesion();
+        $ultima_val = (int)($_SESSION[$prefijo_tok . 'ultima_validacion_token'] ?? 0);
+        if (time() - $ultima_val > 30) {
+            $token_actual = token_sesion_actual();
+            if ($token_actual !== null) {
+                $res_tok = validar_token_sesion($token_actual);
+                if ($res_tok === null) {
+                    limpiar_sesion_php();
+                    responder_json(['exito' => false, 'error' => 'Sesión cerrada o expirada. Volvé a iniciar sesión.']);
+                }
+                $_SESSION[$prefijo_tok . 'ultima_validacion_token'] = time();
+            }
+        }
     }
 
     // Chequeo global: si viene nombre_solicitante y nombre_dueno,
