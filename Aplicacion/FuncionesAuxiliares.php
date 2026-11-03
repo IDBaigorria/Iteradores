@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.37
- * @version   1.5piloto.78t
+ * @version   1.5piloto.84g
  */
 
 use Iteradores\Controlador\Controlador;
@@ -344,6 +344,37 @@ function guardar_ambos($nombre): bool {
     if (!Nodo::hay_nodos_en_superestructura()) {
         Controlador::_error("guardar_ambos: superestructura vacia para \"$nombre\". Se aborta para no pisar el grafo.");
         return false;
+    }
+
+    // Fase 3c (v1.5piloto.84g): chequeo pre-guardado.
+    // Defensa en profundidad. Si hay sesión activa y su
+    // token dejó de estar en el grafo (cierre remoto),
+    // abortar. El enrutador ya chequea antes de procesar
+    // escrituras, pero este chequeo cubre flujos que no
+    // pasan por el enrutador (comandos, migraciones). Si
+    // no hay sesión, no chequear (bootstrap, migraciones
+    // CLI, comandos).
+    if (session_status() === PHP_SESSION_ACTIVE
+        && function_exists('usuario_sesion_actual')
+        && function_exists('validar_token_sesion')
+        && function_exists('token_sesion_actual')
+        && class_exists('\Iteradores\Configuracion\Entorno')) {
+        $sesion_ga = usuario_sesion_actual();
+        if ($sesion_ga !== null) {
+            $token_ga = token_sesion_actual();
+            if ($token_ga !== null) {
+                $prefijo_ga = \Iteradores\Configuracion\Entorno::prefijo_sesion();
+                $ultima_val_ga = (int)($_SESSION[$prefijo_ga . 'ultima_validacion_token'] ?? 0);
+                if (time() - $ultima_val_ga > 30) {
+                    $res_ga = validar_token_sesion($token_ga);
+                    if ($res_ga === null) {
+                        Controlador::_error("guardar_ambos: token de sesion invalido (cierre remoto?). Se aborta el guardado de \"$nombre\".");
+                        return false;
+                    }
+                    $_SESSION[$prefijo_ga . 'ultima_validacion_token'] = time();
+                }
+            }
+        }
     }
 
     // Fase de carga parcial (v1.5piloto.78c): si el grafo en

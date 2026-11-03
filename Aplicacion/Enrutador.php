@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.84f
+ * @version   1.5piloto.84g
  */
 
 use Iteradores\Nodos\Nodo;
@@ -70,6 +70,94 @@ function _es_accion_polling(string $accion): bool {
         'viajes/estado_asientos',
     ];
     return in_array($accion, $pollings, true);
+}
+
+/**
+ * Devuelve true si la acción modifica el grafo (escritura).
+ *
+ * Fase 3c (v1.5piloto.84g). Para estas acciones, el
+ * chequeo pre-escritura verifica el token SIEMPRE (sin
+ * importar el TTL de 30s). Cierra la ventana entre el
+ * cierre remoto y la próxima detección: leer sin token
+ * es molesto, escribir sin token es grave.
+ *
+ * `sesiones/cerrar` queda fuera a propósito: ya valida
+ * `_puede_cerrar_sesion` y sumar un chequeo extra en
+ * cada logout es costo sin beneficio.
+ *
+ * @param string $accion Acción en formato "modulo/subaccion".
+ * @return bool
+ * @since 1.5piloto.84g
+ */
+function _es_accion_escritura(string $accion): bool {
+    static $escrituras = [
+        // administrador
+        'administrador/agregar_usuario',
+        'administrador/actualizar_usuario',
+        'administrador/eliminar_usuario',
+        'administrador/limpiar_usuarios_prueba',
+        // dueno (terminales)
+        'dueno/agregar_terminal',
+        'dueno/actualizar_terminal',
+        'dueno/eliminar_terminal',
+        'dueno/limpiar_terminales_prueba',
+        // empresas
+        'empresas/agregar',
+        'empresas/editar',
+        'empresas/eliminar',
+        'empresas/limpiar_prueba',
+        // vehiculos
+        'vehiculos/agregar',
+        'vehiculos/actualizar',
+        'vehiculos/actualizar_configuracion',
+        'vehiculos/eliminar',
+        'vehiculos/subir_foto',
+        // viajes
+        'viajes/limpiar_prueba',
+        'viajes/guardar',
+        'viajes/guardar_declaracion',
+        'viajes/eliminar',
+        'viajes/agregar_micro',
+        'viajes/eliminar_micro',
+        'viajes/migrar_pasajeros',
+        'viajes/agregar_terminal',
+        'viajes/eliminar_terminal',
+        'viajes/actualizar_monto_micro',
+        'viajes/seleccionar_asiento',
+        'viajes/deseleccionar_asiento',
+        'viajes/reiniciar_seleccion_completa',
+        'viajes/reservar_asiento',
+        'viajes/asignar_pasajero_reserva',
+        'viajes/liberar_reserva_asiento',
+        'viajes/cambiar_asiento',
+        'viajes/guardar_opciones_avanzadas',
+        'viajes/guardar_opciones_terminal',
+        // ventas
+        'ventas/confirmar',
+        'ventas/cancelar',
+        'ventas/pagar_cupon',
+        'ventas/guardar',
+        'ventas/limpiar_prueba',
+        // pasajeros
+        'pasajeros/crear',
+        'pasajeros/subir_declaracion',
+        'pasajeros/eliminar_declaracion',
+        'pasajeros/actualizar',
+        'pasajeros/eliminar',
+        'pasajeros/limpiar_prueba',
+        // rendiciones
+        'rendiciones/confirmar',
+        'rendiciones/aceptar_ajuste',
+        // liquidaciones
+        'liquidaciones/confirmar',
+        // cancelaciones
+        'cancelaciones/limpiar_prueba',
+        // grafo
+        'grafo/eliminar_huerfanos',
+        'grafo/migracion_limpiar',
+        'grafo/migraciones_aplicar',
+    ];
+    return in_array($accion, $escrituras, true);
 }
 
 /**
@@ -415,6 +503,25 @@ function enrutar_peticion_post(string $accion, array $post): void {
             responder_json(['exito' => false, 'error' => 'Sesión expirada o no iniciada. Volvé a iniciar sesión.']);
         }
         $post['nombre_solicitante'] = (string)($sesion_f3['nombre_usuario'] ?? '');
+    }
+
+    // Fase 3c (v1.5piloto.84g): chequeo pre-escritura.
+    // Si la acción modifica el grafo, verificar el token
+    // SIEMPRE, sin importar el TTL de 30s. Cierra la
+    // ventana entre el cierre remoto y la próxima
+    // detección (en lecturas puede ser de hasta 30s, en
+    // escrituras es 0).
+    if (!_es_accion_publica($accion) && _es_accion_escritura($accion)) {
+        $prefijo_esc = Entorno::prefijo_sesion();
+        $token_esc = token_sesion_actual();
+        if ($token_esc !== null) {
+            $res_esc = validar_token_sesion($token_esc);
+            if ($res_esc === null) {
+                limpiar_sesion_php();
+                responder_json(['exito' => false, 'error' => 'Sesión cerrada o expirada. Volvé a iniciar sesión.']);
+            }
+            $_SESSION[$prefijo_esc . 'ultima_validacion_token'] = time();
+        }
     }
 
     // Fase 3b (v1.5piloto.84f): chequeo periódico del token.
