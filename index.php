@@ -27,7 +27,7 @@ use Iteradores\Nodos\Nodo;
  * @author Ignacio David Baigorria
  * @package   Iteradores
  * @since     1.0.0
- * @version   1.5piloto.84f
+ * @version   1.5piloto.84h
  */
 
 // --- Utilidades base ----------------------------------
@@ -87,6 +87,7 @@ require_once __DIR__ . '/Aplicacion/Autenticacion/Autenticacion.php';
 require_once __DIR__ . '/Aplicacion/Empresas/Empresa.php';
 require_once __DIR__ . '/Aplicacion/Vehiculos/Vehiculo.php';
 require_once __DIR__ . '/Aplicacion/Viajes/Viaje.php';
+require_once __DIR__ . '/Aplicacion/Viajes/ViajeRenumerar.php';
 require_once __DIR__ . '/Aplicacion/Ventas/Venta.php';
 require_once __DIR__ . '/Aplicacion/Pasajeros/Pasajero.php';
 require_once __DIR__ . '/Aplicacion/Rendiciones/Rendicion.php';

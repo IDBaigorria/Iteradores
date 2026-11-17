@@ -4,7 +4,7 @@
  *
  * @package   Iteradores
  * @since     1.5piloto.1
- * @version   1.5piloto.84g
+ * @version   1.5piloto.84h
  */
 
 use Iteradores\Nodos\Nodo;
@@ -1207,6 +1207,30 @@ function enrutar_peticion_post(string $accion, array $post): void {
                     // Fase 1c.2: contexto del solicitante.
                     $nodo_contexto = _contexto_solicitante($nombre_solicitante);
                     $resultado = actualizar_monto_micro($nombre_viaje, $nombre_micro, $monto, $nombre_dueno, $nodo_contexto);
+                    responder_json($resultado);
+                    break;
+
+                case 'renumerar_asientos':
+                    // v84h: renumerar los asientos de un micro del viaje.
+                    // Solo dueño/admin/soporte. El terminal no.
+                    $nombre_viaje = $post['nombre_viaje'] ?? '';
+                    $nombre_micro = $post['nombre_micro'] ?? '';
+                    $nombre_dueno = $post['nombre_dueno'] ?? '';
+                    $mapa_json = $post['mapa'] ?? '[]';
+                    if (empty($nombre_viaje) || empty($nombre_micro) || empty($nombre_dueno)) {
+                        responder_json(['exito' => false, 'error' => 'Parámetros incompletos']);
+                    }
+                    $nodo_sol_ren = ($nombre_solicitante !== '') ? Nodo::nodo_por_id('us_' . $nombre_solicitante) : null;
+                    $nivel_ren = $nodo_sol_ren && $nodo_sol_ren->adyacente('nivel') ? $nodo_sol_ren->adyacente('nivel')->dato() : '';
+                    if (!in_array($nivel_ren, ['admin', 'soporte', 'dueno'], true)) {
+                        responder_json(['exito' => false, 'error' => 'Solo dueño, admin o soporte pueden renumerar asientos']);
+                    }
+                    $mapa = json_decode($mapa_json, true);
+                    if (!is_array($mapa)) {
+                        responder_json(['exito' => false, 'error' => 'Mapa inválido']);
+                    }
+                    $nodo_contexto = _contexto_solicitante($nombre_solicitante);
+                    $resultado = renumerar_asientos_micro($nombre_dueno, $nombre_viaje, $nombre_micro, $mapa, $nodo_contexto);
                     responder_json($resultado);
                     break;
 

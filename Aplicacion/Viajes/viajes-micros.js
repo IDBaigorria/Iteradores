@@ -1,7 +1,290 @@
 /**
  * Micros y terminales dentro de viajes.
- * @version 1.5piloto.82f
+ * @version 1.5piloto.84h
  */
+
+// ============================================================
+// v84h: renumerar asientos de un micro de viaje.
+//
+// El modal muestra una grilla por piso con los numeros
+// actuales. Doble click en una celda abre un prompt para
+// cambiar el numero. Click simple selecciona la celda para
+// usar "Renumerar desde aca" (cascada ascendente).
+//
+// Advertencia al usuario: los pasajes ya impresos no
+// cambian. Los que se reimpriman van a salir con los
+// numeros nuevos. Ventas y reservas existentes siguen
+// funcionando (referencian el nodo asiento, no el numero).
+// ============================================================
+async function abrir_modal_renumerar_asientos(nombre_micro) {
+    if (!viaje_seleccionado) return;
+
+    // Bloquear si hay una venta en curso.
+    if (typeof window.venta_en_curso === 'function') {
+        try {
+            if (window.venta_en_curso()) {
+                mostrar_aviso('Hay una venta en curso. Termínala o cancelala antes de renumerar.', 'error');
+                return;
+            }
+        } catch (e) { /* ignorar */ }
+    }
+
+    const nombre_dueno = obtener_nombre_dueno_actual();
+
+    // Pedir la configuracion del micro.
+    let micro_data = null;
+    try {
+        const r = await fetch("index.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                accion: "viajes/obtener_micro",
+                nombre_viaje: viaje_seleccionado.nombre_viaje,
+                nombre_micro,
+                nombre_dueno
+            })
+        });
+        const d = await r.json();
+        if (!d.exito || !d.micro) {
+            mostrar_aviso(d.error || "No se pudo cargar el micro", 'error');
+            return;
+        }
+        micro_data = d.micro;
+    } catch (e) {
+        mostrar_aviso("Error de comunicación", 'error');
+        return;
+    }
+
+    const configuracion = micro_data.configuracion || { pisos: [] };
+    const pisos = JSON.parse(JSON.stringify(configuracion.pisos || []));
+    if (pisos.length === 0 || pisos.every(p => !p.asientos || p.asientos.length === 0)) {
+        mostrar_aviso("El micro no tiene asientos configurados", 'error');
+        return;
+    }
+
+    let html = `
+        <p class="muted small">Los pasajes ya impresos no cambian. Los que se reimpriman van a salir con los números nuevos. Las ventas y reservas existentes siguen funcionando: el pasajero mantiene su asiento (misma fila y columna), solo cambia el número visible.</p>
+        <p class="muted small"><b>Doble click</b> en una celda para cambiar su número. <b>Click simple</b> para seleccionarla y usar "Renumerar desde acá" (cascada ascendente).</p>
+        <div id="renumerar_pisos_container"></div>
+        <div class="actions" style="margin-top:15px;">
+            <button class="btn" id="renumerar_reiniciar">Reiniciar numeración (1..N)</button>
+            <button class="btn" id="renumerar_desde_aqui" disabled>Renumerar desde acá</button>
+            <button class="btn primary" id="renumerar_guardar">Guardar</button>
+            <button class="btn" id="renumerar_cancelar">Cancelar</button>
+        </div>
+    `;
+
+    abrir_modal_apilado('Renumerar asientos', html);
+    const contenedor = document.getElementById('modal_apilado_contenido');
+    if (!contenedor) return;
+
+    const contenedor_pisos = contenedor.querySelector('#renumerar_pisos_container');
+    let asiento_sel = null; // { idx_piso, fila, columna }
+
+    const _quitar_outline = () => {
+        contenedor.querySelectorAll('.celda-editor.seleccionado').forEach(el => {
+            el.classList.remove('seleccionado');
+            el.style.outline = '';
+            el.style.outlineOffset = '';
+        });
+    };
+
+    const render = () => {
+        contenedor_pisos.innerHTML = '';
+        pisos.forEach((piso, idx_piso) => {
+            const piso_div = document.createElement('div');
+            piso_div.className = 'editor-piso';
+            piso_div.innerHTML = `<h4>Piso ${idx_piso + 1}</h4><div class="cuadricula-editor" data-piso="${idx_piso}"></div>`;
+            contenedor_pisos.appendChild(piso_div);
+
+            const cuadricula = piso_div.querySelector('.cuadricula-editor');
+            for (let f = 1; f <= piso.filas; f++) {
+                const filaDiv = document.createElement('div');
+                filaDiv.className = 'seat-row';
+                for (let c = 1; c <= piso.columnas; c++) {
+                    const a = piso.asientos.find(x => parseInt(x.fila) === f && parseInt(x.columna) === c);
+                    const celda = document.createElement('div');
+                    if (a) {
+                        celda.className = 'celda-editor asiento';
+                        celda.textContent = a.numero;
+                        celda.dataset.piso = String(idx_piso + 1);
+                        celda.dataset.fila = String(a.fila);
+                        celda.dataset.columna = String(a.columna);
+
+                        celda.addEventListener('dblclick', (e) => {
+                            e.preventDefault();
+                            const nuevo = prompt("Número de asiento:", a.numero);
+                            if (nuevo !== null && nuevo.trim() !== '') {
+                                a.numero = nuevo.trim();
+                                render();
+                            }
+                        });
+
+                        celda.addEventListener('click', () => {
+                            _quitar_outline();
+                            celda.classList.add('seleccionado');
+                            celda.style.outline = '3px solid #007bff';
+                            celda.style.outlineOffset = '1px';
+                            asiento_sel = { idx_piso, fila: a.fila, columna: a.columna };
+                            const btn = contenedor.querySelector('#renumerar_desde_aqui');
+                            if (btn) btn.disabled = false;
+                        });
+                    } else {
+                        celda.className = 'celda-editor vacio';
+                    }
+                    filaDiv.appendChild(celda);
+                }
+                cuadricula.appendChild(filaDiv);
+            }
+        });
+    };
+
+    render();
+
+    // Reiniciar numeracion (1..N).
+    contenedor.querySelector('#renumerar_reiniciar').addEventListener('click', () => {
+        if (!confirm('¿Renumerar TODOS los asientos de 1 a N en orden (piso, fila, columna)? Los números actuales se pisan.')) return;
+        let contador = 1;
+        pisos.forEach(piso => {
+            piso.asientos.sort((a, b) => {
+                if (parseInt(a.fila) !== parseInt(b.fila)) return parseInt(a.fila) - parseInt(b.fila);
+                return parseInt(a.columna) - parseInt(b.columna);
+            });
+            piso.asientos.forEach(a => {
+                a.numero = String(contador);
+                contador++;
+            });
+        });
+        render();
+        asiento_sel = null;
+        contenedor.querySelector('#renumerar_desde_aqui').disabled = true;
+        mostrar_aviso('Numeración reiniciada. Guardá para aplicar.', 'info');
+    });
+
+    // Renumerar desde aca (cascada ascendente).
+    contenedor.querySelector('#renumerar_desde_aqui').addEventListener('click', () => {
+        if (!asiento_sel) return;
+        const { idx_piso, fila, columna } = asiento_sel;
+        const piso_sel = pisos[idx_piso];
+        if (!piso_sel) return;
+
+        // Ordenar una copia para recorrer en orden.
+        const ordenados = [...piso_sel.asientos].sort((a, b) => {
+            if (parseInt(a.fila) !== parseInt(b.fila)) return parseInt(a.fila) - parseInt(b.fila);
+            return parseInt(a.columna) - parseInt(b.columna);
+        });
+
+        const idx_inicio = ordenados.findIndex(a =>
+            parseInt(a.fila) === parseInt(fila) && parseInt(a.columna) === parseInt(columna)
+        );
+        if (idx_inicio === -1) return;
+
+        const actual = ordenados[idx_inicio];
+        const numero_inicio = parseInt(actual.numero);
+        if (isNaN(numero_inicio)) {
+            mostrar_aviso('El número actual del asiento seleccionado no es numérico. No se puede continuar la cascada.', 'error');
+            return;
+        }
+
+        let contador = numero_inicio + 1;
+        for (let i = idx_inicio + 1; i < ordenados.length; i++) {
+            ordenados[i].numero = String(contador);
+            contador++;
+        }
+
+        render();
+        asiento_sel = null;
+        contenedor.querySelector('#renumerar_desde_aqui').disabled = true;
+        mostrar_aviso('Cascada aplicada. Guardá para aplicar.', 'info');
+    });
+
+    // Guardar.
+    contenedor.querySelector('#renumerar_guardar').addEventListener('click', async () => {
+        const mapa = [];
+        pisos.forEach((piso, idx_piso) => {
+            piso.asientos.forEach(a => {
+                mapa.push({
+                    piso: String(idx_piso + 1),
+                    fila: String(a.fila),
+                    columna: String(a.columna),
+                    numero: String(a.numero).trim()
+                });
+            });
+        });
+
+        // Validacion local: sin duplicados.
+        const vistos = new Set();
+        for (const e of mapa) {
+            if (e.numero === '') {
+                mostrar_aviso('Hay un número vacío', 'error');
+                return;
+            }
+            if (vistos.has(e.numero)) {
+                mostrar_aviso(`Número duplicado: ${e.numero}`, 'error');
+                return;
+            }
+            vistos.add(e.numero);
+        }
+
+        const btn = contenedor.querySelector('#renumerar_guardar');
+        btn.disabled = true;
+        btn.textContent = 'Guardando...';
+
+        try {
+            const r = await fetch("index.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    accion: "viajes/renumerar_asientos",
+                    nombre_viaje: viaje_seleccionado.nombre_viaje,
+                    nombre_micro,
+                    nombre_dueno,
+                    mapa: JSON.stringify(mapa)
+                })
+            });
+            const res = await r.json();
+            if (res.exito) {
+                cerrar_modal_apilado();
+                mostrar_aviso(`Asientos renumerados (${res.cambios} cambios)`, 'exito');
+
+                // Refrescar contadores (lista de micros).
+                await refrescar_contadores_viaje_actual();
+
+                // Si el croquis del micro esta abierto, refrescarlo
+                // (pedir el micro de nuevo y re-renderizar).
+                if (typeof micro_seleccionado !== 'undefined' && micro_seleccionado === nombre_micro
+                    && !document.getElementById('pasaje_micro_viaje')?.classList.contains('hidden')) {
+                    try {
+                        const r2 = await fetch("index.php", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                            body: new URLSearchParams({
+                                accion: "viajes/obtener_micro",
+                                nombre_viaje: viaje_seleccionado.nombre_viaje,
+                                nombre_micro,
+                                nombre_dueno
+                            })
+                        });
+                        const d2 = await r2.json();
+                        if (d2.exito && d2.micro) {
+                            renderizar_pasaje_micro(d2.micro);
+                        }
+                    } catch (e) { console.error(e); }
+                }
+            } else {
+                mostrar_aviso(res.error || "Error al renumerar", 'error');
+                btn.disabled = false;
+                btn.textContent = 'Guardar';
+            }
+        } catch (e) {
+            mostrar_aviso("Error de conexión: " + e.message, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Guardar';
+        }
+    });
+
+    contenedor.querySelector('#renumerar_cancelar').addEventListener('click', cerrar_modal_apilado);
+}
 
 function renderizar_micros_viaje(micros) {
     const contenedor = $("#lista_micros_viaje");
@@ -21,6 +304,7 @@ function renderizar_micros_viaje(micros) {
             <button class="btn btn-ver-pasaje" data-micro="${micro.nombre_micro}">${textoBoton}</button>
             ${usuario_actual.nivel !== 'terminal' ? `
                 <button class="btn btn-editar-monto" data-micro="${micro.nombre_micro}" data-monto="${micro.monto ?? '0'}">Editar monto</button>
+                <button class="btn btn-renumerar-asientos" data-micro="${micro.nombre_micro}">Renumerar asientos</button>
                 ${(parseInt(micro.vendidos || 0) + parseInt(micro.reservados || 0)) > 0 ? `<button class="btn btn-migrar-pasajeros" data-micro="${micro.nombre_micro}">Migrar pasajeros a...</button>` : ''}
                 <button class="btn btn-eliminar-micro" data-micro="${micro.nombre_micro}">Quitar</button>
             ` : ''}
@@ -32,6 +316,8 @@ function renderizar_micros_viaje(micros) {
         if (btnEditarMonto) btnEditarMonto.addEventListener('click', () => editar_monto_micro(micro.nombre_micro, micro.monto ?? '0'));
         const btnMigrar = div.querySelector('.btn-migrar-pasajeros');
         if (btnMigrar) btnMigrar.addEventListener('click', () => abrir_modal_migrar_pasajeros(micro.nombre_micro));
+        const btnRenumerar = div.querySelector('.btn-renumerar-asientos');
+        if (btnRenumerar) btnRenumerar.addEventListener('click', () => abrir_modal_renumerar_asientos(micro.nombre_micro));
         const btnQuitar = div.querySelector('.btn-eliminar-micro');
         if (btnQuitar) btnQuitar.addEventListener('click', () => eliminar_micro(micro.nombre_micro));
     });
