@@ -1,193 +1,25 @@
 <?php
 /**
- * Aplicador — Plan: Fase A (refactor de usuarios) + Fase B (juego).
- *
- * Solo toca prompts/plan_actual.md. Sin bumps.
+ * Aplicador — A.0: plan de Fase A (refactor de usuarios + grafo identidad).
  *
  * Uso (raíz del proyecto): php aplicar_cambios.php
  */
 
 $modo_estricto = true;
 $raiz_proyecto = __DIR__;
-$version_nueva = '';
+$version_nueva = '1.5piloto.84i';
 $htmls_a_bumpear = [];
 
 $cambios = [
-    // ============================================================
-    // Header de §1
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §1: header v84h + Fases A y B',
-        'buscar' => [
-            '**Última actualización:** v1.5piloto.84g + framework 1.5i.7x',
-            '(**Validado en producción:** una semana en pruebas y',
-            'una semana en producción sin errores visibles ni',
-            '`[error]` en el log de persistencia. Todos los guardados',
-            'son `[info]`. Bug §4.7 cerrado y validado. Tanda 4',
-            '(lock, usuario en log, cobertura de `guardar_ambos`,',
-            'returns tempranos, login optimizado) confirmada en',
-            'producción. Grupo A de limpieza aplicado (v83q).',
-            '**Fases 1, 2 y 3 de seguridad aplicadas (v84a-v84g):**',
-            'sesión PHP con cookie PHPSESSID + `$_SESSION`,',
-            'impresión cerrada (sesión + permisos), POST valida',
-            'sesión server-side, chequeo de token con TTL 30s',
-            '(excluyendo polling), chequeo pre-escritura. Fase 4',
-            '(tercer grafo de identidad) queda como deuda riesgosa.',
-            'Ver §2 y §8).',
-        ],
-        'reemplazar' => [
-            '**Última actualización:** v1.5piloto.84h + framework 1.5i.7x',
-            '(**Validado en producción:** una semana en pruebas y',
-            'una semana en producción sin errores visibles ni',
-            '`[error]` en el log de persistencia. Todos los guardados',
-            'son `[info]`. Bug §4.7 cerrado y validado. Tanda 4',
-            '(lock, usuario en log, cobertura de `guardar_ambos`,',
-            'returns tempranos, login optimizado) confirmada en',
-            'producción. Grupo A de limpieza aplicado (v83q).',
-            '**Fases 1, 2 y 3 de seguridad aplicadas (v84a-v84g):**',
-            'sesión PHP con cookie PHPSESSID + `$_SESSION`,',
-            'impresión cerrada (sesión + permisos), POST valida',
-            'sesión server-side, chequeo de token con TTL 30s',
-            '(excluyendo polling), chequeo pre-escritura.',
-            '**v84h:** renumeración de asientos de un micro de',
-            'viaje aplicada (`renumerar_asientos_micro` + subacción',
-            '`viajes/renumerar_asientos` + modal en',
-            '`viajes-micros.js`). **Plan de Fase A (refactor de',
-            'usuarios en framework) y Fase B (juego en 2 modos)',
-            'agregado:** ver §8.5 y §9. Ver §2 y §8).',
-        ],
-    ],
 
-    // ============================================================
-    // §2: arco de v84h antes de Fase 3c
-    // ============================================================
+    // ────────────────────────────────────────────────────────────
+    // B1: §5.5 — tabla de Fase A refinada
+    // ────────────────────────────────────────────────────────────
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §2: arco v84h renumerar',
+        'descripcion' => '§5.5 tabla Fase A refinada (A.1b, columna Destructiva, objetivo de fondo)',
         'buscar' => [
-            '- **Fase 3c de seguridad: chequeo pre-escritura (v84g).**',
-        ],
-        'reemplazar' => [
-            '- **v84h: renumerar asientos de un micro de viaje.**',
-            '  Nuevo módulo `Aplicacion/Viajes/ViajeRenumerar.php`',
-            '  con `renumerar_asientos_micro` (cambia solo el `dato`',
-            '  de cada nodo asiento; no toca pasajeros, ventas ni',
-            '  reservas). Subacción `viajes/renumerar_asientos` en',
-            '  el Enrutador (solo dueño/admin/soporte). Modal en',
-            '  `viajes-micros.js` con grilla, edición por doble',
-            '  click, "Reiniciar numeración (1..N)" y "Renumerar',
-            '  desde acá" (cascada ascendente). Detalle en §5.5.',
-            '',
-            '- **Fase 3c de seguridad: chequeo pre-escritura (v84g).**',
-        ],
-    ],
-
-    // ============================================================
-    // §3: dos decisiones nuevas al final
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §3: decisiones app + juego',
-        'buscar' => [
-            '- **Cada cambio al piloto lleva su espejo de pruebas en el',
-            '  plugin.** Salvo excepción justificada (estilos, refactor',
-            '  sin cambio de comportamiento, herramientas de admin).',
-        ],
-        'reemplazar' => [
-            '- **Cada cambio al piloto lleva su espejo de pruebas en el',
-            '  plugin.** Salvo excepción justificada (estilos, refactor',
-            '  sin cambio de comportamiento, herramientas de admin).',
-            '- **`app` va en identidad, no en credenciales (Fase A,',
-            '  §8.5).** El campo `app` ("viajes" | "juego" | "tienda"',
-            '  | "global") vive en `perfil_<nombre>` del grafo de',
-            '  identidad. Credenciales se carga on-demand (login,',
-            '  validar token); identidad se carga al arranque de cada',
-            '  request. El `app` es dato de perfil (ruteo), no de',
-            '  autenticación. Default en migración: `"viajes"`.',
-            '  Admin global: `"global"`.',
-            '- **Grafo `AdministradorDeJuego` separado del de viajes',
-            '  (Fase B, §9).** Aunque el usuario sea el mismo (mismo',
-            '  `nombre_usuario` en los 3 grafos), los datos del juego',
-            '  (partidas, preguntas, respuestas) no comparten grafo',
-            '  con viajes. El login es único; el ruteo por `app`',
-            '  decide qué grafo cargar.',
-        ],
-    ],
-
-    // ============================================================
-    // §5.2: fila nueva en la tabla del framework
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §5.2: fila usuarios+identidad',
-        'buscar' => [
-            '| **Iteradores con ID especial + ocupante** | Raíces de subgrafo con posición mutable. Resolvería B3.3c. | Pendiente |',
-        ],
-        'reemplazar' => [
-            '| **Iteradores con ID especial + ocupante** | Raíces de subgrafo con posición mutable. Resolvería B3.3c. | Pendiente |',
-            '| **Usuarios al framework + grafo identidad** | Sistema de usuarios sale de `Aplicacion/`; tercer grafo `identidad` con `perfil_*` y `app`; HMAC login O(1); carga parcial por grafo. Ver §8.5 (Fase A). | Pendiente |',
-        ],
-    ],
-
-    // ============================================================
-    // §5.3: bullets de multi-app y juego
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §5.3: multi-app y juego',
-        'buscar' => [
-            '- **Multi-cliente.** Cada cliente con su subdominio y su',
-            '  propio grafo, misma base de código.',
-            '  `Conf::NOMBRE_APP` derivado del subdominio. Ver',
-            '  `prompt_piloto.md` §1.4.',
-        ],
-        'reemplazar' => [
-            '- **Multi-cliente.** Cada cliente con su subdominio y su',
-            '  propio grafo, misma base de código.',
-            '  `Conf::NOMBRE_APP` derivado del subdominio. Ver',
-            '  `prompt_piloto.md` §1.4.',
-            '- **Multi-app por usuario.** Un mismo usuario puede',
-            '  acceder a varias apps (viajes, juego, tienda) con el',
-            '  mismo login. El campo `app` en `perfil_<nombre>`',
-            '  (identidad) indica la app activa. Admin con',
-            '  `app = "global"` ve todas. Ver §8.5 (Fase A).',
-            '- **Juego de trivia.** Grafo `AdministradorDeJuego`',
-            '  separado, con dos modos (directo y plugin). Ver §9',
-            '  (Fase B).',
-        ],
-    ],
-
-    // ============================================================
-    // §5: agregar §5.5 antes de "## 6. ARCO EN CURSO"
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §5.5: fases A y B resumen',
-        'buscar' => [
-            '  inferidos por enlace, patrón de grilla adaptativo al',
-            '  zoom.',
-            '',
-            '---',
-            '',
-            '## 6. ARCO EN CURSO — 4 módulos menores al contexto del solicitante',
-        ],
-        'reemplazar' => [
-            '  inferidos por enlace, patrón de grilla adaptativo al',
-            '  zoom.',
-            '',
-            '### 5.5. Refactor de usuarios + juego (Fases A y B)',
-            '',
-            'Plan de fases para el refactor del sistema de usuarios',
-            '(Fase A) y el juego de trivia (Fase B). Detalle',
-            'completo en §8.5 y §9 respectivamente.',
-            '',
             '**Fase A — Refactor de usuarios + identidad (ver §8.5):**',
             '',
             '| Tanda | Qué hace | Estado |',
@@ -197,78 +29,50 @@ $cambios = [
             '| **A.3** | Carga parcial por grafo + ruteo por `app`. | Pendiente |',
             '| **A.4** | Mover `Usuarios/`, `Sesiones/`, `Autenticacion/`, `GrafoCredenciales.php` al framework. | Pendiente |',
             '| **A.5** | Limpieza: remover `usuarios` de app y credenciales (destructiva). | Pendiente |',
+        ],
+        'reemplazar' => [
+            '**Fase A — Refactor de usuarios + identidad (ver §8.5):**',
             '',
-            '**Fase B — Juego de trivia (ver §9):**',
+            '**Objetivo de fondo:** sacar el nodo raíz `usuarios` de los',
+            'grafos app y credenciales. Hoy `us_Administrador → usuarios`',
+            'hace que la "carga parcial" del admin arrastre los subgrafos',
+            'de todos los usuarios (carga total encubierta). El grafo',
+            '`identidad` reemplaza esa función con un registro liviano:',
+            'solo `app`, `nivel`, `nombre_real`, `email`, `dueno` y',
+            '`duenos` por usuario. Los selects del admin y el ruteo por',
+            'app se sirven desde identidad; los datos de negocio se',
+            'cargan por subgrafo específico.',
+            '',
+            '**Estrategia de ruteo (B):** el `app` de cada usuario se',
+            'cachea en `$_SESSION` al login. En cada request se lee de',
+            'ahí, sin cargar identidad. Identidad se carga solo cuando',
+            'el admin abre un select o cuando hace falta listar usuarios.',
+            'Cero carga de identidad en el 99% de los requests.',
+            '',
+            '**Naming:** `us_<nombre>` en los 3 grafos (app,',
+            'credenciales, identidad). Consistencia de nomenclatura;',
+            'el código que navega `usuarios → <nombre> → us_<nombre>`',
+            'funciona igual en los 3.',
             '',
             '| Tanda | Qué hace | Estado |',
             '|---|---|---|',
-            '| **B.1** | Modelo de partida + endpoints base. | Pendiente |',
-            '| **B.2** | UI owner (proyector) + UI terminal (modo directo). | Pendiente |',
-            '| **B.3** | Ranking + empates + persistencia. | Pendiente |',
-            '| **B.4** | Plugin de chat YouTube (modo inyección). | Pendiente |',
-            '| **B.5** | Pruebas con celulares reales. | Pendiente |',
-            '',
-            '---',
-            '',
-            '## 6. ARCO EN CURSO — 4 módulos menores al contexto del solicitante',
+            '| **A.1** | Crear grafo `identidad` + nodo raíz `usuarios` + `us_<nombre>` por usuario (con `app`, `nivel`, `nombre_real`, `email`, `dueno`, `duenos`). Comando `app:migrar_a_identidad`. No toca app ni credenciales. | **En curso** |',
+            '| **A.1b** | Migrar los listados que solo necesitan identidad (`listar_usuarios` para selects, `listar_duenos`, `listar_soportes`, `listar_duenos_de_soporte`, `listar_nombres_usuarios_para_soporte`) a leer del grafo identidad. Los listados con datos de negocio (efectivo, banco, pasajes, codigo_asignado) siguen leyendo del app. | Pendiente |',
+            '| **A.2** | HMAC + login O(1) con fallback O(N). | Pendiente |',
+            '| **A.3** | Ruteo por `app` en `index.php` y Enrutador + caché de `app` en `$_SESSION`. Carga parcial por grafo. | Pendiente |',
+            '| **A.4** | Mover `Usuarios/`, `Sesiones/`, `Autenticacion/`, `GrafoCredenciales.php` al framework. | Pendiente |',
+            '| **A.5** | Limpieza: remover `usuarios` de app y credenciales. **Destructiva. Backup previo obligatorio.** | Pendiente |',
         ],
     ],
 
-    // ============================================================
-    // §8 header: mención de Fase A
-    // ============================================================
+    // ────────────────────────────────────────────────────────────
+    // B2: §8.5 — Estado + Motivación + Diseño + Estructura del perfil
+    // ────────────────────────────────────────────────────────────
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §8: header con Fase A',
+        'descripcion' => '§8.5 Estado + Objetivo + Diseño + Estructura del perfil',
         'buscar' => [
-            '## 8. SEGURIDAD DE SESIONES E IDENTIDAD',
-            '',
-            'Estado al cierre de v1.5piloto.84g. Las Fases 1, 2 y 3',
-            'están aplicadas y funcionando. La Fase 4 (tercer grafo',
-            'de identidad) queda como deuda riesgosa, diferida por',
-            'decisión consciente.',
-        ],
-        'reemplazar' => [
-            '## 8. SEGURIDAD DE SESIONES E IDENTIDAD',
-            '',
-            'Estado al cierre de v1.5piloto.84h. Las Fases 1, 2 y 3',
-            'están aplicadas y funcionando. Lo que antes se llamaba',
-            '"Fase 4 (tercer grafo de identidad)" se expandió a la',
-            '**Fase A completa** (refactor del sistema de usuarios +',
-            'grafo `identidad` + `app` en perfil + HMAC + carga',
-            'parcial por grafo), con plan detallado en §8.5. No',
-            'implementada todavía.',
-        ],
-    ],
-
-    // ============================================================
-    // §8.5: rewrite completo como Fase A
-    // ============================================================
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §8.5: rewrite como Fase A completa',
-        'buscar' => [
-            '### 8.5. Fase 4 — tercer grafo de identidad (pendiente, riesgosa)',
-            '',
-            '**Estado.** Diferida por decisión consciente. Requiere una',
-            'migración riesgosa (mover datos entre grafos, agregar',
-            '`indices/codigos_hmac`, tocar el login). Con la app en',
-            'producción andando, no es momento. Se retoma cuando haya',
-            'una ventana de mantenimiento.',
-            '',
-            'Objetivo: sacar el esqueleto `usuarios` de la app y de',
-            'credenciales. Hoy `usuarios → us_<nombre>` está duplicado',
-            'en ambos grafos, y al admin/soporte la carga "parcial"',
-            'le trae todo (desde `usuarios` se alcanza a cada',
-            '`us_<nombre>` con su subgrafo).',
-            '',
-            '**Diseño propuesto:** tercer grafo `AdministradorDeViajes_identidad`.',
-        ],
-        'reemplazar' => [
-            '### 8.5. Fase A — Refactor del sistema de usuarios (plan)',
-            '',
             '**Estado.** Plan aprobado, no implementado. La app sigue',
             'funcionando con el modelo actual. La migración es no',
             'destructiva por fases, así que se puede correr con la',
@@ -293,30 +97,20 @@ $cambios = [
             'como "enganche" entre credenciales y los grafos de',
             'aplicación. El punto de unión es el `nombre_usuario`',
             '(string), no un enlace de grafo.',
-        ],
-    ],
-    [
-        'tipo' => 'reemplazar',
-        'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual §8.5: bullets y footer con A.1-A.5',
-        'buscar' => [
-            '- `usuarios` sale del grafo de la app y del de credenciales.',
-            '- `perfil_<nombre>` tiene `nivel`, `nombre_real`, `email`,',
-            '  `dueno`/`duenos` (strings). Liviano (~5 nodos).',
-            '- El admin/soporte carga `[\'usuarios\']` desde identidad',
-            '  (solo perfiles) y, cuando opera sobre un usuario',
-            '  específico, `[\'us_<nombre>\']` desde app o credenciales.',
-            '- El índice HMAC (login por código O(1)) vive en identidad.',
-            '- `en_grafo_identidad` helper nuevo (o generalizar',
-            '  `en_grafo_credenciales`).',
             '',
-            '**Esfuerzo**: 3-4 tandas. Bloqueado por Fases 2 y 3.',
+            '```',
+            'Grafo identidad:',
+            '  usuarios → <nombre> → perfil_<nombre>   (esqueleto liviano)',
+            '  indices  → codigos_hmac → <hmac> → perfil_<nombre>',
             '',
-            '**Deuda de diseño**: dejar el Nodo limpio antes de agregar',
-            'más métodos de indexación (256 bits, HMAC, primos). Ver',
-            '`prompt_framework_iteradores.md` §11.4.',
-        ],
-        'reemplazar' => [
+            'Grafo app:',
+            '  us_<nombre> (raíz propia) → publico, privado, ventas, ...',
+            '',
+            'Grafo credenciales:',
+            '  us_<nombre> (raíz propia) → codigo_hash, contrasena, ...',
+            '  sesiones → <token> → sesion → usuario',
+            '```',
+            '',
             '**Estructura de `perfil_<nombre>`:**',
             '',
             '```',
@@ -328,7 +122,80 @@ $cambios = [
             '  ├─ duenos          contenedor (solo soporte: un hijo por dueño)',
             '  └─ app             "viajes" | "juego" | "tienda" | "global"',
             '```',
+        ],
+        'reemplazar' => [
+            '**Estado.** A.1 en curso. La app sigue funcionando con el',
+            'modelo actual. La migración es no destructiva por fases,',
+            'así que se puede correr con la app andando.',
             '',
+            '**Objetivo de fondo.** Sacar el nodo raíz `usuarios` de',
+            'los grafos app y credenciales. Hoy `us_Administrador →',
+            'usuarios` hace que la "carga parcial" del admin arrastre',
+            'los subgrafos de todos los usuarios (carga total',
+            'encubierta). Con el grafo `identidad`, el admin carga',
+            'solo perfiles livianos para los selects, y los datos de',
+            'negocio se cargan por subgrafo específico cuando hacen',
+            'falta.',
+            '',
+            '**Tres objetivos:**',
+            '',
+            '1. **Escalar.** Eliminar la carga total encubierta del',
+            '   admin. Ningún request debe arrastrar subgrafos',
+            '   ajenos.',
+            '2. **Multi-app.** Los usuarios acceden a varias apps',
+            '   (viajes, juego, tienda) con el mismo login. El',
+            '   campo `app` en identidad indica la app activa.',
+            '3. **Reutilización.** El sistema de usuarios sale de',
+            '   `Aplicacion/` y se mueve al framework, disponible',
+            '   para todas las apps.',
+            '',
+            '**Diseño:** tercer grafo `AdministradorDeViajes_identidad`',
+            'como registro liviano de usuarios. El punto de unión',
+            'con los otros grafos es el `nombre_usuario` (string),',
+            'no un enlace de grafo.',
+            '',
+            '```',
+            'Grafo identidad:',
+            '  usuarios → <nombre> → us_<nombre>   (perfil liviano)',
+            '  indices  → codigos_hmac → <hmac> → us_<nombre>',
+            '',
+            'Grafo app:',
+            '  us_<nombre> (raíz propia) → publico, privado, ventas, ...',
+            '  (el nodo raíz `usuarios` se elimina en A.5)',
+            '',
+            'Grafo credenciales:',
+            '  us_<nombre> (raíz propia) → codigo_hash, contrasena, ...',
+            '  sesiones → <token> → sesion → usuario',
+            '  (el nodo raíz `usuarios` se elimina en A.5)',
+            '```',
+            '',
+            '**Estructura del perfil `us_<nombre>` en identidad:**',
+            '',
+            '```',
+            'us_<nombre_usuario>',
+            '  ├─ nivel           "admin" | "dueno" | "terminal" | "soporte"',
+            '  ├─ nombre_real     string',
+            '  ├─ email           string (opcional)',
+            '  ├─ dueno           (solo terminal: nombre del dueño)',
+            '  ├─ duenos          contenedor (solo soporte: un hijo por dueño)',
+            '  └─ app             "viajes" | "juego" | "tienda" | "global"',
+            '```',
+            '',
+            '**Naming:** `us_<nombre>` en los 3 grafos (app,',
+            'credenciales, identidad). Consistencia de nomenclatura;',
+            'el código que navega `usuarios → <nombre> → us_<nombre>`',
+            'funciona igual en los 3.',
+        ],
+    ],
+
+    // ────────────────────────────────────────────────────────────
+    // B3: §8.5 — Decisión sobre app + Carga parcial + Ruteo por app
+    // ────────────────────────────────────────────────────────────
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => '§8.5 Estrategia B + carga parcial por grafo + ruteo por app',
+        'buscar' => [
             '**Decisión sobre `app`:** va en **identidad**, no en',
             'credenciales. Credenciales se carga on-demand (login,',
             'validar token); identidad se carga al arranque de cada',
@@ -355,21 +222,77 @@ $cambios = [
             'carga ese grafo. El Enrutador hace lo mismo en cada',
             'POST. Exactamente el mismo patrón que',
             '`nombre_solicitante` desde v84e.',
+        ],
+        'reemplazar' => [
+            '**Estrategia de ruteo (B): `app` en `$_SESSION`.**',
             '',
+            '- Al login, `_construir_respuesta_login` guarda `app` en',
+            '  `$_SESSION` junto con `nivel`, `dueno`, `duenos` y',
+            '  `token_sesion` (extiende lo que ya hace v84a).',
+            '- En cada request, `index.php` lee `$_SESSION[\'app\']` y',
+            '  carga el grafo correspondiente. No carga identidad.',
+            '- Identidad se carga **solo** cuando el admin abre un',
+            '  select o cuando hace falta listar usuarios.',
+            '- Trade-off: `app` en sesión puede quedar stale hasta',
+            '  el próximo refresco. Mismo trade-off que el token',
+            '  (TTL 30s). Aceptable: un cambio de `app` es raro y',
+            '  no pierde datos.',
+            '- Se implementa en **A.3** (junto con el ruteo). A.1',
+            '  solo crea el grafo; A.2 solo el HMAC.',
+            '',
+            '**Carga parcial por grafo (A.3).** `_contextos_para_operacion`',
+            'devuelve un mapa por grafo, no un solo valor:',
+            '',
+            '- **Admin:** `identidad=[\'usuarios\']` (perfiles livianos)',
+            '  + `app=[<subgrafo del objetivo>]` (solo lo que necesita).',
+            '- **Soporte:** `identidad=[\'usuarios\']` (perfiles) +',
+            '  `app=[\'us_<soporte>\']`.',
+            '- **Dueño:** `identidad=null` (no necesita la lista) +',
+            '  `app=[\'us_<dueno>\']`.',
+            '- **Terminal:** `identidad=null` +',
+            '  `app=[\'us_<terminal>\']`.',
+            '',
+            'Con `usuarios` eliminado de app y credenciales (A.5),',
+            'ningún request arrastra subgrafos ajenos.',
+            '',
+            '**Ruteo por app (A.3).** `index.php` lee',
+            '`$_SESSION[\'app\']`, resuelve el nombre del grafo',
+            'con un mapa (`app → ConfiguracionApli::NOMBRE_APP_*`) y',
+            'carga ese grafo. El Enrutador hace lo mismo en cada',
+            'POST. Exactamente el mismo patrón que',
+            '`nombre_solicitante` desde v84e.',
+        ],
+    ],
+
+    // ────────────────────────────────────────────────────────────
+    // B4: §8.5 — Login O(1) con HMAC (solo `perfil_<nombre>` → `us_<nombre>`)
+    // ────────────────────────────────────────────────────────────
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => '§8.5 Login O(1): perfil_<nombre> → us_<nombre>',
+        'buscar' => [
             '**Login O(1) con HMAC.**',
             '',
             '- Al crear/editar código: `h = HMAC(secret, codigo)`,',
             '  se guarda `indices/codigos_hmac/<h> → perfil_<nombre>`.',
-            '- Al login por código: `h = HMAC(secret, codigo_ingresado)`',
-            '  → lookup directo → `password_verify` 1 sola vez.',
-            '- O(N) → O(1). Con 1000 usuarios: ~50ms vs ~50s.',
-            '- Secret HMAC en `config_servidor.php`',
-            '  (`Conf::SECRET_HMAC`).',
-            '- Fallback: si `indices/codigos_hmac` está vacío',
-            '  (usuarios viejos sin migrar), usa el recorrido O(N)',
-            '  actual. Migración no destructiva.',
-            '- Login por usuario+contraseña ya es O(1), sin cambios.',
+        ],
+        'reemplazar' => [
+            '**Login O(1) con HMAC.**',
             '',
+            '- Al crear/editar código: `h = HMAC(secret, codigo)`,',
+            '  se guarda `indices/codigos_hmac/<h> → us_<nombre>`.',
+        ],
+    ],
+
+    // ────────────────────────────────────────────────────────────
+    // B5: §8.5 — Tandas + Riesgo + Estimación
+    // ────────────────────────────────────────────────────────────
+    [
+        'tipo' => 'reemplazar',
+        'archivo' => 'prompts/plan_actual.md',
+        'descripcion' => '§8.5 Tandas de Fase A (A.1b, columna Destructiva)',
+        'buscar' => [
             '**Tandas (Fase A):**',
             '',
             '| Tanda | Qué hace |',
@@ -386,133 +309,52 @@ $cambios = [
             '',
             '**Estimación:** 3-4 sesiones de trabajo. A.1 y A.2 son',
             'las más pesadas (migración + HMAC + script).',
+        ],
+        'reemplazar' => [
+            '**Tandas (Fase A):**',
             '',
-            '**Deuda de diseño (heredada):** dejar el Nodo limpio',
-            'antes de agregar más métodos de indexación (256 bits,',
-            'HMAC, primos). Ver `prompt_framework_iteradores.md`',
-            '§11.4.',
+            '| Tanda | Qué hace | Toca | Destructiva |',
+            '|---|---|---|---|',
+            '| **A.1** | Crea grafo `identidad` + `us_<nombre>` por usuario + nodo `indices` vacío. Comando `app:migrar_a_identidad`. | `ConfiguracionApli.php`, `index.php`, `Migraciones/` | No |',
+            '| **A.1b** | Migra los listados que solo necesitan identidad a leer del grafo identidad. Los listados con datos de negocio siguen leyendo del app. | `Usuario.php`, `index.php` | No |',
+            '| **A.2** | HMAC + login O(1) con fallback O(N). Script de migración del índice. | `Autenticacion.php`, `Migraciones/` | No |',
+            '| **A.3** | Ruteo por `app` en `index.php` y Enrutador + caché de `app` en `$_SESSION`. Carga parcial por grafo. | `index.php`, `Enrutador.php`, `Sesion.php` | No |',
+            '| **A.4** | Mover `Aplicacion/Usuarios/`, `Sesiones/`, `Autenticacion/`, `GrafoCredenciales.php` al framework (namespace + referencias). | muchos | No |',
+            '| **A.5** | Limpieza: remover `usuarios` de app y credenciales. **Backup previo obligatorio.** Si falla, A.1-A.4 siguen funcionando (convivencia con el modelo viejo). | muchos | **Sí** |',
+            '',
+            '**Deuda de diseño (heredada):** dejar el Nodo limpio antes',
+            'de agregar más métodos de indexación (256 bits, HMAC,',
+            'primos). Ver `prompt_framework_iteradores.md` §11.4.',
         ],
     ],
 
-    // ============================================================
-    // Insertar §9 (Fase B juego) antes de la nota histórica
-    // y renombrar la nota histórica a §10
-    // ============================================================
+    // ────────────────────────────────────────────────────────────
+    // B6: §1 — agregar párrafo "A.1 en curso"
+    // ────────────────────────────────────────────────────────────
     [
         'tipo' => 'reemplazar',
         'archivo' => 'prompts/plan_actual.md',
-        'descripcion' => 'plan_actual: insertar §9 juego y renombrar §10',
+        'descripcion' => '§1 agregar estado A.1 en curso',
         'buscar' => [
-            '## 9. NOTA HISTÓRICA',
+            '`viajes-micros.js`). **Plan de Fase A (refactor de',
+            'usuarios en framework) y Fase B (juego en 2 modos)',
+            'agregado:** ver §8.5 y §9. Ver §2 y §8).',
         ],
         'reemplazar' => [
-            '## 9. PLAN DEL JUEGO (FASE B)',
+            '`viajes-micros.js`). **Plan de Fase A (refactor de',
+            'usuarios en framework) y Fase B (juego en 2 modos)',
+            'agregado:** ver §8.5 y §9. Ver §2 y §8).',
             '',
-            '**Estado.** Plan aprobado, no implementado. Depende de',
-            'Fase A (§8.5): usa `identidad` para login, `app =',
-            '"juego"` para ruteo, y el mismo sistema de credenciales.',
-            '',
-            '**Contexto.** Juego de trivia con dos modos:',
-            '',
-            '- **Modo 1 (directo):** ~10 terminales (capitanes de',
-            '  equipo) con su celular en LAN, más el dueño',
-            '  proyectando la pregunta. Los capitanes responden por',
-            '  su propio celular. Ideal para evento presencial.',
-            '- **Modo 2 (inyección):** el dueño transmite por',
-            '  YouTube. Un plugin de Chrome lee el chat cada 500ms,',
-            '  filtra respuestas (A/B/C/D), y las inyecta como si',
-            '  fueran de usuarios. No hay terminales reales: los',
-            '  "jugadores" son nombres del chat.',
-            '',
-            '**El código es el mismo.** Cambia solo el adaptador de',
-            'input (LAN directo vs plugin YouTube).',
-            '',
-            '**Grafo:** `AdministradorDeJuego`, separado de',
-            '`AdministradorDeViajes`. Mismos usuarios (mismo',
-            '`nombre_usuario` en los 3 grafos: identidad,',
-            'credenciales, app-juego), distinto grafo de datos. El',
-            'ruteo lo hace `app = "juego"` en `perfil_*` (ver',
-            '§8.5).',
-            '',
-            '**Estructura del grafo:**',
-            '',
-            '```',
-            'us_<dueno>/partidas (árbol hmi/hd)',
-            '  └─ partida_<id>:',
-            '       ├─ estado          "esperando"|"mostrando"|',
-            '       │                  "respondiendo"|"calculando"|',
-            '       │                  "resultado"|"cerrada"',
-            '       ├─ modo            "directo" | "plugin"',
-            '       ├─ pregunta_actual (ref al banco de preguntas)',
-            '       ├─ abre_en_ms      (tiempo restante, no timestamp)',
-            '       ├─ cierra_en_ms',
-            '       ├─ jugadores (contenedor)',
-            '       │    └─ <nombre_jugador>/puntaje, streak',
-            '       ├─ respuestas_<pregunta> (contenedor)',
-            '       │    └─ <jugador>/opcion + ts_server',
-            '       └─ ranking (árbol hmi/hd, top N)',
-            '```',
-            '',
-            '**Jugadores:**',
-            '',
-            '- Modo 1: `nombre_usuario` de un terminal real.',
-            '- Modo 2: username del chat (viewer). Nodo virtual,',
-            '  no usuario del sistema.',
-            '',
-            '**Patrón "inyección" (ya existe en el piloto).** Igual',
-            'que `ventas/confirmar` con `nombre_terminal` en el',
-            'POST (el dueño crea una venta a nombre de un terminal),',
-            'el juego usa `juego/responder` con `jugador` en el',
-            'POST (el dueño responde a nombre de un viewer). Un',
-            'solo endpoint, comportamiento según nivel del',
-            'solicitante: si es `terminal`, el jugador es forzado',
-            'al propio `nombre_sol`; si es `dueno`, se acepta el',
-            '`jugador` del POST; cualquier otro nivel devuelve 403.',
-            '',
-            '**Polling adaptativo (sin WebSockets).** El servidor',
-            'responde con **tiempo restante**, no timestamp',
-            'absoluto. El cliente hace `setTimeout(ms)` y vuelve a',
-            'preguntar. Inmune al desfase de reloj. ~4-5 polls por',
-            'jugador por pregunta. Con 10 capitanes + 1 owner × 10',
-            'preguntas = ~550 hits. Trivial en cualquier hosting',
-            'pago; en LAN local es instantáneo.',
-            '',
-            '**Cronología de respuestas:** `ts_server` (microtime al',
-            'recibir). Orden = `sort by ts_server ASC`. Regla de',
-            'empate: si dos respuestas llegan dentro de 200ms,',
-            'ambas reciben el mismo bonus. Elimina la ventaja del',
-            'WiFi bueno.',
-            '',
-            '**Modo 2 — Plugin YouTube:** content script lee el DOM',
-            'del chat cada 500ms, extrae `{usuario, texto}`, filtra',
-            'por regex (A/B/C/D), y hace `POST juego/responder` al',
-            'endpoint local. El plugin no sabe de trivias: solo',
-            '"exporta" mensajes del chat.',
-            '',
-            '**Tandas (Fase B):**',
-            '',
-            '| Tanda | Qué hace |',
-            '|---|---|',
-            '| **B.1** | Modelo de partida + endpoints (`crear`, `iniciar`, `unirse`, `siguiente`, `responder`, `estado`). |',
-            '| **B.2** | UI owner (proyector) + UI terminal (modo directo). |',
-            '| **B.3** | Ranking + empates + persistencia. |',
-            '| **B.4** | Plugin de chat YouTube (modo inyección). |',
-            '| **B.5** | Pruebas en local con 5-10 celulares reales. |',
-            '',
-            '**Estimación:** 3-4 sesiones de trabajo.',
-            '',
-            '**Fuera de alcance (por ahora):** persistencia de',
-            'rankings entre sesiones, badges, streaks, torneos,',
-            'suscripciones, plataforma propia con video. Todo eso',
-            'se evalúa después de validar la mecánica y la',
-            'audiencia. Ver §5.4 (frentes pendientes) cuando se',
-            'retome la monetización.',
-            '',
-            '---',
-            '',
-            '## 10. NOTA HISTÓRICA',
+            '**Nuevo (A.1 en curso):** plan de Fase A (refactor de',
+            'usuarios + grafo `identidad`) refinado. Objetivo de fondo:',
+            'sacar el nodo raíz `usuarios` de app y credenciales para',
+            'eliminar la carga total encubierta del admin. Estrategia B',
+            '(`app` en `$_SESSION`, identidad on-demand). Naming',
+            '`us_<nombre>` en los 3 grafos. Migración como comando',
+            '`app:migrar_a_identidad`. Ver §8.5.',
         ],
     ],
+
 ];
 
 // ============================================================
@@ -557,6 +399,7 @@ foreach ($reemplazos_por_archivo as $l) $total_reemplazos += count($l);
 echo "[INFO] " . count($reemplazos_por_archivo) . " archivo(s) a reemplazar, "
     . count($creaciones) . " a crear, " . count($eliminaciones) . " a eliminar.\n\n";
 
+// --- Fase 1: aplicar reemplazos ---
 $archivos_a_escribir = [];
 $bloques_ok = 0;
 $bloques_fallidos = [];
@@ -590,6 +433,7 @@ if ($modo_estricto && !empty($bloques_fallidos)) {
     exit(1);
 }
 
+// --- Fase 2: bumps automáticos ---
 $archivos_bump_php_js = [];
 $archivos_bump_js_css = [];
 foreach ($archivos_a_escribir as $ruta_abs => $info) {
@@ -610,6 +454,7 @@ $bumps_detalle = [];
 $info_bumps = [];
 
 if ($bumpear) {
+    // 2a. @version de .php y .js
     foreach (array_unique($archivos_bump_php_js) as $archivo_rel) {
         $ruta_abs = $raiz_proyecto . '/' . $archivo_rel;
         if (!file_exists($ruta_abs)) continue;
@@ -633,6 +478,7 @@ if ($bumpear) {
         $bumps_detalle[] = "$archivo_rel  @version $viejo → $version_nueva";
     }
 
+    // 2b. ?v= en los HTMLs
     foreach ($htmls_a_bumpear as $html_rel) {
         $html_abs = $raiz_proyecto . '/' . $html_rel;
         if (!file_exists($html_abs)) { $info_bumps[] = "$html_rel (no encontrado)"; continue; }
@@ -664,6 +510,7 @@ if ($bumpear) {
     }
 }
 
+// --- Fase 3: escribir ---
 $archivos_escritos = 0;
 foreach ($archivos_a_escribir as $ruta_abs => $info) {
     list($contenido_unix, $eol) = $info;
@@ -696,6 +543,7 @@ foreach ($eliminaciones as $elim) {
     else echo "[FALLO] No se pudo eliminar: " . $elim['archivo'] . "\n";
 }
 
+// --- Reporte de bumps ---
 if ($bumpear && (!empty($bumps_detalle) || !empty($info_bumps))) {
     echo "\n--- Bumps ---\n";
     foreach ($bumps_detalle as $d) echo "[BUMP] $d\n";
